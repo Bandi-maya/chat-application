@@ -17,7 +17,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -50,7 +49,6 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 
 /** Exact port of lib/features/camera/lens/lens_carousel.dart.
  *
@@ -96,7 +94,6 @@ fun LensCarousel(
     }
 
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     var currentIndex by remember { mutableIntStateOf(0) }
     var hapticRearmAtMs by remember { mutableLongStateOf(0L) }
     // Bridge the manager's listener model into Compose state.
@@ -105,6 +102,29 @@ fun LensCarousel(
         val listener = { managerSelectedId = manager.selected.id }
         manager.addListener(listener)
         onDispose { manager.removeListener(listener) }
+    }
+
+    // While a tap/external selection is being centered programmatically, the
+    // scroll-offset watcher must not treat the in-flight offset as a user
+    // scroll and revert the fresh selection (build 100 calls-camera failure:
+    // tap selected the lens, then the watcher re-selected the old centered
+    // item on the first animation frame). The guard clears on completion, on
+    // finger interruption (a user drag cancels the programmatic scroll), on a
+    // newer selection relaunching the effect, and on unmount.
+    // Generation token, not the target index, owns clearing: if the same index
+    // is re-selected while an older centering to that index is still in flight,
+    // the cancelled older animation's finally must not clear the newer run's
+    // guard (ABA). Main-thread confined, so a plain counter is safe.
+    var programmaticTarget by remember { mutableStateOf<Int?>(null) }
+    var centeringGeneration by remember { mutableIntStateOf(0) }
+    suspend fun centerOn(index: Int) {
+        val generation = ++centeringGeneration
+        programmaticTarget = index
+        try {
+            listState.animateScrollToItem(index)
+        } finally {
+            if (centeringGeneration == generation) programmaticTarget = null
+        }
     }
 
     // Start centered on the manager's current selection.
@@ -116,12 +136,13 @@ fun LensCarousel(
         }
     }
 
-    // Keep visuals in sync when selection changes elsewhere.
+    // Keep visuals in sync when selection changes elsewhere; centering goes
+    // through the guard so the offset watcher can never override it.
     LaunchedEffect(managerSelectedId) {
         val index = catalog.indexOfFirst { it.id == manager.selected.id }
         if (index < 0) return@LaunchedEffect
         currentIndex = index
-        listState.animateScrollToItem(index)
+        centerOn(index)
     }
 
     // Selection follows the true scroll position: nearest slot to the offset.
@@ -129,6 +150,9 @@ fun LensCarousel(
         snapshotFlow {
             listState.firstVisibleItemIndex * slotPx + listState.firstVisibleItemScrollOffset
         }.collectLatest { offsetPx ->
+            // Programmatic centering owns selection; user drags always cancel it
+            // first, so a skipped frame here is never a skipped user scroll.
+            if (programmaticTarget != null) return@collectLatest
             val nearest = (offsetPx / slotPx).roundToInt().coerceIn(0, catalog.size - 1)
             if (nearest == currentIndex || catalog.isEmpty()) return@collectLatest
             currentIndex = nearest
@@ -179,13 +203,17 @@ fun LensCarousel(
                         listState.firstVisibleItemScrollOffset,
                     runtimeState = manager.runtimeState,
                     onTap = {
-                        // Dart _centerOn: select, then animate into the center
-                        // (240ms easeOutCubic ~ Compose item animation).
+                        // Dart _centerOn: select, then animate into the center.
+                        // Selection only here - the manager-listener effect centers
+                        // through the programmatic guard, so a stale scroll animation
+                        // can never override this fresh selection.
                         if (index < catalog.size) {
                             val l = catalog[index]
+                            if (manager.selected.id != l.id) {
+                                ChatyHapticsPort.selection(view)
+                            }
                             manager.select(l.id)
                             onSelectionChanged?.invoke(l)
-                            scope.launch { listState.animateScrollToItem(index) }
                         }
                     },
                 )
