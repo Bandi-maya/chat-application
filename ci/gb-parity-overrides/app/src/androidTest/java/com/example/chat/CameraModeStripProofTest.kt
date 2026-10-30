@@ -96,6 +96,11 @@ class CameraModeStripProofTest {
      assertFalse("Idle mode strip stays hidden while paused",d.hasObject(By.desc("Camera modes")))
      d.findObject(By.desc("Resume recording")).click()
      assertTrue("Pause control returns after resuming",d.wait(Until.hasObject(By.desc("Pause recording")),5000))
+     if (d.hasObject(By.desc("Take snapshot while recording"))) {
+      // Device bound the 3-use-case combination: the snapshot tap must keep recording alive.
+      d.findObject(By.desc("Take snapshot while recording")).click()
+      assertTrue("Recording continues after a recording snapshot",d.hasObject(By.desc("Stop recording")))
+     }
      Thread.sleep(1200)
      d.findObject(By.desc("Stop recording")).click()
      val review=d.wait(Until.hasObject(By.text("Record again")),20000)
@@ -116,5 +121,35 @@ class CameraModeStripProofTest {
     }
    }
   } finally {d.unfreezeRotation();if(!had)File(c.getExternalFilesDir(null),"camera-permission-cleanup").writeText("revoke")}
+ }
+
+ /** When the device cannot bind Preview+VideoCapture+ImageCapture, the session
+  *  must fall back to video-only and the UI must NOT draw a dead snapshot button. */
+ @Test fun recordingSnapshotHidesWhenCombinationUnavailable(){
+  val ins=InstrumentationRegistry.getInstrumentation();val c=ins.targetContext;val d=UiDevice.getInstance(ins)
+  d.executeShellCommand("pm grant ${c.packageName} android.permission.CAMERA")
+  com.example.chat.ui.camera.CameraVideoNativeProof.forceSnapshotUnavailable = true
+  try {
+   ActivityScenario.launch<CameraOpeningProofActivity>(Intent(c,CameraOpeningProofActivity::class.java)).use {
+    assertTrue(d.wait(Until.hasObject(By.desc("Take photo")),20000))
+    repeat(6){val r=d.findObject(By.desc("Camera modes")).visibleBounds;d.swipe(r.left+12,r.centerY(),r.right-12,r.centerY(),12)}
+    var video:UiObject2?=null
+    repeat(8){
+     video=d.findObject(By.desc("Video camera mode"))
+     if(video!=null&&video!!.visibleBounds.width()>0)break
+     val r=d.findObject(By.desc("Camera modes")).visibleBounds;d.swipe(r.right-12,r.centerY(),r.left+12,r.centerY(),12)
+    }
+    assertTrue("Video mode reachable",video!=null)
+    video!!.click()
+    assertTrue(d.wait(Until.hasObject(By.desc("Record video")),20000))
+    d.findObject(By.desc("Record video")).click()
+    assertTrue(d.wait(Until.hasObject(By.desc("Stop recording")),20000))
+    Thread.sleep(1000)
+    assertFalse("No dead snapshot button when the 3-use-case bind is unavailable",d.hasObject(By.desc("Take snapshot while recording")))
+    assertTrue("Video recording itself still works without the snapshot combination",d.hasObject(By.desc("Stop recording")))
+    d.findObject(By.desc("Stop recording")).click()
+    assertTrue("Video-only fallback still lands in review",d.wait(Until.hasObject(By.text("Record again")),20000))
+   }
+  } finally { com.example.chat.ui.camera.CameraVideoNativeProof.forceSnapshotUnavailable = false }
  }
 }
