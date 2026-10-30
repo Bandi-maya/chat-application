@@ -112,7 +112,7 @@ fun CameraCaptureViewfinder(
             },
             modifier = Modifier.align(Alignment.Center)
                 .then(if (previewAspect != null) Modifier.fillMaxWidth().aspectRatio(previewAspect) else Modifier.fillMaxSize())
-                .then(effectMatrixModifier(effect, effectIntensity)),
+                .then(effectRenderModifier(effect, effectIntensity)),
         )
         when (phase) {
             CameraPhase.initializing -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
