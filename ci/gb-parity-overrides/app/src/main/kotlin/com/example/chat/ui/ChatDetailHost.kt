@@ -563,6 +563,7 @@ fun ChatDetailHost(
                 entryPreset = cameraEntryPreset,
                 videoHoldRequest = videoHoldRequest,
                 contactName = live.title,
+                callsAllowed = callsAllowed,
                 onResult = { r ->
                     val flow = mountedCameraFlow
                     if (cameraEntryFlow !== flow) {
