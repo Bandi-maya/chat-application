@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.util.Log
 import android.os.IBinder
 
 /**
@@ -59,13 +60,20 @@ class CallForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        Log.i(TAG, "FGS-DIAG onDestroy")
         releaseLocks()
         super.onDestroy()
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        Log.i(TAG, "FGS-DIAG onCreate")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(TAG, "FGS-DIAG onStartCommand entered startId=$startId")
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Chaty call"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) == true
@@ -93,6 +101,7 @@ class CallForegroundService : Service() {
         } else {
             startForeground(SERVICE_ID, notification)
         }
+        Log.i(TAG, "FGS-DIAG startForeground posted startId=$startId")
         acquireLocks()
         // Dart allowAutoRestart=false: never recreated by the system without a live call.
         return START_NOT_STICKY
@@ -157,6 +166,7 @@ class CallForegroundService : Service() {
     companion object {
         const val CHANNEL_ID = "chaty_active_call"
         const val SERVICE_ID = 7401
+        private const val TAG = "CallForegroundService"
         const val EXTRA_TITLE = "chaty.call.title"
         const val EXTRA_TEXT = "chaty.call.text"
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
@@ -194,9 +204,11 @@ class CallForegroundService : Service() {
 
         private fun applySync(context: Context, session: ChatyCallSession?) {
             if (!CallForegroundPolicy.shouldRunFor(session)) {
+                Log.i(TAG, "FGS-DIAG applySync -> stop (session=${session?.state})")
                 stop(context)
                 return
             }
+            Log.i(TAG, "FGS-DIAG applySync -> startForegroundService (session=${session.state})")
             val active = session!!
             val intent = Intent(context, CallForegroundService::class.java).apply {
                 putExtra(EXTRA_TITLE, CallForegroundPolicy.notificationTitle(active))
@@ -227,6 +239,7 @@ class CallForegroundService : Service() {
                     pendingSync = null
                 }
             }
+            Log.i(TAG, "FGS-DIAG stopService issued")
             try {
                 context.stopService(Intent(context, CallForegroundService::class.java))
             } catch (_: Exception) {
