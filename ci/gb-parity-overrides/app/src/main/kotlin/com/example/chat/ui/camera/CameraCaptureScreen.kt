@@ -742,13 +742,24 @@ fun ChatyCameraCaptureScreen(
         var intensity = if (captureViewMode in listOf(CaptureViewMode.document,CaptureViewMode.night,CaptureViewMode.portrait)) 1.0 else engine.intensity
         scope.launch {
             // Stories carry no metadata channel, so the look must live in the pixels.
-            if (mode == ChatyCaptureMode.story &&
-                captureViewMode != CaptureViewMode.document &&
+            // Shader effects (pixelate, segmented backgrounds) have no receiver-side
+            // renderer, so they bake into the pixels in EVERY photo mode and the
+            // metadata tag is cleared - never a double-apply, never a claimed but
+            // unrendered filter (fail-open bakes report applied=false).
+            val hasRenderPath = engineEffect.colorMatrix != null || engineEffect.shaderKey != null
+            val bakeIntoPixels = mode == ChatyCaptureMode.story || engineEffect.shaderKey != null
+            if (captureViewMode != CaptureViewMode.document &&
                 effectId != "none" &&
-                engineEffect.colorMatrix != null
+                hasRenderPath &&
+                bakeIntoPixels
             ) {
                 try {
-                    path = ImageFxBaker.bakeEffectIntoFile(context, path, engineEffect, intensity, onCreated={ ownedFiles.own(it) })
+                    val baked = ImageFxBaker.bakeEffectIntoFile(context, path, engineEffect, intensity, onCreated={ ownedFiles.own(it) })
+                    path = baked.path
+                    if (!baked.applied || engineEffect.shaderKey != null) {
+                        effectId = "none"
+                        intensity = 1.0
+                    }
                 } catch(cancelled:CancellationException) { throw cancelled
                 } catch (_: Exception) {
                     scannerError = "Could not apply this effect at full resolution. Original kept; nothing sent."
