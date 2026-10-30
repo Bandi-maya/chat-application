@@ -314,8 +314,9 @@ fun EffectPickerSheet(
                     val isFavorite = favorites.contains(effect.id)
                     // INTEGRATOR (honest availability): effects with no working renderer
                     // (segmentation bg_* no-ops) — disabled, dimmed, never selectable.
-                    val unavailable = effect.isSegmentationRequired ||
-                    (effect.colorMatrix == null && effect.shaderKey == null && !effect.isFaceTrackingRequired && effect.id != "none")
+                    val unavailable = effect.colorMatrix == null && effect.shaderKey == null &&
+                    !effect.isFaceTrackingRequired && effect.id != "none"
+                    val captureOnly = effect.isSegmentationRequired && !unavailable
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
@@ -339,7 +340,7 @@ fun EffectPickerSheet(
                             .semantics(mergeDescendants = true) {
                                 contentDescription = "${effect.name} filter"
                                 this.selected = isSelected
-                                if (unavailable) stateDescription = "Not available yet"
+                                if (unavailable) stateDescription = "Not available yet" else if (captureOnly) stateDescription = "Applies to the captured photo"
                             },
                     ) {
                         Box(contentAlignment = Alignment.Center) {
