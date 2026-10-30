@@ -388,6 +388,7 @@ fun ChatyCameraCaptureScreen(
     var videoState by remember { mutableStateOf<VideoSessionState?>(null) }
     var videoSeconds by remember { mutableStateOf(0) }
     var videoSnapshotAvailable by remember { mutableStateOf(false) }
+    var videoLensEffectActive by remember { mutableStateOf(true) }
     var videoExitPrompt by remember { mutableStateOf(false) }
     var videoRetakePrompt by remember { mutableStateOf(false) }
     var videoStopPlayback by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -585,6 +586,7 @@ fun ChatyCameraCaptureScreen(
                     zoomRatio = zoom.zoomRatio; minZoom = zoom.minZoomRatio; maxZoom = zoom.maxZoomRatio
                 }
                 videoSnapshotAvailable = next.snapshotAvailable
+                videoLensEffectActive = next.lensEffectActive
             }
             if (next is VideoSessionState.Error) { errorMessage = next.message; phase = CameraPhase.noCamera }
         }
@@ -1084,6 +1086,7 @@ fun ChatyCameraCaptureScreen(
                 videoSeconds = videoSeconds,
                 videoPaused = videoState is VideoSessionState.Paused,
                 videoSnapshotAvailable = videoSnapshotAvailable,
+                videoLensRecorded = videoLensEffectActive,
                 onSnapshot = { videoSession?.takeSnapshot { ok -> if (!ok) scannerError = "Snapshot is unavailable while recording on this camera." } },
                 nightSupported = nightSupported,
                 portraitSupported = portraitSupported,
