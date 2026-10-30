@@ -12,6 +12,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.net.URLEncoder
+import java.security.SecureRandom
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -35,6 +38,28 @@ class SupabaseAuthClient(
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
+
+        // One-time nonces bound to an out-of-band email link so that the
+        // chaty://login-callback / chaty://reset-password deep link cannot be
+        // replayed or triggered by a third party (open-redirect / callback abuse).
+        private val pendingAuthStates = ConcurrentHashMap<String, Long>()
+        private const val PENDING_TTL_MS = 10L * 60 * 1000
+
+        fun registerPendingState(): String {
+            val bytes = ByteArray(16)
+            SecureRandom().nextBytes(bytes)
+            val nonce = bytes.joinToString("") { "%02x".format(it) }
+            pendingAuthStates[nonce] = System.currentTimeMillis() + PENDING_TTL_MS
+            return nonce
+        }
+
+        fun consumePendingState(state: String): Boolean {
+            val expiry = pendingAuthStates.remove(state) ?: return false
+            return System.currentTimeMillis() <= expiry
+        }
+
+        /** Set by MainActivity once a chaty:// deep link presents a valid state nonce. */
+        var pendingDeepLinkData: android.net.Uri? = null
     }
 
 
@@ -101,7 +126,9 @@ class SupabaseAuthClient(
             put("data", data)
         }
         // gotrue uses the redirectTo query param on signup.
-        val raw = post("/signup?redirect_to=chaty%3A%2F%2Flogin-callback%2F", body)
+        val nonce = registerPendingState()
+        val encodedState = URLEncoder.encode(nonce, "UTF-8")
+        val raw = post("/signup?redirect_to=chaty%3A%2F%2Flogin-callback%2F?state=$encodedState", body)
         return json.decodeFromString(AuthResponse.serializer(), raw)
     }
 
@@ -117,8 +144,10 @@ class SupabaseAuthClient(
 
     /** Mirrors resetPasswordForEmail(redirectTo: chaty://reset-password/). */
     suspend fun resetPasswordForEmail(email: String) {
+        val nonce = registerPendingState()
+        val encodedState = URLEncoder.encode(nonce, "UTF-8")
         val body = buildJsonObject { put("email", email) }
-        post("/recover?redirect_to=chaty%3A%2F%2Freset-password%2F", body)
+        post("/recover?redirect_to=chaty%3A%2F%2Freset-password%2F?state=$encodedState", body)
     }
 
     /** Refresh an existing session (supabase_flutter's automatic refresh). */

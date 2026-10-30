@@ -216,11 +216,11 @@ fun SettingsScreen(
                 .padding(horizontal = 18.dp, vertical = 12.dp),
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { onBack?.invoke() }) { Icon(Icons.Rounded.ChevronLeft, null, Modifier.size(22.dp), tint = primaryText) }
+                IconButton(onClick = { onBack?.invoke() }) { Icon(Icons.Rounded.ChevronLeft, "Back", Modifier.size(22.dp), tint = primaryText) }
                 Row {
-                    IconButton(onClick = { onOpenSearch(buildSettingsSearchIndex()) }) { Icon(Icons.Rounded.Search, null, Modifier.size(22.dp), tint = primaryText) }
-                    IconButton(onClick = { sheet = SettingsSheet.Export }) { Icon(Icons.Rounded.QrCodeScanner, null, Modifier.size(22.dp), tint = primaryText) }
-                    IconButton(onClick = { sheet = SettingsSheet.EditProfile }) { Icon(Icons.Outlined.Edit, null, Modifier.size(22.dp), tint = primaryText) }
+                    IconButton(onClick = { onOpenSearch(buildSettingsSearchIndex()) }) { Icon(Icons.Rounded.Search, "Search settings", Modifier.size(22.dp), tint = primaryText) }
+                    IconButton(onClick = { sheet = SettingsSheet.Export }) { Icon(Icons.Rounded.QrCodeScanner, "Export chat", Modifier.size(22.dp), tint = primaryText) }
+                    IconButton(onClick = { sheet = SettingsSheet.EditProfile }) { Icon(Icons.Outlined.Edit, "Edit profile", Modifier.size(22.dp), tint = primaryText) }
                 }
             }
             Spacer(Modifier.height(10.dp))

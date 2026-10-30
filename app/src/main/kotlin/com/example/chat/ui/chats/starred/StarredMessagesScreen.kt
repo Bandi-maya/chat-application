@@ -151,7 +151,7 @@ fun StarredMessagesScreen(
                 navigationIcon = {
                     // Dart AppBar automaticallyImplyLeading on a pushed route.
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = null)
+                        Icon(Icons.Rounded.ChevronLeft, "Back")
                     }
                 },
                 actions = {

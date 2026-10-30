@@ -117,7 +117,7 @@ fun GbModalSheet(
                 }
                 trailing?.invoke()
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, null, tint = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.Close, "Dismiss", tint = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
                 }
             }
             HorizontalDivider(color = colors.divider, thickness = 1.dp)

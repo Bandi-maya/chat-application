@@ -143,7 +143,7 @@ private fun StripBox(accent: Color, content: @Composable RowScope.() -> Unit) {
 @Composable
 private fun SmallClose(onClick: (() -> Unit)?) {
     IconButton(onClick = { onClick?.invoke() }, modifier = Modifier.size(28.dp)) {
-        Icon(Icons.Rounded.Close, null, Modifier.size(18.dp), tint = LocalAppColors.current.foreground)
+        Icon(Icons.Rounded.Close, "Close", Modifier.size(18.dp), tint = LocalAppColors.current.foreground)
     }
 }
 
@@ -189,7 +189,7 @@ private fun InputRow(variantId: String, data: ChatyComposerData, reducedMotion: 
 private fun RecordingRow(data: ChatyComposerData) {
     val c = LocalAppColors.current
     Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = { data.onMicCancel?.invoke() }) { Icon(Icons.Rounded.DeleteOutline, null, tint = c.error) }
+        IconButton(onClick = { data.onMicCancel?.invoke() }) { Icon(Icons.Rounded.DeleteOutline, "Cancel recording", tint = c.error) }
         Spacer(Modifier.width(8.dp))
         Text(data.recordingDurationLabel ?: "0:00", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.W700)
         Spacer(Modifier.width(12.dp))
@@ -212,8 +212,8 @@ private fun RecordingRow(data: ChatyComposerData) {
 }
 
 @Composable
-private fun IconBtn(icon: ImageVector, size: Dp, tint: Color, onClick: () -> Unit) {
-    IconButton(onClick = onClick) { Icon(icon, null, Modifier.size(size), tint = tint) }
+private fun IconBtn(icon: ImageVector, size: Dp, tint: Color, onClick: () -> Unit, contentDescription: String) {
+    IconButton(onClick = onClick) { Icon(icon, contentDescription, Modifier.size(size), tint = tint) }
 }
 
 /** TextField equivalent: borderless, dense, vertical content padding 8, min 1 / max [maxLines] lines, 15sp. */
@@ -243,10 +243,10 @@ private fun CapsuleRow(data: ChatyComposerData, reducedMotion: Boolean) {
             Modifier.weight(1f).background(c.inputFill, RoundedCornerShape(24.dp)).border(0.8.dp, c.border, RoundedCornerShape(24.dp)),
             verticalAlignment = Alignment.Bottom,
         ) {
-            IconBtn(Icons.Outlined.EmojiEmotions, 22.dp, c.foregroundSecondary, data.onEmojiToggle)
+            IconBtn(Icons.Outlined.EmojiEmotions, 22.dp, c.foregroundSecondary, data.onEmojiToggle, "Emoji picker")
             ComposerField(data, if (data.isOffline) "Message (Offline - will queue)" else "Message...", 5, Modifier.weight(1f))
-            IconBtn(Icons.Rounded.AttachFile, 22.dp, c.foregroundSecondary, data.onAttach)
-            if (!showSend) IconBtn(Icons.Outlined.CameraAlt, 22.dp, c.foregroundSecondary, data.onCamera)
+            IconBtn(Icons.Rounded.AttachFile, 22.dp, c.foregroundSecondary, data.onAttach, "Attach file")
+            if (!showSend) IconBtn(Icons.Outlined.CameraAlt, 22.dp, c.foregroundSecondary, data.onCamera, "Camera")
         }
         Spacer(Modifier.width(6.dp))
         ActionBubble(showSend, data.onSend, data.onMicPress, reducedMotion)
@@ -257,10 +257,10 @@ private fun CapsuleRow(data: ChatyComposerData, reducedMotion: Boolean) {
 private fun TelegramDenseRow(data: ChatyComposerData, reducedMotion: Boolean) {
     val c = LocalAppColors.current
     Row(verticalAlignment = Alignment.Bottom) {
-        IconBtn(Icons.Rounded.AttachFile, 22.dp, c.foregroundSecondary, data.onAttach)
+        IconBtn(Icons.Rounded.AttachFile, 22.dp, c.foregroundSecondary, data.onAttach, "Attach file")
         Row(Modifier.weight(1f).background(c.inputFill, RoundedCornerShape(18.dp)), verticalAlignment = Alignment.Bottom) {
             ComposerField(data, "Message", 5, Modifier.weight(1f).padding(horizontal = 12.dp))
-            IconBtn(Icons.Outlined.EmojiEmotions, 20.dp, c.foregroundSecondary, data.onEmojiToggle)
+            IconBtn(Icons.Outlined.EmojiEmotions, 20.dp, c.foregroundSecondary, data.onEmojiToggle, "Emoji picker")
         }
         Spacer(Modifier.width(4.dp))
         ActionBubble(data.hasText, data.onSend, data.onMicPress, reducedMotion)
@@ -271,7 +271,7 @@ private fun TelegramDenseRow(data: ChatyComposerData, reducedMotion: Boolean) {
 private fun SignalQuietRow(data: ChatyComposerData, reducedMotion: Boolean) {
     val c = LocalAppColors.current
     Row(verticalAlignment = Alignment.Bottom) {
-        IconBtn(Icons.Outlined.AddCircleOutline, 24.dp, c.foregroundSecondary, data.onAttach)
+        IconBtn(Icons.Outlined.AddCircleOutline, 24.dp, c.foregroundSecondary, data.onAttach, "Attach")
         ComposerField(data, "Signal message...", 4,
             Modifier.weight(1f).background(c.surfaceSecondary, RoundedCornerShape(22.dp)).padding(horizontal = 14.dp))
         Spacer(Modifier.width(6.dp))
@@ -284,14 +284,14 @@ private fun IMessageRow(data: ChatyComposerData) {
     val c = LocalAppColors.current
     val showSend = data.hasText
     Row(verticalAlignment = Alignment.Bottom) {
-        IconBtn(Icons.Rounded.Add, 26.dp, c.primary, data.onAttach)
+        IconBtn(Icons.Rounded.Add, 26.dp, c.primary, data.onAttach, "Attach")
         Row(
             Modifier.weight(1f).background(c.inputFill, RoundedCornerShape(20.dp)).border(0.8.dp, c.border, RoundedCornerShape(20.dp)).padding(horizontal = 12.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             ComposerField(data, "iMessage", 5, Modifier.weight(1f))
-            if (!showSend) IconBtn(Icons.Outlined.MicNone, 22.dp, c.primary, data.onMicPress)
-            if (showSend) IconBtn(Icons.Rounded.ArrowUpward, 22.dp, c.primary, data.onSend)
+            if (!showSend) IconBtn(Icons.Outlined.MicNone, 22.dp, c.primary, data.onMicPress, "Microphone")
+            if (showSend) IconBtn(Icons.Rounded.ArrowUpward, 22.dp, c.primary, data.onSend, "Send")
         }
     }
 }
@@ -301,13 +301,13 @@ private fun InstagramRow(data: ChatyComposerData) {
     val c = LocalAppColors.current
     val showSend = data.hasText
     Row(verticalAlignment = Alignment.Bottom) {
-        IconBtn(Icons.Rounded.CameraAlt, 22.dp, c.primary, data.onCamera)
+        IconBtn(Icons.Rounded.CameraAlt, 22.dp, c.primary, data.onCamera, "Camera")
         ComposerField(data, "Message...", 4,
             Modifier.weight(1f).background(c.surfaceSecondary, RoundedCornerShape(22.dp)).padding(horizontal = 12.dp))
         Spacer(Modifier.width(4.dp))
         if (!showSend) {
-            IconBtn(Icons.Outlined.MicNone, 22.dp, c.foreground, data.onMicPress)
-            IconBtn(Icons.Outlined.Image, 22.dp, c.foreground, data.onAttach)
+            IconBtn(Icons.Outlined.MicNone, 22.dp, c.foreground, data.onMicPress, "Microphone")
+            IconBtn(Icons.Outlined.Image, 22.dp, c.foreground, data.onAttach, "Gallery")
         } else {
             TextButton(onClick = data.onSend) { Text("Send", color = c.primary, fontWeight = FontWeight.W700) }
         }

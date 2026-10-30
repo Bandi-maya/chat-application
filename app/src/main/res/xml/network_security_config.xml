@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Cleartext traffic is disabled by default. All API/backend calls must use TLS. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">secure.chaty.app</domain>
+        <domain includeSubdomains="true">api.chaty.app</domain>
+    </domain-config>
+</network-security-config>

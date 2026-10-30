@@ -275,7 +275,7 @@ fun RegisterOrganizationScreen(
                         IconButton(onClick = { obscurePassword = !obscurePassword }) {
                             Icon(
                                 if (obscurePassword) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                                contentDescription = null,
+                                if (obscurePassword) "Show password" else "Hide password",
                                 tint = Color(argbWithAlpha(theme.secondaryTextColor, 0.6)),
                                 modifier = Modifier.size(20.dp),
                             )

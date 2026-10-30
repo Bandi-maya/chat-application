@@ -315,7 +315,7 @@ fun MessageManagementPage(
                     badgeColor = if (rule.enabled) colors.success else colors.foregroundTertiary,
                     trailing = {
                         IconButton(onClick = { deleteRule(rule) }) {
-                            Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = colors.error)
+                            Icon(Icons.Outlined.DeleteOutline, "Delete rule", tint = colors.error)
                         }
                     },
                 )
@@ -372,7 +372,7 @@ fun MessageManagementPage(
                                 trailing = if (entry.state == "pending") {
                                     {
                                         IconButton(onClick = { cancelScheduled(entry) }) {
-                                            Icon(Icons.Rounded.Close, contentDescription = null)
+                                            Icon(Icons.Rounded.Close, "Cancel scheduled")
                                         }
                                     }
                                 } else {
