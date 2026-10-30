@@ -15,8 +15,8 @@ import org.junit.Test
  *  lib/features/camera/effects/effect_engine.dart and effect_registry.dart. */
 class EffectEngineParityTest {
 
-    @Test fun `registry holds all 60 effects with none first`() {
-        assertEquals(60, EffectRegistry.allEffects.size)
+    @Test fun `registry holds all 100 effects with none first`() {
+        assertEquals(100, EffectRegistry.allEffects.size)
         assertEquals("none", EffectRegistry.allEffects.first().id)
     }
 
@@ -147,5 +147,20 @@ class EffectEngineParityTest {
     @Test fun `gpu tier effects marked`() {
         val gpu = EffectRegistry.allEffects.filter { it.tier == EffectPerformanceTier.gpuIntensive }
         assertEquals(3, gpu.size)
+    }
+
+    @Test fun `active catalog excludes none and renderer-less entries`() {
+        val all = EffectRegistry.allEffects
+        // Honest count: 100 entries = 1 none + 95 render-backed + 4 unavailable
+        // (3 bg_* segmentation no-ops + renderer-less face_pixel_retro; ids preserved,
+        // presented disabled in pickers, never counted as working filters).
+        val unavailable = all.filter {
+            it.colorMatrix == null && it.shaderKey == null && !it.isFaceTrackingRequired && it.id != "none"
+        }
+        assertEquals(
+            listOf("bg_gradient_studio", "bg_portrait_blur", "bg_virtual_office", "face_pixel_retro"),
+            unavailable.map { it.id }.sorted(),
+        )
+        assertEquals(95, all.count { it.id != "none" } - unavailable.size)
     }
 }
