@@ -506,7 +506,12 @@ fun CameraCaptureBottomControls(
                 }
                 CameraCaptureShutter(enabled = ready, capturing = capturing, onClick = onShutter)
                 Box(Modifier.weight(1f)) {
-                    LensCarousel(manager = lensManager, deviceTier = deviceTier)
+                    // Face lenses are a photo/lenses-mode feature (S1 gate): in
+                    // night, portrait, video and document modes the row keeps its
+                    // gallery / shutter / flip geometry with the slot left empty.
+                    if (captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses) {
+                        LensCarousel(manager = lensManager, deviceTier = deviceTier)
+                    }
                 }
                 Box(
                     modifier = Modifier
