@@ -11,11 +11,28 @@ import kotlinx.coroutines.launch
  *  ringing session if the offer already arrived, otherwise tells the caller directly. */
 class CallActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == ChatyNotifications.ACTION_END_CALL) {
+            // "Hang up" on the ongoing-call notification: ends the live call without
+            // opening the app. The session-end cascade stops the foreground service.
+            val pending = goAsync()
+            ServiceLocator.appScope.launch {
+                try {
+                    val probe = endCallProbe
+                    if (probe != null) probe() else ServiceLocator.callSignaling.endCall()
+                } catch (e: Exception) {
+                    android.util.Log.w("CallActionReceiver", "end call failed: $e")
+                } finally {
+                    pending.finish()
+                }
+            }
+            return
+        }
         if (intent.action != ChatyNotifications.ACTION_DECLINE_CALL) return
         val callId = intent.getStringExtra(ChatyNotifications.EXTRA_CALL_ID).orEmpty()
         val callerId = intent.getStringExtra(ChatyNotifications.EXTRA_CALLER_ID).orEmpty()
         ChatyNotifications.cancelIncomingCall(context, callId)
         ChatyNotifications.forgetCall(callId)
+        declineProbe?.let { it(); return }
         if (callId.isEmpty()) return
         val pending = goAsync()
         ServiceLocator.appScope.launch {
@@ -37,4 +54,13 @@ class CallActionReceiver : BroadcastReceiver() {
             }
         }
     }
+
+    companion object {
+        /** Instrumentation seam (CallPermissionGate.requester pattern): a proof test
+         *  installs a probe to verify notification-button routing end to end.
+         *  Production behavior is unchanged when no probe is installed. */
+        @Volatile internal var endCallProbe: (() -> Unit)? = null
+        @Volatile internal var declineProbe: (() -> Unit)? = null
+    }
 }
+
