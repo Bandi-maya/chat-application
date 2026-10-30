@@ -313,7 +313,7 @@ fun EffectPickerSheet(
                     val isSelected = engine.activeEffect.id == effect.id
                     val isFavorite = favorites.contains(effect.id)
                     // INTEGRATOR (honest availability): effects with no working renderer
-                    // (segmentation bg_* + renderer-less face_pixel_retro) — disabled, dimmed, never selectable.
+                    // (segmentation bg_* no-ops) — disabled, dimmed, never selectable.
                     val unavailable = effect.isSegmentationRequired ||
                     (effect.colorMatrix == null && effect.shaderKey == null && !effect.isFaceTrackingRequired && effect.id != "none")
                     Column(
