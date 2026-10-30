@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.Rect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -59,10 +60,24 @@ object ImageFxBaker {
 
         val rendered = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(rendered)
-        val paint = Paint().apply {
-            colorFilter = ColorMatrixColorFilter(ColorMatrix(matrix))
+        if (effect.shaderKey == "pixelate") {
+            // Original pixelate bake: downscale to the block grid, upscale with
+            // nearest-neighbor (filterBitmap = false). Works on every API level.
+            val blocks = pixelateBlocks(intensity).toInt().coerceIn(2, 512)
+            val longSide = maxOf(image.width, image.height)
+            val scale = blocks.toFloat() / longSide.toFloat()
+            val smallW = maxOf(1, (image.width * scale).toInt())
+            val smallH = maxOf(1, (image.height * scale).toInt())
+            val small = Bitmap.createScaledBitmap(image, smallW, smallH, false)
+            val pixelPaint = Paint().apply { isFilterBitmap = false }
+            canvas.drawBitmap(small, null, Rect(0, 0, image.width, image.height), pixelPaint)
+            small.recycle()
+        } else {
+            val paint = Paint().apply {
+                colorFilter = ColorMatrixColorFilter(ColorMatrix(matrix))
+            }
+            canvas.drawBitmap(image, 0f, 0f, paint)
         }
-        canvas.drawBitmap(image, 0f, 0f, paint)
         image.recycle()
 
         val temp = context.cacheDir
