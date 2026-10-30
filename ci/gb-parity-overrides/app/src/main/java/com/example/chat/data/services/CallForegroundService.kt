@@ -208,7 +208,7 @@ class CallForegroundService : Service() {
                 stop(context)
                 return
             }
-            Log.i(TAG, "FGS-DIAG applySync -> startForegroundService (session=${session.state})")
+            Log.i(TAG, "FGS-DIAG applySync -> startForegroundService (session=${session?.state})")
             val active = session!!
             val intent = Intent(context, CallForegroundService::class.java).apply {
                 putExtra(EXTRA_TITLE, CallForegroundPolicy.notificationTitle(active))
