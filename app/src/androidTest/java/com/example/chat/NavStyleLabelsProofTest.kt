@@ -77,17 +77,7 @@ class NavStyleLabelsProofTest {
             // label as the icon's contentDescription (NavDestinationIcon semanticLabel), so the
             // label contract there is a11y exposure. All other styles must render visible text.
             val iconOnly = m == AppNavigationMode.instagramStyle
-            // Wait + fresh accessibility cache per query: instant hasObject on a
-            // stale tree reports visible labels as missing (API 33+ cache).
-            fun labelVisible(label: String): Boolean {
-                if (android.os.Build.VERSION.SDK_INT >= 33) ins.uiAutomation.clearCache()
-                return if (iconOnly) {
-                    dev.wait(Until.hasObject(By.desc(label)), 3000)
-                } else {
-                    dev.wait(Until.hasObject(By.text(label)), 3000)
-                }
-            }
-            var missing = labels.filter { !labelVisible(it) }
+            var missing = labels.filter { if (iconOnly) !dev.hasObject(By.desc(it)) else !dev.hasObject(By.text(it)) }
             var openedDrawer = false
             if (missing.isNotEmpty() && !iconOnly && dev.hasObject(By.desc("Open menu"))) {
                 dev.findObject(By.desc("Open menu")).click()
@@ -95,13 +85,16 @@ class NavStyleLabelsProofTest {
                 Thread.sleep(900)
                 dev.swipe(w / 2, (h * 0.7f).toInt(), w / 2, (h * 0.3f).toInt(), 24)
                 Thread.sleep(500)
-                missing = labels.filter {
-                    if (android.os.Build.VERSION.SDK_INT >= 33) ins.uiAutomation.clearCache()
-                    !dev.wait(Until.hasObject(By.text(it)), 3000)
-                }
+                missing = labels.filter { !dev.hasObject(By.text(it)) }
             }
             shot("nav-labels-${m.name}")
-            if (missing.isNotEmpty()) failures[m.name] = missing
+            if (missing.isNotEmpty()) {
+                failures[m.name] = missing
+                // Evidence only: the accessibility tree UiAutomator actually saw, to
+                // compare against the screenshot. The assertion below is unchanged.
+                val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots")
+                runCatching { dev.dumpWindowHierarchy(File(dir, "nav-labels-${m.name}.xml")) }
+            }
             if (openedDrawer) {
                 dev.pressBack()
                 Thread.sleep(400)
