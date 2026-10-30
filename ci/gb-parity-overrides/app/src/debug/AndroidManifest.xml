@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name="com.example.chat.StatusUnavailableFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.VoiceGestureFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.ContactsProfileProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.BubbleSheetProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.RadialPlacementProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.PushedPageFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.HeaderProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.EmojiLoopFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.EmojiPackGridFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.SwipeRowFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.MediaFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.CameraOpeningProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.CallControlsFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.CallMinimizedTileProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.HomeHeaderProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.LockBadgeProofActivity" android:exported="true" />
+        <activity
+            android:name="com.example.chat.ChatFixtureActivity"
+            android:exported="false" />
+        <activity
+            android:name="com.example.chat.CompactWindowFixtureActivity"
+            android:exported="false"
+            android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout"
+            android:windowSoftInputMode="adjustResize" />
+        <activity android:name="com.example.chat.ui.chats.location.GeoLibreSyntheticMapActivity" android:exported="false" />
+        <activity android:name="com.example.chat.ui.chats.location.GeoLibreProductionRouteProofActivity" android:exported="false" />
+        <activity android:name="com.example.chat.EmojiRealPackFixtureActivity" android:exported="false" />
+        <activity android:name="com.example.chat.EmojiPickerFixtureActivity" android:exported="false" />
+        <activity android:name=".ProfileHostFixtureActivity" android:exported="false" />
+    </application>
+</manifest>
