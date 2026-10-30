@@ -97,8 +97,16 @@ class CameraModeStripProofTest {
      d.findObject(By.desc("Resume recording")).click()
      assertTrue("Pause control returns after resuming",d.wait(Until.hasObject(By.desc("Pause recording")),5000))
      if (d.hasObject(By.desc("Take snapshot while recording"))) {
-      // Device bound the 3-use-case combination: the snapshot tap must keep recording alive.
+      // Device bound the 3-use-case combination on API 29+: the tap must save a real
+      // JPEG to the gallery, not just leave recording alive.
+      val projection = arrayOf(android.provider.MediaStore.Images.Media._ID)
+      fun chatySnapshots():Int = c.contentResolver.query(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,projection,android.provider.MediaStore.Images.Media.DISPLAY_NAME + " LIKE ?",arrayOf("chaty-recording-%"),null)?.use{it.count} ?: 0
+      val before = chatySnapshots()
       d.findObject(By.desc("Take snapshot while recording")).click()
+      var saved = false
+      val saveDeadline = android.os.SystemClock.uptimeMillis() + 15000
+      while (!saved && android.os.SystemClock.uptimeMillis() < saveDeadline) { Thread.sleep(500); saved = chatySnapshots() > before }
+      assertTrue("Snapshot really saved to the gallery while recording",saved)
       assertTrue("Recording continues after a recording snapshot",d.hasObject(By.desc("Stop recording")))
      }
      Thread.sleep(1200)
