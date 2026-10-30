@@ -1,1 +1,1 @@
-build 101: camera UI reference parity (yellow active mode, shutter states, dot timer, recording zoom/pause/snapshot with fallback, reference zoom pill/slider) + recording proofs
+build 101 retry 1: override-count 58->59 for CameraVideoSession.kt; camera UI reference parity + recording proofs
