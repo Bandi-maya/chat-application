@@ -25,18 +25,20 @@ import org.junit.runner.RunWith
 
 /**
  * Regression proof for the user-reported crop bugs (2026-10-30 device
- * screenshot): a portrait source was squashed into the 16:9 banner frame
- * (scale-to-fill instead of aspect-preserving cover) and the Cancel /
- * Crop & Use row rendered under the system navigation area.
+ * screenshot): a portrait source rendered squashed into the 16:9 banner
+ * frame (scale-to-fill instead of aspect-preserving cover) and the Cancel /
+ * Crop & Use row was clipped by the system navigation area.
  *
- * Locks both fixes with real pixels:
+ * Real-pixel checks, no settled-cause assumptions:
  *  1. Preview: a 1080x1920 portrait source with a red top band, a blue
- *     bottom band and a magenta circle must render COVER-fit - the red and
- *     blue bands are outside the visible window and the circle stays round.
- *  2. Safe area: the accent Crop & Use button must end above the screen
- *     bottom edge (systemBarsPadding), not clipped by the gesture/nav bar.
+ *     bottom band and a magenta circle. Cover-fit keeps the bands off
+ *     screen and the circle round; any scale-to-fill/stretch shows the
+ *     bands and flattens the circle.
+ *  2. Safe area: the accent Crop & Use fill must end at or above
+ *     (screen height - navigation/gesture inset - the row's 16dp padding),
+ *     i.e. fully inside the safe window, never under the nav/gesture bar.
  *  3. Export: the cropped PNG must be the 2.5x capture of the crop window,
- *     free of the red/blue bands, with the circle still round (no stretch).
+ *     free of the bands, with the circle still round (no axis stretch).
  */
 @RunWith(AndroidJUnit4::class)
 class ProfileCropAspectProofTest {
@@ -90,6 +92,12 @@ class ProfileCropAspectProofTest {
     private fun waitFor(cond: () -> Boolean) {
         val deadline = SystemClock.uptimeMillis() + 8000
         while (!cond() && SystemClock.uptimeMillis() < deadline) Thread.sleep(150)
+    }
+
+    /** Let the dialog window fade/settle before reading pixels. */
+    private fun settle() {
+        dev.waitForIdle(3000)
+        Thread.sleep(400)
     }
 
     /** Expected crop window in px, mirroring the dialog's sizing math. */
@@ -152,7 +160,11 @@ class ProfileCropAspectProofTest {
         return if (maxY < 0) null else Pair(minY, maxY)
     }
 
-    private fun launchDialog(isAvatar: Boolean, result: AtomicReference<File?>, error: AtomicReference<String?>): ActivityScenario<ChatFixtureActivity> {
+    private fun launchDialog(
+        isAvatar: Boolean,
+        result: AtomicReference<File?>,
+        error: AtomicReference<String?>,
+    ): ActivityScenario<ChatFixtureActivity> {
         val source = writePortraitSource()
         val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
         scenario.onActivity { activity ->
@@ -171,8 +183,23 @@ class ProfileCropAspectProofTest {
         return scenario
     }
 
+    /** Bottom inset the dialog must clear: max(nav bars, mandatory gestures),
+     *  read from the activity decorView like CallControlsBoundsTest. */
+    private fun bottomInset(scenario: ActivityScenario<ChatFixtureActivity>): Int {
+        var inset = -1
+        scenario.onActivity { activity ->
+            val ri = activity.window.decorView.rootWindowInsets
+            if (ri != null) {
+                val bars = ri.getInsets(android.view.WindowInsets.Type.navigationBars())
+                val gestures = ri.getInsets(android.view.WindowInsets.Type.mandatorySystemGestures())
+                inset = maxOf(bars.bottom, gestures.bottom)
+            }
+        }
+        return inset
+    }
+
     private fun assertCoverFitPreview(tag: String, isAvatar: Boolean) {
-        val (boxW, boxH) = cropWindowPx(isAvatar)
+        val (boxW, _) = cropWindowPx(isAvatar)
         val bmp = ins.uiAutomation.takeScreenshot() ?: fail("screenshot unavailable")
         val s = scan(bmp)
         // Squash (scale-to-fill) would paint the red top band and the blue
@@ -214,9 +241,14 @@ class ProfileCropAspectProofTest {
         dev.wait(Until.findObject(By.text("Crop Profile Banner")), 8000)
             ?: fail("banner crop dialog did not render")
         waitFor { dev.hasObject(By.text("Crop & Use")) && dev.hasObject(By.text("Cancel")) }
+        settle()
 
-        // Safe area: the accent button must be fully on screen with its full
-        // 50dp height and a gap below it (never under the nav/gesture bar).
+        // Safe area: the accent button fill must keep its full 50dp height
+        // and end at or above (screen bottom - bottom inset - 16dp row
+        // padding). On the unpatched dialog it sits 16dp from the raw screen
+        // edge, under the nav/gesture bar, and this fails.
+        val inset = bottomInset(scenario)
+        assertTrue("bottom inset must be readable", inset >= 0)
         val bmp = ins.uiAutomation.takeScreenshot() ?: fail("screenshot unavailable")
         val rows = accentButtonRows(bmp) ?: fail("Crop & Use accent button not found in bottom quarter")
         val minButtonHeight = 45f * density
@@ -224,9 +256,10 @@ class ProfileCropAspectProofTest {
             "Crop & Use must keep its full height, saw ${rows.second - rows.first}px (min $minButtonHeight)",
             rows.second - rows.first >= minButtonHeight,
         )
+        val maxAllowedBottom = bmp.height - inset - (16f * density).toInt() + 3
         assertTrue(
-            "Crop & Use must sit above the navigation area, lowest accent row ${rows.second} of ${bmp.height}",
-            rows.second < bmp.height - 2,
+            "Crop & Use must clear the navigation area: lowest accent row ${rows.second}, allowed <= $maxAllowedBottom (screen ${bmp.height}, inset $inset)",
+            rows.second <= maxAllowedBottom,
         )
         bmp.recycle()
 
@@ -249,6 +282,7 @@ class ProfileCropAspectProofTest {
         dev.wait(Until.findObject(By.text("Crop Avatar Photo")), 8000)
             ?: fail("avatar crop dialog did not render")
         waitFor { dev.hasObject(By.text("Crop & Use")) }
+        settle()
 
         assertCoverFitPreview("avatar", isAvatar = true)
         shot("profile-crop-avatar-coverfit")
