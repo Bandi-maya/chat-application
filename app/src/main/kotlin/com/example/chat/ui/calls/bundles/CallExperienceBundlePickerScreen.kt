@@ -224,7 +224,9 @@ fun CallBundleLivePreviewScreen(
             remoteAvatarInitials = "SM",
             remoteAvatarColorHex = "#8B5CF6",
             isVideo = true,
-            state = CallSessionState.active,
+            isOutgoing = false,
+            state = CallSessionState.connected,
+            startedAt = java.time.Instant.now(),
         )
     }
 
