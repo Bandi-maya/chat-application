@@ -108,7 +108,7 @@ class CameraOpeningProofTest {
                     // User-confirmed reference design (2026-10-30): a compact zoom
                     // presets pill; tapping the active value opens the horizontal
                     // slider with the live value label above it.
-                    assertFalse("The old always-visible arc is gone",device.hasObject(By.desc("Circular zoom dial, drag horizontally to zoom")))
+                    assertTrue("The old always-visible arc is gone",!device.hasObject(By.desc("Circular zoom dial, drag horizontally to zoom")))
                     val preset=device.wait(Until.findObject(By.desc("Zoom 1x")),3000)
                     capture("zoom-pill")
                     assertTrue("Zoom presets pill is present",preset!=null)
