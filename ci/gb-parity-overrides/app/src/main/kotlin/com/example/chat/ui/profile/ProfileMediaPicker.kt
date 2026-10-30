@@ -60,7 +60,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -453,6 +456,10 @@ private fun ProfileImageCropperOwnedDialog(
             ) {
                 Box(
                     Modifier
+                        // Rendered-bounds marker for ProfileCropAspectProofTest: the
+                        // export contract is 2.5x of this rendered crop window.
+                        .semantics { testTagsAsResourceId = true }
+                        .testTag("profile-crop-window")
                         // Dart BoxShadow blur 24 spread 8 black 0.6 (approximation:
                         // Compose shadow has no spread radius).
                         .shadow(
