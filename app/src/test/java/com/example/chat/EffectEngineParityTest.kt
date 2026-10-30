@@ -151,16 +151,13 @@ class EffectEngineParityTest {
 
     @Test fun `active catalog excludes none and renderer-less entries`() {
         val all = EffectRegistry.allEffects
-        // Honest count: 100 entries = 1 none + 96 render-backed + 3 unavailable
-        // (bg_* segmentation no-ops; ids preserved, presented disabled in pickers,
-        // never counted as working filters).
+        // Honest count: 100 entries = 1 none + 99 render-backed + 0 unavailable.
+        // bg_* render on the capture path via the MediaPipe selfie segmenter
+        // (segment_* shaderKeys); face_pixel_retro via the pixelate shader.
         val unavailable = all.filter {
             it.colorMatrix == null && it.shaderKey == null && !it.isFaceTrackingRequired && it.id != "none"
         }
-        assertEquals(
-            listOf("bg_gradient_studio", "bg_portrait_blur", "bg_virtual_office"),
-            unavailable.map { it.id }.sorted(),
-        )
-        assertEquals(96, all.count { it.id != "none" } - unavailable.size)
+        assertEquals(emptyList<String>(), unavailable.map { it.id }.sorted())
+        assertEquals(99, all.count { it.id != "none" } - unavailable.size)
     }
 }
