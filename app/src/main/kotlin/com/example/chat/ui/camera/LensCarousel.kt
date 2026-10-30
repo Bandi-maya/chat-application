@@ -5,6 +5,7 @@ import com.example.chat.ui.kit.ChatyHapticsPort
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -84,7 +85,6 @@ fun LensCarousel(
     val selectedDiameter = max(52f, min(76f, shortestSideDp * 0.115f)).dp
     val slotExtent = selectedDiameter + 18.dp
     val slotPx = with(density) { slotExtent.toPx() }
-    val viewportWidthDp = configuration.screenWidthDp.dp
 
     // Lenses the current device cannot run are hidden entirely rather than
     // offered as repeat-failure buttons (requirement 71).
@@ -142,6 +142,10 @@ fun LensCarousel(
         }
     }
 
+    // Viewport math uses the actual container width so the carousel can sit
+    // inline beside the shutter (Snap-style) as well as full-width.
+    BoxWithConstraints {
+    val viewportWidthDp = maxWidth
     LazyRow(
         state = listState,
         flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
@@ -180,6 +184,7 @@ fun LensCarousel(
                 )
             }
         }
+    }
     }
 }
 
