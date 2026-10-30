@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
@@ -417,9 +418,10 @@ fun CameraCaptureBottomControls(
                 }
             }
             Spacer(Modifier.height((if (tight) 4 else 8).dp))
-            // Snapchat-style: the lens carousel always rides just above the shutter
-            // while shooting (photo / lens mode) — no tray toggle needed to reach lenses.
-            if (ready && (captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses)) {
+            // The lenses tab activates the Snap-style lens UI; the color-filter
+            // tray is a separate surface opened only from the filters button, so
+            // lens UI never mixes with the open tray.
+            if (ready && captureViewMode == CaptureViewMode.lenses && !effectsOpen) {
                 // Lens name + tracking health row.
                 Box(Modifier.fillMaxWidth()) {
                 Row(
@@ -506,11 +508,36 @@ fun CameraCaptureBottomControls(
                 }
                 CameraCaptureShutter(enabled = ready, capturing = capturing, onClick = onShutter)
                 Box(Modifier.weight(1f)) {
-                    // Face lenses are a photo/lenses-mode feature (S1 gate): in
-                    // night, portrait, video and document modes the row keeps its
-                    // gallery / shutter / flip geometry with the slot left empty.
-                    if (captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses) {
-                        LensCarousel(manager = lensManager, deviceTier = deviceTier)
+                    // Lenses tab only: the carousel rides the gallery/shutter/flip
+                    // row and stays hidden while the filters tray is open. In every
+                    // other mode the row keeps its geometry with the slot empty.
+                    // A bottom-to-top drag here opens the lens browser; horizontal
+                    // scrolling stays with the carousel and taps still select, and
+                    // preview tap-to-focus / pinch-zoom live on the viewfinder, so
+                    // no gesture conflicts.
+                    if (captureViewMode == CaptureViewMode.lenses && !effectsOpen) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .pointerInput(lensManager) {
+                                    var draggedUp = 0f
+                                    var opened = false
+                                    detectVerticalDragGestures(
+                                        onDragStart = { draggedUp = 0f; opened = false },
+                                        onVerticalDrag = { _, dragAmount ->
+                                            if (dragAmount < 0f) {
+                                                draggedUp += -dragAmount
+                                                if (!opened && draggedUp > 48.dp.toPx()) {
+                                                    opened = true
+                                                    onBrowseLenses()
+                                                }
+                                            }
+                                        },
+                                    )
+                                },
+                        ) {
+                            LensCarousel(manager = lensManager, deviceTier = deviceTier)
+                        }
                     }
                 }
                 Box(
