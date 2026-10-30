@@ -13,7 +13,12 @@ import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -37,7 +42,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -52,7 +64,9 @@ import androidx.core.location.LocationManagerCompat
 import androidx.core.os.CancellationSignal
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.chat.ui.kit.ChatyConfirmationDialog
 import com.example.chat.ui.kit.ChatyDropdownMenu
+import com.example.chat.ui.kit.ChatyModalShape
 import com.example.chat.ui.kit.ChatyDropdownMenuItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -84,7 +98,6 @@ fun FriendMapScreen(
     val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val systemDark = (LocalConfiguration.current.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
     val mapColors = if (systemDark) darkColorScheme() else lightColorScheme()
-    val controlColors = IconButtonDefaults.filledIconButtonColors(containerColor = mapColors.secondaryContainer, contentColor = mapColors.onSecondaryContainer, disabledContainerColor = mapColors.surfaceVariant, disabledContentColor = mapColors.onSurfaceVariant)
     val scope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var mapActive by remember { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
@@ -198,7 +211,7 @@ fun FriendMapScreen(
     Surface(modifier = Modifier.fillMaxSize(), color = mapColors.background, contentColor = mapColors.onBackground) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                IconButton(onClick = { stopLocate(); onDismiss() }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Back" }) { Icon(Icons.Rounded.ChevronLeft, contentDescription = null) }
+                FriendMapControlButton(onClick = { stopLocate(); onDismiss() }, enabled = true, contentDescription = "Back", containerColor = mapColors.secondaryContainer, contentColor = mapColors.onSecondaryContainer, disabledContainerColor = mapColors.surfaceVariant, disabledContentColor = mapColors.onSurfaceVariant, icon = Icons.Rounded.ChevronLeft)
                 Text("Friends map", modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.size(48.dp))
             }
@@ -230,14 +243,11 @@ fun FriendMapScreen(
                 }
             }
             Column(Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                FilledIconButton(onClick = { mapView?.control("zoomIn") }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Zoom in" }, shape = CircleShape) { Icon(Icons.Rounded.Add, contentDescription = null) }
-                FilledIconButton(onClick = { mapView?.control("zoomOut") }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Zoom out" }, shape = CircleShape) { Icon(Icons.Rounded.Remove, contentDescription = null) }
-                FilledIconButton(onClick = { mapView?.control("toggleBuildings") }, enabled = rendererReady, colors = controlColors,
-                    modifier = Modifier.size(48.dp).semantics { contentDescription = "Toggle 3D buildings"; stateDescription = buildingsStateDescription }, shape = CircleShape) { Icon(Icons.Rounded.ViewInAr, contentDescription = null) }
+                FriendMapControlButton(onClick = { mapView?.control("zoomIn") }, enabled = rendererReady, contentDescription = "Zoom in", containerColor = mapColors.secondaryContainer, contentColor = mapColors.onSecondaryContainer, disabledContainerColor = mapColors.surfaceVariant, disabledContentColor = mapColors.onSurfaceVariant, icon = Icons.Rounded.Add)
+                FriendMapControlButton(onClick = { mapView?.control("zoomOut") }, enabled = rendererReady, contentDescription = "Zoom out", containerColor = mapColors.secondaryContainer, contentColor = mapColors.onSecondaryContainer, disabledContainerColor = mapColors.surfaceVariant, disabledContentColor = mapColors.onSurfaceVariant, icon = Icons.Rounded.Remove)
+                FriendMapControlButton(onClick = { mapView?.control("toggleBuildings") }, enabled = rendererReady, contentDescription = "Toggle 3D buildings", stateDescription = buildingsStateDescription, containerColor = mapColors.secondaryContainer, contentColor = mapColors.onSecondaryContainer, disabledContainerColor = mapColors.surfaceVariant, disabledContentColor = mapColors.onSurfaceVariant, icon = Icons.Rounded.ViewInAr)
                 Box {
-                FilledIconButton(onClick = { layersOpen = true }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Map layers" }, shape = CircleShape) {
-                    Icon(Icons.Rounded.Layers, contentDescription = null)
-                }
+                FriendMapControlButton(onClick = { layersOpen = true }, enabled = rendererReady, contentDescription = "Map layers", containerColor = mapColors.secondaryContainer, contentColor = mapColors.onSecondaryContainer, disabledContainerColor = mapColors.surfaceVariant, disabledContentColor = mapColors.onSurfaceVariant, icon = Icons.Rounded.Layers)
                 ChatyDropdownMenu(expanded = layersOpen, onDismissRequest = { layersOpen = false }, containerColor = mapColors.surfaceContainerHigh) {
                     listOf("liberty" to "Streets", "positron" to "Light", "dark" to "Dark", "bright" to "Bright", "fiord" to "Fiord").forEach { (style, label) ->
                         ChatyDropdownMenuItem(
@@ -265,14 +275,14 @@ fun FriendMapScreen(
                             Text("Friends", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.W700)
                             Text("0 sharing with you", fontSize = 12.5.sp, color = mapColors.onSurfaceVariant)
                         }
-                        FilledIconButton(
+                        FriendMapControlButton(
                             onClick = { locate() }, enabled = currentLocationEnabled && !locating,
-                            modifier = Modifier.size(48.dp).semantics { contentDescription = "Show my location on this map only" },
-                            shape = CircleShape,
-                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = mapColors.primary, contentColor = mapColors.onPrimary, disabledContainerColor = mapColors.surfaceVariant, disabledContentColor = mapColors.onSurfaceVariant),
-                        ) {
-                            if (locating) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp, color = mapColors.onPrimary)
-                            else Icon(Icons.Rounded.MyLocation, contentDescription = null)
+                            contentDescription = "Show my location on this map only",
+                            containerColor = mapColors.primary, contentColor = mapColors.onPrimary,
+                            disabledContainerColor = mapColors.surfaceVariant, disabledContentColor = mapColors.onSurfaceVariant,
+                        ) { tint ->
+                            if (locating) FriendMapLocatingSpinner(tint)
+                            else Icon(Icons.Rounded.MyLocation, contentDescription = null, tint = tint)
                         }
                     }
                     if (status.isNotBlank()) {
@@ -312,8 +322,8 @@ fun FriendMapScreen(
                             Modifier.fillMaxWidth().alpha(0.55f).semantics(mergeDescendants = true) { stateDescription = "Not available until the Chaty backend is connected" },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            RadioButton(selected = false, enabled = false, onClick = { })
-                            Spacer(Modifier.size(4.dp))
+                            Box(Modifier.size(20.dp).clip(CircleShape).border(BorderStroke(2.dp, mapColors.outline), CircleShape))
+                            Spacer(Modifier.size(12.dp))
                             Column(Modifier.padding(vertical = 4.dp)) {
                                 Text(choice.label, fontSize = 14.sp, fontWeight = FontWeight.W600)
                                 Text(choice.description, fontSize = 12.sp, color = mapColors.onSurfaceVariant)
@@ -329,11 +339,89 @@ fun FriendMapScreen(
         }
     }
     }
-    if (rationale) AlertDialog(onDismissRequest = { rationale = false }, title = { Text("Show your location on this map?") },
-        text = { Text("Chaty needs foreground location access only to show your own position on this map. Approximate access is accepted. Nothing is shared with anyone.") },
-        confirmButton = { TextButton(onClick = { rationale = false; requestPermission() }) { Text("Continue") } },
-        dismissButton = { TextButton(onClick = { rationale = false }) { Text("Not now") } })
+    if (rationale) {
+        ChatyConfirmationDialog(
+            shape = ChatyModalShape,
+            onDismissRequest = { rationale = false },
+            title = { Text("Show your location on this map?", fontSize = 18.sp, fontWeight = FontWeight.Bold) },
+            text = { Text("Chaty needs foreground location access only to show your own position on this map. Approximate access is accepted. Nothing is shared with anyone.", fontSize = 14.sp) },
+            confirmButton = { FriendMapDialogAction("Continue", color = MaterialTheme.colorScheme.primary) { rationale = false; requestPermission() } },
+            dismissButton = { FriendMapDialogAction("Not now", color = MaterialTheme.colorScheme.onSurfaceVariant) { rationale = false } },
+        )
     }
+    }
+}
+
+/**
+ * Custom circular map control built from Chaty token colors. Replaces the Material
+ * FilledIconButton/IconButton chrome on this screen: same 48dp circle target, same
+ * tokens, no Material default control styling.
+ */
+@Composable
+private fun FriendMapControlButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    contentDescription: String,
+    containerColor: Color,
+    contentColor: Color,
+    disabledContainerColor: Color,
+    disabledContentColor: Color,
+    modifier: Modifier = Modifier,
+    stateDescription: String? = null,
+    content: @Composable (tint: Color) -> Unit,
+) {
+    val tint = if (enabled) contentColor else disabledContentColor
+    Box(
+        modifier.size(48.dp)
+            .semantics {
+                this.contentDescription = contentDescription
+                if (stateDescription != null) this.stateDescription = stateDescription
+            }
+            .clip(CircleShape)
+            .background(if (enabled) containerColor else disabledContainerColor)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { content(tint) }
+}
+
+@Composable
+private fun FriendMapControlButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    contentDescription: String,
+    containerColor: Color,
+    contentColor: Color,
+    disabledContainerColor: Color,
+    disabledContentColor: Color,
+    modifier: Modifier = Modifier,
+    stateDescription: String? = null,
+    icon: ImageVector,
+) = FriendMapControlButton(
+    onClick, enabled, contentDescription, containerColor, contentColor,
+    disabledContainerColor, disabledContentColor, modifier, stateDescription,
+) { tint -> Icon(icon, contentDescription = null, tint = tint) }
+
+/** Minimal token-colored indeterminate arc; replaces the Material progress control. */
+@Composable
+private fun FriendMapLocatingSpinner(color: Color) {
+    val transition = rememberInfiniteTransition(label = "friendMapLocate")
+    val angle by transition.animateFloat(
+        initialValue = 0f, targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 900, easing = LinearEasing)),
+        label = "sweep",
+    )
+    Canvas(Modifier.size(24.dp)) {
+        drawArc(color = color, startAngle = angle, sweepAngle = 270f, useCenter = false, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
+    }
+}
+
+/** Text action with Chaty styling for custom dialogs; replaces Material TextButton chrome. */
+@Composable
+private fun FriendMapDialogAction(label: String, color: Color, onClick: () -> Unit) {
+    Text(
+        label, color = color, fontSize = 15.sp, fontWeight = FontWeight.W600,
+        modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp),
+    )
 }
 
 private tailrec fun Context.findFriendMapActivity(): Activity? = when (this) {
