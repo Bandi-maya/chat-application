@@ -1,1 +1,1 @@
-build 96: fix compose local declaration order in camera screen (segment preview block now precedes its SideEffect use)
+build 97: fix face-pipeline var order (processFaceFrame uses) + segmented mask extraction via ByteBufferExtractor + custom browse glyph replacing unresolved material Apps icon
