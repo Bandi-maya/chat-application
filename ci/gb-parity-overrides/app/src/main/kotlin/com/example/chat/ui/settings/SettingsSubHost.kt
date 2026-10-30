@@ -162,6 +162,7 @@ fun SettingsSubHost(
             var audio by remember { mutableStateOf(false) }
             BackHandler(enabled = audio) { audio = false }
             @Suppress("UNUSED_EXPRESSION") rev
+            var showBundles by remember { mutableStateOf(false) }
             if (audio) {
                 com.example.chat.ui.settings.AudioSettingsScreen(
                     settings = ServiceLocator.audioSettingsController,
@@ -169,6 +170,20 @@ fun SettingsSubHost(
                     coordinator = ServiceLocator.audioPolicyCoordinator,
                     scope = scope,
                     onBack = { audio = false },
+                )
+            } else if (showBundles) {
+                com.example.chat.ui.calls.bundles.CallExperienceBundlePickerScreen(
+                    currentBundleId = store.value.callExperienceBundleId,
+                    onApplyBundle = { bundleId ->
+                        scope.launch {
+                            try {
+                                store.setCallExperienceBundle(bundleId)
+                            } catch (e: Exception) {
+                                toast(e.message ?: "Unable to apply bundle.")
+                            }
+                        }
+                    },
+                    onBack = { showBundles = false },
                 )
             } else {
                 val v = store.value
@@ -183,6 +198,7 @@ fun SettingsSubHost(
                         lowDataUsageEnabled = v.lowDataUsageEnabled,
                         incomingCallTemplate = v.incomingCallTemplate,
                         ongoingCallTemplate = v.ongoingCallTemplate,
+                        callExperienceBundleId = v.callExperienceBundleId,
                     ),
                     templates = com.example.chat.ui.calls.CallScreenTemplate.all.map { CallTemplateOption(it.wireName, it.displayName) },
                     contacts = ServiceLocator.apiBackend.users.map { CallContactOption(it.id, it.displayName) },
@@ -193,6 +209,7 @@ fun SettingsSubHost(
                     onPictureInPicture = { b -> run { store.setPictureInPictureEnabled(b) } },
                     onLowData = { b -> run { store.setLowDataUsageEnabled(b) } },
                     onOpenAudioSettings = { audio = true },
+                    onOpenCallBundles = { showBundles = true },
                 )
             }
         }
