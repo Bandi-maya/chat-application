@@ -404,7 +404,9 @@ fun ChatyCameraCaptureScreen(
     androidx.compose.runtime.SideEffect {
         session.analyzeFaces = wantsFaceTracking && !nightActive && !portraitActive && !capturing && !videoOpen && documentReviewPath == null
         session.analyzeSegment = segmentEffectKey != null && !nightActive && !portraitActive
-        if (segmentEffectKey == null) segmentPreviewFrame = null
+        // A key change (blur -> office/gradient, or deselect) must never keep the
+        // previous effect's composite on screen while its replacement is in flight.
+        if (segmentEffectKey != segmentPublishedKey) segmentPreviewFrame = null
     }
 
     // Face frame pipeline: throttle 45ms, mirror for front camera, solver maps
@@ -422,6 +424,7 @@ fun ChatyCameraCaptureScreen(
     val liveSegmentPreview = remember { LiveSegmentPreview(segmentationBridge) }
     DisposableEffect(segmentationBridge) { onDispose { segmentationBridge.dispose() } }
     var segmentPreviewFrame by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var segmentPublishedKey by remember { mutableStateOf<String?>(null) }
     var processingSegmentFrame by remember { mutableStateOf(false) }
     var lastSegmentFrameMs by remember { mutableStateOf(0L) }
     val segmentEffectKey = if (engine.activeEffect.isSegmentationRequired &&
@@ -441,8 +444,10 @@ fun ChatyCameraCaptureScreen(
         scope.launch(Dispatchers.Default) {
             try {
                 val bmp = liveSegmentPreview.render(frame, rotationDegrees, mirrored, key, intensity)
-                if (bmp != null && segmentEffectKey == key) segmentPreviewFrame = bmp
-                else bmp?.recycle()
+                if (bmp != null && segmentEffectKey == key) {
+                    segmentPreviewFrame = bmp
+                    segmentPublishedKey = key
+                } else bmp?.recycle()
             } catch (_: Exception) {
                 // Best-effort preview: never interrupt capture.
             } finally {
