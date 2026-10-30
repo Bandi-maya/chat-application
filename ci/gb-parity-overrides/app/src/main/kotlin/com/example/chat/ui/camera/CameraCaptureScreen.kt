@@ -956,7 +956,9 @@ fun ChatyCameraCaptureScreen(
                             effectsOpen=false;captureViewMode=m;videoOpen=true
                         } else if((m!=CaptureViewMode.night||nightSupported)&&(m!=CaptureViewMode.portrait||portraitSupported)) {
                             ChatyHapticsPort.selection(view);captureViewMode=m
-                            effectsOpen=m==CaptureViewMode.lenses
+                            // Color filters open only from the filters button - the
+                            // lenses tab shows the lens carousel, never the tray.
+                            effectsOpen=false
                             faceSolver.reset();facePoses=emptyList()
                         }
                     }
