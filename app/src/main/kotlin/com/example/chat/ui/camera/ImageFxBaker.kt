@@ -7,7 +7,11 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RadialGradient
 import android.graphics.Rect
+import android.graphics.Shader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -60,7 +64,23 @@ object ImageFxBaker {
 
         val rendered = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(rendered)
-        if (effect.shaderKey == "pixelate") {
+        if (effect.shaderKey != null && effect.shaderKey.startsWith("segment_")) {
+            // Segmented background effects: person-confidence mask from the
+            // MediaPipe selfie segmenter, then blur or replace the background.
+            // Fails open: no mask -> the photo saves unfiltered, never corrupt.
+            val mask = SegmentationBridge(context).let { bridge ->
+                try {
+                    bridge.personMask(image)
+                } finally {
+                    bridge.dispose()
+                }
+            }
+            if (mask == null) {
+                canvas.drawBitmap(image, 0f, 0f, Paint())
+            } else {
+                drawSegmentedBackground(canvas, image, mask, effect.shaderKey, intensity)
+            }
+        } else if (effect.shaderKey == "pixelate") {
             // Original pixelate bake: downscale to the block grid, upscale with
             // nearest-neighbor (filterBitmap = false). Works on every API level.
             val blocks = pixelateBlocks(intensity).toInt().coerceIn(2, 512)
@@ -92,5 +112,83 @@ object ImageFxBaker {
         rendered.recycle()
         try { staged.delete() } catch (_: Exception) { /* best effort, mirrors Dart catchError */ }
         if (ok) out.absolutePath else staged.absolutePath
+    }
+
+    /** Person-sharp / background-treated composite driven by the confidence mask. */
+    private fun drawSegmentedBackground(
+        canvas: Canvas,
+        image: Bitmap,
+        mask: Bitmap,
+        shaderKey: String?,
+        intensity: Double,
+    ) {
+        val w = image.width
+        val h = image.height
+        // Bilinear mask scale doubles as edge feathering.
+        val scaledMask = Bitmap.createScaledBitmap(mask, w, h, true)
+        val background = when (shaderKey) {
+            "segment_bg_gradient" -> studioGradientScene(w, h)
+            "segment_bg_office" -> officeScene(w, h)
+            else -> approxBlur(image, intensity)
+        }
+        canvas.drawBitmap(background, 0f, 0f, Paint())
+        // Person cutout: sharp image gated by the mask alpha.
+        val cutout = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val cutCanvas = Canvas(cutout)
+        cutCanvas.drawBitmap(image, 0f, 0f, Paint())
+        cutCanvas.drawBitmap(
+            scaledMask, 0f, 0f,
+            Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN) },
+        )
+        canvas.drawBitmap(cutout, 0f, 0f, Paint())
+        scaledMask.recycle()
+        cutout.recycle()
+        background.recycle()
+    }
+
+    /** Free original blur approximation: aggressive downscale + filtered upscale. */
+    private fun approxBlur(src: Bitmap, intensity: Double): Bitmap {
+        val divisor = (6.0 + 10.0 * intensity.coerceIn(0.0, 1.0)).toInt()
+        val small = Bitmap.createScaledBitmap(
+            src, maxOf(1, src.width / divisor), maxOf(1, src.height / divisor), true,
+        )
+        return Bitmap.createScaledBitmap(small, src.width, src.height, true).also {
+            if (it !== small) small.recycle()
+        }
+    }
+
+    /** Original Chaty studio backdrop: cool radial gradient, no assets. */
+    private fun studioGradientScene(w: Int, h: Int): Bitmap {
+        val scene = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(scene)
+        val paint = Paint().apply {
+            shader = RadialGradient(
+                w / 2f, h * 0.38f, maxOf(w, h) * 0.75f,
+                intArrayOf(0xFF3DDC97.toInt(), 0xFF0F2E2A.toInt(), 0xFF071B19.toInt()),
+                floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP,
+            )
+        }
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        return scene
+    }
+
+    /** Original Chaty office backdrop: warm wall, floor band, window light. */
+    private fun officeScene(w: Int, h: Int): Bitmap {
+        val scene = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(scene)
+        c.drawColor(0xFFD9C7B2.toInt()) // warm wall
+        val floor = Paint().apply { color = 0xFFB49A80.toInt() }
+        c.drawRect(0f, h * 0.72f, w.toFloat(), h.toFloat(), floor)
+        val windowGlow = Paint().apply {
+            shader = RadialGradient(
+                w * 0.8f, h * 0.22f, w * 0.5f,
+                intArrayOf(0xFFFFF6E5.toInt(), 0x00FFF6E5),
+                null, Shader.TileMode.CLAMP,
+            )
+        }
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), windowGlow)
+        val frame = Paint().apply { color = 0x33FFFFFF }
+        c.drawRect(w * 0.62f, h * 0.06f, w * 0.97f, h * 0.40f, frame)
+        return scene
     }
 }
