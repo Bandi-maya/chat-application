@@ -161,9 +161,38 @@ class CallForegroundService : Service() {
         const val EXTRA_TEXT = "chaty.call.text"
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
 
+        private val syncLock = Any()
+        private var syncHandler: android.os.Handler? = null
+        private var pendingSync: Runnable? = null
+
         /** Sync entry point consumed by CallLifecycleCoordinator's
-         *  foregroundSync seam. */
+         *  foregroundSync seam.
+         *
+         *  Start/stop decisions are serialized on the main thread and rapid
+         *  session flaps collapse to the latest state: every
+         *  startForegroundService() opens a "did not start in time" window,
+         *  and a start racing a later stop (the hang-up path) crashes the
+         *  process with ForegroundServiceDidNotStartInTimeException when the
+         *  window expires unserviced. Coalescing guarantees at most one
+         *  pending decision and that a terminal stop discards any queued
+         *  start. The pending slot always clears when its runnable runs, so
+         *  later sessions can start the service again. */
         fun sync(context: Context, session: ChatyCallSession?) {
+            val appContext = context.applicationContext
+            val handler = syncHandler
+                ?: android.os.Handler(android.os.Looper.getMainLooper()).also { syncHandler = it }
+            synchronized(syncLock) {
+                pendingSync?.let { handler.removeCallbacks(it) }
+                val task = Runnable {
+                    synchronized(syncLock) { pendingSync = null }
+                    applySync(appContext, session)
+                }
+                pendingSync = task
+                handler.post(task)
+            }
+        }
+
+        private fun applySync(context: Context, session: ChatyCallSession?) {
             if (!CallForegroundPolicy.shouldRunFor(session)) {
                 stop(context)
                 return
@@ -180,14 +209,24 @@ class CallForegroundService : Service() {
                 } else {
                     context.startService(intent)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // WebRTC remains the media source of truth; a foreground-service
                 // failure must never present as a successful background-call
                 // guarantee.
+                android.util.Log.w("CallForegroundService", "foreground start failed: $e")
             }
         }
 
         fun stop(context: Context) {
+            // A terminal stop also discards any queued start decision so a
+            // hang-up cannot leave a start window open behind the stop.
+            val handler = syncHandler
+            if (handler != null) {
+                synchronized(syncLock) {
+                    pendingSync?.let { handler.removeCallbacks(it) }
+                    pendingSync = null
+                }
+            }
             try {
                 context.stopService(Intent(context, CallForegroundService::class.java))
             } catch (_: Exception) {
