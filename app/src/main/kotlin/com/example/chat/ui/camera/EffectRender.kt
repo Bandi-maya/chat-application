@@ -51,6 +51,13 @@ fun pixelateBlocks(intensity: Double): Float =
 
 /** General render dispatch: pixelate shader effects, else the color matrix. */
 fun effectRenderModifier(effect: ChatyCameraEffect, intensity: Double): Modifier {
+    if (effect.shaderKey != null && effect.shaderKey.startsWith("segment_")) {
+        // Segmented background effects render on the CAPTURE path (ImageFxBaker
+        // + SegmentationBridge); a live segmented preview would need camera
+        // pipeline surgery, so the preview shows them unfiltered (documented
+        // deviation, same contract class as the matrix path below API 31).
+        return Modifier
+    }
     if (effect.shaderKey == "pixelate") {
         if (Build.VERSION.SDK_INT >= 33) {
             val blocks = pixelateBlocks(intensity)
