@@ -149,7 +149,7 @@ fun LensCarousel(
     LazyRow(
         state = listState,
         flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
-        contentPadding = PaddingValues(horizontal = (viewportWidthDp - slotExtent) / 2),
+        contentPadding = PaddingValues(horizontal = ((viewportWidthDp - slotExtent) / 2).coerceAtLeast(0.dp)),
         modifier = Modifier.height(selectedDiameter + 26.dp),
     ) {
         items(catalog.size) { index ->
