@@ -324,7 +324,16 @@ fun ChatyCameraCaptureScreen(
     val engine = remember { com.example.chat.ServiceLocator.effectEngine }
     val lensSchedulerScope = rememberCoroutineScope()
     val lensManager = remember {
+        val lensPrefs = context.getSharedPreferences("chaty_camera_lens", Context.MODE_PRIVATE)
         LensManager(
+            // Recents/favorites survive process death (LensStringListStore contract).
+            prefs = object : LensStringListStore {
+                override fun getStringList(key: String): List<String>? =
+                    lensPrefs.getString(key, null)?.split('|')?.filter { it.isNotBlank() }
+                override fun setStringList(key: String, value: List<String>) {
+                    lensPrefs.edit().putString(key, value.joinToString("|")).apply()
+                }
+            },
             // Dart settle Timer -> composition-scoped coroutine delay.
             timerScheduler = LensTimerScheduler { delayMs, action ->
                 val job = lensSchedulerScope.launch {
@@ -345,6 +354,7 @@ fun ChatyCameraCaptureScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var flashOn by remember { mutableStateOf(false) }
     var effectsOpen by remember { mutableStateOf(false) }
+    var lensBrowserOpen by remember { mutableStateOf(false) }
     var capturing by remember { mutableStateOf(false) }
     var options by remember { mutableStateOf(CameraCaptureOptions()) }
     var optionsOpen by remember { mutableStateOf(false) }
@@ -893,6 +903,15 @@ fun ChatyCameraCaptureScreen(
                         }, ContextCompat.getMainExecutor(context))
                     }
                 }
+            if (lensBrowserOpen) {
+                // Lens explorer: shares this screen's LensManager so selection,
+                // recents and favorites stay in sync with the carousel.
+                LensBrowserHost(
+                    manager = lensManager,
+                    onDismiss = { lensBrowserOpen = false },
+                    deviceTier = deviceTier,
+                )
+            }
             CameraCaptureBottomControls(
                 phase = phase,
                 captureViewMode = captureViewMode,
@@ -906,6 +925,7 @@ fun ChatyCameraCaptureScreen(
                 faceHealth = faceHealth,
                 deviceTier = deviceTier,
                 lensIdForEffect = ::lensIdForEffect,
+                onBrowseLenses = { lensBrowserOpen = true },
                 onSelectEffect = { effect ->
                     ChatyHapticsPort.selection(view)
                     if (effect.isFaceTrackingRequired) {
