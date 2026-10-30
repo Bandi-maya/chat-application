@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -376,6 +377,17 @@ fun ChatyCameraCaptureScreen(
     var maxZoom by remember { mutableStateOf(1f) }
     var videoOpen by remember(entryPreset) { mutableStateOf(entryPreset == CameraEntryPreset.composerFrontVideo) }
     var captureViewMode by remember(entryPreset) { mutableStateOf(if(entryPreset == CameraEntryPreset.composerFrontVideo) CaptureViewMode.video else CaptureViewMode.photo) }
+    // ---- Inline video mode (user redesign, 2026-10-30): recording happens on the
+    // shared PreviewView; the pinned auth-lease architecture is preserved and the
+    // separate VideoCaptureHost screen is no longer used by this composable.
+    var videoSession by remember { mutableStateOf<CameraVideoSession?>(null) }
+    var videoState by remember { mutableStateOf<VideoSessionState?>(null) }
+    var videoSeconds by remember { mutableStateOf(0) }
+    var videoExitPrompt by remember { mutableStateOf(false) }
+    var videoRetakePrompt by remember { mutableStateOf(false) }
+    var videoStopPlayback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val videoInvalidationSignal = remember { kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED) }
+    val videoAuth = remember(videoAuthPort) { videoAuthPort?.let { port -> VideoScopeLease(port) { videoInvalidationSignal.trySend(Unit) } } }
     var documentReviewPath by remember { mutableStateOf<String?>(null) }
     var capturedPath by remember { mutableStateOf<String?>(null) }
     var caption by remember { mutableStateOf("") }
@@ -548,19 +560,76 @@ fun ChatyCameraCaptureScreen(
         cameraPermissionGranted = granted
         if (!granted) phase = CameraPhase.permissionDenied
     }
+    /** Inline video session on the shared PreviewView. The image session must be
+     *  released first; CameraVideoSession owns the camera while video mode is open. */
+    fun bindVideo() {
+        val pv = previewView ?: return
+        val lease = videoAuth ?: return
+        if (!cameraPermissionGranted || capturedPath != null || documentReviewPath != null || scannerBusy || !videoOpen) return
+        bindJob?.cancel()
+        videoSession?.close()
+        phase = CameraPhase.initializing
+        errorMessage = null
+        val sessionSelector = if (session.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+        val vs = CameraVideoSession(pv.context, lifecycleOwner, pv, sessionSelector, options.stabilization, lease) { next ->
+            videoState = next
+            if (next is VideoSessionState.Ready || next is VideoSessionState.Recording) phase = CameraPhase.ready
+            if (next is VideoSessionState.Error) { errorMessage = next.message; phase = CameraPhase.noCamera }
+        }
+        videoSession = vs
+        vs.bind()
+    }
+
+    // Recording timer feeding the inline video pill.
+    LaunchedEffect(videoState) {
+        if (videoState is VideoSessionState.Recording) {
+            videoSeconds = 0
+            while (true) { kotlinx.coroutines.delay(1_000); videoSeconds++ }
+        } else videoSeconds = 0
+    }
+
+    // Auth invalidation: teardown follows the pinned host contract.
+    LaunchedEffect(videoAuth) {
+        for (ignored in videoInvalidationSignal) {
+            videoStopPlayback?.invoke(); videoStopPlayback = null
+            videoSession?.close(); videoSession = null
+            onDismiss()
+        }
+    }
+
+    // Composer hold-to-record requests (front-video entry) drive the inline session.
+    val videoHoldPhase = videoHoldRequest?.phase?.collectAsState()?.value
+    LaunchedEffect(videoHoldRequest, videoHoldPhase, videoState, videoSession) {
+        val video = videoSession ?: return@LaunchedEffect
+        val port = videoAuthPort ?: return@LaunchedEffect
+        val ready = videoState as? VideoSessionState.Ready
+        when (videoHoldRequest?.next(ready != null && port.isSignedIn(port.snapshot()), ready?.boundFront == true)) {
+            VideoHoldRequest.Command.Start -> if (videoAuth?.isCurrent() == true) video.start(requestAudio = true)
+            VideoHoldRequest.Command.Stop -> video.stop()
+            VideoHoldRequest.Command.Discard -> video.discard()
+            null -> Unit
+        }
+    }
+
     LaunchedEffect(Unit) { requestPermission(ChatyPermissions.camera) }
     LaunchedEffect(previewView, cameraPermissionGranted, capturedPath, documentReviewPath, scannerBusy, videoOpen, options.stabilization, options.night, captureViewMode, hdrOn) {
         if (!cameraPermissionGranted) {
             session.unbind()
+            videoSession?.close(); videoSession = null
             phase = CameraPhase.permissionDenied
-        } else if (capturedPath == null && documentReviewPath == null && !scannerBusy && !videoOpen) {
+        } else if (videoOpen) {
+            // Inline video owns the shared PreviewView: release the image session first.
+            session.unbind()
+            if (capturedPath == null && documentReviewPath == null && !scannerBusy) bindVideo()
+        } else if (capturedPath == null && documentReviewPath == null && !scannerBusy) {
+            videoSession?.close(); videoSession = null; videoState = null
             session.stabilization = options.stabilization
             session.night = options.night || captureViewMode == CaptureViewMode.night
             session.portrait = captureViewMode == CaptureViewMode.portrait
             session.hdr = hdrOn
             bindCamera()
         }
-        else if (!videoOpen) session.unbind()
+        else session.unbind()
     }
     // Re-check after returning from Android app settings. A granted permission
     // must not leave this composition stranded in its old denied state.
@@ -573,8 +642,11 @@ fun ChatyCameraCaptureScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 val granted = ChatyPermissions.isGranted(context, ChatyPermissions.camera)
                 cameraPermissionGranted = granted
-                if (granted) bindCamera() else {
+                if (granted) {
+                    if (videoOpen) bindVideo() else bindCamera()
+                } else {
                     session.unbind()
+                    videoSession?.close(); videoSession = null
                     phase = CameraPhase.permissionDenied
                 }
             }
@@ -612,7 +684,7 @@ fun ChatyCameraCaptureScreen(
     }
 
     fun flipCamera() {
-        if (phase == CameraPhase.initializing || capturing || countdown > 0 || scannerBusy) return
+        if (phase == CameraPhase.initializing || capturing || countdown > 0 || scannerBusy || videoOpen) return
         ChatyHapticsPort.selection(view)
         session.lensFacing = if (session.lensFacing == CameraSelector.LENS_FACING_BACK) {
             CameraSelector.LENS_FACING_FRONT
@@ -761,7 +833,17 @@ fun ChatyCameraCaptureScreen(
 
     fun shutter() {
         if (scannerBusy || capturing || countdown > 0) return
-        
+        if (videoOpen) {
+            // Inline video: the shutter toggles recording; review follows on stop.
+            val vs = videoSession ?: return
+            when (videoState) {
+                is VideoSessionState.Recording -> vs.stop()
+                is VideoSessionState.Ready -> if (videoAuth?.isCurrent() == true) vs.start(requestAudio = true)
+                else -> Unit
+            }
+            return
+        }
+
         val captureOptions = options
         timerJob = scope.launch {
             try {
@@ -837,8 +919,15 @@ fun ChatyCameraCaptureScreen(
         if (documentReviewPath != null) { documentReviewPath = null; ownedFiles.discard() } else discard()
     }
 
+    // Inline video: back leaves video mode; an unsaved draft confirms first
+    // (pinned host prompt contract preserved).
+    BackHandler(enabled = videoOpen) {
+        if (videoSession?.hasDraft() == true) videoExitPrompt = true
+        else { videoOpen = false; captureViewMode = CaptureViewMode.photo }
+    }
+
     DisposableEffect(session) {
-        onDispose { videoHoldRequest?.close(); ownedFiles.close(); timerJob?.cancel(); bindJob?.cancel(); session.dispose(); faceDetection.dispose(); lensManager.dispose() }
+        onDispose { videoHoldRequest?.close(); videoStopPlayback?.invoke(); videoSession?.close(); videoAuth?.close(); videoInvalidationSignal.close(); ownedFiles.close(); timerJob?.cancel(); bindJob?.cancel(); session.dispose(); faceDetection.dispose(); lensManager.dispose() }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -846,17 +935,6 @@ fun ChatyCameraCaptureScreen(
             InlineDocumentReview(documentReviewPath!!,
                 onRetake = { documentReviewPath = null; ownedFiles.discard() },
                 onCropped = { path -> if(ownedFiles.own(File(path))) { documentReviewPath = null; stagePickedOrCaptured(path) } },
-            )
-        } else if (videoOpen && videoAuthPort != null && cameraPermissionGranted) {
-            BackHandler { videoOpen = false }
-            VideoCaptureHost(
-                selector = if (session.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA,
-                stabilization = options.stabilization,
-                authPort = videoAuthPort,
-                holdRequest = videoHoldRequest,
-                onUseVideo = null, // Local recording only. No durable video send is connected.
-                onAuthInvalidated = onDismiss,
-                onBackToPhoto = { videoOpen = false;captureViewMode=CaptureViewMode.photo },
             )
         } else if (capturedPath == null) {
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
@@ -954,7 +1032,7 @@ fun ChatyCameraCaptureScreen(
                 ) {
                 if (portraitActive) androidx.compose.material3.Text("Portrait · device background blur",color=androidx.compose.ui.graphics.Color.White)
                 if (nightActive) androidx.compose.material3.Text("Night · hold still while capturing",color=androidx.compose.ui.graphics.Color.White)
-                CameraZoomControls(zoomRatio,minZoom,maxZoom,enabled = phase == CameraPhase.ready && !capturing) { requested ->
+                CameraZoomControls(zoomRatio,minZoom,maxZoom,enabled = phase == CameraPhase.ready && !capturing && !videoOpen) { requested ->
                     val control = session.camera?.cameraControl
                     if (control != null) {
                         val result = control.setZoomRatio(clampCameraZoom(requested,minZoom,maxZoom))
@@ -977,6 +1055,9 @@ fun ChatyCameraCaptureScreen(
                 captureViewMode = captureViewMode,
                 effectsOpen = effectsOpen,
                 capturing = capturing,
+                videoActive = videoOpen,
+                videoRecording = videoState is VideoSessionState.Recording,
+                videoSeconds = videoSeconds,
                 nightSupported = nightSupported,
                 portraitSupported = portraitSupported,
                 videoSupported = videoAuthPort != null,
@@ -1000,14 +1081,20 @@ fun ChatyCameraCaptureScreen(
                         optionsOpen=false
                         options=options.copy(night=false)
                         if(m==CaptureViewMode.video && videoAuthPort!=null) {
-                            timerJob?.cancel();countdown=0;bindJob?.cancel();session.unbind()
+                            timerJob?.cancel();countdown=0;bindJob?.cancel()
+                            ChatyHapticsPort.selection(view)
                             effectsOpen=false;captureViewMode=m;videoOpen=true
                         } else if((m!=CaptureViewMode.night||nightSupported)&&(m!=CaptureViewMode.portrait||portraitSupported)) {
-                            ChatyHapticsPort.selection(view);captureViewMode=m
-                            // Color filters open only from the filters button - the
-                            // lenses tab shows the lens carousel, never the tray.
-                            effectsOpen=false
-                            faceSolver.reset();facePoses=emptyList()
+                            if (videoOpen && videoSession?.hasDraft() == true) {
+                                // A draft exists: the pinned prompt owns the leave decision.
+                                videoExitPrompt = true
+                            } else {
+                                ChatyHapticsPort.selection(view);captureViewMode=m;videoOpen=false
+                                // Color filters open only from the filters button - the
+                                // lenses tab shows the lens carousel, never the tray.
+                                effectsOpen=false
+                                faceSolver.reset();facePoses=emptyList()
+                            }
                         }
                     }
                 },
@@ -1028,6 +1115,43 @@ fun ChatyCameraCaptureScreen(
                 onCaptionChange = { caption = it },
                 onDiscard = ::discard,
                 onConfirm = ::confirmAndSend,
+            )
+        }
+
+        // ---- Inline video review + draft-loss prompts (pinned host contracts,
+        // ported onto the shared preview; the separate host screen is gone). ----
+        if (videoOpen) {
+            val lease = videoAuth
+            val review = videoState as? VideoSessionState.Review
+            if (review != null && lease != null) {
+                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
+                    VideoCaptureReview(review.video, lease,
+                        registerStop = { videoStopPlayback = it },
+                        onConfirm = if (onVideoResult != null) ({
+                            // No asynchronous handoff is authorized by this short guard.
+                            // A supplied callback must synchronously accept ownership.
+                            if (lease.isCurrent()) videoSession?.takeReviewedVideo(review.video)?.let {
+                                onVideoResult?.invoke(it)
+                                videoOpen = false
+                                captureViewMode = CaptureViewMode.photo
+                            }
+                        }) else null,
+                        onRetake = { videoRetakePrompt = true },
+                    )
+                }
+            }
+            if (videoExitPrompt || videoRetakePrompt) androidx.compose.material3.AlertDialog(
+                onDismissRequest = { videoExitPrompt = false; videoRetakePrompt = false },
+                title = { androidx.compose.material3.Text("Discard this unsaved video?") },
+                text = { androidx.compose.material3.Text("This is a temporary draft. It is not sent or saved. Closing the app can lose it.") },
+                confirmButton = { androidx.compose.material3.Button(shape = com.example.chat.ui.kit.ChatyActionShape, onClick = {
+                    val leave = videoExitPrompt
+                    videoStopPlayback?.invoke(); videoStopPlayback = null
+                    videoSession?.discard()
+                    videoExitPrompt = false; videoRetakePrompt = false
+                    if (leave) { videoOpen = false; captureViewMode = CaptureViewMode.photo }
+                }) { androidx.compose.material3.Text("Discard video") } },
+                dismissButton = { androidx.compose.material3.Button(shape = com.example.chat.ui.kit.ChatyActionShape, onClick = { videoExitPrompt = false; videoRetakePrompt = false }) { androidx.compose.material3.Text("Keep reviewing") } },
             )
         }
     }
