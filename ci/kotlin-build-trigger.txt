@@ -1,1 +1,1 @@
-build 95: camera filter/lens batch (lenses-tab UX parity, pixelate, segmented background live preview + capture bake, capture plan resolver, test sources)
+build 96: fix compose local declaration order in camera screen (segment preview block now precedes its SideEffect use)
