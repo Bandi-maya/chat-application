@@ -479,7 +479,7 @@ class MediaInteractionProofTest {
                 try {
                     val child = albumNode.children.firstOrNull()
                     android.util.Log.i("ALBUM-PROBE", "tile2 child bounds=" + (child?.visibleBounds ?: "null") + " clickable=" + (child?.isClickable ?: "null") + " desc=" + (child?.contentDescription ?: "null"))
-                } 
+                } catch (e: Exception) { android.util.Log.i("ALBUM-PROBE", "child probe failed: " + e.message) }
                 // Evidence only (assertions unchanged): pin WHO swallows the tile tap.
                 try {
                     val dir = File(inst.targetContext.getExternalFilesDir(null), "screenshots")
@@ -500,7 +500,7 @@ class MediaInteractionProofTest {
                     device.click(b1.centerX(), b1.centerY())
                     device.waitForIdle()
                     android.util.Log.i("ALBUM-PROBE", "after tile1 click opened=" + opened.get())
-                } catch (e: Exception) { android.util.Log.i("ALBUM-PROBE", "tile1 probe failed: " + e.message) }catch (e: Exception) { android.util.Log.i("ALBUM-PROBE", "child probe failed: " + e.message) }
+                } catch (e: Exception) { android.util.Log.i("ALBUM-PROBE", "tile1 probe failed: " + e.message) }
             }
             assertEquals("album-1", opened.get())
             val a = device.findObject(By.descContains("Album photo 1 of 2")).visibleBounds
