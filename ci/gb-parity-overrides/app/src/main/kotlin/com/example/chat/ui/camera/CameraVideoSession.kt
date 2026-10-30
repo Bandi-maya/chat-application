@@ -24,7 +24,7 @@ import java.util.concurrent.Executors
 data class FinalizedVideo(val file: File, val durationMs: Long, val hasAudio: Boolean, val mimeType: String = "video/mp4")
 sealed interface VideoSessionState {
     data object Preparing : VideoSessionState
-    data class Ready(val stabilizationEnabled: Boolean, val boundFront: Boolean = false, val snapshotAvailable: Boolean = false) : VideoSessionState
+    data class Ready(val stabilizationEnabled: Boolean, val boundFront: Boolean = false, val snapshotAvailable: Boolean = false, val lensEffectActive: Boolean = true) : VideoSessionState
     data class Recording(val hasAudio: Boolean) : VideoSessionState
     data class Paused(val hasAudio: Boolean) : VideoSessionState
     data object Finalizing : VideoSessionState
@@ -170,18 +170,20 @@ class CameraVideoSession(
                     p.bindToLifecycle(owner, selector, group)
                 } catch (_: Exception) { null }
                 var actual: androidx.camera.core.Camera? = null
+                var lensEffectActive = false
                 if (wantSnapshot) {
                     val snap = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build()
                     actual = bindWithEffect(snap)
-                    if (actual != null) snapshot = snap
+                    if (actual != null) { snapshot = snap; lensEffectActive = true }
                 }
                 // Plain-recording fallback: devices rejecting the effect bind still
-                // record video rather than failing the camera outright.
-                if (actual == null) actual = bindWithEffect()
+                // record video rather than failing the camera outright, with the UI
+                // told the lens will NOT be in the recording (lensEffectActive=false).
+                if (actual == null) actual = bindWithEffect().also { if (it != null) lensEffectActive = true }
                 if (actual == null) actual = p.bindToLifecycle(owner, selector, view, video)
                 boundFront = CameraSelector.DEFAULT_FRONT_CAMERA.filter(listOf(actual.cameraInfo)).isNotEmpty()
                 provider = p; preview = view; capture = video; camera = actual
-                publish(VideoSessionState.Ready(stabilized, boundFront, snapshot != null))
+                publish(VideoSessionState.Ready(stabilized, boundFront, snapshot != null, lensEffectActive))
             } catch (e: Exception) { publish(VideoSessionState.Error("Video camera could not start. Try Photo or reopen the camera.")) }
         }
         future.addListener({
