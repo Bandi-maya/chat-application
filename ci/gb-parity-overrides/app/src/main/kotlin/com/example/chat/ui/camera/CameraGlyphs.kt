@@ -65,6 +65,14 @@ fun CameraGlyph(kind: String, color: Color, size: Dp = 24.dp) {
                     drawCircle(color,7f,Offset(21f,12f),style=line)
                     drawCircle(color,7f,Offset(16.5f,21f),style=line)
                 }
+                "browse_grid" -> {
+                    // 2x2 rounded tiles: the lens-browser affordance. Original
+                    // geometry, no Material icon dependency.
+                    drawRoundRect(color, Offset(5f, 5f), Size(9f, 9f), CornerRadius(2.5f, 2.5f), style = line)
+                    drawRoundRect(color, Offset(18f, 5f), Size(9f, 9f), CornerRadius(2.5f, 2.5f), style = line)
+                    drawRoundRect(color, Offset(5f, 18f), Size(9f, 9f), CornerRadius(2.5f, 2.5f), style = line)
+                    drawRoundRect(color, Offset(18f, 18f), Size(9f, 9f), CornerRadius(2.5f, 2.5f), style = line)
+                }
                 "camera" -> {
                     drawRoundRect(color, Offset(3f, 9f), Size(26f, 19f), CornerRadius(4f, 4f), style = line)
                     drawPath(Path().apply {
