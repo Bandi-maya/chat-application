@@ -20,28 +20,28 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 
+/** Preset zoom circles + always-visible arc dial (user redesign, 2026-10-30):
+ *  1x/2x/4x/6x circles sit above the arc, the live value rides the arc's fixed
+ *  top marker, and horizontal drags zoom continuously. No expand/collapse toggle:
+ *  the arc stays visible while the camera is live. */
 @Composable
 fun CameraZoomControls(current:Float,min:Float,max:Float,enabled:Boolean,onZoom:(Float)->Unit) {
     var proposed by remember(current,min,max) { mutableStateOf(clampCameraZoom(current,min,max)) }
-    var expanded by remember { mutableStateOf(false) }
-    val presets = remember(min,max) { (listOf(min,1f,2f,5f,10f,max).filter{it in min..max}).distinct().sorted() }
+    val presets = remember(min,max) { (listOf(min,1f,2f,4f,6f,max).filter{it in min..max}).distinct().sorted() }
     Column(Modifier.fillMaxWidth().padding(horizontal=20.dp),horizontalAlignment=Alignment.CenterHorizontally) {
-        Row(Modifier.background(Color(0xCC141414),RoundedCornerShape(28.dp)).horizontalScroll(rememberScrollState()).padding(4.dp),
+        // Preset circles (user design): yellow when active, always above the arc.
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(4.dp),
             verticalAlignment=Alignment.CenterVertically) {
             presets.forEach { ratio ->
                 val active=abs(current-ratio)<.05f
-                Box(Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).clip(com.example.chat.ui.kit.ChatyActionShape).background(if(active)androidx.compose.material3.MaterialTheme.colorScheme.primary else Color.Transparent,com.example.chat.ui.kit.ChatyActionShape)
+                Box(Modifier.sizeIn(minWidth=56.dp,minHeight=56.dp).clip(CircleShape).background(if(active)Color(0xFFFFD54F) else Color.Transparent,CircleShape)
                     .clickable(enabled=enabled){proposed=ratio;onZoom(ratio)}
-                    .semantics{contentDescription=String.format(java.util.Locale.ROOT,"Zoom %.1fx",ratio);selected=active;role=Role.Button},contentAlignment=Alignment.Center) {
-                    Text(String.format(java.util.Locale.ROOT,if(ratio%1f==0f)"%.0fx" else "%.1fx",ratio),color=if(active)androidx.compose.material3.MaterialTheme.colorScheme.onPrimary else Color.White,maxLines=1)
+                    .semantics{contentDescription=String.format(java.util.Locale.ROOT,if(ratio%1f==0f)"Zoom %.0fx" else "Zoom %.1fx",ratio);selected=active;role=Role.Button},contentAlignment=Alignment.Center) {
+                    Text(String.format(java.util.Locale.ROOT,if(ratio%1f==0f)"%.0fx" else "%.1fx",ratio),color=if(active)Color.Black else Color.White,maxLines=1)
                 }
             }
-            Box(Modifier.sizeIn(minWidth=48.dp,minHeight=48.dp).clickable(enabled=enabled){expanded=!expanded}
-                .semantics{contentDescription="Toggle precise zoom";stateDescription=if(expanded)"Expanded"else"Collapsed";role=Role.Button},contentAlignment=Alignment.Center) {
-                Text(if(expanded)"−"else"+",color=Color.White)
-            }
         }
-        if(expanded && max>min) CircularZoomDial(
+        if(max>min) CircularZoomDial(
             current = proposed,
             min = min,
             max = max,
@@ -103,12 +103,10 @@ private fun CircularZoomDial(current:Float,min:Float,max:Float,enabled:Boolean,o
             while(zTick<=max+0.001f) {
                 val f = rangeFraction(zTick)
                 if(kotlin.math.abs(f-fCurrent)<0.38f) {
-                    val major = (listOf(min,1f,2f,5f,10f,max).any{ kotlin.math.abs(zTick-it)<0.05f })
-                    val a = pointFor(f, radius)
-                    val b = pointFor(f, radius - if(major) 16f else 9f)
+                    val major = (listOf(min,1f,2f,4f,6f,max).any { abs(zTick-it)<.001f })
                     drawLine(
-                        color = if(major) Color.White else Color.White.copy(alpha=.55f),
-                        start = a, end = b,
+                        if(major) Color.White else Color.White.copy(alpha=.55f),
+                        start = pointFor(f, radius), end = pointFor(f, radius - if(major) 18f else 10f),
                         strokeWidth = if(major) 3f else 2f,
                     )
                 }
@@ -121,12 +119,15 @@ private fun CircularZoomDial(current:Float,min:Float,max:Float,enabled:Boolean,o
             }
             drawPath(path, Color.White)
         }
-        // Live value + preset labels.
+        // Live value pill riding the arc's fixed top marker (user design).
         Text(
-            String.format(java.util.Locale.ROOT,"%.1fx",current),
+            String.format(java.util.Locale.ROOT,if(current%1f==0f)"%.0fx" else "%.1fx",current),
             color = Color(0xFFFFD54F),
             fontSize = 13.sp,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 24.dp)
+                .semantics{contentDescription=String.format(java.util.Locale.ROOT,"Zoom value %.1fx",current)},
         )
     }
 }
