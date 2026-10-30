@@ -368,7 +368,7 @@ class LensManager(
      *  fast scroll applies only where the carousel actually settles
      *  (requirements 48/49). Stale pending requests are cancelled by token. */
     fun select(lensId: String) {
-        if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "select(" + lensId + ") prev=" + _selectedId)
+        if (com.example.chat.BuildConfig.DEBUG) runCatching { Log.i("LENS-DIAG", "select(" + lensId + ") prev=" + _selectedId) }
         if (_selectedId == lensId) return
         _selectedId = lensId
         pendingRequestId++ // cancels any in-flight application
@@ -388,7 +388,7 @@ class LensManager(
     }
 
     private fun commitSelection(requestId: Int) {
-        if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "commit requestId=" + requestId + " pending=" + pendingRequestId + " selected=" + selected.id)
+        if (com.example.chat.BuildConfig.DEBUG) runCatching { Log.i("LENS-DIAG", "commit requestId=" + requestId + " pending=" + pendingRequestId + " selected=" + selected.id) }
         // A newer selection superseded this one - drop silently (requirement 48).
         if (requestId != pendingRequestId || selected.isNoLens) {
             return
