@@ -39,13 +39,31 @@ class CameraModeStripProofTest {
       }
       capture("missing-$name");fail("$name mode not reachable");error("unreachable")
      }
+     // Support probed INDEPENDENTLY of the strip under test (CameraX
+     // ExtensionsManager on the back camera): a supported mode missing from the
+     // strip must fail below, never pass as "hidden".
+     val camProvider=androidx.camera.lifecycle.ProcessCameraProvider.getInstance(c).get(10,java.util.concurrent.TimeUnit.SECONDS)
+     val extMgr=androidx.camera.extensions.ExtensionsManager.getInstanceAsync(c,camProvider).get(10,java.util.concurrent.TimeUnit.SECONDS)
+     val backSel=androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA
+     val hwSupport=mapOf("Portrait" to extMgr.isExtensionAvailable(backSel,androidx.camera.extensions.ExtensionMode.BOKEK),"Night" to extMgr.isExtensionAvailable(backSel,androidx.camera.extensions.ExtensionMode.NIGHT))
      for(name in listOf("Portrait","Night")) {
-      val node=target(name);val unsupported=node.contentDescription.contains("unavailable")
+      if(!hwSupport[name]!!){
+       // Approved contract (user direction 2026-10-30, relayed by main): unsupported
+       // modes are hidden entirely - no "unavailable" label. Absence after a full
+       // strip traversal IS the honest behavior on this device.
+       repeat(6){val r=d.findObject(By.desc("Camera modes")).visibleBounds;d.swipe(r.left+12,r.centerY(),r.right-12,r.centerY(),12)}
+       var advertised=false
+       repeat(10){
+        if(d.hasObject(By.desc("$name camera mode"))||d.hasObject(By.desc("$name unavailable camera mode"))){advertised=true}
+        val r=d.findObject(By.desc("Camera modes")).visibleBounds;d.swipe(r.right-12,r.centerY(),r.left+12,r.centerY(),12)
+       }
+       capture("hidden-$name")
+       assertFalse("$name is unsupported on this device and must stay hidden, not advertised",advertised)
+       continue
+      }
+      val node=target(name)
       capture("before-$name")
-      if(unsupported){
-       assertFalse("$name unavailable is disabled",node.isEnabled)
-       assertFalse("$name unavailable is not selected",node.isSelected)
-      } else {
+      run {
        node.click()
        val active=if(name=="Night")"Night · hold still while capturing"else"Portrait · device background blur"
        val activated=d.wait(Until.hasObject(By.text(active)),12000)
