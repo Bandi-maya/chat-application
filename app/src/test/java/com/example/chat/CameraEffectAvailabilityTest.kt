@@ -17,30 +17,30 @@ import org.junit.Test
  */
 class CameraEffectAvailabilityTest {
 
-    private val unavailableIds = listOf(
-        "bg_portrait_blur", "bg_virtual_office", "bg_gradient_studio",
-    )
-
     @Test fun `none renders no matrix and no overlay`() {
         val e = EffectEngine()
         assertNull(e.activeColorMatrix())
         assertFalse(e.isAnimatedOverlayActive)
     }
 
-    @Test fun `unavailable effects are inert when selected`() {
-        val e = EffectEngine()
-        unavailableIds.forEach { id ->
-            e.selectEffect(EffectRegistry.getById(id))
-            assertEquals(id, e.activeEffect.id)
-            assertNull("$id must render no color matrix", e.activeColorMatrix())
-            assertFalse("$id must not stack an overlay", e.isAnimatedOverlayActive)
+    @Test fun `background effects carry the segmentation capture path`() {
+        mapOf(
+            "bg_portrait_blur" to "segment_blur",
+            "bg_virtual_office" to "segment_bg_office",
+            "bg_gradient_studio" to "segment_bg_gradient",
+        ).forEach { (id, shader) ->
+            val effect = EffectRegistry.getById(id)
+            assertEquals(id, effect.id)
+            assertTrue("$id keeps its segmentation flag", effect.isSegmentationRequired)
+            assertEquals("$id shader path", shader, effect.shaderKey)
+            assertNull("$id renders no color matrix", effect.colorMatrix)
         }
     }
 
     @Test fun `every render-backed effect produces engine output`() {
         val e = EffectEngine()
-        val working = EffectRegistry.allEffects.filter { it.id != "none" && it.id !in unavailableIds }
-        assertEquals(96, working.size)
+        val working = EffectRegistry.allEffects.filter { it.id != "none" }
+        assertEquals(99, working.size)
         working.forEach { effect ->
             e.selectEffect(effect)
             val renders = e.activeColorMatrix() != null || e.isAnimatedOverlayActive ||
