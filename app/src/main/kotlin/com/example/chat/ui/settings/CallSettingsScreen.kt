@@ -52,6 +52,7 @@ data class CallPresentationState(
     val lowDataUsageEnabled: Boolean = false,
     val incomingCallTemplate: String,
     val ongoingCallTemplate: String,
+    val callExperienceBundleId: String = "chaty_default",
 )
 
 private val audienceOptions = listOf("Everyone", "My Contacts", "My Contacts Except\u2026", "Nobody")
@@ -78,6 +79,7 @@ fun CallSettingsScreen(
     onPictureInPicture: (Boolean) -> Unit,
     onLowData: (Boolean) -> Unit,
     onOpenAudioSettings: () -> Unit,
+    onOpenCallBundles: () -> Unit = {},
 ) {
     rememberPreferencesVersion(preferences)
     val colors = LocalAppColors.current
@@ -94,6 +96,20 @@ fun CallSettingsScreen(
                 ChatySettingsRowDivider()
                 ChatySettingsTile(title = "Excluded Contacts", icon = Icons.Outlined.PersonOff, iconColor = colors.error, subtitle = " contacts excluded", trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = { dialog = 4 })
             }
+        }
+        ChatySettingsSection(
+            "Call Experience Bundles",
+            "One-tap global calling redesign across incoming, outgoing, group, and compact cards.",
+        ) {
+            val bundle = com.example.chat.ui.calls.bundles.CallBundleId.fromId(call.callExperienceBundleId)
+            ChatySettingsTile(
+                title = "Selected Call Bundle",
+                icon = Icons.Rounded.Style,
+                iconColor = colors.primary,
+                subtitle = bundle.displayName,
+                trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) },
+                onTap = onOpenCallBundles,
+            )
         }
         ChatySettingsSection(
             "Call Screen Style",
