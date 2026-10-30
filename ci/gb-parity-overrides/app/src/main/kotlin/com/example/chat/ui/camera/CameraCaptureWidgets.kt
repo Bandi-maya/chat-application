@@ -340,9 +340,12 @@ fun CameraCaptureBottomControls(
                 ) {
                     items(allEffects.size) { index ->
                         val effect = allEffects[index]
-                        // Honest availability: effects with no working renderer (segmentation bg_* no-ops) are disabled, never shown as working.
-                        val unavailable = effect.isSegmentationRequired ||
-                            (effect.colorMatrix == null && effect.shaderKey == null && !effect.isFaceTrackingRequired && effect.id != "none")
+                        // Honest availability: effects with no working renderer are
+                        // disabled, never shown as working. Segmented background effects
+                        // render on the captured photo (no live segmented preview yet).
+                        val unavailable = effect.colorMatrix == null && effect.shaderKey == null &&
+                            !effect.isFaceTrackingRequired && effect.id != "none"
+                        val captureOnly = effect.isSegmentationRequired && !unavailable
                         val lensId = lensIdForEffect(effect.id)
                         val isSelected = if (effect.isFaceTrackingRequired) {
                             lensId != null && lensManager.selected.id == lensId
@@ -359,7 +362,7 @@ fun CameraCaptureBottomControls(
                             modifier = Modifier
                                 .padding(horizontal = 5.dp)
                                 .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (unavailable) 0.45f else 1f }
-                                .semantics { if (unavailable) stateDescription = "Not available yet" }
+                                .semantics { if (unavailable) stateDescription = "Not available yet" else if (captureOnly) stateDescription = "Applies to the captured photo" }
                                 .clickable(enabled = !unavailable) { onSelectEffect(effect) },
                         ) {
                             Box(
