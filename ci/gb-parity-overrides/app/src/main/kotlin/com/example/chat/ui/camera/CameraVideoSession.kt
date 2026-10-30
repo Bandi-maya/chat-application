@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.*
@@ -22,7 +24,7 @@ import java.util.concurrent.Executors
 data class FinalizedVideo(val file: File, val durationMs: Long, val hasAudio: Boolean, val mimeType: String = "video/mp4")
 sealed interface VideoSessionState {
     data object Preparing : VideoSessionState
-    data class Ready(val stabilizationEnabled: Boolean, val boundFront: Boolean = false) : VideoSessionState
+    data class Ready(val stabilizationEnabled: Boolean, val boundFront: Boolean = false, val snapshotAvailable: Boolean = false) : VideoSessionState
     data class Recording(val hasAudio: Boolean) : VideoSessionState
     data class Paused(val hasAudio: Boolean) : VideoSessionState
     data object Finalizing : VideoSessionState
@@ -34,7 +36,10 @@ sealed interface VideoSessionState {
 internal object CameraVideoNativeProof {
     @Volatile var beforeBind: (suspend () -> Unit)? = null
     @Volatile var observe: ((VideoSessionState) -> Unit)? = null
-    fun reset() { beforeBind=null; observe=null }
+    /** Instrumentation-only: simulate a device that cannot bind the 3-use-case
+     *  combination so tests can prove the no-snapshot fallback path. */
+    @Volatile var forceSnapshotUnavailable: Boolean = false
+    fun reset() { beforeBind=null; observe=null; forceSnapshotUnavailable=false }
 }
 
 /** Main-thread API. Caller must release its image/analysis use cases BEFORE binding.
@@ -57,6 +62,7 @@ class CameraVideoSession(
     private var capture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
     private var camera: androidx.camera.core.Camera? = null
+    private var snapshot: ImageCapture? = null
     private var recordingAudio = false
     private var activeFile: File? = null
     private var reviewFile: File? = null
@@ -105,10 +111,24 @@ class CameraVideoSession(
                 ).build()
                 val video = VideoCapture.Builder(recorder).setVideoStabilizationEnabled(stabilized).build()
                 val view = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
-                val actual = p.bindToLifecycle(owner, selector, view, video)
+                // Reference camera UI offers a still snapshot while recording.
+                // That needs Preview+VideoCapture+ImageCapture together, which not
+                // every device supports: try the 3-use-case bind first and fall
+                // back to video-only, reporting real availability in Ready so the
+                // UI never draws a dead snapshot button.
+                val wantSnapshot = !(com.example.chat.BuildConfig.DEBUG && CameraVideoNativeProof.forceSnapshotUnavailable)
+                var actual: androidx.camera.core.Camera? = null
+                if (wantSnapshot) {
+                    val snap = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build()
+                    try {
+                        actual = p.bindToLifecycle(owner, selector, view, video, snap)
+                        snapshot = snap
+                    } catch (_: Exception) { snapshot = null }
+                }
+                if (actual == null) actual = p.bindToLifecycle(owner, selector, view, video)
                 boundFront = CameraSelector.DEFAULT_FRONT_CAMERA.filter(listOf(actual.cameraInfo)).isNotEmpty()
                 provider = p; preview = view; capture = video; camera = actual
-                publish(VideoSessionState.Ready(stabilized, boundFront))
+                publish(VideoSessionState.Ready(stabilized, boundFront, snapshot != null))
             } catch (e: Exception) { publish(VideoSessionState.Error("Video camera could not start. Try Photo or reopen the camera.")) }
         }
         future.addListener({
@@ -171,6 +191,25 @@ class CameraVideoSession(
     /** The bound camera for this session's own preview/video binding, for zoom control.
      *  Null before bind completes and after close. */
     fun boundCamera(): androidx.camera.core.Camera? = camera
+    /** Still snapshot while recording (reference camera UI). Only possible when the
+     *  device bound the 3-use-case combination (Ready.snapshotAvailable). Saves the
+     *  JPEG to the device gallery via MediaStore; the callback reports the real
+     *  result - no fake success. */
+    fun takeSnapshot(onResult: (Boolean) -> Unit) {
+        checkMain()
+        val snap = snapshot
+        if (snap == null || !auth.isCurrent() || closed || recording == null) { onResult(false); return }
+        val values = android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "chaty-recording-${System.currentTimeMillis()}.jpg")
+            put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Chaty")
+        }
+        val output = ImageCapture.OutputFileOptions.Builder(app.contentResolver, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build()
+        snap.takePicture(output, main, object : ImageCapture.OnImageSavedCallback {
+            override fun onImageSaved(results: ImageCapture.OutputFileResults) { onResult(true) }
+            override fun onError(exception: ImageCaptureException) { onResult(false) }
+        })
+    }
     /** Pause an active recording (reference camera UI: pause control beside stop).
      *  Same auth/main-thread discipline as start/stop; no-op unless recording. */
     fun pauseRecording() {
@@ -218,7 +257,8 @@ class CameraVideoSession(
         // Finalize owns active-file cleanup, so do not delete a file still being encoded.
         if (!busy) activeFile?.delete()
         preview?.let { provider?.unbind(it) }; capture?.let { provider?.unbind(it) }
-        preview = null; capture = null; camera = null
+        snapshot?.let { provider?.unbind(it) }
+        preview = null; capture = null; camera = null; snapshot = null
         // Shutdown accepts already queued finalization work; no further starts are possible.
         if (!busy) io.shutdown()
     }
