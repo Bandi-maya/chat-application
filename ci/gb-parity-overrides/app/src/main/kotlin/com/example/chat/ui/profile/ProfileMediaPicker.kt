@@ -350,6 +350,7 @@ fun ProfileImageCropperDialog(
     onError: (String) -> Unit = {},
 ) = ProfileImageCropperOwnedDialog(sourceFile, isAvatar, title, onDone, onError, null, { true })
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun ProfileImageCropperOwnedDialog(
     sourceFile: File, isAvatar: Boolean, title: String, onDone: (File?) -> Unit, onError: (String) -> Unit,
