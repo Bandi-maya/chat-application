@@ -310,6 +310,7 @@ fun CameraCaptureBottomControls(
     videoRecording: Boolean = false,
     videoSeconds: Int = 0,
     videoPaused: Boolean = false,
+    videoSnapshotAvailable: Boolean = false,
     engine: EffectEngine,
     lensManager: LensManager,
     faceHealth: TrackingHealth,
@@ -319,6 +320,7 @@ fun CameraCaptureBottomControls(
     onSetViewMode: (CaptureViewMode) -> Unit,
     onShutter: () -> Unit,
     onTogglePause: () -> Unit = {},
+    onSnapshot: () -> Unit = {},
     onFlip: () -> Unit,
     onPickFromGallery: () -> Unit,
     onBrowseLenses: () -> Unit = {},
@@ -544,6 +546,21 @@ fun CameraCaptureBottomControls(
                 // stays centered; pause/resume sits at the right edge.
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CameraCaptureShutter(enabled = true, capturing = false, videoActive = true, recording = true, onClick = onShutter)
+                    if (videoSnapshotAvailable) {
+                        // Reference recording row: still snapshot button left of stop.
+                        // Drawn only when the session really bound the 3-use-case
+                        // combination - never a dead button.
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = (if (tight) 12 else 16).dp)
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .border(3.dp, Color.White, CircleShape)
+                                .clickable(onClick = onSnapshot)
+                                .semantics { contentDescription = "Take snapshot while recording" },
+                        ) {}
+                    }
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
