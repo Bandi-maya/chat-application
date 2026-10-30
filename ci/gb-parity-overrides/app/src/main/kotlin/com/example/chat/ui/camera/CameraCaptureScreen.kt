@@ -575,8 +575,15 @@ fun ChatyCameraCaptureScreen(
         val pv = previewView ?: return
         val lease = videoAuth ?: return
         if (!cameraPermissionGranted || capturedPath != null || documentReviewPath != null || scannerBusy || !videoOpen) return
+        // Idempotence: every caller that legitimately re-binds (permission return,
+        // leaving video mode, auth invalidation) closes and nulls the session
+        // first. A live session must NOT be replaced: a duplicate bind closes the
+        // session that may already hold the composer hold token's one-shot Start,
+        // and the surviving session never receives it (117 RealHostVideoHoldProof
+        // evidence: recording finalized ERROR_NO_VALID_DATA 3ms after start when a
+        // second bind closed its session, then 20s of preview with no Recording).
+        if (videoSession != null) return
         bindJob?.cancel()
-        videoSession?.close()
         phase = CameraPhase.initializing
         errorMessage = null
         val sessionSelector = if (session.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
@@ -653,12 +660,18 @@ fun ChatyCameraCaptureScreen(
     // Re-check after returning from Android app settings. A granted permission
     // must not leave this composition stranded in its old denied state.
     DisposableEffect(lifecycleOwner, session, capturedPath, documentReviewPath, scannerBusy, videoOpen) {
+        // Only a real pause->resume cycle re-binds: registering this observer on an
+        // already-RESUMED lifecycle replays ON_CREATE/ON_START/ON_RESUME, and that
+        // replay must not re-bind a session the LaunchedEffect just created.
+        var wasPaused = false
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
+                wasPaused = true
                 timerJob?.cancel()
                 countdown = 0
             }
-            if (event == Lifecycle.Event.ON_RESUME) {
+            if (event == Lifecycle.Event.ON_RESUME && wasPaused) {
+                wasPaused = false
                 val granted = ChatyPermissions.isGranted(context, ChatyPermissions.camera)
                 cameraPermissionGranted = granted
                 if (granted) {
