@@ -1,0 +1,101 @@
+package com.example.chat
+
+import com.example.chat.ui.camera.EffectEngine
+import com.example.chat.ui.camera.EffectRegistry
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * Behavioral proofs for the batch availability contract: which effects actually
+ * render through EffectEngine, and that renderer-less entries are provably inert
+ * (they back the disabled "Not available yet" state in both pickers).
+ */
+class CameraEffectAvailabilityTest {
+
+    private val unavailableIds = listOf(
+        "bg_portrait_blur", "bg_virtual_office", "bg_gradient_studio", "face_pixel_retro",
+    )
+
+    @Test fun `none renders no matrix and no overlay`() {
+        val e = EffectEngine()
+        assertNull(e.activeColorMatrix())
+        assertFalse(e.isAnimatedOverlayActive)
+    }
+
+    @Test fun `unavailable effects are inert when selected`() {
+        val e = EffectEngine()
+        unavailableIds.forEach { id ->
+            e.selectEffect(EffectRegistry.getById(id))
+            assertEquals(id, e.activeEffect.id)
+            assertNull("$id must render no color matrix", e.activeColorMatrix())
+            assertFalse("$id must not stack an overlay", e.isAnimatedOverlayActive)
+        }
+    }
+
+    @Test fun `every render-backed effect produces engine output`() {
+        val e = EffectEngine()
+        val working = EffectRegistry.allEffects.filter { it.id != "none" && it.id !in unavailableIds }
+        assertEquals(95, working.size)
+        working.forEach { effect ->
+            e.selectEffect(effect)
+            val renders = e.activeColorMatrix() != null || e.isAnimatedOverlayActive || effect.isFaceTrackingRequired
+            assertTrue("${effect.id} has no engine output path", renders)
+            if (effect.colorMatrix != null) {
+                assertEquals("${effect.id} matrix size", 20, e.activeColorMatrix()!!.size)
+            }
+        }
+    }
+
+    @Test fun `face-flagged effects are exactly the six lens-mapped originals`() {
+        // CameraCaptureScreen.lensIdForEffect maps these six ids to lenses; a
+        // face-flagged effect outside this set would dead-tap at runtime.
+        val flagged = EffectRegistry.allEffects.filter { it.isFaceTrackingRequired }.map { it.id }.sorted()
+        assertEquals(
+            listOf(
+                "face_angel_halo", "face_dog_filter", "face_hearts_float",
+                "face_neon_crown", "face_sparkles", "face_sunglasses_aviator",
+            ),
+            flagged,
+        )
+    }
+
+    @Test fun `v2 full-frame grades carry real matrices without face flags`() {
+        listOf("glow_rainbow_sheen", "beauty_golden_veil", "beauty_sunkissed", "glow_sunset_haze", "glow_forest_mist").forEach { id ->
+            val effect = EffectRegistry.getById(id)
+            assertEquals(id, effect.id)
+            assertFalse("$id must not require face tracking", effect.isFaceTrackingRequired)
+            assertNotNull("$id needs a real matrix", effect.colorMatrix)
+            assertEquals(20, effect.colorMatrix!!.size)
+        }
+    }
+
+    @Test fun `performance fallback blanks output and restore brings it back`() {
+        val e = EffectEngine()
+        e.selectEffect(EffectRegistry.getById("face_dog_filter"))
+        assertNotNull(e.activeColorMatrix())
+        e.triggerPerformanceFallback()
+        assertNull(e.activeColorMatrix())
+        assertFalse(e.isAnimatedOverlayActive)
+        e.restorePerformanceMode()
+        assertNotNull(e.activeColorMatrix())
+    }
+
+    @Test fun `intensity clamps to unit range and interpolates`() {
+        val e = EffectEngine()
+        e.selectEffect(EffectRegistry.getById("face_dog_filter"))
+        e.setIntensity(2.5)
+        assertEquals(1.0, e.intensity, 0.0)
+        e.setIntensity(-1.0)
+        assertEquals(0.0, e.intensity, 0.0)
+        // intensity 0 is the identity matrix, not a null render
+        val identity = e.activeColorMatrix()
+        assertNotNull(identity)
+        assertEquals(1.0, identity!![0], 1e-9)
+        assertEquals(1.0, identity[5], 1e-9)
+        assertEquals(0.0, identity[1], 1e-9)
+    }
+}
