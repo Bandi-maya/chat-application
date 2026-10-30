@@ -365,6 +365,10 @@ fun ChatyCameraCaptureScreen(
     var countdown by remember { mutableStateOf(0) }
     var scannerBusy by remember { mutableStateOf(false) }
     var scannerError by remember { mutableStateOf<String?>(null) }
+    // Highest zoom ratio the camera has actually accepted (user device screenshot
+    // 2026-10-30: a rejected preset must not stay offered). Float.MAX_VALUE until
+    // a failure proves a lower ceiling.
+    var workingMaxZoom by remember { mutableStateOf(Float.MAX_VALUE) }
     var timerJob by remember { mutableStateOf<Job?>(null) }
     var zoomRatio by remember { mutableStateOf(1f) }
     var hdrOn by remember { mutableStateOf(false) }
@@ -383,6 +387,8 @@ fun ChatyCameraCaptureScreen(
     var videoSession by remember { mutableStateOf<CameraVideoSession?>(null) }
     var videoState by remember { mutableStateOf<VideoSessionState?>(null) }
     var videoSeconds by remember { mutableStateOf(0) }
+    var videoSnapshotAvailable by remember { mutableStateOf(false) }
+    var videoLensEffectActive by remember { mutableStateOf(true) }
     var videoExitPrompt by remember { mutableStateOf(false) }
     var videoRetakePrompt by remember { mutableStateOf(false) }
     var videoStopPlayback by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -400,7 +406,7 @@ fun ChatyCameraCaptureScreen(
     var bindJob by remember { mutableStateOf<Job?>(null) }
 
     val wantsFaceTracking = capturedPath == null &&
-        (captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses) &&
+        (captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses || captureViewMode == CaptureViewMode.video) &&
         lensManager.selected.requiresFaceTracking
 
     fun lensIdForEffect(effectId: String): String? = when (effectId) {
@@ -571,20 +577,30 @@ fun ChatyCameraCaptureScreen(
         phase = CameraPhase.initializing
         errorMessage = null
         val sessionSelector = if (session.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
-        val vs = CameraVideoSession(pv.context, lifecycleOwner, pv, sessionSelector, options.stabilization, lease) { next ->
+        val vs = CameraVideoSession(pv.context, lifecycleOwner, pv, sessionSelector, options.stabilization, lease, { viewportSize }, { lensManager.selected }, { facePoses }) { next ->
             videoState = next
-            if (next is VideoSessionState.Ready || next is VideoSessionState.Recording) phase = CameraPhase.ready
+            if (next is VideoSessionState.Ready || next is VideoSessionState.Recording || next is VideoSessionState.Paused) phase = CameraPhase.ready
+            if (next is VideoSessionState.Ready) {
+                // The video camera can expose a different zoom range than the photo session.
+                videoSession?.boundCamera()?.cameraInfo?.zoomState?.value?.let { zoom ->
+                    zoomRatio = zoom.zoomRatio; minZoom = zoom.minZoomRatio; maxZoom = zoom.maxZoomRatio
+                }
+                videoSnapshotAvailable = next.snapshotAvailable
+                videoLensEffectActive = next.lensEffectActive
+            }
             if (next is VideoSessionState.Error) { errorMessage = next.message; phase = CameraPhase.noCamera }
         }
         videoSession = vs
         vs.bind()
     }
 
-    // Recording timer feeding the inline video pill.
-    LaunchedEffect(videoState) {
-        if (videoState is VideoSessionState.Recording) {
+    // Recording timer feeding the top-center time. The key stays stable across
+    // pause/resume so pausing freezes the count instead of resetting it.
+    val videoTimerActive = videoState is VideoSessionState.Recording || videoState is VideoSessionState.Paused
+    LaunchedEffect(videoTimerActive) {
+        if (videoTimerActive) {
             videoSeconds = 0
-            while (true) { kotlinx.coroutines.delay(1_000); videoSeconds++ }
+            while (true) { kotlinx.coroutines.delay(1_000); if (videoState is VideoSessionState.Recording) videoSeconds++ }
         } else videoSeconds = 0
     }
 
@@ -837,7 +853,7 @@ fun ChatyCameraCaptureScreen(
             // Inline video: the shutter toggles recording; review follows on stop.
             val vs = videoSession ?: return
             when (videoState) {
-                is VideoSessionState.Recording -> vs.stop()
+                is VideoSessionState.Recording, is VideoSessionState.Paused -> vs.stop()
                 is VideoSessionState.Ready -> if (videoAuth?.isCurrent() == true) vs.start(requestAudio = true)
                 else -> Unit
             }
@@ -939,6 +955,7 @@ fun ChatyCameraCaptureScreen(
         } else if (capturedPath == null) {
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
             CameraCaptureViewfinder(
+                videoLensRecorded = videoLensEffectActive,
                 phase = phase,
                 errorMessage = errorMessage,
                 captureViewMode = captureViewMode,
@@ -1024,6 +1041,10 @@ fun ChatyCameraCaptureScreen(
                 }
                 if (countdown > 0) androidx.compose.material3.Text("$countdown", modifier = Modifier.align(Alignment.Center),
                     color = androidx.compose.ui.graphics.Color.White, fontSize = 42.sp)
+                // Reference-grounded (Snap/IG recording frames): elapsed time sits
+                // top-center while a video records.
+                if (videoTimerActive) CameraCaptureTimerTop(videoSeconds,
+                    Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 8.dp))
                 androidx.compose.foundation.layout.Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                         .windowInsetsPadding(WindowInsets.safeDrawing)
@@ -1032,12 +1053,18 @@ fun ChatyCameraCaptureScreen(
                 ) {
                 if (portraitActive) androidx.compose.material3.Text("Portrait · device background blur",color=androidx.compose.ui.graphics.Color.White)
                 if (nightActive) androidx.compose.material3.Text("Night · hold still while capturing",color=androidx.compose.ui.graphics.Color.White)
-                CameraZoomControls(zoomRatio,minZoom,maxZoom,enabled = phase == CameraPhase.ready && !capturing && !videoOpen) { requested ->
-                    val control = session.camera?.cameraControl
+                val videoZoomReady = videoState is VideoSessionState.Ready || videoTimerActive
+                CameraZoomControls(zoomRatio,minZoom,effectiveZoomMax(maxZoom,workingMaxZoom),enabled = phase == CameraPhase.ready && !capturing && (!videoOpen || videoZoomReady),forceSlider = videoTimerActive) { requested ->
+                    val control = if (videoOpen) videoSession?.boundCamera()?.cameraControl else session.camera?.cameraControl
                     if (control != null) {
                         val result = control.setZoomRatio(clampCameraZoom(requested,minZoom,maxZoom))
                         result.addListener({ try { result.get(); zoomRatio = clampCameraZoom(requested,minZoom,maxZoom) }
-                            catch (_: Exception) { scannerError = "Zoom is unavailable on this camera." }
+                            catch (_: Exception) {
+                                // Clamp the offered range to what the camera accepted,
+                                // so the failed preset disappears instead of failing again.
+                                workingMaxZoom = maxOf(minZoom, zoomRatio)
+                                scannerError = "Zoom is unavailable on this camera."
+                            }
                         }, ContextCompat.getMainExecutor(context))
                     }
                 }
@@ -1056,8 +1083,11 @@ fun ChatyCameraCaptureScreen(
                 effectsOpen = effectsOpen,
                 capturing = capturing,
                 videoActive = videoOpen,
-                videoRecording = videoState is VideoSessionState.Recording,
+                videoRecording = videoTimerActive,
                 videoSeconds = videoSeconds,
+                videoPaused = videoState is VideoSessionState.Paused,
+                videoSnapshotAvailable = videoSnapshotAvailable,
+                onSnapshot = { videoSession?.takeSnapshot { ok -> if (!ok) scannerError = "Snapshot is unavailable while recording on this camera." } },
                 nightSupported = nightSupported,
                 portraitSupported = portraitSupported,
                 videoSupported = videoAuthPort != null,
@@ -1099,6 +1129,14 @@ fun ChatyCameraCaptureScreen(
                     }
                 },
                 onShutter = ::shutter,
+                onTogglePause = {
+                    val vs = videoSession
+                    if (vs != null) when (videoState) {
+                        is VideoSessionState.Recording -> vs.pauseRecording()
+                        is VideoSessionState.Paused -> vs.resumeRecording()
+                        else -> Unit
+                    }
+                },
                 onFlip = ::flipCamera,
                 onPickFromGallery = ::pickFromGallery,
             )

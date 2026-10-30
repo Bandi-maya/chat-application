@@ -90,6 +90,7 @@ fun CameraCaptureViewfinder(
     phase: CameraPhase,
     errorMessage: String?,
     captureViewMode: CaptureViewMode,
+    videoLensRecorded: Boolean = true,
     effect: ChatyCameraEffect,
     effectIntensity: Double,
     segmentPreview: android.graphics.Bitmap? = null,
@@ -167,8 +168,27 @@ fun CameraCaptureViewfinder(
             )
             CameraPhase.ready -> Unit
         }
-        if (phase == CameraPhase.ready && (captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses)) {
+        // Lenses preview in photo, lenses AND video modes: the recorded video
+        // composites the same overlay, so preview and output stay identical.
+        // Video preview draws the lens only when the recording pipeline actually
+        // composites it (OverlayEffect bound); otherwise the choice is disabled
+        // below instead of faking a recorded effect that is not there.
+        val lensVisible = captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses ||
+            (captureViewMode == CaptureViewMode.video && videoLensRecorded)
+        if (phase == CameraPhase.ready && lensVisible) {
             LensOverlay(lens = lens, poses = facePoses, health = faceHealth)
+        }
+        if (phase == CameraPhase.ready && captureViewMode == CaptureViewMode.video && !videoLensRecorded && !lens.isNoLens) {
+            Text(
+                "Lens can't be recorded on this device",
+                color = Color.White,
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 96.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
         }
         if (phase == CameraPhase.ready && captureViewMode == CaptureViewMode.document) {
             // Paper detection/corner review belongs to the real scanner flow,
@@ -184,23 +204,31 @@ fun CameraCaptureViewfinder(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CameraCaptureRoundAction(label = "Close camera", kind = "close", onClick = onClose)
-            Spacer(Modifier.weight(1f))
+            // User direction (device screenshot 2026-10-30): the action group is
+            // centered as a unit so every icon stays visible and balanced.
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
             if (phase == CameraPhase.ready) {
-                if (flashSupported) CameraCaptureRoundAction(
-                    label = if (flashOn) "Turn flash off" else "Turn flash on",
-                    kind = "flash",
-                    onClick = onToggleFlash,
-                )
-                if (hdrSupported) {
+                if (flashSupported) {
+                    CameraCaptureRoundAction(
+                        label = if (flashOn) "Turn flash off" else "Turn flash on",
+                        kind = "flash",
+                        onClick = onToggleFlash,
+                    )
                     Spacer(Modifier.width(10.dp))
+                }
+                if (hdrSupported) {
                     CameraCaptureRoundAction(
                         label = if (hdrOn) "Turn HDR off" else "Turn HDR on",
                         kind = "hdr",
                         highlighted = hdrOn,
                         onClick = onToggleHdr,
                     )
+                    Spacer(Modifier.width(10.dp))
                 }
-                Spacer(Modifier.width(10.dp))
                 if ((captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses)) {
                     CameraCaptureRoundAction(
                         label = "Color filters",
@@ -209,9 +237,11 @@ fun CameraCaptureViewfinder(
                         highlighted = effectsOpen || effectActive(effect),
                         onClick = onToggleEffects,
                     )
+                    Spacer(Modifier.width(10.dp))
                 }
             }
             CameraCaptureRoundAction(label = "Camera settings", kind = "settings", onClick = onToggleOptions)
+            }
         }
     }
 }
@@ -288,6 +318,15 @@ private fun CameraCaptureNoCameraPane(
     }
 }
 
+/** Recording accent: the user's design red (stop ring/glyph). Centralized so
+ *  recording semantics stay red regardless of the configurable theme accent. */
+internal val CameraRecordingRed = Color.Red
+
+/** Active mode-strip text color: the reference camera (user video 2026-10-30)
+ *  highlights the active mode in yellow; matches the user's zoom-preset yellow
+ *  (CameraZoomControls 0xFFFFD54F) so there is one active-highlight token. */
+internal val CameraModeActiveYellow = Color(0xFFFFD54F)
+
 @Composable
 fun CameraCaptureBottomControls(
     phase: CameraPhase,
@@ -300,6 +339,8 @@ fun CameraCaptureBottomControls(
     videoActive: Boolean = false,
     videoRecording: Boolean = false,
     videoSeconds: Int = 0,
+    videoPaused: Boolean = false,
+    videoSnapshotAvailable: Boolean = false,
     engine: EffectEngine,
     lensManager: LensManager,
     faceHealth: TrackingHealth,
@@ -308,6 +349,8 @@ fun CameraCaptureBottomControls(
     onSelectEffect: (ChatyCameraEffect) -> Unit,
     onSetViewMode: (CaptureViewMode) -> Unit,
     onShutter: () -> Unit,
+    onTogglePause: () -> Unit = {},
+    onSnapshot: () -> Unit = {},
     onFlip: () -> Unit,
     onPickFromGallery: () -> Unit,
     onBrowseLenses: () -> Unit = {},
@@ -426,6 +469,9 @@ fun CameraCaptureBottomControls(
                 Spacer(Modifier.height((if (tight) 4 else 9).dp))
             }
             }
+            // Reference-grounded (Snap/IG recording frames): idle controls hide
+            // while a video records; only the stop control and timer stay.
+            if (!videoRecording) {
             // Snap-style text mode strip (product direction 2026-10-30): plain
             // text items, never capsule chips; the active mode is centered and
             // underlined. Tapping selects and centers; horizontal swipes only
@@ -434,7 +480,11 @@ fun CameraCaptureBottomControls(
             // width + symmetric content padding from the real viewport width
             // make animateScrollToItem land the active item exactly centered.
             val stripState = rememberLazyListState()
+            // Unsupported modes are hidden entirely (user direction 2026-10-30):
+            // never a truncated "unavailable" label consuming a slot. The active
+            // mode is always supported, so the centered underline never moves.
             val stripModes = listOf(CaptureViewMode.photo,CaptureViewMode.portrait,CaptureViewMode.night,CaptureViewMode.lenses,CaptureViewMode.video,CaptureViewMode.document)
+                .filter { when(it){CaptureViewMode.portrait->portraitSupported;CaptureViewMode.night->nightSupported;CaptureViewMode.video->videoSupported;else->true} }
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val slotWidth = (if (tight) 76 else 88).dp
                 LaunchedEffect(captureViewMode, maxWidth) {
@@ -448,14 +498,14 @@ fun CameraCaptureBottomControls(
                 ) {
                     items(stripModes.size) { i ->
                         val mode = stripModes[i]
-                        val supported=when(mode){CaptureViewMode.portrait->portraitSupported;CaptureViewMode.night->nightSupported;CaptureViewMode.video->videoSupported;else->true}
                         val name=mode.name.replaceFirstChar{it.uppercase()}
-                        CameraCaptureModeButton(label=if(supported)name else "$name unavailable",
-                            selected=captureViewMode==mode,tight=tight,enabled=supported&&!capturing,onClick={onSetViewMode(mode)},modifier=Modifier.width(slotWidth))
+                        CameraCaptureModeButton(label=name,
+                            selected=captureViewMode==mode,tight=tight,enabled=!capturing,onClick={onSetViewMode(mode)},modifier=Modifier.width(slotWidth))
                     }
                 }
             }
             Spacer(Modifier.height((if (tight) 4 else 8).dp))
+            }
             // The lenses tab activates the Snap-style lens UI; the color-filter
             // tray is a separate surface opened only from the filters button, so
             // lens UI never mixes with the open tray.
@@ -520,19 +570,99 @@ fun CameraCaptureBottomControls(
                 }
                 Spacer(Modifier.height((if (tight) 1 else 4).dp))
             }
-            // Inline video: recording-time pill sits above the shutter row while recording.
-            CameraCaptureTimer(recording = videoRecording, seconds = videoSeconds)
             // Snap-style inline row (verified reference): gallery, shutter, then the
             // lens carousel scrolling on the SAME row, flip at the far edge. Gallery
             // and flip keep their existing capabilities and safe-area padding.
-            Row(
+            // While recording, the stop control stays centered alone (reference).
+            if (videoRecording) {
+                // Reference recording row (user video 2026-10-30): the stop control
+                // stays centered; pause/resume sits at the right edge.
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CameraCaptureShutter(enabled = true, capturing = false, videoActive = true, recording = true, onClick = onShutter)
+                    if (videoSnapshotAvailable) {
+                        // Reference recording row: still snapshot button left of stop.
+                        // Drawn only when the session really bound the 3-use-case
+                        // combination - never a dead button.
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = (if (tight) 12 else 16).dp)
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .border(3.dp, Color.White, CircleShape)
+                                .clickable(onClick = onSnapshot)
+                                .semantics { contentDescription = "Take snapshot while recording" },
+                        ) {}
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = (if (tight) 12 else 16).dp)
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onTogglePause)
+                            .semantics { contentDescription = if (videoPaused) "Resume recording" else "Pause recording" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (videoPaused) {
+                            androidx.compose.foundation.Canvas(Modifier.size(18.dp)) {
+                                val w = size.width; val h = size.height
+                                drawPath(androidx.compose.ui.graphics.Path().apply {
+                                    moveTo(w * .25f, h * .12f); lineTo(w * .25f, h * .88f); lineTo(w * .88f, h * .5f); close()
+                                }, color = Color.White)
+                            }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Box(Modifier.width(5.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White))
+                                Box(Modifier.width(5.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White))
+                            }
+                        }
+                    }
+                }
+            } else {
+            // User direction (device screenshot 2026-10-30): the shutter sits at
+            // true screen center in every idle mode; gallery and flip anchor the
+            // edges. In lenses mode the carousel spans the full row and the
+            // centered (selected) lens renders inside the hollow shutter ring -
+            // clean, no white fill over the lens.
+            val lensesRow = captureViewMode == CaptureViewMode.lenses && !effectsOpen
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = (if (tight) 12 else 16).dp),
-                verticalAlignment = Alignment.CenterVertically,
+                contentAlignment = Alignment.Center,
             ) {
+                if (lensesRow) {
+                    // A bottom-to-top drag here opens the lens browser; horizontal
+                    // scrolling stays with the carousel and taps still select, and
+                    // preview tap-to-focus / pinch-zoom live on the viewfinder, so
+                    // no gesture conflicts.
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .pointerInput(lensManager) {
+                                var draggedUp = 0f
+                                var opened = false
+                                detectVerticalDragGestures(
+                                    onDragStart = { draggedUp = 0f; opened = false },
+                                    onVerticalDrag = { _, dragAmount ->
+                                        if (dragAmount < 0f) {
+                                            draggedUp += -dragAmount
+                                            if (!opened && draggedUp > 48.dp.toPx()) {
+                                                opened = true
+                                                onBrowseLenses()
+                                            }
+                                        }
+                                    },
+                                )
+                            },
+                    ) {
+                        LensCarousel(manager = lensManager, deviceTier = deviceTier)
+                    }
+                }
                 Box(
                     modifier = Modifier
+                        .align(Alignment.CenterStart)
                         .size((if (tight) 48 else 52).dp)
                         .clip(CircleShape)
                         .clickable(onClick = onPickFromGallery)
@@ -541,42 +671,10 @@ fun CameraCaptureBottomControls(
                 ) {
                     CameraGlyph(kind = "gallery", color = Color.White, size = 27.dp)
                 }
-                CameraCaptureShutter(enabled = ready, capturing = capturing, videoActive = videoActive, recording = videoRecording, onClick = onShutter)
-                Box(Modifier.weight(1f)) {
-                    // Lenses tab only: the carousel rides the gallery/shutter/flip
-                    // row and stays hidden while the filters tray is open. In every
-                    // other mode the row keeps its geometry with the slot empty.
-                    // A bottom-to-top drag here opens the lens browser; horizontal
-                    // scrolling stays with the carousel and taps still select, and
-                    // preview tap-to-focus / pinch-zoom live on the viewfinder, so
-                    // no gesture conflicts.
-                    if (captureViewMode == CaptureViewMode.lenses && !effectsOpen) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .pointerInput(lensManager) {
-                                    var draggedUp = 0f
-                                    var opened = false
-                                    detectVerticalDragGestures(
-                                        onDragStart = { draggedUp = 0f; opened = false },
-                                        onVerticalDrag = { _, dragAmount ->
-                                            if (dragAmount < 0f) {
-                                                draggedUp += -dragAmount
-                                                if (!opened && draggedUp > 48.dp.toPx()) {
-                                                    opened = true
-                                                    onBrowseLenses()
-                                                }
-                                            }
-                                        },
-                                    )
-                                },
-                        ) {
-                            LensCarousel(manager = lensManager, deviceTier = deviceTier)
-                        }
-                    }
-                }
+                CameraCaptureShutter(enabled = ready, capturing = capturing, videoActive = videoActive, recording = videoRecording, hollow = lensesRow, onClick = onShutter)
                 Box(
                     modifier = Modifier
+                        .align(Alignment.CenterEnd)
                         .size((if (tight) 48 else 52).dp)
                         .clip(CircleShape)
                         .clickable(enabled = ready, onClick = onFlip)
@@ -589,6 +687,7 @@ fun CameraCaptureBottomControls(
                         size = 27.dp,
                     )
                 }
+            }
             }
         }
     }
@@ -624,7 +723,7 @@ private fun CameraCaptureModeButton(
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            color = if (selected) Color.White else if(enabled) Color(0x99FFFFFF) else Color(0x4DFFFFFF),
+            color = if (selected) CameraModeActiveYellow else if(enabled) Color(0x99FFFFFF) else Color(0x4DFFFFFF),
             fontSize = (if (tight) 12 else 13).sp,
             fontWeight = if (selected) FontWeight.W700 else FontWeight.W500,
         )
@@ -634,7 +733,7 @@ private fun CameraCaptureModeButton(
                 .width(18.dp)
                 .height(2.dp)
                 .clip(RoundedCornerShape(1.dp))
-                .background(if (selected) Color.White else Color.Transparent),
+                .background(if (selected) CameraModeActiveYellow else Color.Transparent),
         )
     }
 }
@@ -642,14 +741,15 @@ private fun CameraCaptureModeButton(
 /** _buildShutter: 76dp ring (4dp white border, 5dp gap), spinner while
  *  capturing, filled inner circle otherwise. */
 @Composable
-private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, videoActive: Boolean = false, recording: Boolean = false, onClick: () -> Unit) {
-    // Photo shutter (white) becomes a Snap-style video shutter: red ring in video
-    // mode, filled red while recording. Size stays 76dp so the row geometry is stable.
+private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, videoActive: Boolean = false, recording: Boolean = false, hollow: Boolean = false, onClick: () -> Unit) {
+    // Reference (user video 2026-10-30): white ring in every state; photo fill is
+    // white, video idle is a red filled circle, recording is a red rounded square.
+    // Size stays 76dp so the row geometry is stable.
     Box(
         modifier = Modifier
             .size(76.dp)
             .clip(CircleShape)
-            .border(4.dp, if (videoActive) Color(0xFFFF3B30) else Color.White, CircleShape)
+            .border(4.dp, Color.White, CircleShape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(5.dp)
             .semantics { contentDescription = if (videoActive) { if (recording) "Stop recording" else "Record video" } else "Take photo" },
@@ -661,36 +761,52 @@ private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, videoActi
                 strokeWidth = 3.dp,
                 modifier = Modifier.padding(16.dp),
             )
-        } else {
+        } else if (recording) {
+            // Reference-grounded stop affordance: rounded square inside the ring.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(18.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(CameraRecordingRed),
+            )
+        } else if (videoActive) {
+            // Reference (user video 2026-10-30): video idle shows a red filled
+            // shutter inside the white ring.
             Box(
                 Modifier
                     .fillMaxSize()
                     .clip(CircleShape)
-                    .background(
-                        when {
-                            recording -> Color(0xFFFF3B30)
-                            enabled -> Color.White
-                            else -> Color(0x61FFFFFF)
-                        },
-                    ),
+                    .background(if (enabled) CameraRecordingRed else Color(0x61FF0000)),
+            )
+        } else if (!hollow) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(if (enabled) Color.White else Color(0x61FFFFFF)),
             )
         }
+        // hollow (lenses mode): only the white ring - the centered selected lens
+        // shows clean inside it, no white fill over the lens.
     }
 }
 
-/** Recording-time pill shown above the shutter row while inline video records. */
+/** Top-center recording time (user reference video: red dot + white
+ *  "HH:MM:SS" text, top-center, no pill). */
 @Composable
-private fun CameraCaptureTimer(recording: Boolean, seconds: Int) {
-    if (!recording) return
-    Box(Modifier.fillMaxWidth().padding(bottom = 4.dp), contentAlignment = Alignment.Center) {
+fun CameraCaptureTimerTop(seconds: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.semantics { contentDescription = "Recording time" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(CameraRecordingRed))
+        Spacer(Modifier.width(6.dp))
         Text(
-            String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60),
-            color = Color(0xFFFF3B30),
-            fontSize = 13.sp,
-            modifier = Modifier
-                .background(Color(0x99000000), RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 2.dp)
-                .semantics { contentDescription = "Recording time" },
+            String.format(java.util.Locale.ROOT, "%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60),
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.W600,
         )
     }
 }

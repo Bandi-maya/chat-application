@@ -147,6 +147,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.6.2")
     implementation("androidx.camera:camera-view:1.6.2")
     implementation("androidx.camera:camera-video:1.6.2")
+    implementation("androidx.camera:camera-effects:1.6.2")
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")

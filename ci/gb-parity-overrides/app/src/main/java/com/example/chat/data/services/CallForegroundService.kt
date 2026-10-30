@@ -69,7 +69,11 @@ class CallForegroundService : Service() {
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Chaty call"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) == true
-        acquireLocks()
+        // Foreground FIRST: on API 31+ the system kills the service with
+        // ForegroundServiceDidNotStartInTimeException if startForeground is not
+        // reached within a few seconds of startForegroundService(). Lock
+        // acquisition (wifi/wake) can block, so it must happen after the service
+        // is foreground, never before it.
         ensureChannel()
         val notification = buildNotification(title, text)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -89,6 +93,7 @@ class CallForegroundService : Service() {
         } else {
             startForeground(SERVICE_ID, notification)
         }
+        acquireLocks()
         // Dart allowAutoRestart=false: never recreated by the system without a live call.
         return START_NOT_STICKY
     }

@@ -105,20 +105,23 @@ class CameraOpeningProofTest {
                         }
                     }
                     capture("normal")
-                    // User redesign: the arc is always visible, preset circles sit
-                    // above it, and the live value pill rides the arc marker. No toggle.
-                    assertFalse("Precise-zoom toggle is gone: the arc is always visible",device.hasObject(By.desc("Toggle precise zoom")))
-                    val dial=device.wait(Until.findObject(By.desc("Circular zoom dial, drag horizontally to zoom")),3000)
-                    capture("zoom-arc")
-                    assertTrue("Zoom arc is always present without a toggle",dial!=null)
+                    // User-confirmed reference design (2026-10-30): a compact zoom
+                    // presets pill; tapping the active value opens the horizontal
+                    // slider with the live value label above it.
+                    assertTrue("The old always-visible arc is gone",!device.hasObject(By.desc("Circular zoom dial, drag horizontally to zoom")))
                     val preset=device.wait(Until.findObject(By.desc("Zoom 1x")),3000)
-                    assertTrue("Preset zoom circles are present",preset!=null)
-                    assertTrue("Live zoom value pill is present",device.hasObject(By.descContains("Zoom value")))
-                    val db=dial.visibleBounds
+                    capture("zoom-pill")
+                    assertTrue("Zoom presets pill is present",preset!=null)
+                    preset.click()
+                    val slider=device.wait(Until.findObject(By.desc("Zoom slider, drag to zoom")),3000)
+                    capture("zoom-slider")
+                    assertTrue("Tapping the active preset opens the horizontal slider",slider!=null)
+                    assertTrue("Live zoom value label is present",device.hasObject(By.descContains("Zoom value")))
+                    val db=slider.visibleBounds
                     device.swipe(db.centerX(),db.centerY(),(db.centerX()+db.width()/4).coerceAtMost(db.right),db.centerY(),12)
                     device.waitForIdle()
-                    assertTrue("Circular zoom dial survives drag interaction",device.hasObject(By.desc("Circular zoom dial, drag horizontally to zoom")))
-                    assertTrue("Zoom value pill tracks the drag",device.hasObject(By.descContains("Zoom value")))
+                    assertTrue("Zoom slider survives drag interaction",device.hasObject(By.desc("Zoom slider, drag to zoom")))
+                    assertTrue("Zoom value label tracks the drag",device.hasObject(By.descContains("Zoom value")))
                     assertTrue("Requested orientation actually applied: $label ${device.displayWidth}x${device.displayHeight}",actualLandscape == landscape)
                     assertBottom()
                     device.findObject(By.desc("Camera settings")).click(); Thread.sleep(300)
@@ -161,4 +164,34 @@ class CameraOpeningProofTest {
         }
     }
 
+    @Test fun shutterCenteredAndUnsupportedModesHidden() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+        device.executeShellCommand("pm grant ${context.packageName} android.permission.CAMERA")
+        ActivityScenario.launch<CameraOpeningProofActivity>(Intent(context, CameraOpeningProofActivity::class.java)).use {
+            assertTrue(device.wait(Until.hasObject(By.desc("Take photo")), 20_000))
+            val displayW = device.displayWidth
+            // User direction (device screenshot 2026-10-30): the shutter sits at
+            // true screen center in idle photo mode.
+            val shutter = device.findObject(By.desc("Take photo")).visibleBounds
+            assertTrue("Shutter horizontally centered on screen",
+                kotlin.math.abs(shutter.centerX() - displayW / 2) <= displayW / 20)
+            // Unsupported modes are hidden, never a truncated "unavailable" label.
+            assertTrue("No unavailable mode labels in the strip",
+                device.wait(Until.gone(By.textContains("unavailable")), 2_000))
+            // Lenses mode: the centered selected lens renders at the same center.
+            val lensesTab = device.wait(Until.findObject(By.desc("Lenses camera mode")), 3_000)
+            if (lensesTab != null) {
+                lensesTab.click(); Thread.sleep(800)
+                val shutter2 = device.findObject(By.desc("Take photo")).visibleBounds
+                assertTrue("Shutter stays centered in lenses mode",
+                    kotlin.math.abs(shutter2.centerX() - displayW / 2) <= displayW / 20)
+                val sel = device.wait(Until.findObject(By.descContains("lens thumbnail, in use")), 4_000)
+                assertTrue("A selected lens is marked in the carousel", sel != null)
+                if (sel != null) assertTrue("Selected lens centered at screen center",
+                    kotlin.math.abs(sel.visibleBounds.centerX() - displayW / 2) <= displayW / 10)
+            }
+        }
+    }
 }
