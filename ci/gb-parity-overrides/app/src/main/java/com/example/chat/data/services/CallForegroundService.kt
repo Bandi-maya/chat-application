@@ -74,6 +74,30 @@ class CallForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "FGS-DIAG onStartCommand entered startId=$startId")
+        if (intent?.action == ACTION_STOP) {
+            // Couriered stop (see stop()): satisfy any pending foreground
+            // requirement on this record, then remove the notification and
+            // stop. The platform kills the process when a record comes down
+            // while still waiting for start foreground (system_server:
+            // "Bringing down service while still waiting for start
+            // foreground"), so a stop must never race context.stopService
+            // against an in-flight startForegroundService.
+            Log.i(TAG, "FGS-DIAG ACTION_STOP courier startId=$startId")
+            try {
+                ensureChannel()
+                val stopNotification = buildNotification("Chaty call", "")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(SERVICE_ID, stopNotification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                } else {
+                    startForeground(SERVICE_ID, stopNotification)
+                }
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } catch (e: Exception) {
+                android.util.Log.w("CallForegroundService", "stop courier foreground failed: $e")
+            }
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Chaty call"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) == true
@@ -170,6 +194,7 @@ class CallForegroundService : Service() {
         const val EXTRA_TITLE = "chaty.call.title"
         const val EXTRA_TEXT = "chaty.call.text"
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
+        private const val ACTION_STOP = "chaty.call.STOP"
 
         private val syncLock = Any()
         private var syncHandler: android.os.Handler? = null
@@ -239,10 +264,28 @@ class CallForegroundService : Service() {
                     pendingSync = null
                 }
             }
-            Log.i(TAG, "FGS-DIAG stopService issued")
+            Log.i(TAG, "FGS-DIAG stop requested (courier)")
+            // Never race context.stopService against an in-flight
+            // startForegroundService: if the platform processes the stop
+            // first it brings the record down with the foreground
+            // requirement still pending and kills the process with
+            // ForegroundServiceDidNotStartInTimeException. Couriering the
+            // stop as a start command on the same record keeps platform
+            // ordering: the service satisfies the requirement first, then
+            // removes its notification and stops itself.
             try {
-                context.stopService(Intent(context, CallForegroundService::class.java))
-            } catch (_: Exception) {
+                context.startService(
+                    Intent(context, CallForegroundService::class.java).setAction(ACTION_STOP),
+                )
+            } catch (e: Exception) {
+                // Background-start rejection means no foreground service is
+                // running or pending, so nothing needs the courier; the
+                // legacy direct stop is then a harmless no-op.
+                android.util.Log.w("CallForegroundService", "stop courier start failed: $e")
+                try {
+                    context.stopService(Intent(context, CallForegroundService::class.java))
+                } catch (_: Exception) {
+                }
             }
         }
     }
