@@ -99,6 +99,7 @@ void main() {
     private var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
     private var eglContext: EGLContext = EGL14.EGL_NO_CONTEXT
     private var eglConfig: EGLConfig? = null
+    private var placeholderSurface: EGLSurface = EGL14.EGL_NO_SURFACE
     private var program = 0
     private var frameTextureId = 0
     private var overlayTextureId = 0
@@ -144,6 +145,14 @@ void main() {
             intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE), 0,
         )
         check(eglContext != EGL14.EGL_NO_CONTEXT) { "eglCreateContext failed" }
+        // GL state setup below (textures, program) requires a current context;
+        // bind a 1x1 pbuffer so initGl is not a silent no-op.
+        placeholderSurface = EGL14.eglCreatePbufferSurface(
+            eglDisplay, eglConfig,
+            intArrayOf(EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE), 0,
+        )
+        check(placeholderSurface != EGL14.EGL_NO_SURFACE) { "eglCreatePbufferSurface failed" }
+        EGL14.eglMakeCurrent(eglDisplay, placeholderSurface, placeholderSurface, eglContext)
 
         val tex = IntArray(2)
         GLES20.glGenTextures(2, tex, 0)
@@ -355,6 +364,8 @@ void main() {
                 overlayBitmap = null
                 if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
                     EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+                    if (placeholderSurface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(eglDisplay, placeholderSurface)
+                    placeholderSurface = EGL14.EGL_NO_SURFACE
                     if (eglContext != EGL14.EGL_NO_CONTEXT) EGL14.eglDestroyContext(eglDisplay, eglContext)
                     EGL14.eglTerminate(eglDisplay)
                 }
