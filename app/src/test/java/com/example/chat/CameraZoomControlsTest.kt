@@ -1,0 +1,32 @@
+package com.example.chat
+
+import com.example.chat.ui.camera.effectiveZoomMax
+import com.example.chat.ui.camera.zoomPresetsFor
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** Zoom pill preset filtering and failure clamping (user device screenshot
+ *  2026-10-30: a rejected preset must not stay offered beside a "Zoom is
+ *  unavailable" message). */
+class CameraZoomControlsTest {
+
+    @Test fun presetsStayInsideReportedRange() {
+        assertEquals(listOf(0.6f, 1f, 2f, 4f, 6f, 10f), zoomPresetsFor(0.6f, 10f))
+        assertEquals(listOf(1f, 2f), zoomPresetsFor(1f, 2f))
+        assertEquals(listOf(1f), zoomPresetsFor(1f, 1f))
+    }
+
+    @Test fun noZoomRangeYieldsSinglePreset() {
+        val presets = zoomPresetsFor(1f, 1f)
+        assertTrue("no slider range, no unreachable presets", presets.size == 1 && presets[0] == 1f)
+    }
+
+    @Test fun failedRequestClampsOfferedMaximum() {
+        // Camera reported 10x but rejected a request at the current 1x: the
+        // working ceiling collapses to the last accepted ratio.
+        assertEquals(1f, effectiveZoomMax(10f, 1f))
+        assertEquals(4f, effectiveZoomMax(10f, 4f))
+        assertEquals(6f, effectiveZoomMax(6f, Float.MAX_VALUE))
+    }
+}

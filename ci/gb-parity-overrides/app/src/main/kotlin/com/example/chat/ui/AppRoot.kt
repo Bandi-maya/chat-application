@@ -801,7 +801,7 @@ fun AppRoot() {
                                         onDismissRequest = { showCallPicker = false },
                                         properties = androidx.compose.ui.window.DialogProperties(
                                             usePlatformDefaultWidth = false,
-                                            decorFitsSystemWindows = true,
+                                            decorFitsSystemWindows = false,
                                         ),
                                     ) {
                                         val ctx = androidx.compose.ui.platform.LocalContext.current

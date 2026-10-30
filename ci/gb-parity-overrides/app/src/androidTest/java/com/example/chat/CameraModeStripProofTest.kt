@@ -86,7 +86,29 @@ class CameraModeStripProofTest {
      d.findObject(By.desc("Record video")).click()
      val recording=d.wait(Until.hasObject(By.desc("Stop recording")),20000)
      capture("video-recording");assertTrue("Shutter tap really starts recording",recording)
-     assertTrue("Recording time pill shows while recording",d.wait(Until.hasObject(By.desc("Recording time")),5000))
+     assertTrue("Recording time shows while recording",d.wait(Until.hasObject(By.desc("Recording time")),5000))
+     assertTrue("Idle mode strip hides while recording",d.wait(Until.gone(By.desc("Camera modes")),5000))
+     assertTrue("Gallery shortcut hides while recording",d.wait(Until.gone(By.desc("Pick image from gallery")),5000))
+     assertTrue("Pause control shows while recording",d.wait(Until.hasObject(By.desc("Pause recording")),5000))
+     d.findObject(By.desc("Pause recording")).click()
+     assertTrue("Resume control shows after pausing",d.wait(Until.hasObject(By.desc("Resume recording")),5000))
+     assertTrue("Recording time stays while paused",d.hasObject(By.desc("Recording time")))
+     assertFalse("Idle mode strip stays hidden while paused",d.hasObject(By.desc("Camera modes")))
+     d.findObject(By.desc("Resume recording")).click()
+     assertTrue("Pause control returns after resuming",d.wait(Until.hasObject(By.desc("Pause recording")),5000))
+     if (d.hasObject(By.desc("Take snapshot while recording"))) {
+      // Device bound the 3-use-case combination on API 29+: the tap must save a real
+      // JPEG to the gallery, not just leave recording alive.
+      val projection = arrayOf(android.provider.MediaStore.Images.Media._ID)
+      fun chatySnapshots():Int = c.contentResolver.query(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,projection,android.provider.MediaStore.Images.Media.DISPLAY_NAME + " LIKE ?",arrayOf("chaty-recording-%"),null)?.use{it.count} ?: 0
+      val before = chatySnapshots()
+      d.findObject(By.desc("Take snapshot while recording")).click()
+      var saved = false
+      val saveDeadline = android.os.SystemClock.uptimeMillis() + 15000
+      while (!saved && android.os.SystemClock.uptimeMillis() < saveDeadline) { Thread.sleep(500); saved = chatySnapshots() > before }
+      assertTrue("Snapshot really saved to the gallery while recording",saved)
+      assertTrue("Recording continues after a recording snapshot",d.hasObject(By.desc("Stop recording")))
+     }
      Thread.sleep(1200)
      d.findObject(By.desc("Stop recording")).click()
      val review=d.wait(Until.hasObject(By.text("Record again")),20000)
@@ -96,6 +118,7 @@ class CameraModeStripProofTest {
      assertTrue("Retake asks before discarding the draft",d.wait(Until.hasObject(By.text("Discard this unsaved video?")),5000))
      d.findObject(By.text("Discard video")).click()
      assertTrue("Discarding the draft returns to an armed recorder",d.wait(Until.hasObject(By.desc("Record video")),20000))
+     assertTrue("Mode strip returns after recording stops",d.wait(Until.hasObject(By.desc("Camera modes")),10000))
      target("Photo").click()
      val photo=d.wait(Until.hasObject(By.desc("Take photo")),20000)
      capture("return-video");assertTrue("Video returns to photo lifecycle",photo)
@@ -106,5 +129,114 @@ class CameraModeStripProofTest {
     }
    }
   } finally {d.unfreezeRotation();if(!had)File(c.getExternalFilesDir(null),"camera-permission-cleanup").writeText("revoke")}
+ }
+
+ /** When the device cannot bind Preview+VideoCapture+ImageCapture, the session
+  *  must fall back to video-only and the UI must NOT draw a dead snapshot button. */
+ @Test fun recordingSnapshotHidesWhenCombinationUnavailable(){
+  val ins=InstrumentationRegistry.getInstrumentation();val c=ins.targetContext;val d=UiDevice.getInstance(ins)
+  d.executeShellCommand("pm grant ${c.packageName} android.permission.CAMERA")
+  com.example.chat.ui.camera.CameraVideoNativeProof.forceSnapshotUnavailable = true
+  try {
+   ActivityScenario.launch<CameraOpeningProofActivity>(Intent(c,CameraOpeningProofActivity::class.java)).use {
+    assertTrue(d.wait(Until.hasObject(By.desc("Take photo")),20000))
+    repeat(6){val r=d.findObject(By.desc("Camera modes")).visibleBounds;d.swipe(r.left+12,r.centerY(),r.right-12,r.centerY(),12)}
+    var video:UiObject2?=null
+    repeat(8){
+     if(video==null||video!!.visibleBounds.width()<=0){
+      video=d.findObject(By.desc("Video camera mode"))
+      if(video==null||video!!.visibleBounds.width()<=0){val r=d.findObject(By.desc("Camera modes")).visibleBounds;d.swipe(r.right-12,r.centerY(),r.left+12,r.centerY(),12)}
+     }
+    }
+    assertTrue("Video mode reachable",video!=null)
+    video!!.click()
+    assertTrue(d.wait(Until.hasObject(By.desc("Record video")),20000))
+    d.findObject(By.desc("Record video")).click()
+    assertTrue(d.wait(Until.hasObject(By.desc("Stop recording")),20000))
+    Thread.sleep(1000)
+    assertFalse("No dead snapshot button when the 3-use-case bind is unavailable",d.hasObject(By.desc("Take snapshot while recording")))
+    assertTrue("Video recording itself still works without the snapshot combination",d.hasObject(By.desc("Stop recording")))
+    d.findObject(By.desc("Stop recording")).click()
+    assertTrue("Video-only fallback still lands in review",d.wait(Until.hasObject(By.text("Record again")),20000))
+   }
+  } finally { com.example.chat.ui.camera.CameraVideoNativeProof.forceSnapshotUnavailable = false }
+ }
+
+ @Test fun videoRecordingBakesSelectedLens(){
+  val ins=InstrumentationRegistry.getInstrumentation();val c=ins.targetContext;val d=UiDevice.getInstance(ins)
+  d.executeShellCommand("pm grant ${c.packageName} android.permission.CAMERA")
+  // DEBUG-only synthetic pose in preview coordinates: the emulator camera sees
+  // no real face, so this hook proves the recorded-output compositing path with
+  // real video pixels instead of pretending detection.
+  val pose = com.example.chat.ui.camera.FacePose(0,
+   com.example.chat.ui.camera.LensRect(390f,600f,690f,950f),
+   com.example.chat.ui.camera.LensOffset(470f,740f), com.example.chat.ui.camera.LensOffset(630f,740f),
+   com.example.chat.ui.camera.LensOffset(550f,830f), com.example.chat.ui.camera.LensOffset(550f,900f),
+   0.0,0.0,0.0,1.0)
+  fun latestVideo(before:Set<String>):File?{
+   val dir=File(c.cacheDir,"camera-video")
+   return dir.listFiles()?.filter{it.extension=="mp4" && it.name !in before}?.maxByOrNull{it.lastModified()}
+  }
+  fun frameAt(video:File,us:Long):Bitmap{
+   val mmr=android.media.MediaMetadataRetriever()
+   try{mmr.setDataSource(video.absolutePath);return mmr.getFrameAtTime(us) ?: error("no frame")}
+   finally{mmr.release()}
+  }
+  fun regionMeanDiff(a:Bitmap,b:Bitmap,l:Float,t:Float,r:Float,bo:Float):Double{
+   var sum=0.0;var n=0
+   var x=l.toInt().coerceIn(0,a.width-1)
+   while(x<r.toInt().coerceIn(1,a.width)){
+    var y=t.toInt().coerceIn(0,a.height-1)
+    while(y<bo.toInt().coerceIn(1,a.height)){
+     val p=a.getPixel(x,y);val q=b.getPixel(x,y)
+     sum+=Math.abs(android.graphics.Color.red(p)-android.graphics.Color.red(q))+
+      Math.abs(android.graphics.Color.green(p)-android.graphics.Color.green(q))+
+      Math.abs(android.graphics.Color.blue(p)-android.graphics.Color.blue(q))
+     n++;y+=8
+    }
+    x+=8
+   }
+   return if(n==0) 0.0 else sum/n
+  }
+  try {
+   ActivityScenario.launch<CameraOpeningProofActivity>(Intent(c,CameraOpeningProofActivity::class.java)).use {
+    assertTrue(d.wait(Until.hasObject(By.desc("Take photo")),20000))
+    // Select a real lens through the carousel tap path.
+    d.findObject(By.desc("Lenses camera mode"))?.click()
+    val thumb=d.wait(Until.findObject(By.desc("Gold Crown lens thumbnail")),5000)
+    assertTrue("Lens carousel offers the Gold Crown lens",thumb!=null)
+    thumb!!.click()
+    assertTrue("Lens selection is marked in the carousel",d.wait(Until.hasObject(By.desc("Gold Crown lens thumbnail, in use")),5000))
+    // Record WITH the lens composited (synthetic pose), then WITHOUT.
+    fun recordOnce():File{
+     val dir=File(c.cacheDir,"camera-video")
+     val before=dir.listFiles()?.filter{it.extension=="mp4"}?.map{it.name}?.toSet() ?: emptySet()
+     d.findObject(By.desc("Video camera mode")).click()
+     assertTrue(d.wait(Until.hasObject(By.desc("Record video")),20000))
+     d.findObject(By.desc("Record video")).click()
+     Thread.sleep(1800)
+     d.findObject(By.desc("Stop recording")).click()
+     assertTrue(d.wait(Until.hasObject(By.text("Record again")),20000))
+     d.findObject(By.text("Record again")).click()
+     assertTrue(d.wait(Until.hasObject(By.text("Discard this unsaved video?")),5000))
+     d.findObject(By.text("Discard video")).click()
+     assertTrue(d.wait(Until.hasObject(By.desc("Record video")),20000))
+     val v=latestVideo(before)
+     assertTrue("Recorded video file exists",v!=null && v.length()>0)
+     return v!!
+    }
+    CameraVideoNativeProof.fakeLensPoses=listOf(pose)
+    val withLens=recordOnce()
+    CameraVideoNativeProof.fakeLensPoses=null
+    // No real face on the emulator, so without the hook nothing composites.
+    val bare=recordOnce()
+    val fa=frameAt(withLens,900000);val fb=frameAt(bare,900000)
+    assertTrue("Frames decoded at same size",fa.width==fb.width && fa.height==fb.height)
+    val w=fa.width.toFloat();val h=fa.height.toFloat()
+    val center=regionMeanDiff(fa,fb,w*0.30f,h*0.20f,w*0.70f,h*0.60f)
+    val corner=regionMeanDiff(fa,fb,0f,0f,w*0.15f,h*0.12f)
+    assertTrue("Lens pixels appear in the recorded video (center diff $center vs corner $corner)",center>8.0 && center>corner*1.5)
+   }
+  } finally { CameraVideoNativeProof.reset() }
  }
 }
