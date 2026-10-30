@@ -200,7 +200,21 @@ object ServiceLocator {
         com.example.chat.ui.settings.appicon.AndroidLauncherIconBridge(requireContext())
     }
     /** Dart locator<EffectEngine>: one shared engine for the picker sheet and the camera. */
-    val effectEngine: com.example.chat.ui.camera.EffectEngine by lazy { com.example.chat.ui.camera.EffectEngine() }
+    val effectEngine: com.example.chat.ui.camera.EffectEngine by lazy {
+        // Effect favorites survive process death, same SharedPreferences file
+        // and LensStringListStore contract as the lens catalog (distinct key).
+        val sp = requireContext().applicationContext
+            .getSharedPreferences("chaty_camera_lens", android.content.Context.MODE_PRIVATE)
+        com.example.chat.ui.camera.EffectEngine(
+            prefs = object : com.example.chat.ui.camera.LensStringListStore {
+                override fun getStringList(key: String): List<String>? =
+                    sp.getString(key, null)?.split('|')?.filter { it.isNotBlank() }
+                override fun setStringList(key: String, value: List<String>) {
+                    sp.edit().putString(key, value.joinToString("|")).apply()
+                }
+            },
+        )
+    }
     val nativeCallPip: com.example.chat.data.services.NativeCallPipService by lazy { com.example.chat.data.services.NativeCallPipService() }
     val appIconController: com.example.chat.ui.settings.appicon.AppIconController by lazy {
         com.example.chat.ui.settings.appicon.AppIconController(
