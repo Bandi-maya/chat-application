@@ -58,6 +58,7 @@ class CameraVideoSession(
     private val viewportProvider: () -> LensSize = { LensSize(0f, 0f) },
     private val lensProvider: () -> LensDefinition? = { null },
     private val posesProvider: () -> List<FacePose> = { emptyList() },
+    private val matrixProvider: () -> FloatArray? = { null },
     private val onState: (VideoSessionState) -> Unit,
 ) : DefaultLifecycleObserver, AutoCloseable {
     private val app = context.applicationContext
@@ -68,6 +69,7 @@ class CameraVideoSession(
     private var capture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
     private var camera: androidx.camera.core.Camera? = null
+    private var overlayProcessorRef: ColorLensSurfaceProcessor? = null
     private var snapshot: ImageCapture? = null
     private var recordingAudio = false
     private var activeFile: File? = null
@@ -128,39 +130,32 @@ class CameraVideoSession(
                 val canSaveSnapshot = android.os.Build.VERSION.SDK_INT >= 29
                 val wantSnapshot = canSaveSnapshot && !(com.example.chat.BuildConfig.DEBUG && CameraVideoNativeProof.forceSnapshotUnavailable)
                 // Selected face lenses composite into BOTH preview and the recorded
-                // file (CameraX OverlayEffect) so video output is never a raw feed
-                // behind a filtered preview. Drawing reuses the same
-                // LensAnchorPainter as the photo bake path; poses map from preview
-                // cover-crop space onto each frame like composeLensIntoImage.
-                val overlay = androidx.camera.effects.OverlayEffect(
-                    androidx.camera.effects.OverlayEffect.PREVIEW or androidx.camera.effects.OverlayEffect.VIDEO_CAPTURE,
-                    0,
-                    android.os.Handler(android.os.Looper.getMainLooper()),
-                    androidx.core.util.Consumer { /* overlay errors must never kill recording */ },
+                // file, and the active color matrix reaches the recorded file too
+                // (single CameraEffect targeting PREVIEW|VIDEO_CAPTURE with a
+                // custom SurfaceProcessor) so video output is never a raw feed
+                // behind a filtered preview. UseCaseGroup rejects multiple
+                // effects sharing a target, so lens and color share this one
+                // pipeline; the shader applies the matrix only to VIDEO_CAPTURE
+                // output (preview color stays on the Compose modifier) while the
+                // lens overlay draws for both. Drawing reuses the same
+                // LensAnchorPainter as the photo bake path; poses map from
+                // preview cover-crop space onto each frame like
+                // composeLensIntoImage.
+                val processor = ColorLensSurfaceProcessor(
+                    lensProvider = { lensProvider() },
+                    posesProvider = { (if (com.example.chat.BuildConfig.DEBUG) CameraVideoNativeProof.fakeLensPoses else null) ?: posesProvider() },
+                    viewportProvider = viewportProvider,
+                    matrixProvider = matrixProvider,
+                    lensTargetMask = androidx.camera.core.CameraEffect.PREVIEW or androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
+                    colorTargetMask = androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
                 )
-                overlay.setOnDrawListener { frame ->
-                    val lens = lensProvider()
-                    val poses = (if (com.example.chat.BuildConfig.DEBUG) CameraVideoNativeProof.fakeLensPoses else null) ?: posesProvider()
-                    if (lens == null || lens.isNoLens || poses.isEmpty()) return@setOnDrawListener true
-                    val oc = frame.overlayCanvas
-                    val w = oc.width.toFloat(); val h = oc.height.toFloat()
-                    val pv = viewportProvider()
-                    if (w <= 0f || h <= 0f || pv.width <= 0f || pv.height <= 0f) return@setOnDrawListener true
-                    val scale = maxOf(pv.width / w, pv.height / h)
-                    val cropLeft = (pv.width - w * scale) / 2f
-                    val cropTop = (pv.height - h * scale) / 2f
-                    fun toFrame(p0: LensOffset) = LensOffset((p0.dx - cropLeft) / scale, (p0.dy - cropTop) / scale)
-                    val mapped = poses.map { pose ->
-                        FacePose(
-                            pose.trackingId,
-                            LensRect.fromPoints(toFrame(LensOffset(pose.headBounds.left, pose.headBounds.top)), toFrame(LensOffset(pose.headBounds.right, pose.headBounds.bottom))),
-                            toFrame(pose.leftEye), toFrame(pose.rightEye), toFrame(pose.noseBase), toFrame(pose.mouthCenter),
-                            pose.rollRadians, pose.yawRadians, pose.pitchRadians, pose.confidence,
-                        )
-                    }
-                    LensAnchorPainter.paint(androidx.compose.ui.graphics.Canvas(oc), lens, mapped, 1.0f)
-                    true
-                }
+                val overlay = androidx.camera.core.CameraEffect(
+                    androidx.camera.core.CameraEffect.PREVIEW or androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
+                    processor.getGlExecutor(),
+                    processor,
+                    androidx.core.util.Consumer { /* effect errors must never kill recording */ },
+                )
+                overlayProcessorRef = processor
                 fun bindWithEffect(vararg extra: androidx.camera.core.UseCase): androidx.camera.core.Camera? = try {
                     val group = androidx.camera.core.UseCaseGroup.Builder()
                         .addUseCase(view).addUseCase(video)
@@ -306,6 +301,7 @@ class CameraVideoSession(
     override fun onResume(owner: LifecycleOwner) { if (!closed && capture == null) bind() }
     override fun onDestroy(owner: LifecycleOwner) { close() }
     override fun close() {
+        try { overlayProcessorRef?.release() } catch (_: Exception) {}
         checkMain()
         if (closed) return
         closed = true; generation++; owner.lifecycle.removeObserver(this)
