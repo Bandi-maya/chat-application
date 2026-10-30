@@ -152,6 +152,7 @@ private class CameraSession(
     var hdrActive = false
     var extensions: androidx.camera.extensions.ExtensionsManager? = null
     @Volatile var analyzeFaces = false
+    @Volatile var analyzeSegment = false
     private var lastAnalysisNs = 0L
 
     suspend fun ensureProvider(): ProcessCameraProvider {
@@ -233,7 +234,7 @@ private class CameraSession(
         analyzer.setAnalyzer(analysisExecutor) { proxy ->
             try {
                 val now = System.nanoTime()
-                if (shouldAnalyzeCameraFrame(analyzeFaces,now,lastAnalysisNs)) {
+                if (shouldAnalyzeCameraFrame(analyzeFaces || analyzeSegment,now,lastAnalysisNs)) {
                     lastAnalysisNs = now
                     onFrame(proxy.toFrameData(), proxy.imageInfo.rotationDegrees)
                 }
@@ -400,13 +401,55 @@ fun ChatyCameraCaptureScreen(
         else -> null
     }
 
-    androidx.compose.runtime.SideEffect { session.analyzeFaces = wantsFaceTracking && !nightActive && !portraitActive && !capturing && !videoOpen && documentReviewPath == null }
+    androidx.compose.runtime.SideEffect {
+        session.analyzeFaces = wantsFaceTracking && !nightActive && !portraitActive && !capturing && !videoOpen && documentReviewPath == null
+        session.analyzeSegment = segmentEffectKey != null && !nightActive && !portraitActive
+        if (segmentEffectKey == null) segmentPreviewFrame = null
+    }
 
     // Face frame pipeline: throttle 45ms, mirror for front camera, solver maps
     // into the cover-cropped preview space.
     var lastFaceFrameMs by remember { mutableStateOf(0L) }
     var processingFaceFrame by remember { mutableStateOf(false) }
     var viewportSize by remember { mutableStateOf(LensSize(0f, 0f)) }
+
+    // Live segmented background preview (bg_* effects): the same analysis
+    // stream as face frames, throttled harder and composited off the main
+    // thread. Failures are silent and leave the viewfinder unfiltered - the
+    // capture-time bake stays the exact path. Never runs during night /
+    // portrait / video / review, matching the face pipeline's discipline.
+    val segmentationBridge = remember { SegmentationBridge(context) }
+    val liveSegmentPreview = remember { LiveSegmentPreview(segmentationBridge) }
+    DisposableEffect(segmentationBridge) { onDispose { segmentationBridge.dispose() } }
+    var segmentPreviewFrame by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var processingSegmentFrame by remember { mutableStateOf(false) }
+    var lastSegmentFrameMs by remember { mutableStateOf(0L) }
+    val segmentEffectKey = if (engine.activeEffect.isSegmentationRequired &&
+        (captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses) &&
+        !capturing && !videoOpen && capturedPath == null && documentReviewPath == null
+    ) engine.activeEffect.shaderKey else null
+
+    fun processSegmentFrame(frame: FrameData, rotationDegrees: Int) {
+        val key = segmentEffectKey ?: return
+        if (processingSegmentFrame) return
+        val nowMs = System.currentTimeMillis()
+        if (nowMs - lastSegmentFrameMs < 150) return
+        lastSegmentFrameMs = nowMs
+        processingSegmentFrame = true
+        val intensity = engine.intensity
+        val mirrored = session.lensFacing == CameraSelector.LENS_FACING_FRONT
+        scope.launch(Dispatchers.Default) {
+            try {
+                val bmp = liveSegmentPreview.render(frame, rotationDegrees, mirrored, key, intensity)
+                if (bmp != null && segmentEffectKey == key) segmentPreviewFrame = bmp
+                else bmp?.recycle()
+            } catch (_: Exception) {
+                // Best-effort preview: never interrupt capture.
+            } finally {
+                processingSegmentFrame = false
+            }
+        }
+    }
 
     fun processFaceFrame(frame: FrameData, rotationDegrees: Int) {
         if (!wantsFaceTracking || capturing || processingFaceFrame) return
@@ -462,7 +505,7 @@ fun ChatyCameraCaptureScreen(
                 try { session.ensureExtensions() } catch (_: Exception) { /* Photo stays available. */ }
                 session.bind(
                     previewView = pv,
-                    onFrame = { frame, rotation -> processFaceFrame(frame, rotation) },
+                    onFrame = { frame, rotation -> processFaceFrame(frame, rotation); processSegmentFrame(frame, rotation) },
                     onError = { message ->
                         errorMessage = message
                         phase = CameraPhase.noCamera
@@ -818,6 +861,7 @@ fun ChatyCameraCaptureScreen(
                 captureViewMode = captureViewMode,
                 effect = if (captureViewMode in listOf(CaptureViewMode.document,CaptureViewMode.night,CaptureViewMode.portrait)) EffectRegistry.allEffects.first { it.id == "none" } else engine.activeEffect,
                 effectIntensity = engine.intensity,
+                segmentPreview = segmentPreviewFrame,
                 onPreviewView = { pv ->
                     previewView = pv
                     var touchDownX = 0f
@@ -832,11 +876,10 @@ fun ChatyCameraCaptureScreen(
                                 val dx = event.x - touchDownX
                                 val dy = event.y - touchDownY
                                 val swipeThreshold = 56 * pv.resources.displayMetrics.density
-                                val lensMode = captureViewMode == CaptureViewMode.photo ||
-                                    captureViewMode == CaptureViewMode.lenses
-                                // Snapchat-style: a decisive horizontal swipe on the live
-                                // preview cycles lenses (left = next, right = previous);
-                                // an ordinary tap still focuses at the touch point.
+                                // Lenses tab only: a decisive horizontal swipe on the
+                                // live preview cycles lenses (left = next, right =
+                                // previous); an ordinary tap still focuses.
+                                val lensMode = captureViewMode == CaptureViewMode.lenses
                                 if (lensMode && kotlin.math.abs(dx) > swipeThreshold &&
                                     kotlin.math.abs(dx) > 1.6f * kotlin.math.abs(dy)) {
                                     val catalog = kBuiltInLenses
