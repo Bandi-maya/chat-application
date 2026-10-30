@@ -69,8 +69,8 @@ class CameraCombinedOutputProofTest {
         private val outputSurface: Surface,
         private val transformKind: Int,
     ) : SurfaceOutput {
-        override val targets: Int get() = targetValue
-        override val size: Size get() = Size(W, H)
+        override fun getTargets(): Int = targetValue
+        override fun getSize(): Size = Size(W, H)
         override fun getSurface(executor: Executor, listener: Consumer<SurfaceOutput.Event>): Surface = outputSurface
         override fun updateTransformMatrix(updated: FloatArray, original: FloatArray) {
             System.arraycopy(original, 0, updated, 0, 16)
