@@ -134,13 +134,17 @@ fun CameraCaptureViewfinder(
             },
             modifier = Modifier.align(Alignment.Center)
                 .then(if (previewAspect != null) Modifier.fillMaxWidth().aspectRatio(previewAspect) else Modifier.fillMaxSize())
-                .then(effectRenderModifier(effect, effectIntensity)),
+                // Video records only color-matrix effects; other filters stay
+                // off the preview in video mode instead of faking a recorded
+                // effect that is not there.
+                .then(if (captureViewMode != CaptureViewMode.video || effect.id == "none" || effect.colorMatrix != null) effectRenderModifier(effect, effectIntensity) else Modifier),
         )
         // Live segmented background preview (bg_*): the composited analysis
         // frame covers the raw preview surface while a segment effect is
         // active. Best effort - when no composited frame exists yet (or the
-        // segmenter fails open) the unfiltered preview shows through.
-        if (segmentPreview != null && effect.shaderKey?.startsWith("segment_") == true) {
+        // segmenter fails open) the unfiltered preview shows through. Not shown
+        // in video mode: segment effects are not recorded into video.
+        if (segmentPreview != null && effect.shaderKey?.startsWith("segment_") == true && captureViewMode != CaptureViewMode.video) {
             Image(
                 bitmap = segmentPreview.asImageBitmap(),
                 contentDescription = "Live background filter preview",
@@ -177,6 +181,18 @@ fun CameraCaptureViewfinder(
             (captureViewMode == CaptureViewMode.video && videoLensRecorded)
         if (phase == CameraPhase.ready && lensVisible) {
             LensOverlay(lens = lens, poses = facePoses, health = faceHealth)
+        }
+        if (phase == CameraPhase.ready && captureViewMode == CaptureViewMode.video && effect.id != "none" && effect.colorMatrix == null) {
+            Text(
+                "Filter can't be recorded; video captures the unfiltered camera",
+                color = Color.White,
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 118.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
         }
         if (phase == CameraPhase.ready && captureViewMode == CaptureViewMode.video && !videoLensRecorded && !lens.isNoLens) {
             Text(
