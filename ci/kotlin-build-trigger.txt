@@ -1,1 +1,1 @@
-build 93: calib pressHome cleanup + passive crash capture + title/entrance diagnostics + AddedStyles shard inclusion
+build 94: verify test-setup batch a39b507 (HomeHeaderTabs bounded settle + AddedStyles root-exclusive guard + override count 51); same overlay source, no app change
