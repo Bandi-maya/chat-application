@@ -30,6 +30,37 @@ object ImageFxBaker {
     /** Bake result: the output path plus whether the effect truly rendered. */
     data class BakedEffect(val path: String, val applied: Boolean)
 
+    /** Pre-bake decision for one photo capture. Pure and JVM-testable; the
+     *  capture screen and its proofs share this exact contract. */
+    data class CaptureEffectPlan(
+        val bake: Boolean,
+        /** Metadata tag after a successful bake: shader pixels carry the look,
+         *  so the tag clears to none (never a double-apply downstream). */
+        val tagOnSuccess: String,
+        val intensityOnSuccess: Double,
+    )
+
+    fun resolveCaptureEffectPlan(
+        storyMode: Boolean,
+        effectId: String,
+        hasRenderPath: Boolean,
+        isShaderEffect: Boolean,
+        intensity: Double,
+    ): CaptureEffectPlan {
+        val bake = effectId != "none" && hasRenderPath && (storyMode || isShaderEffect)
+        return CaptureEffectPlan(
+            bake = bake,
+            tagOnSuccess = if (isShaderEffect) "none" else effectId,
+            intensityOnSuccess = if (isShaderEffect) 1.0 else intensity,
+        )
+    }
+
+    /** Tag after the bake outcome: fail-open never claims an unrendered filter. */
+    fun tagAfterBake(plan: CaptureEffectPlan, applied: Boolean, currentId: String, currentIntensity: Double): Pair<String, Double> =
+        if (!plan.bake) currentId to currentIntensity
+        else if (!applied) "none" to 1.0
+        else plan.tagOnSuccess to plan.intensityOnSuccess
+
     /** Matrix lerp shared with the engine (identity -> target by intensity). */
     fun lerpedMatrix(effect: ChatyCameraEffect, intensity: Double): FloatArray {
         val m = effect.colorMatrix ?: return FloatArray(20) { i -> if (i % 6 == 0) 1f else 0f }
