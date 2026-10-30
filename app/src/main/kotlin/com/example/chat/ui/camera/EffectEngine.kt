@@ -7,7 +7,9 @@ package com.example.chat.ui.camera
  *  animated particle overlay) is ported in CameraEffectRender.kt as Compose;
  *  this class is context-free and JVM-testable.
  */
-class EffectEngine {
+class EffectEngine(
+    private val prefs: LensStringListStore? = null,
+) {
     private val listeners = mutableListOf<() -> Unit>()
 
     fun addListener(listener: () -> Unit) { listeners.add(listener) }
@@ -21,7 +23,8 @@ class EffectEngine {
     private var _intensity = 1.0
     private var _isEngineDisabledForPerformance = false
     private val _recentEffectIds = mutableListOf<String>()
-    private val _favoriteEffectIds = mutableSetOf<String>()
+    private val _favoriteEffectIds =
+        (prefs?.getStringList(FAVORITES_KEY) ?: emptyList()).toMutableSet()
 
     val activeEffect: ChatyCameraEffect
         get() = if (_isEngineDisabledForPerformance) {
@@ -58,6 +61,7 @@ class EffectEngine {
         if (!_favoriteEffectIds.add(effectId)) {
             _favoriteEffectIds.remove(effectId)
         }
+        prefs?.setStringList(FAVORITES_KEY, _favoriteEffectIds.toList())
         notifyListeners()
     }
 
@@ -98,6 +102,9 @@ class EffectEngine {
     }
 
     companion object {
+        /** SharedPreferences string-list key for persisted effect favorites. */
+        const val FAVORITES_KEY = "camera.effect.favorites"
+
         private val IDENTITY = listOf(
             1.0, 0.0, 0.0, 0.0, 0.0,
             0.0, 1.0, 0.0, 0.0, 0.0,
