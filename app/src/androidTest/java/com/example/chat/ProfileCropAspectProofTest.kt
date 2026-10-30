@@ -101,11 +101,14 @@ class ProfileCropAspectProofTest {
     }
 
     /** Expected crop window in px, mirroring the dialog's sizing math. */
-    private fun cropWindowPx(isAvatar: Boolean): Pair<Float, Float> {
-        val dm = ins.targetContext.resources.displayMetrics
-        val boxW = (dm.widthPixels / dm.density - 48f) * dm.density
-        val boxH = if (isAvatar) boxW else boxW * 9f / 16f
-        return Pair(boxW, boxH)
+    // Measure the actually-rendered crop window via its testTag (exposed as a
+    // resource id), so the export expectation derives from what is on screen
+    // rather than from re-deriving the implementation's rounding.
+    private fun measuredCropWindow(): Pair<Float, Float>? {
+        val obj = dev.wait(Until.findObject(By.res("profile-crop-window")), 2000) ?: return null
+        val b = obj.visibleBounds
+        if (b.width() <= 0 || b.height() <= 0) return null
+        return Pair(b.width().toFloat(), b.height().toFloat())
     }
 
     private class ScreenScan {
@@ -198,8 +201,7 @@ class ProfileCropAspectProofTest {
         return inset
     }
 
-    private fun assertCoverFitPreview(tag: String, isAvatar: Boolean) {
-        val (boxW, _) = cropWindowPx(isAvatar)
+    private fun assertCoverFitPreview(tag: String, isAvatar: Boolean, boxW: Float) {
         val bmp = ins.uiAutomation.takeScreenshot() ?: error("screenshot unavailable")
         val s = scan(bmp)
         // Squash (scale-to-fill) would paint the red top band and the blue
@@ -218,8 +220,7 @@ class ProfileCropAspectProofTest {
         bmp.recycle()
     }
 
-    private fun assertExportedCrop(tag: String, file: File, isAvatar: Boolean) {
-        val (boxW, boxH) = cropWindowPx(isAvatar)
+    private fun assertExportedCrop(tag: String, file: File, isAvatar: Boolean, boxW: Float, boxH: Float) {
         val out = BitmapFactory.decodeFile(file.absolutePath) ?: error("exported crop must decode")
         assertEquals("$tag: export width is the 2.5x capture", boxW * 2.5f, out.width.toFloat(), 2f)
         assertEquals("$tag: export height is the 2.5x capture", boxH * 2.5f, out.height.toFloat(), 2f)
@@ -264,14 +265,17 @@ class ProfileCropAspectProofTest {
         bmp.recycle()
 
         // Capture BEFORE the cover-fit asserts so a failure keeps its pixels.
+        val win = measuredCropWindow()
+            ?: fail("crop window marker missing: testTag profile-crop-window not found in the open crop dialog")
+
         shot("profile-crop-banner-coverfit")
-        assertCoverFitPreview("banner", isAvatar = false)
+        assertCoverFitPreview("banner", isAvatar = false, boxW = win.first)
 
         dev.findObject(By.text("Crop & Use")).click()
         waitFor { result.get() != null || error.get() != null }
         assertNull("banner crop failed: ${error.get()}", error.get())
         val exported = result.get() ?: error("Crop & Use produced no file")
-        assertExportedCrop("banner", exported, isAvatar = false)
+        assertExportedCrop("banner", exported, isAvatar = false, boxW = win.first, boxH = win.second)
         scenario.close()
     }
 
@@ -286,14 +290,17 @@ class ProfileCropAspectProofTest {
         settle()
 
         // Capture BEFORE the cover-fit asserts so a failure keeps its pixels.
+        val win = measuredCropWindow()
+            ?: fail("crop window marker missing: testTag profile-crop-window not found in the open crop dialog")
+
         shot("profile-crop-avatar-coverfit")
-        assertCoverFitPreview("avatar", isAvatar = true)
+        assertCoverFitPreview("avatar", isAvatar = true, boxW = win.first)
 
         dev.findObject(By.text("Crop & Use")).click()
         waitFor { result.get() != null || error.get() != null }
         assertNull("avatar crop failed: ${error.get()}", error.get())
         val exported = result.get() ?: error("Crop & Use produced no file")
-        assertExportedCrop("avatar", exported, isAvatar = true)
+        assertExportedCrop("avatar", exported, isAvatar = true, boxW = win.first, boxH = win.second)
         scenario.close()
     }
 }
