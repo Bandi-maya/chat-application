@@ -3,6 +3,7 @@
 *.log
 *.pyc
 *.swp
+__pycache__/
 .DS_Store
 .atom/
 .build/
@@ -32,6 +33,11 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+
+# Local runtime state and Gradle cache
+.chaty_data/
+.gradle/
+build-artifacts/
 
 # Symbolication related
 app.*.symbols
