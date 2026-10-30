@@ -1,1 +1,1 @@
-build 105: androidTest compile fixes batch 2 (elvis error(), float assertEquals, qualified CameraVideoNativeProof) + preserve user callsAllowed/health merge into overrides
+build 106: ChatDetailHost callsAllowed scope fix + color-video pipeline (ColorLensSurfaceProcessor) + emoji memory fix
