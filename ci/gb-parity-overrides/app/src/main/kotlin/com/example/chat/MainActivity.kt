@@ -58,6 +58,13 @@ class MainActivity : FragmentActivity() {
         val N = com.example.chat.notifications.ChatyNotifications
         when (intent?.action) {
             N.ACTION_OPEN_CHAT -> N.requestOpenRoom(intent.getStringExtra(N.EXTRA_ROOM_ID))
+            N.ACTION_SHOW_CALL -> {
+                // Ongoing-call notification tap: return to the full call UI. Only for a
+                // live session, so an ended call is never resurrected on screen.
+                if (ServiceLocator.callSignaling.hasActiveSession) {
+                    ServiceLocator.callPresentationController.showFullScreen()
+                }
+            }
             N.ACTION_INCOMING_CALL, N.ACTION_ANSWER_CALL -> {
                 showOverLockScreen()
                 val callId = intent.getStringExtra(N.EXTRA_CALL_ID).orEmpty()
@@ -136,3 +143,4 @@ class MainActivity : FragmentActivity() {
         ServiceLocator.nativeCallPip.onPipModeChanged(isInPictureInPictureMode)
     }
 }
+
