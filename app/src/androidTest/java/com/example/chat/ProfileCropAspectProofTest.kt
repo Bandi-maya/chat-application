@@ -263,8 +263,9 @@ class ProfileCropAspectProofTest {
         )
         bmp.recycle()
 
-        assertCoverFitPreview("banner", isAvatar = false)
+        // Capture BEFORE the cover-fit asserts so a failure keeps its pixels.
         shot("profile-crop-banner-coverfit")
+        assertCoverFitPreview("banner", isAvatar = false)
 
         dev.findObject(By.text("Crop & Use")).click()
         waitFor { result.get() != null || error.get() != null }
@@ -284,8 +285,9 @@ class ProfileCropAspectProofTest {
         waitFor { dev.hasObject(By.text("Crop & Use")) }
         settle()
 
-        assertCoverFitPreview("avatar", isAvatar = true)
+        // Capture BEFORE the cover-fit asserts so a failure keeps its pixels.
         shot("profile-crop-avatar-coverfit")
+        assertCoverFitPreview("avatar", isAvatar = true)
 
         dev.findObject(By.text("Crop & Use")).click()
         waitFor { result.get() != null || error.get() != null }
