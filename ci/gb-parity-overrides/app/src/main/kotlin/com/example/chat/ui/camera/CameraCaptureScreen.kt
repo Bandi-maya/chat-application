@@ -401,6 +401,12 @@ fun ChatyCameraCaptureScreen(
         else -> null
     }
 
+    // Face frame pipeline: throttle 45ms, mirror for front camera, solver maps
+    // into the cover-cropped preview space.
+    var lastFaceFrameMs by remember { mutableStateOf(0L) }
+    var processingFaceFrame by remember { mutableStateOf(false) }
+    var viewportSize by remember { mutableStateOf(LensSize(0f, 0f)) }
+
     // Live segmented background preview (bg_* effects): the same analysis
     // stream as face frames, throttled harder and composited off the main
     // thread. Failures are silent and leave the viewfinder unfiltered - the
@@ -491,12 +497,6 @@ fun ChatyCameraCaptureScreen(
         // previous effect's composite on screen while its replacement is in flight.
         if (segmentEffectKey != segmentPublishedKey) segmentPreviewFrame = null
     }
-
-    // Face frame pipeline: throttle 45ms, mirror for front camera, solver maps
-    // into the cover-cropped preview space.
-    var lastFaceFrameMs by remember { mutableStateOf(0L) }
-    var processingFaceFrame by remember { mutableStateOf(false) }
-    var viewportSize by remember { mutableStateOf(LensSize(0f, 0f)) }
 
     fun bindCamera() {
         val pv = previewView ?: return
