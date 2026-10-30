@@ -24,12 +24,49 @@ import androidx.compose.ui.graphics.graphicsLayer
 @Composable
 fun ApplyStoredEffect(effectId: String?, intensity: Double, content: @Composable () -> Unit) {
     val effect = EffectRegistry.byId(effectId)
-    if (effect.id == "none" || effect.colorMatrix == null) {
+    if (effect.id == "none" || (effect.colorMatrix == null && effect.shaderKey == null)) {
         content()
         return
     }
-    val modifier = remember(effectId, intensity) { effectMatrixModifier(effect, intensity) }
+    val modifier = remember(effectId, intensity) { effectRenderModifier(effect, intensity) }
     androidx.compose.foundation.layout.Box(modifier = modifier) { content() }
+}
+
+/** Original AGSL pixelate shader: snaps sample positions to a grid whose block
+ *  count follows intensity (higher intensity = chunkier blocks). */
+private const val PIXELATE_AGSL = """
+uniform shader content;
+uniform float2 size;
+uniform float blocks;
+half4 main(float2 fragCoord) {
+    float2 block = size / blocks;
+    float2 snapped = (floor(fragCoord / block) + 0.5) * block;
+    return content.eval(snapped);
+}
+"""
+
+/** Block count across the long edge for an intensity (72 fine .. 16 chunky). */
+fun pixelateBlocks(intensity: Double): Float =
+    (72.0 - 56.0 * intensity.coerceIn(0.0, 1.0)).toFloat()
+
+/** General render dispatch: pixelate shader effects, else the color matrix. */
+fun effectRenderModifier(effect: ChatyCameraEffect, intensity: Double): Modifier {
+    if (effect.shaderKey == "pixelate") {
+        if (Build.VERSION.SDK_INT >= 33) {
+            val blocks = pixelateBlocks(intensity)
+            return Modifier.graphicsLayer {
+                val shader = android.graphics.RuntimeShader(PIXELATE_AGSL)
+                shader.setFloatUniform("size", size.width, size.height)
+                shader.setFloatUniform("blocks", blocks)
+                renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content").asComposeRenderEffect()
+            }
+        }
+        // Below API 33 the preview renders unfiltered while the capture bake
+        // still applies the pixelate (documented deviation, same contract as
+        // the matrix path below API 31).
+        return Modifier
+    }
+    return effectMatrixModifier(effect, intensity)
 }
 
 /** Modifier applying the interpolated color matrix where the platform can. */
