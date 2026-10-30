@@ -120,11 +120,14 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
     }
     val session = service.currentSession ?: return
     val prefs = prefsStore.value
+    val activeBundle = remember(prefs.callExperienceBundleId) {
+        com.example.chat.ui.calls.bundles.CallBundleId.fromId(prefs.callExperienceBundleId)
+    }
 
     if (session.state == CallSessionState.incoming) {
-        IncomingCallScreen(
+        com.example.chat.ui.calls.bundles.BundleIncomingCallView(
+            bundleId = activeBundle,
             session = session,
-            template = CallScreenTemplate.fromName(prefs.incomingCallTemplate),
             onAccept = {
                 presentation.showFullScreen()
                 callAction(session.callId, "Unable to accept the call. Check microphone and camera permissions.") { service.acceptCall() }
