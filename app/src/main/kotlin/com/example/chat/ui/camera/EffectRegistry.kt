@@ -130,13 +130,14 @@ data class ChatyCameraEffect(
  *  verbatim), plus 40 new original Chaty effects expanding Beauty,
  *  Cinematic, Retro, Film, Glow, Cyber, Fun (celebration), Color grading
  *  and Portrait. New artwork is original Chaty content only: no
- *  third-party lens/filter assets bundled or fetched. shaderKey stays
- *  null for every entry - the render pipeline consumes colorMatrix
- *  exclusively (EffectEngine.activeColorMatrix). New entries are all
+ *  third-party lens/filter assets bundled or fetched. The render pipeline
+ *  consumes colorMatrix, plus the single "pixelate" shaderKey above. New entries are all
  *  full-frame color grades: no new entry claims face tracking or
  *  segmentation, because the live pipeline only bridges the six
  *  original face_* ids to lenses (CameraCaptureScreen.lensIdForEffect)
- *  and ships no segmentation renderer.
+ *  and ships no segmentation renderer. shaderKey is null for every entry
+ *  except face_pixel_retro, whose "pixelate" key selects the original
+ *  Chaty pixelate renderer (EffectRender/ImageFxBaker).
  */
 object EffectRegistry {
     val allEffects: List<ChatyCameraEffect> = listOf(
@@ -840,6 +841,9 @@ object EffectRegistry {
             category = EffectCategory.cyber,
             icon = Icons.Rounded.VideogameAsset,
             previewColor = Color(0xFF10B981),
+            // Original Chaty pixelate renderer (AGSL preview API 33+, nearest-neighbor
+            // bake on every API); no third-party shader or asset.
+            shaderKey = "pixelate",
         ),
         ChatyCameraEffect(
             id = "face_angel_halo",
