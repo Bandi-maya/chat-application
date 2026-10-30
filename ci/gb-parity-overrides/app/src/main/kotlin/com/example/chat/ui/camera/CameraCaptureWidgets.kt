@@ -290,6 +290,7 @@ fun CameraCaptureBottomControls(
     onShutter: () -> Unit,
     onFlip: () -> Unit,
     onPickFromGallery: () -> Unit,
+    onBrowseLenses: () -> Unit = {},
 ) {
     val ready = phase == CameraPhase.ready
     val configuration = LocalConfiguration.current
@@ -339,6 +340,9 @@ fun CameraCaptureBottomControls(
                 ) {
                     items(allEffects.size) { index ->
                         val effect = allEffects[index]
+                        // Honest availability: segmentation-backed effects have no renderer
+                        // yet (bg_* no-ops); show them disabled, never as working filters.
+                        val unavailable = effect.isSegmentationRequired
                         val lensId = lensIdForEffect(effect.id)
                         val isSelected = if (effect.isFaceTrackingRequired) {
                             lensId != null && lensManager.selected.id == lensId
@@ -354,8 +358,9 @@ fun CameraCaptureBottomControls(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .padding(horizontal = 5.dp)
-                                .graphicsLayer { scaleX = scale; scaleY = scale }
-                                .clickable { onSelectEffect(effect) },
+                                .graphicsLayer { scaleX = scale; scaleY = scale; alpha = if (unavailable) 0.45f else 1f }
+                                .semantics { if (unavailable) stateDescription = "Not available yet" }
+                                .clickable(enabled = !unavailable) { onSelectEffect(effect) },
                         ) {
                             Box(
                                 modifier = Modifier
@@ -413,6 +418,7 @@ fun CameraCaptureBottomControls(
             // while shooting (photo / lens mode) — no tray toggle needed to reach lenses.
             if (ready && (captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses)) {
                 // Lens name + tracking health row.
+                Box(Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -453,6 +459,26 @@ fun CameraCaptureBottomControls(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                }
+                // Lens explorer entry: browse grid beside the carousel (Snap-style).
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 10.dp)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x33FFFFFF))
+                        .clickable(onClick = onBrowseLenses)
+                        .semantics { contentDescription = "Browse all lenses" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    androidx.compose.material3.Icon(
+                        androidx.compose.material.icons.Icons.Rounded.Apps,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
                 }
                 Spacer(Modifier.height((if (tight) 1 else 4).dp))
                 LensCarousel(manager = lensManager, deviceTier = deviceTier)
