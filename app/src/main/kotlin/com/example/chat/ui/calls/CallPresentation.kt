@@ -219,6 +219,11 @@ class CallPresentationController(
     private var fullScreenPresentations = 0
     private var isBackgrounded = false
 
+    /** Call id the user intentionally minimized (island/PiP). A process restart has no
+     *  minimize record, so an active call then restores the full call UI - hangup and
+     *  controls must always be reachable. An explicit minimize is preserved. */
+    private var minimizedCallId: String? = null
+
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
     fun addListener(listener: () -> Unit) { listeners.add(listener) }
     fun removeListener(listener: () -> Unit) { listeners.remove(listener) }
@@ -243,6 +248,7 @@ class CallPresentationController(
     /** Invoked when OngoingCallScreen is mounted or pushed to full-screen. */
     fun showFullScreen() {
         fullScreenPresentations = 1
+        minimizedCallId = null
         mode = CallPresentationMode.fullScreen
         publishMode()
         notifyListeners()
@@ -252,6 +258,7 @@ class CallPresentationController(
     fun minimizeToPipOrIsland() {
         fullScreenPresentations = 0
         val session = callService.currentSession
+        if (session != null && session.isActive) minimizedCallId = session.callId
         mode = if (session == null || !session.isActive) {
             CallPresentationMode.none
         } else if (session.isVideo && preferences.value.pictureInPictureEnabled) {
@@ -267,6 +274,7 @@ class CallPresentationController(
     /** Transition from Video PiP to Call Island. */
     fun collapseToIsland() {
         if (mode == CallPresentationMode.inAppVideoPip) {
+            callService.currentSession?.let { if (it.isActive) minimizedCallId = it.callId }
             mode = if (preferences.value.dynamicIslandEnabled) {
                 CallPresentationMode.inAppIsland
             } else {
@@ -352,6 +360,7 @@ class CallPresentationController(
         val isActive = session != null && session.isActive
 
         if (!isActive) {
+            minimizedCallId = null
             if (mode != CallPresentationMode.none) {
                 mode = CallPresentationMode.none
                 fullScreenPresentations = 0
@@ -380,6 +389,19 @@ class CallPresentationController(
                 mode = CallPresentationMode.fullScreen
                 publishAndNotify()
             }
+            return
+        }
+
+        // Fresh controller (process restart) with a live call and no minimize record:
+        // restore the full call UI so hangup/controls are always reachable. Only when
+        // the session is active - an ended call takes the !isActive branch above and
+        // is never resurrected.
+        if (mode == CallPresentationMode.none &&
+            (minimizedCallId == null || minimizedCallId != session!!.callId)
+        ) {
+            mode = CallPresentationMode.fullScreen
+            fullScreenPresentations = 1
+            publishAndNotify()
             return
         }
 
@@ -432,3 +454,4 @@ class CallPresentationController(
             private set
     }
 }
+
