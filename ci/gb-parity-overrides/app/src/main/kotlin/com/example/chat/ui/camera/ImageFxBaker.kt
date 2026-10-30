@@ -31,7 +31,15 @@ object ImageFxBaker {
     data class BakedEffect(val path: String, val applied: Boolean)
 
     /** Pre-bake decision for one photo capture. Pure and JVM-testable; the
-     *  capture screen and its proofs share this exact contract. */
+     *  capture screen and its tests share this exact contract:
+     *   - story + colorMatrix: bake (stories carry no metadata channel), tag kept;
+     *   - chat + colorMatrix: NO bake - the look travels as message metadata and
+     *     receivers render it (matrix contract unchanged, nothing double-applies);
+     *   - shader effects (pixelate, segment_*): bake in EVERY photo mode because
+     *     no receiver-side renderer exists, and the tag clears to none so the
+     *     sent message never re-applies what is already in the pixels;
+     *   - any failed bake (applied=false): tag clears to none - fail-open never
+     *     claims an unrendered filter. */
     data class CaptureEffectPlan(
         val bake: Boolean,
         /** Metadata tag after a successful bake: shader pixels carry the look,
