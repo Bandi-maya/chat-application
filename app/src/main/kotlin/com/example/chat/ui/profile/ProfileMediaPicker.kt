@@ -331,6 +331,7 @@ private fun boundImageBytesToCache(context: Context, bytes: ByteArray, square: I
         }.getOrNull()
 
 /** Port of image_editor_cropper_dialog.dart as a full-screen dialog. */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun ProfileImageCropperDialog(
     sourceFile: File,
