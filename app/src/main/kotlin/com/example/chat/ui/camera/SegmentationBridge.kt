@@ -3,7 +3,7 @@ package com.example.chat.ui.camera
 import android.content.Context
 import android.graphics.Bitmap
 import com.google.mediapipe.framework.image.BitmapImageBuilder
-import com.google.mediapipe.framework.image.ByteBufferContainer
+import com.google.mediapipe.framework.image.ByteBufferExtractor
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.imagesegmenter.ImageSegmenter
@@ -63,9 +63,8 @@ class SegmentationBridge(private val context: Context) {
             if (!masks.isPresent || masks.get().isEmpty()) return null
             val list = masks.get()
             val maskImage = if (list.size > 1) list[1] else list[0]
-            val container = maskImage.container
-            if (container !is ByteBufferContainer) return null
-            val floats = container.byteBuffer.order(ByteOrder.nativeOrder()).asFloatBuffer()
+            val floats = ByteBufferExtractor.extract(maskImage)
+                .order(ByteOrder.nativeOrder()).asFloatBuffer()
             val w = maskImage.width
             val h = maskImage.height
             if (floats.remaining() < w * h) return null
