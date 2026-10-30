@@ -2,6 +2,7 @@ package com.example.chat
 
 import com.example.chat.ui.camera.EffectEngine
 import com.example.chat.ui.camera.EffectRegistry
+import com.example.chat.ui.camera.pixelateBlocks
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -17,7 +18,7 @@ import org.junit.Test
 class CameraEffectAvailabilityTest {
 
     private val unavailableIds = listOf(
-        "bg_portrait_blur", "bg_virtual_office", "bg_gradient_studio", "face_pixel_retro",
+        "bg_portrait_blur", "bg_virtual_office", "bg_gradient_studio",
     )
 
     @Test fun `none renders no matrix and no overlay`() {
@@ -39,10 +40,11 @@ class CameraEffectAvailabilityTest {
     @Test fun `every render-backed effect produces engine output`() {
         val e = EffectEngine()
         val working = EffectRegistry.allEffects.filter { it.id != "none" && it.id !in unavailableIds }
-        assertEquals(95, working.size)
+        assertEquals(96, working.size)
         working.forEach { effect ->
             e.selectEffect(effect)
-            val renders = e.activeColorMatrix() != null || e.isAnimatedOverlayActive || effect.isFaceTrackingRequired
+            val renders = e.activeColorMatrix() != null || e.isAnimatedOverlayActive ||
+                effect.isFaceTrackingRequired || effect.shaderKey != null
             assertTrue("${effect.id} has no engine output path", renders)
             if (effect.colorMatrix != null) {
                 assertEquals("${effect.id} matrix size", 20, e.activeColorMatrix()!!.size)
@@ -61,6 +63,40 @@ class CameraEffectAvailabilityTest {
             ),
             flagged,
         )
+    }
+
+    @Test fun `pixel retro carries the original pixelate shader path`() {
+        val pixel = EffectRegistry.getById("face_pixel_retro")
+        assertEquals("pixelate", pixel.shaderKey)
+        assertNull(pixel.colorMatrix)
+        assertFalse(pixel.isFaceTrackingRequired)
+        // Not a matrix effect: the engine emits no color matrix for it; the
+        // pixelate path renders via EffectRender/ImageFxBaker instead.
+        val e = EffectEngine()
+        e.selectEffect(pixel)
+        assertNull(e.activeColorMatrix())
+        // Bake-side matrix fallback is identity, never a wrong color shift.
+        val identity = com.example.chat.ui.camera.ImageFxBaker.lerpedMatrix(pixel, 0.7)
+        assertEquals(1f, identity[0], 1e-6f)
+        assertEquals(1f, identity[6], 1e-6f)
+        assertEquals(0f, identity[1], 1e-6f)
+        // Intensity maps to the block grid: higher intensity = chunkier.
+        assertTrue(pixelateBlocks(1.0) < pixelateBlocks(0.0))
+    }
+
+    @Test fun `effect favorites persist through the store seam`() {
+        val store = mutableMapOf<String, List<String>>()
+        val prefs = object : com.example.chat.ui.camera.LensStringListStore {
+            override fun getStringList(key: String) = store[key]
+            override fun setStringList(key: String, value: List<String>) { store[key] = value }
+        }
+        val e = EffectEngine(prefs = prefs)
+        e.toggleFavorite("face_dog_filter")
+        e.toggleFavorite("glow_rainbow_sheen")
+        assertTrue(store[EffectEngine.FAVORITES_KEY]!!.containsAll(listOf("face_dog_filter", "glow_rainbow_sheen")))
+        e.toggleFavorite("face_dog_filter")
+        val restored = EffectEngine(prefs = prefs)
+        assertEquals(setOf("glow_rainbow_sheen"), restored.favoriteEffectIds)
     }
 
     @Test fun `v2 full-frame grades carry real matrices without face flags`() {
