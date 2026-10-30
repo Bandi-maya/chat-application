@@ -453,12 +453,13 @@ class MediaInteractionProofTest {
                 metadata = com.example.chat.ui.chats.detail.MediaAlbumContract.stamp("synthetic-batch", i, 2), createdAt = Instant.EPOCH)
         }
         val opened = java.util.concurrent.atomic.AtomicReference<String>()
+        val menued = java.util.concurrent.atomic.AtomicReference<String>()
         ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
             scenario.onActivity { it.setContent { MaterialTheme {
                 ChatMessageBubble(messages[0], true, ThemePresets.whatsappIosLight,
                     mediaContent = {
                         com.example.chat.ui.chats.detail.CompactMediaAlbum(messages, null, null, null,
-                            onOpen = { item, _ -> opened.set(item.id) }, onMenu = { _, _ -> })
+                            onOpen = { item, _ -> opened.set(item.id) }, onMenu = { item, _ -> menued.set(item.id) })
                     })
             } } }
             waitText("Compact album caption")
@@ -478,7 +479,28 @@ class MediaInteractionProofTest {
                 try {
                     val child = albumNode.children.firstOrNull()
                     android.util.Log.i("ALBUM-PROBE", "tile2 child bounds=" + (child?.visibleBounds ?: "null") + " clickable=" + (child?.isClickable ?: "null") + " desc=" + (child?.contentDescription ?: "null"))
-                } catch (e: Exception) { android.util.Log.i("ALBUM-PROBE", "child probe failed: " + e.message) }
+                } 
+                // Evidence only (assertions unchanged): pin WHO swallows the tile tap.
+                try {
+                    val dir = File(inst.targetContext.getExternalFilesDir(null), "screenshots")
+                    java.io.FileOutputStream(File(dir, "compact-album-hierarchy.xml")).use { device.dumpWindowHierarchy(it) }
+                    android.util.Log.i("ALBUM-PROBE", "hierarchy dumped")
+                } catch (e: Exception) { android.util.Log.i("ALBUM-PROBE", "dump failed: " + e.message) }
+                // Long-press shares detectTapGestures' awaitFirstDown path: if onMenu fires,
+                // the tile receives downs and only tap completion fails; if not, the down
+                // never reaches the tile (child/parent/overlay consumption).
+                albumNode.longClick()
+                device.waitForIdle()
+                android.util.Log.i("ALBUM-PROBE", "after longclick menued=" + menued.get())
+                // Tile specificity: does tile 1 open when tile 2 does not?
+                try {
+                    val t1 = device.findObject(By.descContains("Album photo 1 of 2"))
+                    val b1 = t1.visibleBounds
+                    android.util.Log.i("ALBUM-PROBE", "tile1 bounds=" + b1 + " clickable=" + t1.isClickable)
+                    device.click(b1.centerX(), b1.centerY())
+                    device.waitForIdle()
+                    android.util.Log.i("ALBUM-PROBE", "after tile1 click opened=" + opened.get())
+                } catch (e: Exception) { android.util.Log.i("ALBUM-PROBE", "tile1 probe failed: " + e.message) }catch (e: Exception) { android.util.Log.i("ALBUM-PROBE", "child probe failed: " + e.message) }
             }
             assertEquals("album-1", opened.get())
             val a = device.findObject(By.descContains("Album photo 1 of 2")).visibleBounds
