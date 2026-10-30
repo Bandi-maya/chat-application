@@ -127,11 +127,15 @@ class CameraEffectAvailabilityTest {
         assertEquals(1.0, e.intensity, 0.0)
         e.setIntensity(-1.0)
         assertEquals(0.0, e.intensity, 0.0)
-        // intensity 0 is the identity matrix, not a null render
+        // intensity 0 is the identity matrix, not a null render; a 4x5
+        // ColorMatrix identity has its diagonal at indices 0, 6, 12, 18
         val identity = e.activeColorMatrix()
         assertNotNull(identity)
         assertEquals(1.0, identity!![0], 1e-9)
-        assertEquals(1.0, identity[5], 1e-9)
+        assertEquals(1.0, identity[6], 1e-9)
+        assertEquals(1.0, identity[12], 1e-9)
+        assertEquals(1.0, identity[18], 1e-9)
         assertEquals(0.0, identity[1], 1e-9)
+        assertEquals(0.0, identity[5], 1e-9)
     }
 }
