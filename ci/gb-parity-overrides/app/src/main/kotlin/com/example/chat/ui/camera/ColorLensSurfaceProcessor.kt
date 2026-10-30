@@ -287,7 +287,10 @@ void main() {
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, overlayTextureId)
             GLES20.glUniform1i(locOverlay, 1)
 
-            GLES20.glUniformMatrix4fv(locMatrix, 1, false, textureTransform, 0)
+            // Per-output transform (rotation/crop/mirroring per SurfaceOutput contract).
+            val updated = FloatArray(16)
+            output.updateTransformMatrix(updated, textureTransform)
+            GLES20.glUniformMatrix4fv(locMatrix, 1, false, updated, 0)
 
             val m = matrix
             val colorOn = m != null && m.size >= 20 && (targets and colorTargetMask) != 0
