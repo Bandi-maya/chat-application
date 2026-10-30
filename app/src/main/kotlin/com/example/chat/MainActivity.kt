@@ -1,11 +1,15 @@
 package com.example.chat
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.example.chat.ui.AppRoot
+
+private const val TAG = "ChatyMain"
 
 /**
  * Native Kotlin entry point for the Chaty port.
@@ -38,6 +42,7 @@ class MainActivity : FragmentActivity() {
             AppRoot()
         }
         handleNotificationIntent(intent)
+        handleDeepLink(intent)
     }
 
     // launchMode=singleTop: a shortcut tap or notification action while the task is running arrives here, not onCreate.
@@ -51,6 +56,7 @@ class MainActivity : FragmentActivity() {
             scope.generation,
         )
         handleNotificationIntent(intent)
+        handleDeepLink(intent)
     }
 
     /** Taps on chat / call notifications (see notifications/ChatyNotifications). */
@@ -70,6 +76,27 @@ class MainActivity : FragmentActivity() {
                 }
             }
             else -> intent?.getStringExtra(N.EXTRA_ROOM_ID)?.let { N.requestOpenRoom(it) }
+        }
+    }
+
+    /**
+     * Handles chaty:// deep links from email magic-link / password-reset callbacks.
+     * The state nonce issued by SupabaseAuthClient.registerPendingState() must be present
+     * and unexpired, otherwise the deep link is ignored (open-redirect / callback-abuse guard).
+     */
+    private fun handleDeepLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme?.lowercase() != "chaty") return
+        when (val host = data.host?.lowercase()) {
+            "login-callback", "reset-password" -> {
+                val state = data.getQueryParameter("state")
+                if (state.isNullOrEmpty() || !ServiceLocator.apiBackend.consumePendingState(state)) {
+                    Log.w(TAG, "Rejected $host deep link: missing or invalid state nonce")
+                    return
+                }
+                ServiceLocator.apiBackend.pendingDeepLinkData = data
+            }
+            else -> Unit
         }
     }
 

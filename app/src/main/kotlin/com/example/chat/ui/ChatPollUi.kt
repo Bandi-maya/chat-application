@@ -87,7 +87,7 @@ fun CreatePollDialog(onCancel: () -> Unit, onCreate: (PollDraft) -> Unit) {
                 }
                 if (options.size < 12) {
                     TextButton(onClick = { options.add("") }) {
-                        Icon(Icons.Rounded.AddCircleOutline, contentDescription = null)
+                        Icon(Icons.Rounded.AddCircleOutline, "Add option")
                         Spacer(Modifier.width(6.dp))
                         Text("Add option")
                     }

@@ -310,10 +310,10 @@ private fun LivePreviewCard(
                 avatar = { StylesAvatarCore(initials = "AM", color = Color(0xFF3B82F6), size = 36) },
                 actions = {
                     IconButton(onClick = {}) {
-                        Icon(Icons.Outlined.Call, contentDescription = null, tint = colors.foreground, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Outlined.Call, "Voice call", tint = colors.foreground, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = {}) {
-                        Icon(Icons.Outlined.Videocam, contentDescription = null, tint = colors.foreground, modifier = Modifier.size(22.dp))
+                        Icon(Icons.Outlined.Videocam, "Video call", tint = colors.foreground, modifier = Modifier.size(22.dp))
                     }
                 },
             ),

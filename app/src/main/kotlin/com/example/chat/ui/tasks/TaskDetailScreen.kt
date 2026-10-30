@@ -125,7 +125,7 @@ fun TaskDetailScreen(
                         DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
                                 text = { Text("Edit Task") },
-                                leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                leadingIcon = { Icon(Icons.Rounded.Edit, "Edit task", modifier = Modifier.size(20.dp)) },
                                 onClick = { menuOpen = false; onEditTask(currentTask) },
                             )
                             DropdownMenuItem(

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -166,6 +167,8 @@ fun CameraCaptureViewfinder(
                         onClick = onToggleEffects,
                     )
                 }
+                Spacer(Modifier.width(10.dp))
+                CameraCaptureRoundAction(label = "Settings", kind = "settings", onClick = onOpenSettings)
             }
         }
     }
@@ -232,10 +235,178 @@ private fun CameraCaptureNoCameraPane(
     }
 }
 
+/** Mode selector pills: Night, Portrait, Photo, Video, Micro Movie. */
+@Composable
+fun CameraCaptureModeSelector(
+    captureViewMode: CaptureViewMode,
+    isVideoMode: Boolean,
+    tight: Boolean,
+    onSetPhoto: () -> Unit,
+    onSetDocument: () -> Unit,
+    onSetVideo: () -> Unit,
+) {
+    val items = listOf(
+        Pair("Night", false),
+        Pair("Portrait", false),
+        Pair("Photo", false),
+        Pair("Video", isVideoMode),
+        Pair("Micro Movie", false),
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = (if (tight) 30 else 62).dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        items.forEachIndexed { index, (label, selected) ->
+            val isSelected = when (label) {
+                "Photo" -> captureViewMode == CaptureViewMode.photo
+                "Document" -> captureViewMode == CaptureViewMode.document
+                "Video" -> isVideoMode
+                else -> false
+            }
+            CameraCaptureModeButton(
+                label = label,
+                selected = isSelected,
+                tight = tight,
+                onClick = {
+                    when (label) {
+                        "Photo" -> onSetPhoto()
+                        "Video" -> onSetVideo()
+                        else -> onSetPhoto()
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            )
+            if (index < items.lastIndex) Spacer(Modifier.width(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun CameraCaptureModeButton(
+    label: String,
+    selected: Boolean,
+    tight: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .height((if (tight) 34 else 38).dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(if (selected) Color.White else Color.White.copy(alpha = 0.08f))
+            .border(
+                width = 1.dp,
+                color = if (selected) Color.White else Color(0x4DFFFFFF),
+                shape = RoundedCornerShape(22.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = (if (tight) 9 else 14).dp)
+            .semantics { contentDescription = "$label camera mode" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (selected) Color.Black else Color.White,
+            fontSize = 12.sp,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.W700,
+        )
+    }
+}
+
+/** Shutter button: yellow ring for photo, filled red circle when recording video. */
+@Composable
+fun CameraCaptureShutter(
+    enabled: Boolean,
+    capturing: Boolean,
+    isVideoMode: Boolean,
+    isRecording: Boolean,
+    onClick: () -> Unit,
+) {
+    val ringColor = if (isRecording) Color.Red else Color(0xFFFFD54F)
+    Box(
+        modifier = Modifier
+            .size(82.dp)
+            .clip(CircleShape)
+            .border(5.dp, ringColor, CircleShape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(6.dp)
+            .semantics {
+                contentDescription = if (isRecording) "Stop recording" else "Take photo"
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isRecording) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(Color.Red),
+            )
+        } else if (capturing) {
+            CircularProgressIndicator(
+                color = Color.White,
+                strokeWidth = 3.dp,
+                modifier = Modifier.padding(16.dp),
+            )
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(if (enabled) Color.White else Color(0x61FFFFFF)),
+            )
+        }
+    }
+}
+
+/** Bottom gallery thumbnail (placeholder). */
+@Composable
+fun CameraCaptureGalleryThumbnail(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size((52.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0x4DFFFFFF))
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = "Pick image from gallery" },
+        contentAlignment = Alignment.Center,
+    ) {
+        CameraGlyph(kind = "gallery", color = Color.White, size = 27.dp)
+    }
+}
+
+/** Timer pill: shows "00:00" in photo mode, red "MM:SS" when recording video. */
+@Composable
+fun CameraCaptureTimer(isRecording: Boolean, seconds: Int) {
+    if (!isRecording && seconds == 0) return
+    val minutes = seconds / 60
+    val secs = seconds % 60
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .background(if (isRecording) Color.Red else Color(0xCC000000), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "%02d:%02d".format(minutes, secs),
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.W700,
+        )
+    }
+}
+
+/** Bottom controls row: gallery, shutter, flip, mode pills, timer. */
 @Composable
 fun CameraCaptureBottomControls(
     phase: CameraPhase,
     captureViewMode: CaptureViewMode,
+    isVideoMode: Boolean,
+    isRecording: Boolean,
+    recordingSeconds: Int,
     effectsOpen: Boolean,
     capturing: Boolean,
     engine: EffectEngine,
@@ -243,8 +414,8 @@ fun CameraCaptureBottomControls(
     faceHealth: TrackingHealth,
     deviceTier: DeviceCapabilityTier,
     lensIdForEffect: (String) -> String?,
-    onSelectEffect: (ChatyCameraEffect) -> Unit,
     onSetViewMode: (CaptureViewMode) -> Unit,
+    onSetVideo: () -> Unit,
     onShutter: () -> Unit,
     onFlip: () -> Unit,
     onPickFromGallery: () -> Unit,
@@ -401,32 +572,17 @@ fun CameraCaptureBottomControls(
                 }
                 Spacer(Modifier.height((if (tight) 4 else 9).dp))
             }
-            // Mode selector.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = (if (tight) 30 else 62).dp),
-            ) {
-                CameraCaptureModeButton(
-                    label = "Photo",
-                    document = false,
-                    selected = captureViewMode == CaptureViewMode.photo,
-                    tight = tight,
-                    onClick = { onSetViewMode(CaptureViewMode.photo) },
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(8.dp))
-                CameraCaptureModeButton(
-                    label = "Document",
-                    document = true,
-                    selected = captureViewMode == CaptureViewMode.document,
-                    tight = tight,
-                    onClick = { onSetViewMode(CaptureViewMode.document) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            // Mode selector pills.
+            CameraCaptureModeSelector(
+                captureViewMode = captureViewMode,
+                isVideoMode = isVideoMode,
+                tight = tight,
+                onSetPhoto = { onSetViewMode(CaptureViewMode.photo) },
+                onSetDocument = { onSetViewMode(CaptureViewMode.document) },
+                onSetVideo = onSetVideo,
+            )
             Spacer(Modifier.height((if (tight) 4 else 8).dp))
-            // Gallery / shutter / flip.
+            // Gallery / shutter / flip + timer.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -434,17 +590,14 @@ fun CameraCaptureBottomControls(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size((if (tight) 46 else 52).dp)
-                        .clip(CircleShape)
-                        .clickable(onClick = onPickFromGallery)
-                        .semantics { contentDescription = "Pick image from gallery" },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CameraGlyph(kind = "gallery", color = Color.White, size = 27.dp)
-                }
-                CameraCaptureShutter(enabled = ready, capturing = capturing, onClick = onShutter)
+                CameraCaptureGalleryThumbnail(onClick = onPickFromGallery)
+                CameraCaptureShutter(
+                    enabled = ready,
+                    capturing = capturing,
+                    isVideoMode = isVideoMode,
+                    isRecording = isRecording,
+                    onClick = onShutter,
+                )
                 Box(
                     modifier = Modifier
                         .size((if (tight) 46 else 52).dp)
@@ -459,55 +612,45 @@ fun CameraCaptureBottomControls(
                         size = 27.dp,
                     )
                 }
+                CameraCaptureTimer(isRecording = isRecording, seconds = recordingSeconds)
             }
         }
     }
 }
 
+/** Zoom wheel row: presets (1x/2x/4x/6x) + circular arc + live value pill. */
 @Composable
-private fun CameraCaptureModeButton(
-    label: String,
-    document: Boolean,
-    selected: Boolean,
-    tight: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+fun CameraZoomWheel(
+    current: Float,
+    min: Float,
+    max: Float,
+    enabled: Boolean,
+    onZoom: (Float) -> Unit,
 ) {
-    Row(
-        modifier = modifier
-            .height((if (tight) 34 else 38).dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(if (selected) Color.White else Color.White.copy(alpha = 0.08f))
-            .border(
-                width = 1.dp,
-                color = if (selected) Color.White else Color(0x4DFFFFFF),
-                shape = RoundedCornerShape(22.dp),
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = (if (tight) 9 else 14).dp)
-            .semantics { contentDescription = "$label camera mode" },
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, bottom = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CameraGlyph(
-            kind = if (document) "document" else "camera",
-            color = if (selected) Color.Black else Color.White,
-            size = 16.dp,
+        CameraZoomPresets(current = current, min = min, max = max, enabled = enabled, onZoom = onZoom)
+        Spacer(Modifier.height(4.dp))
+        CircularZoomDial(
+            current = current,
+            min = min,
+            max = max,
+            enabled = enabled,
+            onZoomLive = onZoom,
         )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            label,
-            color = if (selected) Color.Black else Color.White,
-            fontSize = 12.sp,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.W700,
-        )
+        Spacer(Modifier.height(8.dp))
+        CameraZoomValue(current = current)
     }
 }
 
 /** _buildShutter: 76dp ring (4dp white border, 5dp gap), spinner while
  *  capturing, filled inner circle otherwise. */
 @Composable
-private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, onClick: () -> Unit) {
+private fun OldCameraCaptureShutter(enabled: Boolean, capturing: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(76.dp)
@@ -664,9 +807,8 @@ fun CameraCaptureConfirmPane(
     }
 }
 
-
 /** InteractiveViewer pan clamp with zero boundaryMargin over a
- *  viewport-constrained child (top-left pivot): offset stays in
+ *  viewport-constrained child: offset stays in
  *  [viewport * (1-scale), 0] per axis. Pure for JVM tests. */
 fun clampConfirmPanePan(
     offset: Offset,
@@ -681,7 +823,6 @@ fun clampConfirmPanePan(
         offset.y.coerceIn(minY, 0f),
     )
 }
-
 
 /** One InteractiveViewer scale/pan update: zoom clamps to [1,4], the gesture
  *  centroid stays fixed on screen (Flutter scales the matrix about the focal

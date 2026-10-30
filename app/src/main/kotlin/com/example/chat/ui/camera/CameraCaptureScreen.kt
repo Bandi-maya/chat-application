@@ -54,6 +54,9 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.CompositionLocalProvider
+import com.example.chat.ui.camera.CameraVideoSession
+import androidx.camera.core.VideoCapture
 
 /** Exact port of lib/features/camera/camera_capture_screen.dart.
  *
@@ -83,7 +86,12 @@ import kotlinx.coroutines.withContext
  *  - openAppSettings -> ChatyPermissions.openAppSettings.
  *  - PopScope discard -> BackHandler when a capture is staged.
  *  - App lifecycle: CameraX rebinds automatically with the lifecycle owner;
- *    the Dart's manual dispose/re-init maps to provider.unbindAll on dispose. */
+ *    the Dart's manual dispose/re-init maps to provider.unbindAll on dispose.
+ *
+ *  Video mode is inline (no separate screen): switching to "Video" pill swaps
+ *  the image session for a [CameraVideoSession] on the same PreviewView. The
+ *  shutter button starts/stops recording and the recording timer runs inline.
+ */
 
 enum class ChatyCaptureMode { chat, story }
 
@@ -303,6 +311,13 @@ fun ChatyCameraCaptureScreen(
     }
     var bindJob by remember { mutableStateOf<Job?>(null) }
 
+    // ---- Inline video mode state ----
+    var isVideoMode by remember { mutableStateOf(false) }
+    var isRecording by remember { mutableStateOf(false) }
+    var recordingSeconds by remember { mutableStateOf(0) }
+    var videoSession by remember { mutableStateOf<CameraVideoSession?>(null) }
+    var videoSessionState by remember { mutableStateOf<VideoSessionState?>(null) }
+
     val wantsFaceTracking = capturedPath == null &&
         captureViewMode == CaptureViewMode.photo &&
         lensManager.selected.requiresFaceTracking
@@ -367,7 +382,7 @@ fun ChatyCameraCaptureScreen(
 
     fun bindCamera() {
         val pv = previewView ?: return
-        if (!cameraPermissionGranted || capturedPath != null || scannerBusy || videoOpen) return
+        if (!cameraPermissionGranted || capturedPath != null || scannerBusy || isVideoMode) return
         bindJob?.cancel()
         bindJob = scope.launch {
             phase = CameraPhase.initializing
@@ -397,24 +412,98 @@ fun ChatyCameraCaptureScreen(
         }
     }
 
+    fun bindVideo() {
+        val pv = previewView ?: return
+        if (!cameraPermissionGranted || capturedPath != null || scannerBusy || !isVideoMode) return
+        bindJob?.cancel()
+        bindJob = scope.launch {
+            phase = CameraPhase.initializing
+            errorMessage = null
+            try {
+                val vs = CameraVideoSession(
+                    context = pv.context,
+                    owner = lifecycleOwner,
+                    previewView = pv,
+                    selector = if (session.lensFacing == CameraSelector.LENS_FACING_FRONT)
+                        CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA,
+                    stabilization = options.stabilization,
+                    onState = { state ->
+                        videoSessionState = state
+                        when (state) {
+                            is VideoSessionState.Recording -> {
+                                isRecording = true
+                                recordingSeconds = 0
+                                startRecordingTimer()
+                            }
+                            is VideoSessionState.Finalizing -> {
+                                isRecording = false
+                                stopRecordingTimer()
+                            }
+                            is VideoSessionState.Ready, is VideoSessionState.Preparing -> {
+                                isRecording = false
+                                stopRecordingTimer()
+                            }
+                            else -> Unit
+                        }
+                    },
+                )
+                videoSession = vs
+                vs.bind()
+                phase = CameraPhase.ready
+                flashSupported = false
+                stabilizationSupported = false
+                zoomRatio = 1f
+            } catch (error: Exception) {
+                errorMessage = error.message ?: "Video camera could not start."
+                phase = CameraPhase.noCamera
+            }
+        }
+    }
+
+    fun startRecordingTimer() {
+        stopRecordingTimer()
+        timerJob = scope.launch {
+            while (isRecording) {
+                kotlinx.coroutines.delay(1_000)
+                recordingSeconds++
+            }
+        }
+    }
+
+    fun stopRecordingTimer() {
+        timerJob?.cancel()
+        timerJob = null
+    }
+
     val requestPermission = rememberPermissionRequester { granted, _ ->
         cameraPermissionGranted = granted
         if (!granted) phase = CameraPhase.permissionDenied
     }
     LaunchedEffect(Unit) { requestPermission(ChatyPermissions.camera) }
-    LaunchedEffect(previewView, cameraPermissionGranted, capturedPath, scannerBusy, videoOpen, options.stabilization) {
+    LaunchedEffect(previewView, cameraPermissionGranted, capturedPath, scannerBusy, isVideoMode, options.stabilization) {
+        // Always unbind both sessions before rebinding the correct one.
+        session.unbind()
+        videoSession?.close()
+        videoSession = null
+        videoSessionState = null
+        isRecording = false
+        recordingSeconds = 0
+        stopRecordingTimer()
+
         if (!cameraPermissionGranted) {
-            session.unbind()
             phase = CameraPhase.permissionDenied
-        } else if (capturedPath == null && !scannerBusy && !videoOpen) {
-            session.stabilization = options.stabilization
-            bindCamera()
+        } else if (capturedPath == null && !scannerBusy) {
+            if (isVideoMode) {
+                bindVideo()
+            } else {
+                session.stabilization = options.stabilization
+                bindCamera()
+            }
         }
-        else if (!videoOpen) session.unbind()
     }
     // Re-check after returning from Android app settings. A granted permission
     // must not leave this composition stranded in its old denied state.
-    DisposableEffect(lifecycleOwner, session, capturedPath, scannerBusy, videoOpen) {
+    DisposableEffect(lifecycleOwner, session, capturedPath, scannerBusy, isVideoMode) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
                 timerJob?.cancel()
@@ -423,8 +512,12 @@ fun ChatyCameraCaptureScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 val granted = ChatyPermissions.isGranted(context, ChatyPermissions.camera)
                 cameraPermissionGranted = granted
-                if (granted) bindCamera() else {
+                if (granted) {
+                    if (isVideoMode) bindVideo() else bindCamera()
+                } else {
                     session.unbind()
+                    videoSession?.close()
+                    videoSession = null
                     phase = CameraPhase.permissionDenied
                 }
             }
@@ -439,6 +532,8 @@ fun ChatyCameraCaptureScreen(
                 errorMessage = "The camera did not open. Close another app using it, then reopen the camera. You can also pick from your gallery."
                 phase = CameraPhase.noCamera
                 session.unbind()
+                videoSession?.close()
+                videoSession = null
             }
         }
     }
@@ -462,7 +557,7 @@ fun ChatyCameraCaptureScreen(
     }
 
     fun flipCamera() {
-        if (phase == CameraPhase.initializing || capturing || countdown > 0 || scannerBusy) return
+        if (phase == CameraPhase.initializing || capturing || countdown > 0 || scannerBusy || isRecording) return
         ChatyHapticsPort.selection(view)
         session.lensFacing = if (session.lensFacing == CameraSelector.LENS_FACING_BACK) {
             CameraSelector.LENS_FACING_FRONT
@@ -476,6 +571,20 @@ fun ChatyCameraCaptureScreen(
         faceSolver.reset()
         facePoses = emptyList()
         bindCamera()
+    }
+
+    fun switchToVideo() {
+        if (capturing || scannerBusy || isRecording) return
+        ChatyHapticsPort.selection(view)
+        isVideoMode = true
+        captureViewMode = CaptureViewMode.photo
+        effectsOpen = false
+    }
+
+    fun switchToPhoto() {
+        isVideoMode = false
+        captureViewMode = CaptureViewMode.photo
+        effectsOpen = false
     }
 
     fun stagePickedOrCaptured(path: String) {
@@ -520,7 +629,6 @@ fun ChatyCameraCaptureScreen(
             }
         }
     }
-
 
     fun pickFromGallery() {
         if (captureViewMode == CaptureViewMode.document) { scanDocument(); return }
@@ -604,6 +712,18 @@ fun ChatyCameraCaptureScreen(
     fun shutter() {
         if (scannerBusy || capturing || countdown > 0) return
         if (captureViewMode == CaptureViewMode.document) { scanDocument(); return }
+        if (isVideoMode) {
+            // Video recording toggle: start/stop recording inline.
+            val vs = videoSession ?: return
+            if (isRecording) {
+                vs.stop()
+                isRecording = false
+                stopRecordingTimer()
+            } else {
+                vs.start(requestAudio = true)
+            }
+            return
+        }
         val captureOptions = options
         timerJob = scope.launch {
             try {
@@ -654,23 +774,50 @@ fun ChatyCameraCaptureScreen(
         }
     }
 
-    // PopScope: back with a staged capture discards instead of leaving.
-    BackHandler(enabled = capturedPath != null) { discard() }
+    // Handle video review confirmation from CameraVideoSession.
+    LaunchedEffect(videoSessionState) {
+        val state = videoSessionState
+        if (state is VideoSessionState.Review) {
+            // Auto-confirm: send the reviewed video to the host inline.
+            // The user can retake by switching back to photo mode and recording again.
+            val video = state.video
+            onVideoResult?.invoke(video)
+            // Return to photo mode after sending.
+            isVideoMode = false
+            captureViewMode = CaptureViewMode.photo
+            videoSessionState = null
+        }
+    }
 
-    DisposableEffect(session) {
-        onDispose { timerJob?.cancel(); bindJob?.cancel(); session.dispose(); faceDetection.dispose(); lensManager.dispose() }
+    fun confirmAndSendVideo() {
+        // Called from inline review UI if we add one; for now auto-confirms via LaunchedEffect above.
+    }
+
+    // PopScope: back with a staged capture discards instead of leaving.
+    BackHandler(enabled = capturedPath != null || isRecording) {
+        if (isRecording) {
+            videoSession?.stop()
+            isRecording = false
+            stopRecordingTimer()
+        } else {
+            discard()
+        }
+    }
+
+    DisposableEffect(session, videoSession) {
+        onDispose {
+            timerJob?.cancel()
+            bindJob?.cancel()
+            stopRecordingTimer()
+            session.dispose()
+            videoSession?.close()
+            faceDetection.dispose()
+            lensManager.dispose()
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
-        if (videoOpen && onVideoResult != null) {
-            BackHandler { videoOpen = false }
-            VideoCaptureHost(
-                selector = if (session.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA,
-                stabilization = options.stabilization,
-                onUseVideo = onVideoResult,
-                onBackToPhoto = { videoOpen = false },
-            )
-        } else if (capturedPath == null) {
+        if (capturedPath == null && !isRecording) {
             CameraCaptureViewfinder(
                 phase = phase,
                 errorMessage = errorMessage,
@@ -707,9 +854,33 @@ fun ChatyCameraCaptureScreen(
                 onOpenSettings = { ChatyPermissions.openAppSettings(context) },
                 onPickFromGallery = ::pickFromGallery,
             )
+            // Zoom wheel: always visible when ready, above bottom controls.
+            if (phase == CameraPhase.ready && !effectsOpen) {
+                val zoomState = session.camera?.cameraInfo?.zoomState?.value
+                val vMin = zoomState?.minZoomRatio ?: 1f
+                val vMax = zoomState?.maxZoomRatio ?: 6f
+                val cur = zoomState?.zoomRatio ?: zoomRatio
+                CameraZoomWheel(
+                    current = cur,
+                    min = vMin,
+                    max = vMax,
+                    enabled = phase == CameraPhase.ready && !capturing && !isRecording,
+                    onZoom = { requested ->
+                        val target = requested.coerceIn(vMin, vMax)
+                        val result = session.camera?.cameraControl?.setZoomRatio(target)
+                        result?.addListener({
+                            try { result.get(); zoomRatio = target }
+                            catch (_: Exception) { scannerError = "Zoom is unavailable on this camera." }
+                        }, ContextCompat.getMainExecutor(context))
+                    },
+                )
+            }
             CameraCaptureBottomControls(
                 phase = phase,
                 captureViewMode = captureViewMode,
+                isVideoMode = isVideoMode,
+                isRecording = isRecording,
+                recordingSeconds = recordingSeconds,
                 effectsOpen = effectsOpen,
                 capturing = capturing,
                 engine = engine,
@@ -717,15 +888,6 @@ fun ChatyCameraCaptureScreen(
                 faceHealth = faceHealth,
                 deviceTier = deviceTier,
                 lensIdForEffect = ::lensIdForEffect,
-                onSelectEffect = { effect ->
-                    ChatyHapticsPort.selection(view)
-                    if (effect.isFaceTrackingRequired) {
-                        lensIdForEffect(effect.id)?.let { lensManager.select(it) }
-                        effectsOpen = false
-                    } else {
-                        engine.selectEffect(effect)
-                    }
-                },
                 onSetViewMode = { m ->
                     val changed = captureViewMode != m
                     if (changed) {
@@ -742,6 +904,7 @@ fun ChatyCameraCaptureScreen(
                         scanDocument()
                     }
                 },
+                onSetVideo = ::switchToVideo,
                 onShutter = ::shutter,
                 onFlip = ::flipCamera,
                 onPickFromGallery = ::pickFromGallery,
@@ -755,12 +918,6 @@ fun ChatyCameraCaptureScreen(
                 androidx.compose.material3.TextButton(onClick = { optionsOpen = !optionsOpen }) {
                     androidx.compose.material3.Text("More settings", color = androidx.compose.ui.graphics.Color.White)
                 }
-                if (onVideoResult != null) androidx.compose.material3.TextButton(onClick = {
-                    timerJob?.cancel(); countdown = 0; bindJob?.cancel(); session.unbind()
-                    optionsOpen = false; videoOpen = true
-                }, enabled = !capturing && !scannerBusy) {
-                    androidx.compose.material3.Text("Video", color = androidx.compose.ui.graphics.Color.White)
-                }
                 if (optionsOpen) CameraOptionsPanel(options, stabilizationSupported, { next -> options = next }, { optionsOpen = false })
                 if (scannerBusy) androidx.compose.material3.Text("Opening on-device scanner…", color = androidx.compose.ui.graphics.Color.White)
                 scannerError?.let { message ->
@@ -770,22 +927,6 @@ fun ChatyCameraCaptureScreen(
                 }
                 if (countdown > 0) androidx.compose.material3.Text("$countdown", color = androidx.compose.ui.graphics.Color.White,
                     fontSize = 42.sp)
-                val zoomState = session.camera?.cameraInfo?.zoomState?.value
-                if (zoomState != null) {
-                    CameraZoomControls(
-                        current = zoomRatio,
-                        min = zoomState.minZoomRatio,
-                        max = zoomState.maxZoomRatio,
-                        enabled = phase == CameraPhase.ready && !capturing,
-                    ) { requested ->
-                        val target = requested.coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
-                        val result = session.camera?.cameraControl?.setZoomRatio(target)
-                        result?.addListener({
-                            try { result.get(); zoomRatio = target }
-                            catch (_: Exception) { scannerError = "Zoom is unavailable on this camera." }
-                        }, ContextCompat.getMainExecutor(context))
-                    }
-                }
             }
         } else {
             CameraCaptureConfirmPane(
