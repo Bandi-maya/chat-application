@@ -149,11 +149,18 @@ class CameraVideoSession(
                     lensTargetMask = androidx.camera.core.CameraEffect.PREVIEW or androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
                     colorTargetMask = androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
                 )
+                // Effect failures must surface, not silently record unfiltered:
+                // the consumer reports through onState so the UI can show the
+                // lens/filter is not applied instead of a dead effect.
                 val overlay = androidx.camera.core.CameraEffect(
                     androidx.camera.core.CameraEffect.PREVIEW or androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
                     processor.getGlExecutor(),
                     processor,
-                    androidx.core.util.Consumer { /* effect errors must never kill recording */ },
+                    androidx.core.util.Consumer { err ->
+                        main.execute {
+                            onState(VideoSessionState.Error("Camera effect failed; reopen the camera or disable the lens/filter. (" + (err.message ?: "unknown") + ")"))
+                        }
+                    },
                 )
                 overlayProcessorRef = processor
                 fun bindWithEffect(vararg extra: androidx.camera.core.UseCase): androidx.camera.core.Camera? = try {
