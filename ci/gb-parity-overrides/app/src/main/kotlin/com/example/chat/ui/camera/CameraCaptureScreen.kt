@@ -1,5 +1,7 @@
 package com.example.chat.ui.camera
 
+import android.util.Log
+
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.camera.core.CameraSelector
@@ -1062,14 +1064,19 @@ fun ChatyCameraCaptureScreen(
                 val videoZoomReady = videoState is VideoSessionState.Ready || videoTimerActive
                 CameraZoomControls(zoomRatio,minZoom,effectiveZoomMax(maxZoom,workingMaxZoom),enabled = phase == CameraPhase.ready && !capturing && (!videoOpen || videoZoomReady),forceSlider = videoTimerActive) { requested ->
                     val control = if (videoOpen) videoSession?.boundCamera()?.cameraControl else session.camera?.cameraControl
+                    if (com.example.chat.BuildConfig.DEBUG) Log.i("ZOOM-DIAG", "request=" + requested + " clamped=" + clampCameraZoom(requested,minZoom,maxZoom) + " current=" + zoomRatio + " range=[" + minZoom + "," + maxZoom + "] workingMax=" + workingMaxZoom + " controlNull=" + (control == null))
                     if (control != null) {
                         val result = control.setZoomRatio(clampCameraZoom(requested,minZoom,maxZoom))
-                        result.addListener({ try { result.get(); zoomRatio = clampCameraZoom(requested,minZoom,maxZoom) }
-                            catch (_: Exception) {
+                        result.addListener({ try { result.get(); zoomRatio = clampCameraZoom(requested,minZoom,maxZoom)
+                            if (com.example.chat.BuildConfig.DEBUG) Log.i("ZOOM-DIAG", "accepted ratio=" + zoomRatio) }
+                            catch (e: Exception) {
                                 // Clamp the offered range to what the camera accepted,
                                 // so the failed preset disappears instead of failing again.
                                 workingMaxZoom = maxOf(minZoom, zoomRatio)
                                 scannerError = "Zoom is unavailable on this camera."
+                                // A rejection here is a failed REQUEST, not proof of
+                                // missing camera capability - log the exact error.
+                                if (com.example.chat.BuildConfig.DEBUG) Log.i("ZOOM-DIAG", "rejected requested=" + requested + " error=" + e.javaClass.simpleName + ":" + e.message + " workingMax->" + workingMaxZoom)
                             }
                         }, ContextCompat.getMainExecutor(context))
                     }
