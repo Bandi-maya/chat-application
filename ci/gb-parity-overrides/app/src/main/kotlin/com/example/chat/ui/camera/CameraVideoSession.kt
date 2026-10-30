@@ -142,7 +142,7 @@ class CameraVideoSession(
                     val lens = lensProvider()
                     val poses = (if (com.example.chat.BuildConfig.DEBUG) CameraVideoNativeProof.fakeLensPoses else null) ?: posesProvider()
                     if (lens == null || lens.isNoLens || poses.isEmpty()) return@setOnDrawListener true
-                    val oc = frame.overlayCanvas.canvas
+                    val oc = frame.overlayCanvas
                     val w = oc.width.toFloat(); val h = oc.height.toFloat()
                     val pv = viewportProvider()
                     if (w <= 0f || h <= 0f || pv.width <= 0f || pv.height <= 0f) return@setOnDrawListener true
