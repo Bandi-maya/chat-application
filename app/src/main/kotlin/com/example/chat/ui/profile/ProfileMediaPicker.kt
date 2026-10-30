@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -467,7 +468,11 @@ fun ProfileImageCropperDialog(
                             contentScale = ContentScale.FillBounds,
                             modifier = Modifier
                                 .align(Alignment.Center)
-                                .size(
+                                // requiredSize, not size: the cover-fit child is
+                                // larger than the crop window on one axis, and
+                                // size() would clamp it to the window and let
+                                // FillBounds squash the image into it.
+                                .requiredSize(
                                     with(density) { childW.toDp() },
                                     with(density) { childH.toDp() },
                                 )
