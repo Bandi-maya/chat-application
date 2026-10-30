@@ -225,9 +225,9 @@ class CameraModeStripProofTest {
      assertTrue("Recorded video file exists",v!=null && v.length()>0)
      return v!!
     }
-    CameraVideoNativeProof.fakeLensPoses=listOf(pose)
+    com.example.chat.ui.camera.CameraVideoNativeProof.fakeLensPoses=listOf(pose)
     val withLens=recordOnce()
-    CameraVideoNativeProof.fakeLensPoses=null
+    com.example.chat.ui.camera.CameraVideoNativeProof.fakeLensPoses=null
     // No real face on the emulator, so without the hook nothing composites.
     val bare=recordOnce()
     val fa=frameAt(withLens,900000);val fb=frameAt(bare,900000)
@@ -237,6 +237,6 @@ class CameraModeStripProofTest {
     val corner=regionMeanDiff(fa,fb,0f,0f,w*0.15f,h*0.12f)
     assertTrue("Lens pixels appear in the recorded video (center diff $center vs corner $corner)",center>8.0 && center>corner*1.5)
    }
-  } finally { CameraVideoNativeProof.reset() }
+  } finally { com.example.chat.ui.camera.CameraVideoNativeProof.reset() }
  }
 }
