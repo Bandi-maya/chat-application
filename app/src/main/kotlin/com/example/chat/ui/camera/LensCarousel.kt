@@ -1,5 +1,6 @@
 package com.example.chat.ui.camera
 
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import com.example.chat.ui.kit.ChatyHapticsPort
 import androidx.compose.foundation.Canvas
@@ -158,7 +159,13 @@ fun LensCarousel(
             Box(
                 modifier = Modifier
                     .size(width = slotExtent, height = selectedDiameter + 26.dp)
-                    .semantics { this.selected = selected },
+                    .semantics {
+                        this.selected = selected
+                        // Unique vs the browse sheet ("<name> lens"): carousel items
+                        // are thumbnails, so a test can address each surface separately.
+                        contentDescription =
+                            if (selected) "${lens.name} lens thumbnail, in use" else "${lens.name} lens thumbnail"
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 LensCarouselItem(
