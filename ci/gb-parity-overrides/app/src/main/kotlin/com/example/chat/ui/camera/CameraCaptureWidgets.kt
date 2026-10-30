@@ -426,6 +426,9 @@ fun CameraCaptureBottomControls(
                 Spacer(Modifier.height((if (tight) 4 else 9).dp))
             }
             }
+            // Reference-grounded (Snap/IG recording frames): idle controls hide
+            // while a video records; only the stop control and timer stay.
+            if (!videoRecording) {
             // Snap-style text mode strip (product direction 2026-10-30): plain
             // text items, never capsule chips; the active mode is centered and
             // underlined. Tapping selects and centers; horizontal swipes only
@@ -456,6 +459,7 @@ fun CameraCaptureBottomControls(
                 }
             }
             Spacer(Modifier.height((if (tight) 4 else 8).dp))
+            }
             // The lenses tab activates the Snap-style lens UI; the color-filter
             // tray is a separate surface opened only from the filters button, so
             // lens UI never mixes with the open tray.
@@ -520,11 +524,15 @@ fun CameraCaptureBottomControls(
                 }
                 Spacer(Modifier.height((if (tight) 1 else 4).dp))
             }
-            // Inline video: recording-time pill sits above the shutter row while recording.
-            CameraCaptureTimer(recording = videoRecording, seconds = videoSeconds)
             // Snap-style inline row (verified reference): gallery, shutter, then the
             // lens carousel scrolling on the SAME row, flip at the far edge. Gallery
             // and flip keep their existing capabilities and safe-area padding.
+            // While recording, the stop control stays centered alone (reference).
+            if (videoRecording) {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CameraCaptureShutter(enabled = true, capturing = false, videoActive = true, recording = true, onClick = onShutter)
+                }
+            } else {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -589,6 +597,7 @@ fun CameraCaptureBottomControls(
                         size = 27.dp,
                     )
                 }
+            }
             }
         }
     }
@@ -661,38 +670,38 @@ private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, videoActi
                 strokeWidth = 3.dp,
                 modifier = Modifier.padding(16.dp),
             )
+        } else if (recording) {
+            // Reference-grounded stop affordance: rounded square inside the ring.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(18.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFFF3B30)),
+            )
         } else {
             Box(
                 Modifier
                     .fillMaxSize()
                     .clip(CircleShape)
-                    .background(
-                        when {
-                            recording -> Color(0xFFFF3B30)
-                            enabled -> Color.White
-                            else -> Color(0x61FFFFFF)
-                        },
-                    ),
+                    .background(if (enabled) Color.White else Color(0x61FFFFFF)),
             )
         }
     }
 }
 
-/** Recording-time pill shown above the shutter row while inline video records. */
+/** Top-center recording-time pill (reference geometry: elapsed time top-center). */
 @Composable
-private fun CameraCaptureTimer(recording: Boolean, seconds: Int) {
-    if (!recording) return
-    Box(Modifier.fillMaxWidth().padding(bottom = 4.dp), contentAlignment = Alignment.Center) {
-        Text(
-            String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60),
-            color = Color(0xFFFF3B30),
-            fontSize = 13.sp,
-            modifier = Modifier
-                .background(Color(0x99000000), RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 2.dp)
-                .semantics { contentDescription = "Recording time" },
-        )
-    }
+fun CameraCaptureTimerTop(seconds: Int, modifier: Modifier = Modifier) {
+    Text(
+        String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60),
+        color = Color.White,
+        fontSize = 14.sp,
+        modifier = modifier
+            .background(Color(0x99000000), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .semantics { contentDescription = "Recording time" },
+    )
 }
 
 /** _buildConfirmPane: zoomable preview with the stored effect applied exactly
