@@ -32,6 +32,14 @@ class CallForegroundService : Service() {
     private var wakeLock: android.os.PowerManager.WakeLock? = null
     private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
 
+    // Owner of the session this service instance is currently serving: the
+    // started session's callId, or a synthetic id for direct (sessionless)
+    // starts. A couriered stop may only tear down the owner it names (see
+    // stop()): a stale teardown must never kill a newer call that started
+    // after it (118 evidence: a previous test's courier executed after a new
+    // start and destroyed its service 5ms into the call).
+    private var servingOwner: String? = null
+
     private fun acquireLocks() {
         try {
             if (wakeLock == null) {
@@ -91,11 +99,30 @@ class CallForegroundService : Service() {
                 } else {
                     startForeground(SERVICE_ID, stopNotification)
                 }
-                stopForeground(STOP_FOREGROUND_REMOVE)
             } catch (e: Exception) {
                 android.util.Log.w("CallForegroundService", "stop courier foreground failed: $e")
             }
-            stopSelf(startId)
+            val stopOwner = intent.getStringExtra(EXTRA_STOP_OWNER)
+            val serving = servingOwner
+            when {
+                // No live session on this record: pure pending-requirement
+                // cleanup (the ForegroundServiceDidNotStartInTimeException case).
+                serving == null -> {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf(startId)
+                }
+                // The courier names the session actually being served: tear down.
+                stopOwner != null && stopOwner == serving -> {
+                    Log.i(TAG, "FGS-DIAG stop accepted owner=$stopOwner")
+                    servingOwner = null
+                    currentServingOwner = null
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf(startId)
+                }
+                // Anything else is a stale teardown racing a newer call: leave
+                // the live session (and its notification) alone.
+                else -> Log.i(TAG, "FGS-DIAG stale stop ignored serving=$serving owner=$stopOwner")
+            }
             return START_NOT_STICKY
         }
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Chaty call"
@@ -125,7 +152,9 @@ class CallForegroundService : Service() {
         } else {
             startForeground(SERVICE_ID, notification)
         }
-        Log.i(TAG, "FGS-DIAG startForeground posted startId=$startId")
+        servingOwner = intent.getStringExtra(EXTRA_SESSION_ID) ?: "anon-" + (++anonStartCounter)
+        currentServingOwner = servingOwner
+        Log.i(TAG, "FGS-DIAG startForeground posted startId=$startId owner=$servingOwner")
         acquireLocks()
         // Dart allowAutoRestart=false: never recreated by the system without a live call.
         return START_NOT_STICKY
@@ -195,6 +224,14 @@ class CallForegroundService : Service() {
         const val EXTRA_TEXT = "chaty.call.text"
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
         private const val ACTION_STOP = "chaty.call.STOP"
+        const val EXTRA_SESSION_ID = "chaty.call.session_id"
+        private const val EXTRA_STOP_OWNER = "chaty.call.stop_owner"
+
+        /** Owner identity of the live service (set/cleared by the service in
+         *  this process) and of the most recently started session. */
+        @Volatile private var currentServingOwner: String? = null
+        @Volatile private var lastStartedCallId: String? = null
+        private var anonStartCounter = 0
 
         private val syncLock = Any()
         private var syncHandler: android.os.Handler? = null
@@ -235,10 +272,12 @@ class CallForegroundService : Service() {
             }
             Log.i(TAG, "FGS-DIAG applySync -> startForegroundService (session=${session?.state})")
             val active = session!!
+            lastStartedCallId = active.callId
             val intent = Intent(context, CallForegroundService::class.java).apply {
                 putExtra(EXTRA_TITLE, CallForegroundPolicy.notificationTitle(active))
                 putExtra(EXTRA_TEXT, CallForegroundPolicy.notificationText(active))
                 putExtra(EXTRA_IS_VIDEO, active.isVideo)
+                putExtra(EXTRA_SESSION_ID, active.callId)
             }
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -264,7 +303,13 @@ class CallForegroundService : Service() {
                     pendingSync = null
                 }
             }
-            Log.i(TAG, "FGS-DIAG stop requested (courier)")
+            // Stop authority is scoped to the session actually being torn
+            // down: the live service's owner when known (same process), else
+            // the most recently started session. A courier that names an older
+            // owner is ignored by the service if a newer call has since
+            // started, so this teardown cannot kill it.
+            val stopOwner = currentServingOwner ?: lastStartedCallId
+            Log.i(TAG, "FGS-DIAG stop requested (courier owner=$stopOwner)")
             // Never race context.stopService against an in-flight
             // startForegroundService: if the platform processes the stop
             // first it brings the record down with the foreground
@@ -275,7 +320,8 @@ class CallForegroundService : Service() {
             // removes its notification and stops itself.
             try {
                 context.startService(
-                    Intent(context, CallForegroundService::class.java).setAction(ACTION_STOP),
+                    Intent(context, CallForegroundService::class.java).setAction(ACTION_STOP)
+                        .putExtra(EXTRA_STOP_OWNER, stopOwner),
                 )
             } catch (e: Exception) {
                 // Background-start rejection means no foreground service is
