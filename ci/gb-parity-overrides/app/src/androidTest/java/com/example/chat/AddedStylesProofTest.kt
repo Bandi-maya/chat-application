@@ -2,6 +2,7 @@ package com.example.chat
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -155,10 +156,49 @@ class AddedStylesProofTest {
      */
     private fun slowDrag(b: android.graphics.Rect, revealBelow: Boolean) {
         val cx = b.centerX()
-        val yLow = b.top + b.height() * 7 / 10
-        val yHigh = b.top + b.height() * 3 / 10
+        // 22% of the container height per drag (was 40%): build-113 evidence
+        // (added-sweep-Home-Screen-down-4.png vs its paired tree dump) shows a
+        // fully rendered row ABSENT from the served a11y snapshot in the same
+        // settled moment - the snapshot lags the rendered list by about one
+        // sweep iteration. A row must therefore stay in view across at least
+        // two check windows to be observable.
+        val yLow = b.top + b.height() * 61 / 100
+        val yHigh = b.top + b.height() * 39 / 100
         if (revealBelow) device.swipe(cx, yLow, cx, yHigh, 40) else device.swipe(cx, yHigh, cx, yLow, 40)
         device.waitForIdle(350)
+    }
+
+    /** Text+description set of the CURRENT accessibility root, fetched directly
+     *  from UiAutomation (not through UiDevice's query path), so tree advancement
+     *  is observed on the freshest snapshot the framework will serve. */
+    private fun freshRootTexts(): Set<String> {
+        val root = try { instrumentation.uiAutomation.rootInActiveWindow } catch (_: Exception) { null } ?: return emptySet()
+        val out = HashSet<String>()
+        val stack = ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>()
+        stack.add(root)
+        while (stack.isNotEmpty()) {
+            val n = stack.removeFirst()
+            try {
+                n.text?.toString()?.takeIf { it.isNotBlank() }?.let { out.add(it) }
+                n.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let { out.add(it) }
+                for (i in 0 until n.childCount) n.getChild(i)?.let { stack.add(it) }
+            } catch (_: Exception) {}
+        }
+        return out
+    }
+
+    /** Wait (bounded) for the served a11y tree to ADVANCE past the pre-drag
+     *  snapshot, observing the fresh root directly; returns immediately when the
+     *  target text becomes accessible. True when advancement or target seen. */
+    private fun awaitTreeCatchUp(before: Set<String>, target: String, timeoutMs: Long = 2500): Boolean {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < deadline) {
+            val now = freshRootTexts()
+            if (target in now) return true
+            if (now.isNotEmpty() && now != before) return true
+            SystemClock.sleep(200)
+        }
+        return target in freshRootTexts()
     }
 
     private fun scrollables(): List<UiObject2> =
@@ -186,7 +226,9 @@ class AddedStylesProofTest {
             var still = 0
             while (budget > 0) {
                 budget--; toTopDrags++
+                val before = freshRootTexts()
                 slowDrag(b, revealBelow = false)
+                if (awaitTreeCatchUp(before, text)) return true
                 // Bounded event wait (not an arbitrary sleep): rows enter the a11y tree
                 // only after the scroll settles (~1s at evidence-capture cadence, capture
                 // 40823906408 sweep trees/pixels). Returns early on match; assertion unchanged.
@@ -205,7 +247,9 @@ class AddedStylesProofTest {
             var still = 0
             while (budget > 0) {
                 budget--; sweepDrags++
+                val before = freshRootTexts()
                 slowDrag(b, revealBelow = true)
+                if (awaitTreeCatchUp(before, text)) return true
                 if (device.wait(Until.hasObject(By.text(text)), 1500)) return true
                 val (sig, _) = windowSig()
                 if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
@@ -213,7 +257,25 @@ class AddedStylesProofTest {
             if (budget <= 0) break
         }
 
-        val found = device.wait(Until.hasObject(By.text(text)), 1500)
+        var found = device.wait(Until.hasObject(By.text(text)), 1500)
+        if (!found) {
+            // Settle probe: give the tree a long quiet window, then read the
+            // fresh root once more. If the row is STILL absent while rendered,
+            // that is a product accessibility gap, not a search miss.
+            device.waitForIdle(3000)
+            SystemClock.sleep(2000)
+            val settled = freshRootTexts()
+            if (text in settled) {
+                found = true
+            } else {
+                capture("added-settle-miss-" + text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40) + ".png")
+                throw AssertionError(
+                    "'" + text + "' remained absent from the accessibility tree after settle; " +
+                    "if the paired settle screenshot shows it rendered, this is a product " +
+                    "semantics-publication issue, not a sweep miss",
+                )
+            }
+        }
         if (!found) {
             val tag = text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40)
             capture("added-scroll-fail-" + tag + ".png")
