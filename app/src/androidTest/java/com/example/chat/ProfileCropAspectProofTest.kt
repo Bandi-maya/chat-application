@@ -200,7 +200,7 @@ class ProfileCropAspectProofTest {
 
     private fun assertCoverFitPreview(tag: String, isAvatar: Boolean) {
         val (boxW, _) = cropWindowPx(isAvatar)
-        val bmp = ins.uiAutomation.takeScreenshot() ?: fail("screenshot unavailable")
+        val bmp = ins.uiAutomation.takeScreenshot() ?: error("screenshot unavailable")
         val s = scan(bmp)
         // Squash (scale-to-fill) would paint the red top band and the blue
         // bottom band inside the frame; cover-fit keeps them off screen.
@@ -249,8 +249,8 @@ class ProfileCropAspectProofTest {
         // edge, under the nav/gesture bar, and this fails.
         val inset = bottomInset(scenario)
         assertTrue("bottom inset must be readable", inset >= 0)
-        val bmp = ins.uiAutomation.takeScreenshot() ?: fail("screenshot unavailable")
-        val rows = accentButtonRows(bmp) ?: fail("Crop & Use accent button not found in bottom quarter")
+        val bmp = ins.uiAutomation.takeScreenshot() ?: error("screenshot unavailable")
+        val rows = accentButtonRows(bmp) ?: error("Crop & Use accent button not found in bottom quarter")
         val minButtonHeight = 45f * density
         assertTrue(
             "Crop & Use must keep its full height, saw ${rows.second - rows.first}px (min $minButtonHeight)",
@@ -269,7 +269,7 @@ class ProfileCropAspectProofTest {
         dev.findObject(By.text("Crop & Use")).click()
         waitFor { result.get() != null || error.get() != null }
         assertNull("banner crop failed: ${error.get()}", error.get())
-        val exported = result.get() ?: fail("Crop & Use produced no file")
+        val exported = result.get() ?: error("Crop & Use produced no file")
         assertExportedCrop("banner", exported, isAvatar = false)
         scenario.close()
     }
@@ -290,7 +290,7 @@ class ProfileCropAspectProofTest {
         dev.findObject(By.text("Crop & Use")).click()
         waitFor { result.get() != null || error.get() != null }
         assertNull("avatar crop failed: ${error.get()}", error.get())
-        val exported = result.get() ?: fail("Crop & Use produced no file")
+        val exported = result.get() ?: error("Crop & Use produced no file")
         assertExportedCrop("avatar", exported, isAvatar = true)
         scenario.close()
     }
