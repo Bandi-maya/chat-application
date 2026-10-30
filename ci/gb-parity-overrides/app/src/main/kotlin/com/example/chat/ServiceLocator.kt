@@ -560,12 +560,17 @@ object ServiceLocator {
         com.example.chat.ui.calls.CallPresentationController(callSignaling, callPresentationPrefs)
             .also { it.start() }
     }
+    // Identity of THIS wiring owner for foreground-service start/stop
+    // authority: stop couriers name the session this owner is tearing down,
+    // never a process-global current value, so a stale teardown from an old
+    // locator/coordinator generation cannot kill a newer call's service.
+    private val callForegroundOwnerToken: String = "callfg-" + java.util.UUID.randomUUID().toString().substring(0, 8)
     val callLifecycle: com.example.chat.data.services.CallLifecycleCoordinator by lazy {
         com.example.chat.data.services.CallLifecycleCoordinator(
             scope = appScope,
             callService = callSignaling,
-            foregroundSync = { session -> com.example.chat.data.services.CallForegroundService.sync(requireContext(), session) },
-            foregroundStop = { com.example.chat.data.services.CallForegroundService.stop(requireContext()) },
+            foregroundSync = { session -> com.example.chat.data.services.CallForegroundService.sync(requireContext(), session, callForegroundOwnerToken) },
+            foregroundStop = { com.example.chat.data.services.CallForegroundService.stop(requireContext(), callForegroundOwnerToken, null) },
             // W1 realtime has its own reconnect while the socket is alive; no-op.
             reconnectSignaling = { },
         ).also { it.start() }
