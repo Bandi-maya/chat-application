@@ -38,8 +38,8 @@ class LensManagerParityTest {
         return Triple(scheduler, store, LensManager(prefs = store, timerScheduler = scheduler))
     }
 
-    @Test fun `catalog has 10 built-in lenses with none first`() {
-        assertEquals(10, kBuiltInLenses.size)
+    @Test fun `catalog has 31 built-in lenses with none first`() {
+        assertEquals(31, kBuiltInLenses.size)
         assertEquals("none", kBuiltInLenses.first().id)
         assertTrue(kBuiltInLenses.first().isNoLens)
         assertFalse(kBuiltInLenses.first().requiresFaceTracking)
