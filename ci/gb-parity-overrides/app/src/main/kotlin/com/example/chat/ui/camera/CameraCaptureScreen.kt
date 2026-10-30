@@ -745,21 +745,22 @@ fun ChatyCameraCaptureScreen(
             // Shader effects (pixelate, segmented backgrounds) have no receiver-side
             // renderer, so they bake into the pixels in EVERY photo mode and the
             // metadata tag is cleared - never a double-apply, never a claimed but
-            // unrendered filter (fail-open bakes report applied=false).
-            val hasRenderPath = engineEffect.colorMatrix != null || engineEffect.shaderKey != null
-            val bakeIntoPixels = mode == ChatyCaptureMode.story || engineEffect.shaderKey != null
-            if (captureViewMode != CaptureViewMode.document &&
-                effectId != "none" &&
-                hasRenderPath &&
-                bakeIntoPixels
-            ) {
+            // unrendered filter (fail-open bakes report applied=false). The exact
+            // contract lives in ImageFxBaker.resolveCaptureEffectPlan (unit-tested).
+            val effectPlan = ImageFxBaker.resolveCaptureEffectPlan(
+                storyMode = mode == ChatyCaptureMode.story,
+                effectId = effectId,
+                hasRenderPath = engineEffect.colorMatrix != null || engineEffect.shaderKey != null,
+                isShaderEffect = engineEffect.shaderKey != null,
+                intensity = intensity,
+            )
+            if (captureViewMode != CaptureViewMode.document && effectPlan.bake) {
                 try {
                     val baked = ImageFxBaker.bakeEffectIntoFile(context, path, engineEffect, intensity, onCreated={ ownedFiles.own(it) })
                     path = baked.path
-                    if (!baked.applied || engineEffect.shaderKey != null) {
-                        effectId = "none"
-                        intensity = 1.0
-                    }
+                    val (tag, tagIntensity) = ImageFxBaker.tagAfterBake(effectPlan, baked.applied, effectId, intensity)
+                    effectId = tag
+                    intensity = tagIntensity
                 } catch(cancelled:CancellationException) { throw cancelled
                 } catch (_: Exception) {
                     scannerError = "Could not apply this effect at full resolution. Original kept; nothing sent."
