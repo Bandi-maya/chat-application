@@ -1,1 +1,1 @@
-build 97: fix face-pipeline var order (processFaceFrame uses) + segmented mask extraction via ByteBufferExtractor + custom browse glyph replacing unresolved material Apps icon
+build 98: androidTest compile fix - CameraFullResolutionEffectTest uses BakedEffect.path + asserts applied (baker API correction, override count 56)
