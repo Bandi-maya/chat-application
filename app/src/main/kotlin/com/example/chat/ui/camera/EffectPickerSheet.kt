@@ -316,7 +316,6 @@ fun EffectPickerSheet(
                     // (segmentation bg_* no-ops) — disabled, dimmed, never selectable.
                     val unavailable = effect.colorMatrix == null && effect.shaderKey == null &&
                     !effect.isFaceTrackingRequired && effect.id != "none"
-                    val captureOnly = effect.isSegmentationRequired && !unavailable
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
@@ -340,7 +339,7 @@ fun EffectPickerSheet(
                             .semantics(mergeDescendants = true) {
                                 contentDescription = "${effect.name} filter"
                                 this.selected = isSelected
-                                if (unavailable) stateDescription = "Not available yet" else if (captureOnly) stateDescription = "Applies to the captured photo"
+                                if (unavailable) stateDescription = "Not available yet"
                             },
                     ) {
                         Box(contentAlignment = Alignment.Center) {
