@@ -266,7 +266,7 @@ class ProfileCropAspectProofTest {
 
         // Capture BEFORE the cover-fit asserts so a failure keeps its pixels.
         val win = measuredCropWindow()
-            ?: fail("crop window marker missing: testTag profile-crop-window not found in the open crop dialog")
+            ?: error("crop window marker missing: testTag profile-crop-window not found in the open crop dialog")
 
         shot("profile-crop-banner-coverfit")
         assertCoverFitPreview("banner", isAvatar = false, boxW = win.first)
@@ -291,7 +291,7 @@ class ProfileCropAspectProofTest {
 
         // Capture BEFORE the cover-fit asserts so a failure keeps its pixels.
         val win = measuredCropWindow()
-            ?: fail("crop window marker missing: testTag profile-crop-window not found in the open crop dialog")
+            ?: error("crop window marker missing: testTag profile-crop-window not found in the open crop dialog")
 
         shot("profile-crop-avatar-coverfit")
         assertCoverFitPreview("avatar", isAvatar = true, boxW = win.first)
