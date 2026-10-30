@@ -288,6 +288,15 @@ private fun CameraCaptureNoCameraPane(
     }
 }
 
+/** Recording accent: the user's design red (stop ring/glyph). Centralized so
+ *  recording semantics stay red regardless of the configurable theme accent. */
+internal val CameraRecordingRed = Color.Red
+
+/** Active mode-strip text color: the reference camera (user video 2026-10-30)
+ *  highlights the active mode in yellow; matches the user's zoom-preset yellow
+ *  (CameraZoomControls 0xFFFFD54F) so there is one active-highlight token. */
+internal val CameraModeActiveYellow = Color(0xFFFFD54F)
+
 @Composable
 fun CameraCaptureBottomControls(
     phase: CameraPhase,
@@ -633,7 +642,7 @@ private fun CameraCaptureModeButton(
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            color = if (selected) Color.White else if(enabled) Color(0x99FFFFFF) else Color(0x4DFFFFFF),
+            color = if (selected) CameraModeActiveYellow else if(enabled) Color(0x99FFFFFF) else Color(0x4DFFFFFF),
             fontSize = (if (tight) 12 else 13).sp,
             fontWeight = if (selected) FontWeight.W700 else FontWeight.W500,
         )
@@ -643,7 +652,7 @@ private fun CameraCaptureModeButton(
                 .width(18.dp)
                 .height(2.dp)
                 .clip(RoundedCornerShape(1.dp))
-                .background(if (selected) Color.White else Color.Transparent),
+                .background(if (selected) CameraModeActiveYellow else Color.Transparent),
         )
     }
 }
@@ -652,13 +661,14 @@ private fun CameraCaptureModeButton(
  *  capturing, filled inner circle otherwise. */
 @Composable
 private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, videoActive: Boolean = false, recording: Boolean = false, onClick: () -> Unit) {
-    // Photo shutter (white) becomes a Snap-style video shutter: red ring in video
-    // mode, filled red while recording. Size stays 76dp so the row geometry is stable.
+    // Reference (user video 2026-10-30): white ring in every state; photo fill is
+    // white, video idle is a red filled circle, recording is a red rounded square.
+    // Size stays 76dp so the row geometry is stable.
     Box(
         modifier = Modifier
             .size(76.dp)
             .clip(CircleShape)
-            .border(4.dp, if (videoActive) Color(0xFFFF3B30) else Color.White, CircleShape)
+            .border(4.dp, Color.White, CircleShape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(5.dp)
             .semantics { contentDescription = if (videoActive) { if (recording) "Stop recording" else "Record video" } else "Take photo" },
@@ -677,7 +687,16 @@ private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, videoActi
                     .fillMaxSize()
                     .padding(18.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFFFF3B30)),
+                    .background(CameraRecordingRed),
+            )
+        } else if (videoActive) {
+            // Reference (user video 2026-10-30): video idle shows a red filled
+            // shutter inside the white ring.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(if (enabled) CameraRecordingRed else Color(0x61FF0000)),
             )
         } else {
             Box(
@@ -690,18 +709,23 @@ private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, videoActi
     }
 }
 
-/** Top-center recording-time pill (reference geometry: elapsed time top-center). */
+/** Top-center recording time (user reference video: red dot + white
+ *  "HH:MM:SS" text, top-center, no pill). */
 @Composable
 fun CameraCaptureTimerTop(seconds: Int, modifier: Modifier = Modifier) {
-    Text(
-        String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60),
-        color = Color.White,
-        fontSize = 14.sp,
-        modifier = modifier
-            .background(Color(0x99000000), RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .semantics { contentDescription = "Recording time" },
-    )
+    Row(
+        modifier = modifier.semantics { contentDescription = "Recording time" },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(CameraRecordingRed))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            String.format(java.util.Locale.ROOT, "%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60),
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.W600,
+        )
+    }
 }
 
 /** _buildConfirmPane: zoomable preview with the stored effect applied exactly
