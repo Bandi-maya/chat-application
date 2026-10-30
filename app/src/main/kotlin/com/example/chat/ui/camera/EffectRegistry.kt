@@ -135,9 +135,12 @@ data class ChatyCameraEffect(
  *  full-frame color grades: no new entry claims face tracking or
  *  segmentation, because the live pipeline only bridges the six
  *  original face_* ids to lenses (CameraCaptureScreen.lensIdForEffect)
- *  and ships no segmentation renderer. shaderKey is null for every entry
- *  except face_pixel_retro, whose "pixelate" key selects the original
- *  Chaty pixelate renderer (EffectRender/ImageFxBaker).
+ *  and ships no live-preview segmentation renderer: the bg_* entries carry
+ *  segment_* shaderKeys rendered on the CAPTURE path by ImageFxBaker with the
+ *  MediaPipe selfie segmenter (SegmentationBridge); the live preview shows
+ *  them unfiltered (documented deviation). shaderKey is otherwise null except
+ *  face_pixel_retro, whose "pixelate" key selects the original Chaty pixelate
+ *  renderer (EffectRender/ImageFxBaker).
  */
 object EffectRegistry {
     val allEffects: List<ChatyCameraEffect> = listOf(
@@ -869,6 +872,8 @@ object EffectRegistry {
             previewColor = Color(0xFF6366F1),
             isSegmentationRequired = true,
             tier = EffectPerformanceTier.gpuIntensive,
+            // MediaPipe selfie segmenter mask -> blurred background on capture.
+            shaderKey = "segment_blur",
         ),
         ChatyCameraEffect(
             id = "bg_virtual_office",
@@ -878,6 +883,8 @@ object EffectRegistry {
             previewColor = Color(0xFF475569),
             isSegmentationRequired = true,
             tier = EffectPerformanceTier.gpuIntensive,
+            // MediaPipe selfie segmenter mask -> original Chaty office backdrop.
+            shaderKey = "segment_bg_office",
         ),
         ChatyCameraEffect(
             id = "bg_gradient_studio",
@@ -887,6 +894,8 @@ object EffectRegistry {
             previewColor = Color(0xFF8B5CF6),
             isSegmentationRequired = true,
             tier = EffectPerformanceTier.gpuIntensive,
+            // MediaPipe selfie segmenter mask -> original Chaty gradient backdrop.
+            shaderKey = "segment_bg_gradient",
         ),
         ChatyCameraEffect(
             id = "beauty_rose_glow",
