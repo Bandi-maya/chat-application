@@ -97,12 +97,22 @@ class LensManagerParityTest {
         assertEquals(count, scheduler.scheduled.size)
     }
 
-    @Test fun `recents dedupe and cap at 20`() {
+    @Test fun `recents dedupe with most recent first`() {
         val (_, _, m) = fixture()
         m.select("lens_dog_ears")
         m.select("lens_sparkles")
         m.select("lens_dog_ears")
         assertEquals(listOf("lens_dog_ears", "lens_sparkles"), m.recents)
+    }
+
+    @Test fun `recents cap at 20 with newest kept`() {
+        val (_, store, m) = fixture()
+        val ids = kBuiltInLenses.filter { !it.isNoLens }.take(25).map { it.id }
+        ids.forEach { m.select(it) }
+        assertEquals(20, m.recents.size)
+        assertEquals(ids[24], m.recents.first())
+        assertEquals(ids[5], m.recents.last())
+        assertEquals(m.recents, store.data[LensManager.RECENT_KEY])
     }
 
     @Test fun `toggleFavorite flips and persists`() {
