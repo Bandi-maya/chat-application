@@ -4,3 +4,4 @@ trigger-111: FGS end-call coalesced sync fix (CallForegroundService)
 trigger-112: crop requiredSize + crop capture-before-assert + nav dump evidence + FGS delivery diag logging
 trigger-113: FGS diag nullable fix rebuild (112 compile error e274322->fixed)
 trigger-114: reviewed batch - crop measured-bounds, sweep a11y fix, Portrait/Night hide-unsupported, video main-thread, guard 67, LENS/ZOOM-DIAG + combo diagtrigger-115: compile fix - ExperimentalComposeUiApi opt-in on crop dialog marker (override + branch copies)trigger-116: androidTest compile fixes - ExtensionMode.BOKEH typo, error() in elvis for nullable markertrigger-117: LENS-DIAG runCatching guard for JVM unit tests
+trigger-118: FGS stop-courier race fix (ACTION_STOP courier in CallForegroundService.stop)
