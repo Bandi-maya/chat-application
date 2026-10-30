@@ -105,20 +105,23 @@ class CameraOpeningProofTest {
                         }
                     }
                     capture("normal")
-                    // User redesign: the arc is always visible, preset circles sit
-                    // above it, and the live value pill rides the arc marker. No toggle.
-                    assertFalse("Precise-zoom toggle is gone: the arc is always visible",device.hasObject(By.desc("Toggle precise zoom")))
-                    val dial=device.wait(Until.findObject(By.desc("Circular zoom dial, drag horizontally to zoom")),3000)
-                    capture("zoom-arc")
-                    assertTrue("Zoom arc is always present without a toggle",dial!=null)
+                    // User-confirmed reference design (2026-10-30): a compact zoom
+                    // presets pill; tapping the active value opens the horizontal
+                    // slider with the live value label above it.
+                    assertFalse("The old always-visible arc is gone",device.hasObject(By.desc("Circular zoom dial, drag horizontally to zoom")))
                     val preset=device.wait(Until.findObject(By.desc("Zoom 1x")),3000)
-                    assertTrue("Preset zoom circles are present",preset!=null)
-                    assertTrue("Live zoom value pill is present",device.hasObject(By.descContains("Zoom value")))
-                    val db=dial.visibleBounds
+                    capture("zoom-pill")
+                    assertTrue("Zoom presets pill is present",preset!=null)
+                    preset.click()
+                    val slider=device.wait(Until.findObject(By.desc("Zoom slider, drag to zoom")),3000)
+                    capture("zoom-slider")
+                    assertTrue("Tapping the active preset opens the horizontal slider",slider!=null)
+                    assertTrue("Live zoom value label is present",device.hasObject(By.descContains("Zoom value")))
+                    val db=slider.visibleBounds
                     device.swipe(db.centerX(),db.centerY(),(db.centerX()+db.width()/4).coerceAtMost(db.right),db.centerY(),12)
                     device.waitForIdle()
-                    assertTrue("Circular zoom dial survives drag interaction",device.hasObject(By.desc("Circular zoom dial, drag horizontally to zoom")))
-                    assertTrue("Zoom value pill tracks the drag",device.hasObject(By.descContains("Zoom value")))
+                    assertTrue("Zoom slider survives drag interaction",device.hasObject(By.desc("Zoom slider, drag to zoom")))
+                    assertTrue("Zoom value label tracks the drag",device.hasObject(By.descContains("Zoom value")))
                     assertTrue("Requested orientation actually applied: $label ${device.displayWidth}x${device.displayHeight}",actualLandscape == landscape)
                     assertBottom()
                     device.findObject(By.desc("Camera settings")).click(); Thread.sleep(300)
