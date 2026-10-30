@@ -169,8 +169,25 @@ fun CameraCaptureViewfinder(
         }
         // Lenses preview in photo, lenses AND video modes: the recorded video
         // composites the same overlay, so preview and output stay identical.
-        if (phase == CameraPhase.ready && (captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses || captureViewMode == CaptureViewMode.video)) {
+        // Video preview draws the lens only when the recording pipeline actually
+        // composites it (OverlayEffect bound); otherwise the choice is disabled
+        // below instead of faking a recorded effect that is not there.
+        val lensVisible = captureViewMode == CaptureViewMode.photo || captureViewMode == CaptureViewMode.lenses ||
+            (captureViewMode == CaptureViewMode.video && videoLensRecorded)
+        if (phase == CameraPhase.ready && lensVisible) {
             LensOverlay(lens = lens, poses = facePoses, health = faceHealth)
+        }
+        if (phase == CameraPhase.ready && captureViewMode == CaptureViewMode.video && !videoLensRecorded && !lens.isNoLens) {
+            Text(
+                "Lens can't be recorded on this device",
+                color = Color.White,
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 96.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
         }
         if (phase == CameraPhase.ready && captureViewMode == CaptureViewMode.document) {
             // Paper detection/corner review belongs to the real scanner flow,
@@ -323,6 +340,7 @@ fun CameraCaptureBottomControls(
     videoSeconds: Int = 0,
     videoPaused: Boolean = false,
     videoSnapshotAvailable: Boolean = false,
+    videoLensRecorded: Boolean = true,
     engine: EffectEngine,
     lensManager: LensManager,
     faceHealth: TrackingHealth,
