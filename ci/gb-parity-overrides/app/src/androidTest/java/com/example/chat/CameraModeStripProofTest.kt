@@ -45,7 +45,7 @@ class CameraModeStripProofTest {
      val camProvider=androidx.camera.lifecycle.ProcessCameraProvider.getInstance(c).get(10,java.util.concurrent.TimeUnit.SECONDS)
      val extMgr=androidx.camera.extensions.ExtensionsManager.getInstanceAsync(c,camProvider).get(10,java.util.concurrent.TimeUnit.SECONDS)
      val backSel=androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA
-     val hwSupport=mapOf("Portrait" to extMgr.isExtensionAvailable(backSel,androidx.camera.extensions.ExtensionMode.BOKEK),"Night" to extMgr.isExtensionAvailable(backSel,androidx.camera.extensions.ExtensionMode.NIGHT))
+     val hwSupport=mapOf("Portrait" to extMgr.isExtensionAvailable(backSel,androidx.camera.extensions.ExtensionMode.BOKEH),"Night" to extMgr.isExtensionAvailable(backSel,androidx.camera.extensions.ExtensionMode.NIGHT))
      for(name in listOf("Portrait","Night")) {
       if(!hwSupport[name]!!){
        // Approved contract (user direction 2026-10-30, relayed by main): unsupported
