@@ -136,8 +136,10 @@ class CameraVideoSession(
                 // behind a filtered preview. UseCaseGroup rejects multiple
                 // effects sharing a target, so lens and color share this one
                 // pipeline; the shader applies the matrix only to VIDEO_CAPTURE
-                // output (preview color stays on the Compose modifier) while the
-                // lens overlay draws for both. Drawing reuses the same
+                // output (preview color stays on the Compose modifier) and the
+                // lens overlay draws only into VIDEO_CAPTURE output (the Compose
+                // LensOverlay remains the single preview owner, gated by
+                // videoLensRecorded) so the lens is never drawn twice. Drawing reuses the same
                 // LensAnchorPainter as the photo bake path; poses map from
                 // preview cover-crop space onto each frame like
                 // composeLensIntoImage.
@@ -146,7 +148,7 @@ class CameraVideoSession(
                     posesProvider = { (if (com.example.chat.BuildConfig.DEBUG) CameraVideoNativeProof.fakeLensPoses else null) ?: posesProvider() },
                     viewportProvider = viewportProvider,
                     matrixProvider = matrixProvider,
-                    lensTargetMask = androidx.camera.core.CameraEffect.PREVIEW or androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
+                    lensTargetMask = androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
                     colorTargetMask = androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
                 )
                 // Effect failures must surface, not silently record unfiltered:
