@@ -138,7 +138,10 @@ class CameraVideoRecordProofTest {
             .build()
 
         val provider = ProcessCameraProvider.getInstance(context).get(15, TimeUnit.SECONDS)
-        val owner = TestLifecycleOwner()
+        // LifecycleRegistry enforces main-thread state changes: the owner must
+        // be CONSTRUCTED on the main thread too (its init sets RESUMED).
+        lateinit var owner: TestLifecycleOwner
+        instrumentation.runOnMainSync { owner = TestLifecycleOwner() }
         instrumentation.runOnMainSync {
             provider.unbindAll()
             provider.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, group)
