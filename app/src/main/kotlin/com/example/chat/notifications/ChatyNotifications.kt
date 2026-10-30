@@ -37,6 +37,8 @@ object ChatyNotifications {
     const val ACTION_INCOMING_CALL = "com.example.chat.action.INCOMING_CALL"
     const val ACTION_ANSWER_CALL = "com.example.chat.action.ANSWER_CALL"
     const val ACTION_DECLINE_CALL = "com.example.chat.action.DECLINE_CALL"
+    const val ACTION_END_CALL = "com.example.chat.action.END_CALL"
+    const val ACTION_SHOW_CALL = "com.example.chat.action.SHOW_CALL"
 
     const val EXTRA_ROOM_ID = "room_id"
     const val EXTRA_CALL_ID = "call_id"
@@ -292,3 +294,4 @@ object ChatyNotifications {
         vibrator = null
     }
 }
+
