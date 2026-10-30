@@ -297,6 +297,9 @@ fun CameraCaptureBottomControls(
     nightSupported: Boolean = false,
     portraitSupported: Boolean = false,
     videoSupported: Boolean = false,
+    videoActive: Boolean = false,
+    videoRecording: Boolean = false,
+    videoSeconds: Int = 0,
     engine: EffectEngine,
     lensManager: LensManager,
     faceHealth: TrackingHealth,
@@ -517,6 +520,8 @@ fun CameraCaptureBottomControls(
                 }
                 Spacer(Modifier.height((if (tight) 1 else 4).dp))
             }
+            // Inline video: recording-time pill sits above the shutter row while recording.
+            CameraCaptureTimer(recording = videoRecording, seconds = videoSeconds)
             // Snap-style inline row (verified reference): gallery, shutter, then the
             // lens carousel scrolling on the SAME row, flip at the far edge. Gallery
             // and flip keep their existing capabilities and safe-area padding.
@@ -536,7 +541,7 @@ fun CameraCaptureBottomControls(
                 ) {
                     CameraGlyph(kind = "gallery", color = Color.White, size = 27.dp)
                 }
-                CameraCaptureShutter(enabled = ready, capturing = capturing, onClick = onShutter)
+                CameraCaptureShutter(enabled = ready, capturing = capturing, videoActive = videoActive, recording = videoRecording, onClick = onShutter)
                 Box(Modifier.weight(1f)) {
                     // Lenses tab only: the carousel rides the gallery/shutter/flip
                     // row and stays hidden while the filters tray is open. In every
@@ -637,15 +642,17 @@ private fun CameraCaptureModeButton(
 /** _buildShutter: 76dp ring (4dp white border, 5dp gap), spinner while
  *  capturing, filled inner circle otherwise. */
 @Composable
-private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, onClick: () -> Unit) {
+private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, videoActive: Boolean = false, recording: Boolean = false, onClick: () -> Unit) {
+    // Photo shutter (white) becomes a Snap-style video shutter: red ring in video
+    // mode, filled red while recording. Size stays 76dp so the row geometry is stable.
     Box(
         modifier = Modifier
             .size(76.dp)
             .clip(CircleShape)
-            .border(4.dp, Color.White, CircleShape)
+            .border(4.dp, if (videoActive) Color(0xFFFF3B30) else Color.White, CircleShape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(5.dp)
-            .semantics { contentDescription = "Take photo" },
+            .semantics { contentDescription = if (videoActive) { if (recording) "Stop recording" else "Record video" } else "Take photo" },
         contentAlignment = Alignment.Center,
     ) {
         if (capturing) {
@@ -659,9 +666,32 @@ private fun CameraCaptureShutter(enabled: Boolean, capturing: Boolean, onClick: 
                 Modifier
                     .fillMaxSize()
                     .clip(CircleShape)
-                    .background(if (enabled) Color.White else Color(0x61FFFFFF)),
+                    .background(
+                        when {
+                            recording -> Color(0xFFFF3B30)
+                            enabled -> Color.White
+                            else -> Color(0x61FFFFFF)
+                        },
+                    ),
             )
         }
+    }
+}
+
+/** Recording-time pill shown above the shutter row while inline video records. */
+@Composable
+private fun CameraCaptureTimer(recording: Boolean, seconds: Int) {
+    if (!recording) return
+    Box(Modifier.fillMaxWidth().padding(bottom = 4.dp), contentAlignment = Alignment.Center) {
+        Text(
+            String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60),
+            color = Color(0xFFFF3B30),
+            fontSize = 13.sp,
+            modifier = Modifier
+                .background(Color(0x99000000), RoundedCornerShape(12.dp))
+                .padding(horizontal = 10.dp, vertical = 2.dp)
+                .semantics { contentDescription = "Recording time" },
+        )
     }
 }
 
