@@ -1,1 +1,1 @@
-build 107: bundle preservation (3 files) + combined-output proof test + initGl pbuffer fix + guard 63
+build 108: CameraVideoSession CameraEffect anonymous subclass + viewport Size wrap; picker mock session params
