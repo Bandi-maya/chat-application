@@ -1024,6 +1024,10 @@ fun ChatyCameraCaptureScreen(
                 }
                 if (countdown > 0) androidx.compose.material3.Text("$countdown", modifier = Modifier.align(Alignment.Center),
                     color = androidx.compose.ui.graphics.Color.White, fontSize = 42.sp)
+                // Reference-grounded (Snap/IG recording frames): elapsed time sits
+                // top-center while a video records.
+                if (videoState is VideoSessionState.Recording) CameraCaptureTimerTop(videoSeconds,
+                    Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(top = 8.dp))
                 androidx.compose.foundation.layout.Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                         .windowInsetsPadding(WindowInsets.safeDrawing)
