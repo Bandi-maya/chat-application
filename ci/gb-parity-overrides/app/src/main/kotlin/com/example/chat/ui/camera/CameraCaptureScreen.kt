@@ -955,6 +955,7 @@ fun ChatyCameraCaptureScreen(
         } else if (capturedPath == null) {
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
             CameraCaptureViewfinder(
+                videoLensRecorded = videoLensEffectActive,
                 phase = phase,
                 errorMessage = errorMessage,
                 captureViewMode = captureViewMode,
@@ -1086,7 +1087,6 @@ fun ChatyCameraCaptureScreen(
                 videoSeconds = videoSeconds,
                 videoPaused = videoState is VideoSessionState.Paused,
                 videoSnapshotAvailable = videoSnapshotAvailable,
-                videoLensRecorded = videoLensEffectActive,
                 onSnapshot = { videoSession?.takeSnapshot { ok -> if (!ok) scannerError = "Snapshot is unavailable while recording on this camera." } },
                 nightSupported = nightSupported,
                 portraitSupported = portraitSupported,
