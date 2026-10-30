@@ -10,6 +10,25 @@ import androidx.compose.material.icons.rounded.RemoveRedEye
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.WbTwilight
 import androidx.compose.material.icons.rounded.WorkspacePremium
+import androidx.compose.material.icons.rounded.AcUnit
+import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Diamond
+import androidx.compose.material.icons.rounded.Eco
+import androidx.compose.material.icons.rounded.EmojiEmotions
+import androidx.compose.material.icons.rounded.EmojiNature
+import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Headset
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.LocalFlorist
+import androidx.compose.material.icons.rounded.Loupe
+import androidx.compose.material.icons.rounded.Mood
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.SentimentVerySatisfied
+import androidx.compose.material.icons.rounded.StarRate
+import androidx.compose.material.icons.rounded.Stars
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.WbIridescent
 import androidx.compose.ui.graphics.Color
 
 /** Exact port of defaultLensCategory + kBuiltInLenses from
@@ -17,7 +36,10 @@ import androidx.compose.ui.graphics.Color
  *
  *  Placeholder category until a themed category system ships (requirement 55).
  *  Catalog content is original Chaty artwork only - no third-party lens
- *  assets are bundled or fetched.
+ *  assets are bundled or fetched. The original 10 built-ins are preserved
+ *  (ids unchanged) and the catalog now spans 31 lenses: redesigned classics
+ *  plus new ear accessories, eyewear, crowns/hats, horns, mouth/nose art and
+ *  full-head scene lenses, all painted procedurally in LensOverlay.
  */
 val defaultLensCategory: EffectCategory = EffectCategory.faceAR
 
@@ -103,6 +125,176 @@ val kBuiltInLenses: List<LensDefinition> = listOf(
         anchor = LensAnchor.forehead,
         icon = Icons.Rounded.WorkspacePremium,
         accentColor = Color(0xFF22D3EE),
+    ),
+    LensDefinition(
+        id = "lens_cat_ears",
+        name = "Cat Ears",
+        category = defaultLensCategory,
+        anchor = LensAnchor.ears,
+        icon = Icons.Rounded.Pets,
+        accentColor = Color(0xFFF59E0B),
+        maxFaces = 2,
+    ),
+    LensDefinition(
+        id = "lens_bunny_ears",
+        name = "Bunny Ears",
+        category = defaultLensCategory,
+        anchor = LensAnchor.ears,
+        icon = Icons.Rounded.EmojiNature,
+        accentColor = Color(0xFFF9A8D4),
+    ),
+    LensDefinition(
+        id = "lens_round_shades",
+        name = "Retro Rounds",
+        category = defaultLensCategory,
+        anchor = LensAnchor.eyes,
+        icon = Icons.Rounded.Face,
+        accentColor = Color(0xFF111827),
+    ),
+    LensDefinition(
+        id = "lens_heart_shades",
+        name = "Heart Shades",
+        category = defaultLensCategory,
+        anchor = LensAnchor.eyes,
+        icon = Icons.Rounded.Favorite,
+        accentColor = Color(0xFFEF4444),
+        maxFaces = 2,
+    ),
+    LensDefinition(
+        id = "lens_star_eyes",
+        name = "Starstruck",
+        category = defaultLensCategory,
+        anchor = LensAnchor.eyes,
+        icon = Icons.Rounded.StarRate,
+        accentColor = Color(0xFFFDE047),
+    ),
+    LensDefinition(
+        id = "lens_monocle",
+        name = "Monocle",
+        category = defaultLensCategory,
+        anchor = LensAnchor.eyes,
+        icon = Icons.Rounded.Loupe,
+        accentColor = Color(0xFFEAB308),
+    ),
+    LensDefinition(
+        id = "lens_flower_crown",
+        name = "Flower Crown",
+        category = defaultLensCategory,
+        anchor = LensAnchor.forehead,
+        icon = Icons.Rounded.LocalFlorist,
+        accentColor = Color(0xFFF472B6),
+    ),
+    LensDefinition(
+        id = "lens_tiara",
+        name = "Tiara",
+        category = defaultLensCategory,
+        anchor = LensAnchor.forehead,
+        icon = Icons.Rounded.Diamond,
+        accentColor = Color(0xFF93C5FD),
+    ),
+    LensDefinition(
+        id = "lens_wizard_hat",
+        name = "Wizard Hat",
+        category = defaultLensCategory,
+        anchor = LensAnchor.forehead,
+        icon = Icons.Rounded.AutoFixHigh,
+        accentColor = Color(0xFF8B5CF6),
+    ),
+    LensDefinition(
+        id = "lens_headphones",
+        name = "Studio Phones",
+        category = defaultLensCategory,
+        anchor = LensAnchor.ears,
+        icon = Icons.Rounded.Headset,
+        accentColor = Color(0xFF38BDF8),
+    ),
+    LensDefinition(
+        id = "lens_devil_horns",
+        name = "Devil Horns",
+        category = defaultLensCategory,
+        anchor = LensAnchor.forehead,
+        icon = Icons.Rounded.LocalFireDepartment,
+        accentColor = Color(0xFFDC2626),
+    ),
+    LensDefinition(
+        id = "lens_rainbow_arc",
+        name = "Rainbow Arc",
+        category = defaultLensCategory,
+        anchor = LensAnchor.fullHead,
+        icon = Icons.Rounded.WbIridescent,
+        accentColor = Color(0xFFF97316),
+    ),
+    LensDefinition(
+        id = "lens_butterflies",
+        name = "Butterflies",
+        category = defaultLensCategory,
+        anchor = LensAnchor.fullHead,
+        icon = Icons.Rounded.Eco,
+        accentColor = Color(0xFFA78BFA),
+    ),
+    LensDefinition(
+        id = "lens_freckles",
+        name = "Sunkissed Freckles",
+        category = defaultLensCategory,
+        anchor = LensAnchor.mouth,
+        icon = Icons.Rounded.Mood,
+        accentColor = Color(0xFFFB923C),
+    ),
+    LensDefinition(
+        id = "lens_mustache",
+        name = "Handlebar Mustache",
+        category = defaultLensCategory,
+        anchor = LensAnchor.mouth,
+        icon = Icons.Rounded.SentimentVerySatisfied,
+        accentColor = Color(0xFF3F3F46),
+    ),
+    LensDefinition(
+        id = "lens_lip_gloss",
+        name = "Lip Gloss",
+        category = defaultLensCategory,
+        anchor = LensAnchor.mouth,
+        icon = Icons.Rounded.FavoriteBorder,
+        accentColor = Color(0xFFF472B6),
+    ),
+    LensDefinition(
+        id = "lens_clown_nose",
+        name = "Clown Nose",
+        category = defaultLensCategory,
+        anchor = LensAnchor.noseTip,
+        icon = Icons.Rounded.EmojiEmotions,
+        accentColor = Color(0xFFEF4444),
+    ),
+    LensDefinition(
+        id = "lens_pirate_patch",
+        name = "Pirate Patch",
+        category = defaultLensCategory,
+        anchor = LensAnchor.eyes,
+        icon = Icons.Rounded.VisibilityOff,
+        accentColor = Color(0xFF1F2937),
+    ),
+    LensDefinition(
+        id = "lens_snow_drift",
+        name = "Snow Drift",
+        category = defaultLensCategory,
+        anchor = LensAnchor.fullHead,
+        icon = Icons.Rounded.AcUnit,
+        accentColor = Color(0xFFBAE6FD),
+    ),
+    LensDefinition(
+        id = "lens_music_notes",
+        name = "Music Notes",
+        category = defaultLensCategory,
+        anchor = LensAnchor.fullHead,
+        icon = Icons.Rounded.MusicNote,
+        accentColor = Color(0xFF8B5CF6),
+    ),
+    LensDefinition(
+        id = "lens_star_crown",
+        name = "Star Crown",
+        category = defaultLensCategory,
+        anchor = LensAnchor.forehead,
+        icon = Icons.Rounded.Stars,
+        accentColor = Color(0xFFFDE047),
     ),
 )
 
