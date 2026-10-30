@@ -1,1 +1,1 @@
-build 98: androidTest compile fix - CameraFullResolutionEffectTest uses BakedEffect.path + asserts applied (baker API correction, override count 56)
+build 99: unit test correction - CameraEffectAvailabilityTest asserts the real 4x5 ColorMatrix identity diagonal (0/6/12/18); no engine change
