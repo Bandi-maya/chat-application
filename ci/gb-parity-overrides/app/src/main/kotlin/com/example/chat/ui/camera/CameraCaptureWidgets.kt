@@ -4,8 +4,6 @@ import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +13,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -45,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -423,13 +423,33 @@ fun CameraCaptureBottomControls(
                 Spacer(Modifier.height((if (tight) 4 else 9).dp))
             }
             }
-            // Scrollable mode strip keeps full labels and48dp targets at large text sizes.
-            Row(Modifier.fillMaxWidth().semantics{contentDescription="Camera modes"}.horizontalScroll(rememberScrollState()).padding(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                listOf(CaptureViewMode.photo,CaptureViewMode.portrait,CaptureViewMode.night,CaptureViewMode.lenses,CaptureViewMode.video,CaptureViewMode.document).forEach { mode ->
-                    val supported=when(mode){CaptureViewMode.portrait->portraitSupported;CaptureViewMode.night->nightSupported;CaptureViewMode.video->videoSupported;else->true}
-                    val name=mode.name.replaceFirstChar{it.uppercase()}
-                    CameraCaptureModeButton(label=if(supported)name else "$name unavailable",document=mode==CaptureViewMode.document,
-                        selected=captureViewMode==mode,tight=tight,enabled=supported&&!capturing,onClick={onSetViewMode(mode)},modifier=Modifier.widthIn(min=96.dp))
+            // Snap-style text mode strip (product direction 2026-10-30): plain
+            // text items, never capsule chips; the active mode is centered and
+            // underlined. Tapping selects and centers; horizontal swipes only
+            // scroll - selection never derives from scroll position, so the
+            // strip can never change or revert a mode by itself. Fixed slot
+            // width + symmetric content padding from the real viewport width
+            // make animateScrollToItem land the active item exactly centered.
+            val stripState = rememberLazyListState()
+            val stripModes = listOf(CaptureViewMode.photo,CaptureViewMode.portrait,CaptureViewMode.night,CaptureViewMode.lenses,CaptureViewMode.video,CaptureViewMode.document)
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val slotWidth = (if (tight) 76 else 88).dp
+                LaunchedEffect(captureViewMode, maxWidth) {
+                    val idx = stripModes.indexOf(captureViewMode)
+                    if (idx >= 0) stripState.animateScrollToItem(idx)
+                }
+                LazyRow(
+                    state = stripState,
+                    contentPadding = PaddingValues(horizontal = ((maxWidth - slotWidth) / 2).coerceAtLeast(0.dp)),
+                    modifier = Modifier.fillMaxWidth().semantics{contentDescription="Camera modes"},
+                ) {
+                    items(stripModes.size) { i ->
+                        val mode = stripModes[i]
+                        val supported=when(mode){CaptureViewMode.portrait->portraitSupported;CaptureViewMode.night->nightSupported;CaptureViewMode.video->videoSupported;else->true}
+                        val name=mode.name.replaceFirstChar{it.uppercase()}
+                        CameraCaptureModeButton(label=if(supported)name else "$name unavailable",
+                            selected=captureViewMode==mode,tight=tight,enabled=supported&&!capturing,onClick={onSetViewMode(mode)},modifier=Modifier.width(slotWidth))
+                    }
                 }
             }
             Spacer(Modifier.height((if (tight) 4 else 8).dp))
@@ -572,23 +592,17 @@ fun CameraCaptureBottomControls(
 @Composable
 private fun CameraCaptureModeButton(
     label: String,
-    document: Boolean,
     selected: Boolean,
     tight: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    Row(
+    // Plain text + active-only underline (Snap-style), 48dp touch target,
+    // tab semantics preserved for the mode-strip proofs and TalkBack.
+    Column(
         modifier = modifier
-            .heightIn(min = 48.dp)
-            .clip(com.example.chat.ui.kit.ChatyActionShape)
-            .background(if (selected) androidx.compose.material3.MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.65f))
-            .border(
-                width = 1.dp,
-                color = if (selected) Color.White else Color(0x4DFFFFFF),
-                shape = com.example.chat.ui.kit.ChatyActionShape,
-            )
+            .height(48.dp)
             .clearAndSetSemantics {
                 contentDescription = "$label camera mode"
                 this.selected = selected
@@ -596,26 +610,26 @@ private fun CameraCaptureModeButton(
                 if(!enabled) disabled() else onClick { onClick(); true }
             }
             .clickable(enabled=enabled,onClick = onClick)
-            .padding(horizontal = 14.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        if (androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.5f) {
-        CameraGlyph(
-            kind = if (document) "document" else "camera",
-            color = if (selected) androidx.compose.material3.MaterialTheme.colorScheme.onPrimary else if(enabled)Color.White else Color.LightGray,
-            size = 16.dp,
-        )
-        Spacer(Modifier.width(6.dp))
-        }
         Text(
             label,
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            color = if (selected) androidx.compose.material3.MaterialTheme.colorScheme.onPrimary else if(enabled)Color.White else Color.LightGray,
-            fontSize = 12.sp,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.W700,
+            color = if (selected) Color.White else if(enabled) Color(0x99FFFFFF) else Color(0x4DFFFFFF),
+            fontSize = (if (tight) 12 else 13).sp,
+            fontWeight = if (selected) FontWeight.W700 else FontWeight.W500,
+        )
+        Spacer(Modifier.height(3.dp))
+        Box(
+            Modifier
+                .width(18.dp)
+                .height(2.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(if (selected) Color.White else Color.Transparent),
         )
     }
 }
