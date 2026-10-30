@@ -258,6 +258,7 @@ fun ChatyCameraCaptureScreen(
     mode: ChatyCaptureMode,
     contactName: String? = null,
     deviceTier: DeviceCapabilityTier = DeviceCapabilityTier.midRange,
+    callsAllowed: Boolean = true,
     onResult: (ChatyCaptureResult) -> Unit,
     onDismiss: () -> Unit,
     onVideoResult: ((FinalizedVideo) -> Unit)? = null,
@@ -632,6 +633,12 @@ fun ChatyCameraCaptureScreen(
 
     fun pickFromGallery() {
         if (captureViewMode == CaptureViewMode.document) { scanDocument(); return }
+        if (!callsAllowed) {
+            // Contact not mutually accepted: block attachment and show auth dialog.
+            // Messaging still works, but media/calls require both users to accept.
+            scannerError = "Contact acceptance required — both users must accept before media can be shared."
+            return
+        }
         ChatyHapticsPort.light(view)
         galleryLauncher.launch(
             androidx.activity.result.PickVisualMediaRequest(

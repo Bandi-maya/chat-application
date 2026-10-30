@@ -130,6 +130,7 @@ class ConnectionHealthService(
         if (disposed) return state
         if (!probing.compareAndSet(false, true)) return state
         try {
+            val probeStartMs = System.currentTimeMillis()
             // 1. Detect network interfaces (same name heuristics as Dart).
             var transport = NetworkTransportType.none
             var hasNetwork = false
@@ -161,13 +162,14 @@ class ConnectionHealthService(
             }
 
             if (!hasNetwork) {
+                val elapsedMs = System.currentTimeMillis() - probeStartMs
                 state = ConnectionHealthClassifier.evaluate(
                     previousState = state,
                     hasNetwork = false,
                     internetReachable = false,
                     backendReachable = false,
                     realtimeStatus = RealtimeSocketStatus.disconnected,
-                    latency = null,
+                    latency = elapsedMs.milliseconds,
                     transport = NetworkTransportType.none,
                     failureType = NetworkFailureType.noNetwork,
                     queuedMessagesCount = queuedCount,
@@ -193,13 +195,14 @@ class ConnectionHealthService(
             }
 
             if (!internetReachable) {
+                val elapsedMs = System.currentTimeMillis() - probeStartMs
                 state = ConnectionHealthClassifier.evaluate(
                     previousState = state,
                     hasNetwork = true,
                     internetReachable = false,
                     backendReachable = false,
                     realtimeStatus = RealtimeSocketStatus.disconnected,
-                    latency = null,
+                    latency = elapsedMs.milliseconds,
                     transport = transport,
                     failureType = failureType,
                     queuedMessagesCount = queuedCount,
