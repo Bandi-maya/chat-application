@@ -1,1 +1,1 @@
-build 106: ChatDetailHost callsAllowed scope fix + color-video pipeline (ColorLensSurfaceProcessor) + emoji memory fix
+build 107: bundle preservation (3 files) + combined-output proof test + initGl pbuffer fix + guard 63
