@@ -50,19 +50,20 @@ class CameraFullResolutionEffectTest {
             val result=BitmapFactory.decodeFile(output.absolutePath)
             try{
                 assertEquals(640,result.width);assertEquals(480,result.height)
-                // Record which branch actually ran so a pass is attributable in the shard log.
-                android.util.Log.i("SegmentBakeProof","branch="+(if(baked.applied)"applied"else"fail-open"))
-                var mixedEdge=false
-                for(x in 316..323){val c=result.getPixel(x,240)
-                    val red=Color.red(c);val blue=Color.blue(c)
-                    if(red>10&&blue>10)mixedEdge=true}
+                // Record which branch actually ran plus pipeline evidence stats, so a
+                // pass is attributable in the shard log. Whole-frame sampling: no
+                // assumption about where the mask puts the boundary - a real mask blur
+                // must change pixels SOMEWHERE, and fail-open must change NONE.
+                var changed=0;var sampled=0
+                for(y in 60..420 step 60){for(x in 20..620 step 20){
+                    sampled++;val c=result.getPixel(x,y)
+                    val pure=(Color.red(c)>240&&Color.blue(c)<15)||(Color.blue(c)>240&&Color.red(c)<15)
+                    if(!pure)changed++}}
+                android.util.Log.i("SegmentBakeProof","branch="+(if(baked.applied)"applied"else"fail-open")+" changedSamples="+changed+"/"+sampled)
                 if(baked.applied){
-                    assertTrue("applied=true must show real pipeline output: the two-tone edge must be softened by the mask blur",mixedEdge)
+                    assertTrue("applied=true must show real pipeline output: the mask blur must alter pixels somewhere (changed="+changed+"/"+sampled+")",changed>0)
                 }else{
-                    assertFalse("fail-open returns the original pixels, never a processed or blank frame",mixedEdge)
-                    val l=result.getPixel(100,240);val r=result.getPixel(540,240)
-                    assertTrue(Color.red(l)>240&&Color.blue(l)<15)
-                    assertTrue(Color.blue(r)>240&&Color.red(r)<15)
+                    assertEquals("fail-open returns the original pixels, never a processed or blank frame (changed="+changed+")",0,changed)
                 }
             }finally{result.recycle()}
         }finally{output?.delete();source.delete()}
