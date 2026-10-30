@@ -61,6 +61,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.BeachAccess
+import androidx.compose.material.icons.rounded.Brush
+import androidx.compose.material.icons.rounded.Brightness7
+import androidx.compose.material.icons.rounded.Cake
+import androidx.compose.material.icons.rounded.ColorLens
+import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.Eco
+import androidx.compose.material.icons.rounded.EmojiEmotions
+import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.FilterDrama
+import androidx.compose.material.icons.rounded.FilterHdr
+import androidx.compose.material.icons.rounded.InvertColors
+import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.LocalFlorist
+import androidx.compose.material.icons.rounded.Nightlife
+import androidx.compose.material.icons.rounded.Park
+import androidx.compose.material.icons.rounded.SentimentVerySatisfied
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Texture
+import androidx.compose.material.icons.rounded.Tonality
+import androidx.compose.material.icons.rounded.WbIridescent
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.WbSunny
 
@@ -103,11 +125,18 @@ data class ChatyCameraEffect(
 
 /** Exact port of lib/features/camera/effects/effect_registry.dart.
  *
- *  Complete catalog of the original 60 fully-working distinct effects
- *  spanning Beauty, Cinematic, Retro/Film, Glow, Face AR, Cyber, and Color
- *  Grading. Data table generated from the Dart source at the api anchor;
- *  every id, name, category, flag and 4x5 color matrix value is preserved
- *  verbatim.
+ *  The original 60 effects ported from the Dart source at the api anchor
+ *  (every id, name, category, flag and 4x5 color matrix value preserved
+ *  verbatim), plus 40 new original Chaty effects expanding Beauty,
+ *  Cinematic, Retro, Film, Glow, Cyber, Fun (celebration), Color grading
+ *  and Portrait. New artwork is original Chaty content only: no
+ *  third-party lens/filter assets bundled or fetched. shaderKey stays
+ *  null for every entry - the render pipeline consumes colorMatrix
+ *  exclusively (EffectEngine.activeColorMatrix). New entries are all
+ *  full-frame color grades: no new entry claims face tracking or
+ *  segmentation, because the live pipeline only bridges the six
+ *  original face_* ids to lenses (CameraCaptureScreen.lensIdForEffect)
+ *  and ships no segmentation renderer.
  */
 object EffectRegistry {
     val allEffects: List<ChatyCameraEffect> = listOf(
@@ -854,6 +883,526 @@ object EffectRegistry {
             previewColor = Color(0xFF8B5CF6),
             isSegmentationRequired = true,
             tier = EffectPerformanceTier.gpuIntensive,
+        ),
+        ChatyCameraEffect(
+            id = "beauty_rose_glow",
+            name = "Rose Glow",
+            category = EffectCategory.beauty,
+            icon = Icons.Rounded.LocalFlorist,
+            previewColor = Color(0xFFFB7185),
+            colorMatrix = listOf(
+                1.15, 0.0, 0.0, 0.0, 14.0,
+                0.0, 0.98, 0.0, 0.0, 2.0,
+                0.0, 0.0, 1.05, 0.0, 8.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "beauty_silk",
+            name = "Silk Skin",
+            category = EffectCategory.beauty,
+            icon = Icons.Rounded.AutoFixHigh,
+            previewColor = Color(0xFFFBCFE8),
+            colorMatrix = listOf(
+                1.07, 0.0, 0.0, 0.0, 9.0,
+                0.0, 1.07, 0.0, 0.0, 9.0,
+                0.0, 0.0, 1.07, 0.0, 0.0,
+                9.0, 0.0, 0.0, 0.0, 1.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "beauty_bronze",
+            name = "Bronze Tan",
+            category = EffectCategory.beauty,
+            icon = Icons.Rounded.Brightness7,
+            previewColor = Color(0xFFD97706),
+            colorMatrix = listOf(
+                1.22, 0.0, 0.0, 0.0, 18.0,
+                0.0, 1.0, 0.0, 0.0, 4.0,
+                0.0, 0.0, 0.8, 0.0, -12.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "beauty_pearl",
+            name = "Pearl Sheen",
+            category = EffectCategory.beauty,
+            icon = Icons.Rounded.Diamond,
+            previewColor = Color(0xFFE0F2FE),
+            colorMatrix = listOf(
+                1.06, 0.0, 0.0, 0.0, 10.0,
+                0.0, 1.08, 0.0, 0.0, 12.0,
+                0.0, 0.0, 1.14, 0.0, 18.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "beauty_velvet",
+            name = "Velvet Matte",
+            category = EffectCategory.beauty,
+            icon = Icons.Rounded.Texture,
+            previewColor = Color(0xFFA8A29E),
+            colorMatrix = listOf(
+                0.92, 0.06, 0.02, 0.0, 4.0,
+                0.02, 0.92, 0.06, 0.0, 4.0,
+                0.06, 0.02, 0.92, 0.0, 6.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "beauty_honey",
+            name = "Honey Light",
+            category = EffectCategory.beauty,
+            icon = Icons.Rounded.LightMode,
+            previewColor = Color(0xFFFCD34D),
+            colorMatrix = listOf(
+                1.18, 0.0, 0.0, 0.0, 14.0,
+                0.0, 1.06, 0.0, 0.0, 8.0,
+                0.0, 0.0, 0.88, 0.0, -6.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "cine_emerald_city",
+            name = "Emerald City",
+            category = EffectCategory.cinematic,
+            icon = Icons.Rounded.Park,
+            previewColor = Color(0xFF059669),
+            colorMatrix = listOf(
+                0.82, 0.0, 0.0, 0.0, -8.0,
+                0.0, 1.3, 0.0, 0.0, 18.0,
+                0.0, 0.0, 1.0, 0.0, 4.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "cine_royal_purple",
+            name = "Royal Purple",
+            category = EffectCategory.cinematic,
+            icon = Icons.Rounded.AutoAwesome,
+            previewColor = Color(0xFF7C3AED),
+            colorMatrix = listOf(
+                1.05, 0.0, 0.0, 0.0, 8.0,
+                0.0, 0.85, 0.0, 0.0, -6.0,
+                0.0, 0.0, 1.35, 0.0, 24.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "cine_steel_blue",
+            name = "Steel Blue",
+            category = EffectCategory.cinematic,
+            icon = Icons.Rounded.Tonality,
+            previewColor = Color(0xFF60A5FA),
+            colorMatrix = listOf(
+                0.9, 0.0, 0.0, 0.0, -6.0,
+                0.0, 1.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 1.25, 0.0, 14.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "cine_midnight_sun",
+            name = "Midnight Sun",
+            category = EffectCategory.cinematic,
+            icon = Icons.Rounded.DarkMode,
+            previewColor = Color(0xFFF97316),
+            colorMatrix = listOf(
+                1.3, 0.0, 0.0, 0.0, 16.0,
+                0.0, 0.95, 0.0, 0.0, 0.0,
+                0.0, 0.0, 1.1, 0.0, 8.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "retro_seventies",
+            name = "Retro 70s",
+            category = EffectCategory.retro,
+            icon = Icons.Rounded.Nightlife,
+            previewColor = Color(0xFFEA580C),
+            colorMatrix = listOf(
+                1.1, 0.05, 0.0, 0.0, 18.0,
+                0.0, 1.0, 0.02, 0.0, 10.0,
+                0.05, 0.0, 0.75, 0.0, -12.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "retro_newspaper",
+            name = "Old Newspaper",
+            category = EffectCategory.retro,
+            icon = Icons.Rounded.AutoStories,
+            previewColor = Color(0xFF9CA3AF),
+            colorMatrix = listOf(
+                0.4, 0.4, 0.4, 0.0, 10.0,
+                0.4, 0.4, 0.4, 0.0, 10.0,
+                0.35, 0.35, 0.35, 0.0, 14.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "retro_seaside",
+            name = "Seaside Fade",
+            category = EffectCategory.retro,
+            icon = Icons.Rounded.BeachAccess,
+            previewColor = Color(0xFF67E8F9),
+            colorMatrix = listOf(
+                1.05, 0.0, 0.0, 0.0, 12.0,
+                0.0, 1.1, 0.0, 0.0, 14.0,
+                0.0, 0.0, 1.2, 0.0, 18.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "retro_faded_denim",
+            name = "Faded Denim",
+            category = EffectCategory.retro,
+            icon = Icons.Rounded.Brush,
+            previewColor = Color(0xFF60A5FA),
+            colorMatrix = listOf(
+                0.95, 0.0, 0.0, 0.0, 4.0,
+                0.0, 1.0, 0.0, 0.0, 8.0,
+                0.0, 0.0, 1.15, 0.0, 16.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "film_ektar",
+            name = "Ektar 100",
+            category = EffectCategory.film,
+            icon = Icons.Rounded.PhotoFilter,
+            previewColor = Color(0xFFEF4444),
+            colorMatrix = listOf(
+                1.28, 0.0, 0.0, 0.0, 10.0,
+                0.0, 1.2, 0.0, 0.0, 8.0,
+                0.0, 0.0, 1.12, 0.0, 6.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "film_cinestill",
+            name = "CineStill 800",
+            category = EffectCategory.film,
+            icon = Icons.Rounded.Nightlight,
+            previewColor = Color(0xFFF43F5E),
+            colorMatrix = listOf(
+                1.25, 0.0, 0.0, 0.0, 20.0,
+                0.0, 1.02, 0.0, 0.0, 2.0,
+                0.0, 0.0, 1.1, 0.0, 12.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "film_delta_mono",
+            name = "Delta Mono",
+            category = EffectCategory.film,
+            icon = Icons.Rounded.FilterBAndW,
+            previewColor = Color(0xFF6B7280),
+            colorMatrix = listOf(
+                0.35, 0.35, 0.35, 0.0, 5.0,
+                0.35, 0.35, 0.35, 0.0, 5.0,
+                0.35, 0.35, 0.35, 0.0, 5.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "film_slide_chrome",
+            name = "Slide Chrome",
+            category = EffectCategory.film,
+            icon = Icons.Rounded.FilterHdr,
+            previewColor = Color(0xFF38BDF8),
+            colorMatrix = listOf(
+                1.1, 0.0, 0.0, 0.0, 6.0,
+                0.0, 1.15, 0.0, 0.0, 8.0,
+                0.0, 0.0, 1.3, 0.0, 16.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "glow_cherry",
+            name = "Cherry Neon",
+            category = EffectCategory.glow,
+            icon = Icons.Rounded.Favorite,
+            previewColor = Color(0xFFF43F5E),
+            colorMatrix = listOf(
+                1.5, 0.0, 0.0, 0.0, 32.0,
+                0.0, 0.85, 0.0, 0.0, -8.0,
+                0.0, 0.0, 1.1, 0.0, 12.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "glow_lime",
+            name = "Lime Pulse",
+            category = EffectCategory.glow,
+            icon = Icons.Rounded.Eco,
+            previewColor = Color(0xFF84CC16),
+            colorMatrix = listOf(
+                0.85, 0.0, 0.0, 0.0, -8.0,
+                0.0, 1.5, 0.0, 0.0, 30.0,
+                0.0, 0.0, 0.9, 0.0, -6.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "glow_ice",
+            name = "Ice Crystal",
+            category = EffectCategory.glow,
+            icon = Icons.Rounded.AcUnit,
+            previewColor = Color(0xFFBAE6FD),
+            colorMatrix = listOf(
+                1.0, 0.0, 0.0, 0.0, 6.0,
+                0.0, 1.15, 0.0, 0.0, 16.0,
+                0.0, 0.0, 1.4, 0.0, 28.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "glow_ember",
+            name = "Ember Glow",
+            category = EffectCategory.glow,
+            icon = Icons.Rounded.LocalFireDepartment,
+            previewColor = Color(0xFFF97316),
+            colorMatrix = listOf(
+                1.35, 0.0, 0.0, 0.0, 24.0,
+                0.0, 0.95, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.7, 0.0, -18.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "cyber_purple_rain",
+            name = "Purple Rain",
+            category = EffectCategory.cyber,
+            icon = Icons.Rounded.FilterDrama,
+            previewColor = Color(0xFF9333EA),
+            colorMatrix = listOf(
+                1.2, 0.0, 0.0, 0.0, 16.0,
+                0.0, 0.75, 0.0, 0.0, -12.0,
+                0.0, 0.0, 1.5, 0.0, 32.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "cyber_infrared",
+            name = "Infrared",
+            category = EffectCategory.cyber,
+            icon = Icons.Rounded.WbIridescent,
+            previewColor = Color(0xFFDC2626),
+            colorMatrix = listOf(
+                1.4, 0.3, 0.0, 0.0, 10.0,
+                0.0, 0.6, 0.0, 0.0, -10.0,
+                0.0, 0.0, 0.8, 0.0, -6.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "cyber_arcade",
+            name = "Arcade CRT",
+            category = EffectCategory.cyber,
+            icon = Icons.Rounded.VideogameAsset,
+            previewColor = Color(0xFF22D3EE),
+            colorMatrix = listOf(
+                1.35, 0.0, 0.0, 0.0, 22.0,
+                0.0, 1.0, 0.0, 0.0, 4.0,
+                0.0, 0.0, 1.45, 0.0, 28.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "glow_rainbow_sheen",
+            name = "Rainbow Sheen",
+            category = EffectCategory.glow,
+            icon = Icons.Rounded.WbIridescent,
+            previewColor = Color(0xFFF0ABFC),
+            colorMatrix = listOf(
+                1.12, 0.0, 0.0, 0.0, 14.0,
+                0.0, 1.08, 0.0, 0.0, 12.0,
+                0.0, 0.0, 1.16, 0.0, 16.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "beauty_golden_veil",
+            name = "Golden Veil",
+            category = EffectCategory.beauty,
+            icon = Icons.Rounded.Diamond,
+            previewColor = Color(0xFFEAB308),
+            colorMatrix = listOf(
+                1.25, 0.0, 0.0, 0.0, 18.0,
+                0.0, 1.1, 0.0, 0.0, 12.0,
+                0.0, 0.0, 0.8, 0.0, -8.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "beauty_sunkissed",
+            name = "Sunkissed",
+            category = EffectCategory.beauty,
+            icon = Icons.Rounded.WbSunny,
+            previewColor = Color(0xFFFB923C),
+            colorMatrix = listOf(
+                1.12, 0.0, 0.0, 0.0, 10.0,
+                0.0, 1.02, 0.0, 0.0, 4.0,
+                0.0, 0.0, 0.95, 0.0, 0.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "celebration_fireworks",
+            name = "Fireworks",
+            category = EffectCategory.celebration,
+            icon = Icons.Rounded.EmojiEvents,
+            previewColor = Color(0xFFFDE047),
+            colorMatrix = listOf(
+                1.2, 0.0, 0.0, 0.0, 16.0,
+                0.0, 1.1, 0.0, 0.0, 12.0,
+                0.0, 0.0, 1.3, 0.0, 20.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "celebration_balloons",
+            name = "Balloon Pop",
+            category = EffectCategory.celebration,
+            icon = Icons.Rounded.Cake,
+            previewColor = Color(0xFFF472B6),
+            colorMatrix = listOf(
+                1.15, 0.0, 0.0, 0.0, 14.0,
+                0.0, 1.12, 0.0, 0.0, 12.0,
+                0.0, 0.0, 1.18, 0.0, 16.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "celebration_gold_confetti",
+            name = "Gold Confetti",
+            category = EffectCategory.celebration,
+            icon = Icons.Rounded.Stars,
+            previewColor = Color(0xFFFBBF24),
+            colorMatrix = listOf(
+                1.3, 0.0, 0.0, 0.0, 22.0,
+                0.0, 1.15, 0.0, 0.0, 14.0,
+                0.0, 0.0, 0.85, 0.0, -6.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "color_boost",
+            name = "Color Boost",
+            category = EffectCategory.color,
+            icon = Icons.Rounded.ColorLens,
+            previewColor = Color(0xFF22D3EE),
+            colorMatrix = listOf(
+                1.3, 0.0, 0.0, 0.0, 8.0,
+                0.0, 1.3, 0.0, 0.0, 8.0,
+                0.0, 0.0, 1.3, 0.0, 8.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "color_muted",
+            name = "Muted Earth",
+            category = EffectCategory.color,
+            icon = Icons.Rounded.InvertColors,
+            previewColor = Color(0xFFA8A29E),
+            colorMatrix = listOf(
+                0.85, 0.08, 0.05, 0.0, 6.0,
+                0.05, 0.85, 0.08, 0.0, 6.0,
+                0.08, 0.05, 0.85, 0.0, 8.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "color_vivid_pop",
+            name = "Vivid Pop",
+            category = EffectCategory.color,
+            icon = Icons.Rounded.Star,
+            previewColor = Color(0xFFF43F5E),
+            colorMatrix = listOf(
+                1.45, 0.0, 0.0, 0.0, 12.0,
+                0.0, 1.35, 0.0, 0.0, 10.0,
+                0.0, 0.0, 1.4, 0.0, 14.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "color_mono_cool",
+            name = "Cool Mono",
+            category = EffectCategory.color,
+            icon = Icons.Rounded.Contrast,
+            previewColor = Color(0xFF94A3B8),
+            colorMatrix = listOf(
+                0.28, 0.28, 0.28, 0.0, 8.0,
+                0.3, 0.3, 0.3, 0.0, 12.0,
+                0.38, 0.38, 0.38, 0.0, 20.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "color_warm_soft",
+            name = "Soft Warm",
+            category = EffectCategory.color,
+            icon = Icons.Rounded.WbSunny,
+            previewColor = Color(0xFFFDBA74),
+            colorMatrix = listOf(
+                1.1, 0.0, 0.0, 0.0, 12.0,
+                0.0, 1.03, 0.0, 0.0, 8.0,
+                0.0, 0.0, 0.95, 0.0, 2.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "portrait_soft_focus",
+            name = "Soft Focus",
+            category = EffectCategory.portrait,
+            icon = Icons.Rounded.EmojiEmotions,
+            previewColor = Color(0xFFFDA4AF),
+            colorMatrix = listOf(
+                1.06, 0.0, 0.0, 0.0, 10.0,
+                0.0, 1.05, 0.0, 0.0, 10.0,
+                0.0, 0.0, 1.04, 0.0, 10.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "portrait_contour",
+            name = "Studio Contour",
+            category = EffectCategory.portrait,
+            icon = Icons.Rounded.SentimentVerySatisfied,
+            previewColor = Color(0xFFCBD5E1),
+            colorMatrix = listOf(
+                1.18, 0.0, 0.0, 0.0, -6.0,
+                0.0, 1.15, 0.0, 0.0, -6.0,
+                0.0, 0.0, 1.12, 0.0, -4.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "glow_sunset_haze",
+            name = "Sunset Haze",
+            category = EffectCategory.glow,
+            icon = Icons.Rounded.Flare,
+            previewColor = Color(0xFFFB923C),
+            colorMatrix = listOf(
+                1.28, 0.0, 0.0, 0.0, 22.0,
+                0.0, 0.95, 0.0, 0.0, 4.0,
+                0.0, 0.0, 1.05, 0.0, 10.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
+        ),
+        ChatyCameraEffect(
+            id = "glow_forest_mist",
+            name = "Forest Mist",
+            category = EffectCategory.glow,
+            icon = Icons.Rounded.Eco,
+            previewColor = Color(0xFF34D399),
+            colorMatrix = listOf(
+                0.9, 0.0, 0.0, 0.0, -4.0,
+                0.0, 1.2, 0.0, 0.0, 16.0,
+                0.0, 0.0, 0.95, 0.0, 2.0,
+                0.0, 0.0, 0.0, 1.0, 0.0,
+            ),
         ),
     )
 
