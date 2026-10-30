@@ -17,9 +17,11 @@ class SupabasePendingStateTest {
 
     @Suppress("UNCHECKED_CAST")
     private fun store(): ConcurrentHashMap<String, Long> {
-        val field = SupabaseAuthClient.Companion::class.java.getDeclaredField("pendingAuthStates")
+        // Private companion vals compile to a private static field on the OUTER
+        // class, so reflection must target SupabaseAuthClient, not Companion.
+        val field = SupabaseAuthClient::class.java.getDeclaredField("pendingAuthStates")
         field.isAccessible = true
-        return field.get(SupabaseAuthClient.Companion) as ConcurrentHashMap<String, Long>
+        return field.get(null) as ConcurrentHashMap<String, Long>
     }
 
     @Test
