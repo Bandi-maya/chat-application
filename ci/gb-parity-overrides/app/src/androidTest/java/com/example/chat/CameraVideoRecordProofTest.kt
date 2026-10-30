@@ -115,13 +115,17 @@ class CameraVideoRecordProofTest {
 
         var previewReader: ImageReader? = null
         val preview = Preview.Builder().build()
-        preview.setSurfaceProvider(drainExecutor) { request: SurfaceRequest ->
-            val reader = ImageReader.newInstance(
-                request.resolution.width, request.resolution.height, PixelFormat.RGBA_8888, 3,
-            )
-            previewReader = reader
-            reader.setOnImageAvailableListener({ r -> r.acquireLatestImage()?.close() }, drainHandler)
-            request.provideSurface(reader.surface, drainExecutor) { }
+        // Preview.setSurfaceProvider enforces the main thread (CameraX Threads.
+        // checkMainThread); the test body runs on the instrumentation thread.
+        instrumentation.runOnMainSync {
+            preview.setSurfaceProvider(drainExecutor) { request: SurfaceRequest ->
+                val reader = ImageReader.newInstance(
+                    request.resolution.width, request.resolution.height, PixelFormat.RGBA_8888, 3,
+                )
+                previewReader = reader
+                reader.setOnImageAvailableListener({ r -> r.acquireLatestImage()?.close() }, drainHandler)
+                request.provideSurface(reader.surface, drainExecutor) { }
+            }
         }
         val recorder = Recorder.Builder()
             .setQualitySelector(QualitySelector.from(Quality.SD))
