@@ -340,6 +340,139 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLensGlyph(
                 )
                 drawStar(Offset(24f, 10f), 5f, color)
             }
+            "lens_cat_ears" -> {
+                val leftEar = Path().apply { moveTo(10f, 17f); lineTo(8f, 4f); lineTo(21f, 12f); close() }
+                val rightEar = Path().apply { moveTo(38f, 17f); lineTo(40f, 4f); lineTo(27f, 12f); close() }
+                drawPath(leftEar, color, style = stroke)
+                drawPath(rightEar, color, style = stroke)
+            }
+            "lens_bunny_ears" -> {
+                drawRoundRect(color, Offset(14f, 4f), androidx.compose.ui.geometry.Size(8f, 22f), androidx.compose.ui.geometry.CornerRadius(4f, 4f), style = stroke)
+                drawRoundRect(color, Offset(26f, 4f), androidx.compose.ui.geometry.Size(8f, 22f), androidx.compose.ui.geometry.CornerRadius(4f, 4f), style = stroke)
+            }
+            "lens_round_shades" -> {
+                drawCircle(color, 8f, Offset(14f, 21f), style = stroke)
+                drawCircle(color, 8f, Offset(34f, 21f), style = stroke)
+                drawLine(color, Offset(22f, 20f), Offset(26f, 20f), strokeWidth = 3f, cap = StrokeCap.Round)
+                drawLine(color, Offset(6f, 19f), Offset(2f, 15f), strokeWidth = 3f, cap = StrokeCap.Round)
+                drawLine(color, Offset(42f, 19f), Offset(46f, 15f), strokeWidth = 3f, cap = StrokeCap.Round)
+            }
+            "lens_heart_shades" -> {
+                drawHeart(Offset(14f, 18f), 0.42f, color)
+                drawHeart(Offset(29f, 18f), 0.42f, color)
+                drawLine(color, Offset(22f, 17f), Offset(26f, 17f), strokeWidth = 3f, cap = StrokeCap.Round)
+            }
+            "lens_star_eyes" -> {
+                drawStar(Offset(14f, 21f), 7f, color)
+                drawStar(Offset(34f, 21f), 7f, color)
+            }
+            "lens_monocle" -> {
+                drawCircle(color, 9f, Offset(30f, 19f), style = stroke)
+                drawLine(color, Offset(37f, 25f), Offset(42f, 40f), strokeWidth = 3f, cap = StrokeCap.Round)
+                drawCircle(color, 2.5f, Offset(42f, 42f))
+            }
+            "lens_flower_crown" -> {
+                listOf(Offset(9f, 17f), Offset(19f, 11f), Offset(29f, 11f), Offset(39f, 17f)).forEach { c ->
+                    drawCircle(color, 4f, c, style = stroke)
+                    drawCircle(color, 1.2f, c)
+                }
+            }
+            "lens_tiara" -> {
+                val tiara = Path().apply {
+                    moveTo(12f, 26f); lineTo(15f, 14f); lineTo(21f, 20f); lineTo(24f, 10f)
+                    lineTo(27f, 20f); lineTo(33f, 14f); lineTo(36f, 26f); close()
+                }
+                drawPath(tiara, color, style = stroke)
+                drawCircle(color, 2.5f, Offset(24f, 23f))
+            }
+            "lens_wizard_hat" -> {
+                val cone = Path().apply { moveTo(24f, 4f); lineTo(34f, 25f); lineTo(14f, 25f); close() }
+                drawPath(cone, color, style = stroke)
+                drawLine(color, Offset(9f, 29f), Offset(39f, 29f), strokeWidth = 3f, cap = StrokeCap.Round)
+                drawStar(Offset(24f, 17f), 3.5f, color)
+            }
+            "lens_headphones" -> {
+                drawArc(color, startAngle = 180f, sweepAngle = 180f, useCenter = false,
+                    topLeft = Offset(10f, 8f), size = androidx.compose.ui.geometry.Size(28f, 26f), style = stroke)
+                drawRoundRect(color, Offset(7f, 20f), androidx.compose.ui.geometry.Size(7f, 13f), androidx.compose.ui.geometry.CornerRadius(3f, 3f), style = stroke)
+                drawRoundRect(color, Offset(34f, 20f), androidx.compose.ui.geometry.Size(7f, 13f), androidx.compose.ui.geometry.CornerRadius(3f, 3f), style = stroke)
+            }
+            "lens_devil_horns" -> {
+                val left = Path().apply { moveTo(15f, 16f); quadraticTo(10f, 4f, 20f, 7f); quadraticTo(19f, 14f, 15f, 16f); close() }
+                val right = Path().apply { moveTo(33f, 16f); quadraticTo(38f, 4f, 28f, 7f); quadraticTo(29f, 14f, 33f, 16f); close() }
+                drawPath(left, color, style = stroke)
+                drawPath(right, color, style = stroke)
+            }
+            "lens_rainbow_arc" -> {
+                drawArc(color, startAngle = 180f, sweepAngle = 180f, useCenter = false,
+                    topLeft = Offset(6f, 18f), size = androidx.compose.ui.geometry.Size(36f, 30f), style = stroke)
+                drawArc(color, startAngle = 180f, sweepAngle = 180f, useCenter = false,
+                    topLeft = Offset(11f, 23f), size = androidx.compose.ui.geometry.Size(26f, 20f), style = stroke)
+                drawArc(color, startAngle = 180f, sweepAngle = 180f, useCenter = false,
+                    topLeft = Offset(16f, 28f), size = androidx.compose.ui.geometry.Size(16f, 10f), style = stroke)
+            }
+            "lens_butterflies" -> {
+                drawCircle(color, 3.5f, Offset(12f, 15f), style = stroke)
+                drawCircle(color, 2.5f, Offset(17f, 20f), style = stroke)
+                drawLine(color, Offset(13.5f, 13f), Offset(15.5f, 22f), strokeWidth = 2f, cap = StrokeCap.Round)
+                drawCircle(color, 3.5f, Offset(34f, 24f), style = stroke)
+                drawCircle(color, 2.5f, Offset(29f, 28f), style = stroke)
+                drawLine(color, Offset(33f, 21f), Offset(31f, 30f), strokeWidth = 2f, cap = StrokeCap.Round)
+            }
+            "lens_freckles" -> {
+                listOf(Offset(11f, 25f), Offset(16f, 28f), Offset(13f, 32f), Offset(35f, 25f), Offset(32f, 29f), Offset(37f, 32f), Offset(24f, 20f)).forEach {
+                    drawCircle(color, 1.6f, it)
+                }
+            }
+            "lens_mustache" -> {
+                val m = Path().apply {
+                    moveTo(24f, 28f)
+                    quadraticTo(18f, 22f, 8f, 27f)
+                    quadraticTo(15f, 34f, 24f, 30f)
+                    quadraticTo(33f, 34f, 40f, 27f)
+                    quadraticTo(30f, 22f, 24f, 28f)
+                    close()
+                }
+                drawPath(m, color)
+                drawPath(m, color, style = stroke)
+            }
+            "lens_lip_gloss" -> {
+                drawArc(color, startAngle = 180f, sweepAngle = 180f, useCenter = false,
+                    topLeft = Offset(13f, 22f), size = androidx.compose.ui.geometry.Size(22f, 9f), style = stroke)
+                drawArc(color, startAngle = 0f, sweepAngle = 180f, useCenter = false,
+                    topLeft = Offset(13f, 26f), size = androidx.compose.ui.geometry.Size(22f, 12f), style = stroke)
+            }
+            "lens_clown_nose" -> {
+                drawCircle(color, 7f, Offset(24f, 25f))
+                drawCircle(Color(0x66FFFFFF), 2f, Offset(21.5f, 22.5f))
+            }
+            "lens_pirate_patch" -> {
+                drawLine(color, Offset(4f, 12f), Offset(44f, 17f), strokeWidth = 3f, cap = StrokeCap.Round)
+                drawCircle(color, 7f, Offset(31f, 23f))
+                drawCircle(Color(0x66000000), 3f, Offset(31f, 23f))
+            }
+            "lens_snow_drift" -> {
+                drawStar(Offset(14f, 15f), 5f, color)
+                drawStar(Offset(33f, 12f), 4f, color)
+                drawStar(Offset(25f, 27f), 6f, color)
+                drawCircle(color, 1.4f, Offset(38f, 30f))
+                drawCircle(color, 1.4f, Offset(9f, 26f))
+            }
+            "lens_music_notes" -> {
+                drawCircle(color, 3.5f, Offset(16f, 33f))
+                drawLine(color, Offset(19.5f, 33f), Offset(19.5f, 13f), strokeWidth = 3f, cap = StrokeCap.Round)
+                drawLine(color, Offset(19.5f, 13f), Offset(28f, 17f), strokeWidth = 3f, cap = StrokeCap.Round)
+                drawCircle(color, 2.8f, Offset(33f, 36f))
+                drawLine(color, Offset(35.8f, 36f), Offset(35.8f, 21f), strokeWidth = 3f, cap = StrokeCap.Round)
+            }
+            "lens_star_crown" -> {
+                val crown = Path().apply {
+                    moveTo(9f, 34f); lineTo(12f, 17f); lineTo(20f, 25f); lineTo(24f, 15f)
+                    lineTo(28f, 25f); lineTo(36f, 17f); lineTo(39f, 34f); close()
+                }
+                drawPath(crown, color, style = stroke)
+                drawStar(Offset(24f, 8f), 4.5f, color)
+            }
             else -> {
                 drawCircle(color, 17f, Offset(24f, 24f), style = stroke)
                 drawCircle(color, 5f, Offset(24f, 24f))
