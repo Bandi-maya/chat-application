@@ -27,4 +27,29 @@ class CameraFullResolutionEffectTest {
             try{assertEquals(1800,result.width);assertEquals(1200,result.height);val c=result.getPixel(900,600);assertTrue(Color.red(c)>240&&Color.blue(c)<15)}finally{result.recycle()}
         }finally{output?.delete();source.delete()}
     }
+
+    @Test fun segmentBakeRunsRealMaskPipelineAndFailsOpenHonestly() = runBlocking {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val source=File.createTempFile("synthetic_segment_", ".png",context.cacheDir)
+        val b=Bitmap.createBitmap(640,480,Bitmap.Config.ARGB_8888);b.eraseColor(Color.GREEN)
+        source.outputStream().use{b.compress(Bitmap.CompressFormat.PNG,100,it)};b.recycle()
+        var output:File?=null
+        try{
+            // Real segmenter inference on a synthetic bitmap. The mask content on
+            // a solid-color frame is not meaningful, so orientation is NOT asserted
+            // here; the contract is: never crash, always produce an output at the
+            // original size, and applied=false means fail-open drew the original.
+            val baked=ImageFxBaker.bakeEffectIntoFile(context,source.absolutePath,EffectRegistry.byId("bg_portrait_blur"),0.8)
+            output=File(baked.path)
+            assertTrue(output.exists());assertTrue(output.length()>0)
+            val result=BitmapFactory.decodeFile(output.absolutePath)
+            try{
+                assertEquals(640,result.width);assertEquals(480,result.height)
+                if(!baked.applied){
+                    val px=result.getPixel(320,240)
+                    assertTrue("fail-open keeps the original pixels, never a blank frame",Color.green(px)>200&&Color.red(px)<15)
+                }
+            }finally{result.recycle()}
+        }finally{output?.delete();source.delete()}
+    }
 }
