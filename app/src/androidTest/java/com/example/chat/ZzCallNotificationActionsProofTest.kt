@@ -52,20 +52,27 @@ class CallNotificationActionsProofTest {
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, permission)
     }
 
+    // Per-test start/stop owner: a couriered stop from one test must never
+    // match (and kill) a later test's freshly started service.
+    private var testOwner: String? = null
+
     @After fun tearDown() {
         CallActionReceiver.endCallProbe = null
         CallActionReceiver.declineProbe = null
         ChatyNotifications.cancelIncomingCall(context)
-        CallForegroundService.stop(context)
+        CallForegroundService.stop(context, "test", testOwner)
+        testOwner = null
     }
 
     @Test fun ongoingCallNotificationHasWorkingHangUpButton() {
         grant(Manifest.permission.POST_NOTIFICATIONS)
         grant(Manifest.permission.RECORD_AUDIO)
+        testOwner = "zz-callnotif-hangup"
         val start = Intent(context, CallForegroundService::class.java)
             .putExtra(CallForegroundService.EXTRA_TITLE, "Proof Caller")
             .putExtra(CallForegroundService.EXTRA_TEXT, "Voice call")
             .putExtra(CallForegroundService.EXTRA_IS_VIDEO, false)
+            .putExtra(CallForegroundService.EXTRA_OWNER, "test:zz-callnotif-hangup")
         context.startForegroundService(start)
         awaitCondition(8000, "ongoing-call notification to post") {
             activeNotification(CallForegroundService.SERVICE_ID) != null
@@ -78,7 +85,7 @@ class CallNotificationActionsProofTest {
         CallActionReceiver.endCallProbe = { fired.set(true) }
         actions[0].actionIntent.send()
         awaitCondition(5000, "hang-up PendingIntent to route to CallActionReceiver") { fired.get() }
-        CallForegroundService.stop(context)
+        CallForegroundService.stop(context, "test", "zz-callnotif-hangup")
     }
 
     @Test fun incomingCallNotificationDeclineButtonRoutesToReceiver() {
@@ -105,10 +112,12 @@ class CallNotificationActionsProofTest {
         grant(Manifest.permission.POST_NOTIFICATIONS)
         grant(Manifest.permission.RECORD_AUDIO)
         grant(Manifest.permission.CAMERA)
+        testOwner = "zz-callnotif-video"
         val start = Intent(context, CallForegroundService::class.java)
             .putExtra(CallForegroundService.EXTRA_TITLE, "Proof Caller")
             .putExtra(CallForegroundService.EXTRA_TEXT, "Video call")
             .putExtra(CallForegroundService.EXTRA_IS_VIDEO, true)
+            .putExtra(CallForegroundService.EXTRA_OWNER, "test:zz-callnotif-video")
         context.startForegroundService(start)
         awaitCondition(8000, "video-call notification to post") {
             activeNotification(CallForegroundService.SERVICE_ID) != null
@@ -128,6 +137,41 @@ class CallNotificationActionsProofTest {
                 activeNotification(CallForegroundService.SERVICE_ID) != null,
             )
         }
-        CallForegroundService.stop(context)
+        CallForegroundService.stop(context, "test", "zz-callnotif-video")
+    }
+
+    @Test fun staleOwnerStopCannotKillNewerSession() {
+        grant(Manifest.permission.POST_NOTIFICATIONS)
+        grant(Manifest.permission.RECORD_AUDIO)
+        testOwner = "zz-callnotif-owner-scope"
+        val start = Intent(context, CallForegroundService::class.java)
+            .putExtra(CallForegroundService.EXTRA_TITLE, "Proof Caller")
+            .putExtra(CallForegroundService.EXTRA_TEXT, "Voice call")
+            .putExtra(CallForegroundService.EXTRA_IS_VIDEO, false)
+            .putExtra(CallForegroundService.EXTRA_OWNER, "test:zz-callnotif-owner-scope")
+        context.startForegroundService(start)
+        awaitCondition(8000, "owner-scoped notification to post") {
+            activeNotification(CallForegroundService.SERVICE_ID) != null
+        }
+        // A courier from an older owner generation must be ignored.
+        CallForegroundService.stop(context, "test", "zz-callnotif-older-generation")
+        Thread.sleep(1500)
+        assertNotNull(
+            "stale-owner stop must not kill the live session's notification",
+            activeNotification(CallForegroundService.SERVICE_ID),
+        )
+        // The same callId under a DIFFERENT owner token must also be ignored
+        // (recreation serves the same call under a new wiring token).
+        CallForegroundService.stop(context, "other-token", "zz-callnotif-owner-scope")
+        Thread.sleep(1500)
+        assertNotNull(
+            "same callId under another owner token must not stop the session",
+            activeNotification(CallForegroundService.SERVICE_ID),
+        )
+        // The serving owner's own stop still works promptly (hang-up path).
+        CallForegroundService.stop(context, "test", "zz-callnotif-owner-scope")
+        awaitCondition(5000, "serving owner's stop to remove the notification") {
+            activeNotification(CallForegroundService.SERVICE_ID) == null
+        }
     }
 }
