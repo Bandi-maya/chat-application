@@ -1,3 +1,1 @@
-build 100: camera lens coverage tests + call notification hangup/presentation fixes and proofs
-build 102: consolidated camera batch12+13 (video lens OverlayEffect bake + layout fixes + lens-fallback honesty), dialer nav-inset patch, FGS startForeground timing fix, crop aspect/inset patch; guard 60; verify shard suite + proofs
-build 103: compile fixes for consolidated camera changes (videoLensRecorded param placement, overlayCanvas API)
+build 104: fix androidTest compile - error() in elvis bindings (JUnit fail returns Unit -> Any)
