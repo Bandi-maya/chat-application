@@ -156,6 +156,7 @@ class CameraVideoSession(
                 // lens/filter is not applied instead of a dead effect.
                 val overlay = object : androidx.camera.core.CameraEffect(
                     androidx.camera.core.CameraEffect.PREVIEW or androidx.camera.core.CameraEffect.VIDEO_CAPTURE,
+                    androidx.camera.core.CameraEffect.TRANSFORMATION_ARBITRARY,
                     processor.getGlExecutor(),
                     processor,
                     androidx.core.util.Consumer { err ->
