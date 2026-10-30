@@ -1,1 +1,1 @@
-build 94: verify test-setup batch a39b507 (HomeHeaderTabs bounded settle + AddedStyles root-exclusive guard + override count 51); same overlay source, no app change
+build 95: camera filter/lens batch (lenses-tab UX parity, pixelate, segmented background live preview + capture bake, capture plan resolver, test sources)
