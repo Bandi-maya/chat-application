@@ -220,9 +220,9 @@ class ProfileCropAspectProofTest {
 
     private fun assertExportedCrop(tag: String, file: File, isAvatar: Boolean) {
         val (boxW, boxH) = cropWindowPx(isAvatar)
-        val out = BitmapFactory.decodeFile(file.absolutePath) ?: fail("exported crop must decode")
-        assertEquals("$tag: export width is the 2.5x capture", (boxW * 2.5f).toInt(), out.width, 2)
-        assertEquals("$tag: export height is the 2.5x capture", (boxH * 2.5f).toInt(), out.height, 2)
+        val out = BitmapFactory.decodeFile(file.absolutePath) ?: error("exported crop must decode")
+        assertEquals("$tag: export width is the 2.5x capture", boxW * 2.5f, out.width.toFloat(), 2f)
+        assertEquals("$tag: export height is the 2.5x capture", boxH * 2.5f, out.height.toFloat(), 2f)
         val s = scan(out)
         assertTrue("$tag: export must not contain the red band", s.redCount < 40)
         assertTrue("$tag: export must not contain the blue band", s.blueCount < 40)
