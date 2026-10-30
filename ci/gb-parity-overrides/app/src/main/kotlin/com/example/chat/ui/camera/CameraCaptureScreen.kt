@@ -578,7 +578,7 @@ fun ChatyCameraCaptureScreen(
         phase = CameraPhase.initializing
         errorMessage = null
         val sessionSelector = if (session.lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
-        val vs = CameraVideoSession(pv.context, lifecycleOwner, pv, sessionSelector, options.stabilization, lease, { viewportSize }, { lensManager.selected }, { facePoses }) { next ->
+        val vs = CameraVideoSession(pv.context, lifecycleOwner, pv, sessionSelector, options.stabilization, lease, { viewportSize }, { lensManager.selected }, { facePoses }, { engine.activeColorMatrix()?.let { m -> FloatArray(m.size) { i -> m[i].toFloat() } } }) { next ->
             videoState = next
             if (next is VideoSessionState.Ready || next is VideoSessionState.Recording || next is VideoSessionState.Paused) phase = CameraPhase.ready
             if (next is VideoSessionState.Ready) {
