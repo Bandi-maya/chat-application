@@ -118,14 +118,25 @@ class EmojiPackAssetsAndPerfTest {
         // compile classpath (run-129 compile error), and Class.forName from the
         // test classloader missed it at runtime too (run-130 CNFE). Load via the
         // TARGET context's classloader (the app's), which sees app classes.
+        // Loader-blindness vs class-absence discrimination (run-130 Class.forName
+        // CNFE, run-131 targetContext-loader CNFE): probe lottie classes by their
+        // COMPILED names through the same loader - a Kotlin top-level compose
+        // function class (*Kt) the app provably calls, the core factory, and the
+        // cache. If the first two load and the cache does not, the cache class is
+        // genuinely absent from the dex; if none load, the loader is blind.
+        val loader = ctx.classLoader
+        fun probe(n: String) = runCatching { loader.loadClass(n); "ok" }.getOrElse { "fail:" + (it.cause ?: it).javaClass.simpleName }
+        val probeAnim = probe("com.airbnb.lottie.compose.LottieAnimationKt")
+        val probeFactory = probe("com.airbnb.lottie.LottieCompositionFactory")
         val cacheClear = runCatching {
-            val cls = ctx.classLoader.loadClass("com.airbnb.lottie.LottieCompositionCache")
+            val cls = loader.loadClass("com.airbnb.lottie.LottieCompositionCache")
             val inst = cls.getMethod("getInstance").invoke(null)
             cls.getMethod("clear").invoke(inst)
             "ok"
         }.getOrElse { "fail:" + (it.cause ?: it).javaClass.simpleName }
+        android.util.Log.w("EmojiPerf", "LOTTIE-PROBE animKt=" + probeAnim + " factory=" + probeFactory + " cacheClear=" + cacheClear)
         val clearedP = heapPartsKb(); val cleared = clearedP.first + clearedP.second
-        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back closedKb=$closed beforeSplitKb=${beforeP.first}/${beforeP.second} visibleSplitKb=${peakP.first}/${peakP.second} offSplitKb=${offP.first}/${offP.second} backSplitKb=${backP.first}/${backP.second} closedSplitKb=${closedP.first}/${closedP.second} cacheClear=$cacheClear clearedKb=$cleared clearedSplitKb=${clearedP.first}/${clearedP.second} (split=nativeKb/managedKb)")
+        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back closedKb=$closed beforeSplitKb=${beforeP.first}/${beforeP.second} visibleSplitKb=${peakP.first}/${peakP.second} offSplitKb=${offP.first}/${offP.second} backSplitKb=${backP.first}/${backP.second} closedSplitKb=${closedP.first}/${closedP.second} probeAnimKt=$probeAnim probeFactory=$probeFactory cacheClear=$cacheClear clearedKb=$cleared clearedSplitKb=${clearedP.first}/${clearedP.second} (split=nativeKb/managedKb)")
         assertEquals("grid did not finish all phases for $pack", "done", EmojiPackGridProbe.phase)
         return Triple(peak - before, off - before, back - before)
     }
