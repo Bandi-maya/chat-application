@@ -114,9 +114,18 @@ class EmojiPackAssetsAndPerfTest {
         // cache-owned; no drop means per-drawable or other references survive
         // composition. Assertions unchanged; this only enriches the evidence file.
         Thread.sleep(1_000)
-        com.airbnb.lottie.LottieCompositionCache.getInstance().clear()
+        // Lottie is an `implementation` dependency, absent from the androidTest
+        // compile classpath (run-129 compile error). Reach the runtime class
+        // reflectively: the test APK shares the app process classloader, so the
+        // class resolves at runtime without coupling the build to Lottie's API.
+        val cacheClear = runCatching {
+            val cls = Class.forName("com.airbnb.lottie.LottieCompositionCache")
+            val inst = cls.getMethod("getInstance").invoke(null)
+            cls.getMethod("clear").invoke(inst)
+            "ok"
+        }.getOrElse { "fail:" + (it.cause ?: it).javaClass.simpleName }
         val clearedP = heapPartsKb(); val cleared = clearedP.first + clearedP.second
-        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back closedKb=$closed beforeSplitKb=${beforeP.first}/${beforeP.second} visibleSplitKb=${peakP.first}/${peakP.second} offSplitKb=${offP.first}/${offP.second} backSplitKb=${backP.first}/${backP.second} closedSplitKb=${closedP.first}/${closedP.second} clearedKb=$cleared clearedSplitKb=${clearedP.first}/${clearedP.second} (split=nativeKb/managedKb)")
+        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back closedKb=$closed beforeSplitKb=${beforeP.first}/${beforeP.second} visibleSplitKb=${peakP.first}/${peakP.second} offSplitKb=${offP.first}/${offP.second} backSplitKb=${backP.first}/${backP.second} closedSplitKb=${closedP.first}/${closedP.second} cacheClear=$cacheClear clearedKb=$cleared clearedSplitKb=${clearedP.first}/${clearedP.second} (split=nativeKb/managedKb)")
         assertEquals("grid did not finish all phases for $pack", "done", EmojiPackGridProbe.phase)
         return Triple(peak - before, off - before, back - before)
     }
