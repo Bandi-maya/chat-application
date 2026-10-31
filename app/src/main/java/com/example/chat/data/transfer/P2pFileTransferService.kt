@@ -178,6 +178,7 @@ class P2pFileTransferService(
             val offer = createDescription(peer, offer = true)
             if (!sendSignal(targetUserId, mapOf(
                 "signal_type" to "file_transfer_offer",
+                "call_id" to invite.transferId,
                 "transfer_id" to invite.transferId,
                 "sdp" to offer.description,
                 "manifest" to mapOf("transfer_id" to wireManifest.transferId, "name" to wireManifest.displayName, "mime" to wireManifest.mimeType, "size" to wireManifest.sizeBytes, "chunk" to wireManifest.chunkBytes, "sha256" to wireManifest.sha256Hex, "nonce" to b64(wireManifest.noncePrefix), "expires" to wireManifest.expiresAtEpochSeconds),
@@ -249,7 +250,7 @@ class P2pFileTransferService(
         )
         val session = Session(invite.transferId, offer.senderId, null, manifest, invite.secret,
             TransferDirection.download, destination = null, finalDestination = destination)
-        val partFile = File(appContext.filesDir, "p2p-receive/${invite.transferId}.part")
+        val partFile = File(destination.parentFile ?: appContext.filesDir, ".${invite.transferId}.part")
         session.destination = partFile
         session.ledger = ChunkReceiptLedger(File(appContext.filesDir, "p2p-ledger/${invite.transferId}.state"), manifest.chunkCount)
         incomingCandidates.remove(invite.transferId)?.let { session.queuedCandidates.addAll(it) }
@@ -264,7 +265,7 @@ class P2pFileTransferService(
             flushCandidates(session)
             val answer = createDescription(peer, offer = false)
             if (!sendSignal(offer.senderId, mapOf(
-                "signal_type" to "file_transfer_answer", "transfer_id" to invite.transferId, "sdp" to answer.description,
+                "signal_type" to "file_transfer_answer", "call_id" to invite.transferId, "transfer_id" to invite.transferId, "sdp" to answer.description,
             ))) throw IllegalStateException("Chaty signaling is offline")
             session.signalingReady = true
             flushLocalCandidates(session)
@@ -279,7 +280,7 @@ class P2pFileTransferService(
 
     fun cancel(transferId: String) {
         val session = sessions[transferId] ?: return
-        sendSignal(session.peerUserId, mapOf("signal_type" to "file_transfer_cancel", "transfer_id" to transferId))
+        sendSignal(session.peerUserId, mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
         fail(session, "Cancelled")
     }
 
@@ -293,7 +294,7 @@ class P2pFileTransferService(
         val peer = factory.createPeerConnection(config, object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate?) {
                 if (candidate != null) sendSignal(session.peerUserId, mapOf(
-                    "signal_type" to "file_transfer_ice", "transfer_id" to session.id,
+                    "signal_type" to "file_transfer_ice", "call_id" to session.id, "transfer_id" to session.id,
                     "candidate" to candidate.sdp, "sdp_mid" to candidate.sdpMid,
                     "sdp_mline" to candidate.sdpMLineIndex,
                 ))
