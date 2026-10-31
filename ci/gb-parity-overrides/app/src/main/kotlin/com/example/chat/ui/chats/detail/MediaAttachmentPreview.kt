@@ -99,13 +99,19 @@ internal fun MediaAttachmentPreview(
         catch (_: Exception) { failed = true; kotlinx.coroutines.awaitCancellation() }
         finally { thumbnail?.recycle(); thumbnail = null; releaseConsumerSource(ownedSource); ownedSource = null }
     }
+    // A disabled clickable still runs detectTapGestures in foundation 1.7.6 and
+    // consumes the down AND the up without firing (run-127 ALBUM-PROBE proof:
+    // Initial unconsumed -> Final consumed, tile onOpen/onMenu never fired).
+    // Install the detector only when the preview is actually actionable so
+    // parents (album tile tap/long-press/drag) receive unconsumed events.
+    val previewActionable = onTap != null || onTapWithBounds != null || (failed && retryable)
     Box(
         Modifier.widthIn(max = 300.dp).fillMaxWidth().aspectRatio(fixedRatio ?: ratio)
             .clip(RoundedCornerShape(9.dp)).background(Color.Black.copy(alpha = 0.12f))
             .onGloballyPositioned { tileBounds = it.boundsInWindow() }
-            .clickable(enabled = onTap != null || onTapWithBounds != null || (failed && retryable)) {
+            .then(if (previewActionable) Modifier.clickable {
                 if (failed && retryable) retry() else open()
-            },
+            } else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         when {
