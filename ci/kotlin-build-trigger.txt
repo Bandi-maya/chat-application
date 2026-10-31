@@ -1,1 +1,1 @@
-135b - c5 anchor fix lands CALLEND-DIAG signaling cascade (full 135 set)
+136 - combined run: 135 diagnostics (hang-up cycles, lens OPTION_CLOSEST, meminfo, qemu-identity) + batch 136 (9 bundles, gesture rebuilds, a11y, e2e picker proof, review-dialog insets)
