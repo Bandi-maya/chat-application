@@ -210,13 +210,13 @@ class WebRtcCallMediaController(
 
         val stream = factory.createLocalMediaStream("chaty_local_stream")
 
+        // Keep voice processing enabled in every network profile; low bandwidth must
+        // not mean degraded intelligibility. The adaptive sender bitrate handles load.
         val audioConstraints = MediaConstraints().apply {
-            if (lowData) {
-                mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
-                mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
-                mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
-                optional.add(MediaConstraints.KeyValuePair("channelCount", "1"))
-            }
+            mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+            optional.add(MediaConstraints.KeyValuePair("channelCount", "1"))
         }
         val audioSource: AudioSource = factory.createAudioSource(audioConstraints)
         localAudioTrack = factory.createAudioTrack("chaty_audio", audioSource)
@@ -327,18 +327,25 @@ class WebRtcCallMediaController(
             }
         }
         val peer = peerConnection ?: return
-        val sender = peer.senders.firstOrNull { it.track()?.kind() == "video" } ?: return
-        runCatching {
-            val parameters = sender.parameters
-            parameters.encodings.forEach { encoding ->
-                encoding.maxBitrateBps = profile.maxBitrateBps
-                encoding.maxFramerate = profile.frameRate
+        peer.senders.forEach { sender ->
+            val kind = sender.track()?.kind()
+            if (kind != "video" && kind != "audio") return@forEach
+            runCatching {
+                val parameters = sender.parameters
+                parameters.encodings.forEach { encoding ->
+                    if (kind == "video") {
+                        encoding.maxBitrateBps = profile.maxBitrateBps
+                        encoding.maxFramerate = profile.frameRate
+                    } else {
+                        encoding.maxBitrateBps = profile.audioBitrateBps
+                    }
+                }
+                if (!sender.setParameters(parameters)) {
+                    android.util.Log.w("ChatyWebRTC", "$kind sender rejected adaptive bitrate profile")
+                }
+            }.onFailure {
+                android.util.Log.w("ChatyWebRTC", "Could not apply adaptive $kind bitrate", it)
             }
-            if (!sender.setParameters(parameters)) {
-                android.util.Log.w("ChatyWebRTC", "Video sender rejected adaptive bitrate profile")
-            }
-        }.onFailure {
-            android.util.Log.w("ChatyWebRTC", "Could not apply adaptive video bitrate", it)
         }
     }
 
