@@ -96,6 +96,7 @@ class WebRtcCallMediaController(
 
     /** Cumulative WebRTC RTP bytes since this peer connected. */
     var onTrafficBytes: ((uploadedBytes: Long, downloadedBytes: Long) -> Unit)? = null
+    var onNetworkMetrics: ((upstreamKbps: Int, packetLossPercent: Double, roundTripTimeMs: Long) -> Unit)? = null
     var onTrafficEnded: (() -> Unit)? = null
     private val statsHandler = Handler(Looper.getMainLooper())
     private var statsStarted = false
@@ -276,17 +277,26 @@ class WebRtcCallMediaController(
                 if (!statsStarted) return
                 var sent = 0L
                 var received = 0L
+                var availableOutgoingBps = 0L
+                var packetsSent = 0L
+                var packetsLost = 0L
+                var roundTripTimeMs = 0L
                 reports.forEach { report ->
-                    val type = report.type.lowercase()
-                    if (type == "ssrc" || type == "outbound-rtp" || type == "inbound-rtp") {
-                        report.values.forEach { value ->
-                            when (value.name) {
-                                "bytesSent" -> sent += value.value.toDoubleOrNull()?.toLong() ?: 0L
-                                "bytesReceived" -> received += value.value.toLongOrNull() ?: 0L
-                            }
+                    report.values.forEach { value ->
+                        val number = value.value.toDoubleOrNull() ?: 0.0
+                        when (value.name) {
+                            "bytesSent" -> if (report.type == "ssrc" || report.type == "outbound-rtp") sent += number.toLong()
+                            "bytesReceived" -> if (report.type == "ssrc" || report.type == "inbound-rtp") received += number.toLong()
+                            "availableOutgoingBitrate" -> availableOutgoingBps = maxOf(availableOutgoingBps, number.toLong())
+                            "packetsSent" -> packetsSent += number.toLong()
+                            "packetsLost" -> packetsLost += number.toLong().coerceAtLeast(0L)
+                            "currentRoundTripTime" -> roundTripTimeMs = maxOf(roundTripTimeMs, (number * 1_000.0).toLong())
                         }
                     }
                 }
+                val lossDenominator = packetsSent + packetsLost
+                val lossPercent = if (lossDenominator > 0L) packetsLost * 100.0 / lossDenominator else 0.0
+                onNetworkMetrics?.invoke((availableOutgoingBps / 1_000L).toInt(), lossPercent, roundTripTimeMs)
                 if (sent > 0L || received > 0L) {
                     lastSentBytes = maxOf(lastSentBytes, sent)
                     lastReceivedBytes = maxOf(lastReceivedBytes, received)
