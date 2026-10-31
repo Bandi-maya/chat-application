@@ -1192,7 +1192,7 @@ fun ChatDetailScreen(
         ) {
             com.example.chat.ui.chats.detail.AttachmentGallerySheet(
                 theme = theme,
-                heightFraction = if (attachmentSheetState.targetValue == androidx.compose.material3.SheetValue.Expanded) 0.92f else 0.5f,
+                heightFraction = 0.92f,
                 secondReference = entryStyle == com.example.chat.ui.chats.detail.SECOND_REFERENCE_ENTRY_STYLE,
                 onVoiceNote = { if (galleryLease?.isValid == true) { dismissGallery(); onVoiceTap() } },
                 onCamera = { if (galleryLease?.isValid == true) { dismissGallery(); onCameraTap() } },
