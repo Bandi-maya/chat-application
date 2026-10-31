@@ -38,7 +38,9 @@ internal fun MediaReviewScreen(items: List<MediaReviewItem>, onCancel: () -> Uni
         })
         return
     }
-    Column(Modifier.fillMaxSize().background(Color.Black).safeDrawingPadding().imePadding()) {
+    Column(Modifier.fillMaxSize().background(Color.Black)
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+        .imePadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onCancel) { Text("Cancel") }
             Text("Review attachment", color = Color.White, modifier = Modifier.weight(1f))

@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.chat.core.theme.ThemeConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -54,7 +55,8 @@ internal suspend fun readAttachmentGallery(context: Context): List<AttachmentGal
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAction) -> Unit,
-    onCamera: () -> Unit, onReviewImages: ((List<Uri>) -> Unit)?, maxSelection: Int = 30,
+    onCamera: () -> Unit, onReviewImages: ((List<Uri>) -> Unit)?,
+    onDirectSendImages: ((List<Uri>) -> Unit)? = null, maxSelection: Int = 30,
     secondReference: Boolean = false, onVoiceNote: () -> Unit = {},
     // Host-driven: opens half screen; the sheet grows when the user pulls up.
     heightFraction: Float = 0.5f,
@@ -91,7 +93,10 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Gallery", color = foreground, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
             TextButton(onClick = { onAction(AttachmentAction.image) }) { Text("Browse") }
-            if (selected.isNotEmpty() && onReviewImages != null) Button(onClick = { onReviewImages(selected.toList()) }) { Text("Review (${selected.size})") }
+            if (selected.isNotEmpty()) {
+                if (onReviewImages != null) OutlinedButton(onClick = { onReviewImages(selected.toList()) }) { Text("Review") }
+                if (onDirectSendImages != null) Button(onClick = { onDirectSendImages(selected.toList()) }) { Text("Send (${selected.size})") }
+            }
         }
         if (!canRead && fixtureItems == null) {
             Text("Choose photos with Browse, or allow gallery access to see recent photos here.", color = foreground,
@@ -130,6 +135,9 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
             }
             items(images, key = { it.uri.toString() }) { item ->
                 val index = selected.indexOf(item.uri)
+                val thumbnailRequest = remember(item.uri) {
+                    ImageRequest.Builder(context).data(item.uri).size(256, 256).crossfade(false).build()
+                }
                 val choose: () -> Unit = {
                     selected = if (index >= 0) selected - item.uri else if (selected.size < maxSelection.coerceIn(1, 100)) selected + item.uri else selected
                 }
@@ -138,7 +146,7 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
                         contentDescription = "Photo ${item.name}"; this.selected = index >= 0
                         stateDescription = if (index >= 0) "Selected ${index + 1}" else "Not selected"
                     }) {
-                    AsyncImage(item.uri, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    AsyncImage(thumbnailRequest, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     Surface(Modifier.align(Alignment.TopEnd).padding(6.dp).size(28.dp), shape = CircleShape,
                         color = if (index >= 0) accent else Color.Black.copy(alpha = 0.45f), border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)) {
                         Box(contentAlignment = Alignment.Center) { Text(if (index >= 0) "${index + 1}" else "", color = if (index >= 0) Color(theme.onAccentColor) else Color.White) }

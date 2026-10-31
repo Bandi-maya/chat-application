@@ -29,7 +29,7 @@ jobs:
             exit 0
           fi
           B="${{ github.event.before }}"
-          if [ -z "$B" ] || [ "$B" = "0000000000000000000000000000000000000000" ]; then B="HEAD~1"; fi
+          if [ -z "$B" ] || [ "$B" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$B^{commit}" 2>/dev/null; then B="HEAD~1"; fi
           CH=$(git diff --name-only "$B" HEAD)
           printf 'GATE-CHANGED\n%s\n' "$CH"
           if printf '%s\n' "$CH" | grep -qx 'ci/kotlin-build-trigger.txt'; then echo "build=true" >> "$GITHUB_OUTPUT"; else echo "build=false" >> "$GITHUB_OUTPUT"; fi
@@ -108,7 +108,7 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 74:
+          if applied != 76:
               raise SystemExit(f"Expected 74 override files, applied {applied}")
           PYOVERRIDES
       - uses: actions/setup-java@v4

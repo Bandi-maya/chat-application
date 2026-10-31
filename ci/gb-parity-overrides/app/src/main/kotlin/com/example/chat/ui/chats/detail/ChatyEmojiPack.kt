@@ -242,6 +242,9 @@ internal fun StaticAssetEmoji(
         if (b == null) onUnavailable() else bitmap = b
     }
     val b = bitmap ?: return
+    DisposableEffect(b) {
+        onDispose { if (!b.isRecycled) b.recycle() }
+    }
     AndroidView(
         modifier = Modifier.size(size.dp),
         factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.FIT_CENTER } },

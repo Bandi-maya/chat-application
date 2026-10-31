@@ -502,6 +502,8 @@ fun UniversalChatyIconsScreen(
     // all ten themes.
     detailIcon?.let { iconId ->
         val scheme = MaterialTheme.colorScheme
+        val selectedVariant = preferences.universal.iconVariants[iconId.name]
+            ?.let(ChatyIconThemeId::fromString) ?: activeTheme
         ModalBottomSheet(tonalElevation = 0.dp,
             onDismissRequest = { detailIcon = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -551,20 +553,29 @@ fun UniversalChatyIconsScreen(
                     verticalSpacing = 12.dp,
                     cellAspectRatio = 0.85f,
                 ) { theme ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val isApplied = selectedVariant == theme
+                    Column(
+                        modifier = Modifier.clickable {
+                            val updated = preferences.universal.iconVariants + (iconId.name to theme.name)
+                            preferences.updateUniversal(preferences.universal.copy(iconVariants = updated))
+                            onMessage("${UniversalIconsLogic.iconDisplayName(iconId)} uses ${theme.title}")
+                        },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         Box(
                             Modifier.size(48.dp)
                                 .background(scheme.surfaceContainerHighest.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
-                                .border(1.dp, White12, RoundedCornerShape(12.dp)),
+                                .border(if (isApplied) 2.dp else 1.dp, if (isApplied) scheme.primary else White12, RoundedCornerShape(12.dp)),
                             contentAlignment = Alignment.Center,
                         ) {
                             ChatyIcon(iconId, size = 24.dp, color = scheme.primary, themeOverride = theme)
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            theme.title,
+                            if (isApplied) "${theme.title} ✓" else theme.title,
+                            color = if (isApplied) scheme.primary else scheme.onSurfaceVariant,
                             fontSize = 9.5.sp,
-                            fontWeight = FontWeight.W500,
+                            fontWeight = if (isApplied) FontWeight.W700 else FontWeight.W500,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Center,

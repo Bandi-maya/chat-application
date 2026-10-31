@@ -53,6 +53,7 @@ class ChatAttachmentsBindings(
     val openCaptureSession: ((onCancel: () -> Unit) -> AttachFlow?) = { null },
     val closeCaptureSession: (AttachFlow) -> Unit = {},
     val onPickedImages: (GalleryLease, List<Uri>) -> Unit = { _, _ -> },
+    val onDirectSendImages: (GalleryLease, List<Uri>) -> Unit = { _, _ -> },
     /** Bumped on the main dispatcher (never under the transition lock) after every transition; sheet closes and drops selection. */
     val scopeEpoch: Int = 0,
 )
@@ -351,6 +352,35 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             finally { registry.end(flow) }
         }
     }
+    val onDirectSendImages: (GalleryLease, List<Uri>) -> Unit = { lease, uris ->
+        scope.launch {
+            val flow = registry.begin(lease.scope, lease) { api.authSnapshot() }
+            if (flow == null) {
+                toast(if (lease.isValid) "Another attachment is in progress." else "Account changed. Open the gallery again.")
+                return@launch
+            }
+            try {
+                if (api.authSnapshot() !== lease.scope) {
+                    flow.cancelled.set(true)
+                    toast("Account changed. Open the gallery again.")
+                    return@launch
+                }
+                val limit = ServiceLocator.preferencesController.gbDouble("Img_share_limit", 30.0).toInt().coerceIn(1, 100)
+                if (uris.isEmpty()) return@launch
+                check(uris.size <= limit) { "Your configured send limit is $limit." }
+                val files = uris.map { uri -> read(uri, "image") }
+                if (flow.isCancelled) return@launch
+                withContext(AttachFlowElement(flow)) {
+                    controller.sendReviewedMedia(files, "image", "", false)
+                }
+                afterSend()
+            } catch (e: Exception) {
+                toast(e.message ?: "Unable to send selected images")
+            } finally {
+                registry.end(flow)
+            }
+        }
+    }
     mediaReview?.let { (items, deferred) ->
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { mediaReview = null; deferred.complete(null) },
@@ -392,5 +422,5 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             onClose = { readerDoc = null },
         )
     }
-    return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller, openGallery, closeGallery, openCaptureSession, closeCaptureSession, onPickedImages, scopeEpoch)
+    return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller, openGallery, closeGallery, openCaptureSession, closeCaptureSession, onPickedImages, onDirectSendImages, scopeEpoch)
 }

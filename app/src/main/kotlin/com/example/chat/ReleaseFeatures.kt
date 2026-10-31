@@ -21,8 +21,9 @@ object ReleaseFeatures {
     /** Polls in chats. Needs poll create/vote endpoints. */
     const val POLLS = false
 
-    /** Message reactions (double tap, reaction rail, reaction picker). Needs a reactions API. */
-    const val MESSAGE_REACTIONS = false
+    /** Message reactions are enabled with local-first encrypted persistence; remote sync is best-effort
+     *  and becomes cross-device only when the deployed backend exposes toggle_message_reaction. */
+    const val MESSAGE_REACTIONS = true
 
     /** Call history list in the Calls tab. Calls work; history needs a call-log API. */
     const val CALL_HISTORY = false

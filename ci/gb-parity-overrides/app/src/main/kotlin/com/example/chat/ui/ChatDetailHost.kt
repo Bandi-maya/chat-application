@@ -508,6 +508,7 @@ fun ChatDetailHost(
         openGallery = attachments.openGallery,
         closeGallery = attachments.closeGallery,
         onPickedImages = attachments.onPickedImages,
+        onDirectSendImages = attachments.onDirectSendImages,
         attachmentScopeEpoch = attachments.scopeEpoch,
         onGalleryTap = { attachments.onMedia("image") },
         onAudioTap = { attachments.onMedia("audio") },

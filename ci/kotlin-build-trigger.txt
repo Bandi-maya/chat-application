@@ -1,2 +1,5 @@
 137 - Compose annotation repair: compile ongoing-call bundle after correcting AzureRingVerticalOngoingCall and ControlIconButton annotations
 Instrumentation test compile fixes: call picker, call notification, emoji diagnostics.
+Single-commit implementation: gallery direct-send, local reactions, per-icon variants, cache and inset fixes.
+Run CI after single-commit tree correction.
+CI gate handles rewritten commit parents; rerun implementation verification.
