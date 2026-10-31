@@ -52,6 +52,7 @@ class TransferMonitor(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences("chaty_transfer_usage_v1", Context.MODE_PRIVATE)
     private val lock = Any()
     private val active = LinkedHashMap<String, TransferItem>()
+    private var lastTotalsPersistElapsedMs = 0L
     private val _items = MutableStateFlow<List<TransferItem>>(emptyList())
     val items: StateFlow<List<TransferItem>> = _items
     private val _totals = MutableStateFlow(readTotals())
@@ -99,6 +100,19 @@ class TransferMonitor(context: Context) {
             etaSeconds = if (remaining != null && rate > 0) remaining / rate else null,
             updatedAtElapsedMs = now,
         )
+        if (delta > 0L) {
+            val current = _totals.value
+            val next = when (old.direction) {
+                TransferDirection.upload -> current.copy(uploadedBytes = current.uploadedBytes + delta)
+                TransferDirection.download -> current.copy(downloadedBytes = current.downloadedBytes + delta)
+            }.addKind(old.kind, delta)
+            _totals.value = next
+            // Keep the UI live but avoid a SharedPreferences write for every small socket chunk.
+            if (now - lastTotalsPersistElapsedMs >= 1_000L) {
+                persistTotals(next)
+                lastTotalsPersistElapsedMs = now
+            }
+        }
         publish()
     }
 
@@ -111,15 +125,10 @@ class TransferMonitor(context: Context) {
     fun finish(id: String, status: TransferStatus = TransferStatus.completed) = synchronized(lock) {
         val old = active.remove(id) ?: return
         val actual = old.transferredBytes.coerceAtLeast(0L)
-        // Count bytes actually transferred even when a request fails or is cancelled:
-        // those bytes still consumed the user's mobile data allowance.
-        val t = _totals.value
-        val updated = when (old.direction) {
-            TransferDirection.upload -> t.copy(uploadedBytes = t.uploadedBytes + actual)
-            TransferDirection.download -> t.copy(downloadedBytes = t.downloadedBytes + actual)
-        }.addKind(old.kind, actual)
-        _totals.value = updated
-        persistTotals(updated)
+        // Progress callbacks have already accounted for the actual bytes, including
+        // interrupted transfers. Persist the final in-memory totals on completion/exit.
+        persistTotals(_totals.value)
+        lastTotalsPersistElapsedMs = SystemClock.elapsedRealtime()
         // Keep terminal rows briefly in the observable list so the UI can show completion.
         completedRows.add(0, old.copy(
             transferredBytes = if (status == TransferStatus.completed) old.totalBytes ?: actual else actual,
