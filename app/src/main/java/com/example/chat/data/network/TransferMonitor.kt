@@ -111,15 +111,15 @@ class TransferMonitor(context: Context) {
     fun finish(id: String, status: TransferStatus = TransferStatus.completed) = synchronized(lock) {
         val old = active.remove(id) ?: return
         val actual = old.transferredBytes.coerceAtLeast(0L)
-        if (status == TransferStatus.completed) {
-            val t = _totals.value
-            val updated = when (old.direction) {
-                TransferDirection.upload -> t.copy(uploadedBytes = t.uploadedBytes + actual)
-                TransferDirection.download -> t.copy(downloadedBytes = t.downloadedBytes + actual)
-            }.addKind(old.kind, actual)
-            _totals.value = updated
-            persistTotals(updated)
-        }
+        // Count bytes actually transferred even when a request fails or is cancelled:
+        // those bytes still consumed the user's mobile data allowance.
+        val t = _totals.value
+        val updated = when (old.direction) {
+            TransferDirection.upload -> t.copy(uploadedBytes = t.uploadedBytes + actual)
+            TransferDirection.download -> t.copy(downloadedBytes = t.downloadedBytes + actual)
+        }.addKind(old.kind, actual)
+        _totals.value = updated
+        persistTotals(updated)
         // Keep terminal rows briefly in the observable list so the UI can show completion.
         completedRows.add(0, old.copy(
             transferredBytes = if (status == TransferStatus.completed) old.totalBytes ?: actual else actual,
