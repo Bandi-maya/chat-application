@@ -20,6 +20,26 @@ import org.junit.runner.RunWith
 class VoiceComposerGestureProofTest {
     private val ins = InstrumentationRegistry.getInstrumentation()
     private val device = UiDevice.getInstance(ins)
+
+    // TalkBack-path activation through the accessibility tree itself. UiObject2
+    // has no performAction (verified against the current API reference; the
+    // 798a91bd commit message's "uiautomator 2.3.0 performAction" was unverified
+    // and broke compileDebugAndroidTestKotlin in run 129). UiAutomation delivers
+    // the published ACTION_CLICK exactly as an accessibility service would.
+    private fun a11yActivateByDesc(descPrefix: String): Boolean {
+        val root = ins.uiAutomation.rootInActiveWindow ?: return false
+        fun find(n: android.view.accessibility.AccessibilityNodeInfo?): android.view.accessibility.AccessibilityNodeInfo? {
+            if (n == null) return null
+            val d = n.contentDescription
+            if (d != null && d.toString().startsWith(descPrefix) && n.isVisibleToUser &&
+                n.actionList.any { it.id == android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK.id }
+            ) return n
+            for (i in 0 until n.childCount) { val r = find(n.getChild(i)); if (r != null) return r }
+            return null
+        }
+        val node = find(root) ?: return false
+        return node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+    }
     private fun status(text: String) = assertTrue("Missing state: $text", device.wait(Until.hasObject(By.textContains(text)), 5000))
     private fun pointer(action: Int, x: Float, y: Float, down: Long) {
         val e = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)
@@ -93,12 +113,11 @@ class VoiceComposerGestureProofTest {
             // hold/record is gesture-only, so uploads/sends/deletes stay 0.
             val mic = device.wait(Until.findObject(By.descStartsWith("Microphone mode.")), 10000)
                 ?: throw AssertionError("mic node missing")
-            assertTrue("mic node must publish ACTION_CLICK",
-                mic.performAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK))
+            assertTrue("mic node must publish ACTION_CLICK", a11yActivateByDesc("Microphone mode."))
             assertTrue(device.wait(Until.hasObject(By.descStartsWith("Video mode.")), 12000))
             status("recording=false;locked=false;busy=false;uploads=0;sends=0;deletes=0")
             val vid = device.findObject(By.descStartsWith("Video mode."))
-            assertTrue(vid.performAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK))
+            assertTrue("video node must publish ACTION_CLICK", a11yActivateByDesc("Video mode."))
             assertTrue(device.wait(Until.hasObject(By.descStartsWith("Microphone mode.")), 12000))
             status("recording=false;locked=false;busy=false;uploads=0;sends=0;deletes=0")
             capture("a11y-toggle-$style2")
