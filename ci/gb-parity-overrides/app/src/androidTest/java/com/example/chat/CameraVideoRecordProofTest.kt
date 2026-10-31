@@ -18,6 +18,7 @@ import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
+import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
@@ -128,7 +129,9 @@ class CameraVideoRecordProofTest {
             }
         }
         val recorder = Recorder.Builder()
-            .setQualitySelector(QualitySelector.from(Quality.SD))
+            .setQualitySelector(
+                QualitySelector.from(Quality.FHD, FallbackStrategy.lowerQualityOrHigherThan(Quality.FHD)),
+            )
             .build()
         val videoCapture = VideoCapture.withOutput(recorder)
         val group = UseCaseGroup.Builder()
