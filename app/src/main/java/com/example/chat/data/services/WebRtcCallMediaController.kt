@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.media.projection.MediaProjection
+import android.os.Handler
+import android.os.Looper
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
 import org.webrtc.Camera2Enumerator
@@ -92,6 +94,17 @@ class WebRtcCallMediaController(
     override var onConnectionState: ((CallTransportState) -> Unit)? = null
     override var onIceFailed: (() -> Unit)? = null
 
+    /** Cumulative WebRTC RTP bytes since this peer connected. */
+    var onTrafficBytes: ((uploadedBytes: Long, downloadedBytes: Long) -> Unit)? = null
+    var onTrafficEnded: (() -> Unit)? = null
+    private val statsHandler = Handler(Looper.getMainLooper())
+    private var statsStarted = false
+    private var lastSentBytes = 0L
+    private var lastReceivedBytes = 0L
+    private val statsPoll = object : Runnable {
+        override fun run() { pollTrafficStats() }
+    }
+
     val localVideoTrackForRender: VideoTrack? get() = localVideoTrack
     val remoteVideoTrackForRender: VideoTrack? get() =
         remoteStream?.videoTracks?.firstOrNull()
@@ -150,15 +163,16 @@ class WebRtcCallMediaController(
             }
 
             override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
-                onConnectionState?.invoke(
-                    when (newState) {
-                        PeerConnection.PeerConnectionState.CONNECTED -> CallTransportState.connected
-                        PeerConnection.PeerConnectionState.DISCONNECTED -> CallTransportState.disconnected
-                        PeerConnection.PeerConnectionState.FAILED -> CallTransportState.failed
-                        PeerConnection.PeerConnectionState.CLOSED -> CallTransportState.closed
-                        else -> CallTransportState.other
-                    },
-                )
+                val mapped = when (newState) {
+                    PeerConnection.PeerConnectionState.CONNECTED -> CallTransportState.connected
+                    PeerConnection.PeerConnectionState.DISCONNECTED -> CallTransportState.disconnected
+                    PeerConnection.PeerConnectionState.FAILED -> CallTransportState.failed
+                    PeerConnection.PeerConnectionState.CLOSED -> CallTransportState.closed
+                    else -> CallTransportState.other
+                }
+                onConnectionState?.invoke(mapped)
+                if (mapped == CallTransportState.connected) startTrafficStats()
+                else if (mapped == CallTransportState.closed || mapped == CallTransportState.failed) stopTrafficStats()
             }
 
             override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
@@ -241,6 +255,49 @@ class WebRtcCallMediaController(
             return enumerator.createCapturer(deviceName, null)
         }
         return null
+    }
+
+    private fun startTrafficStats() {
+        if (statsStarted) return
+        statsStarted = true
+        lastSentBytes = 0L
+        lastReceivedBytes = 0L
+        pollTrafficStats()
+    }
+
+    private fun pollTrafficStats() {
+        val peer = peerConnection ?: return
+        if (!statsStarted) return
+        peer.getStats(object : org.webrtc.StatsObserver {
+            override fun onComplete(reports: Array<org.webrtc.StatsReport>) {
+                var sent = 0L
+                var received = 0L
+                reports.forEach { report ->
+                    val type = report.type.lowercase()
+                    if (type == "ssrc" || type == "outbound-rtp" || type == "inbound-rtp") {
+                        report.values.forEach { value ->
+                            when (value.name) {
+                                "bytesSent" -> sent += value.value.toLongOrNull() ?: 0L
+                                "bytesReceived" -> received += value.value.toLongOrNull() ?: 0L
+                            }
+                        }
+                    }
+                }
+                if (sent > 0L || received > 0L) {
+                    lastSentBytes = maxOf(lastSentBytes, sent)
+                    lastReceivedBytes = maxOf(lastReceivedBytes, received)
+                    onTrafficBytes?.invoke(lastSentBytes, lastReceivedBytes)
+                }
+                if (statsStarted) statsHandler.postDelayed(statsPoll, 1_000L)
+            }
+        }, null)
+    }
+
+    private fun stopTrafficStats() {
+        if (!statsStarted) return
+        statsStarted = false
+        statsHandler.removeCallbacks(statsPoll)
+        onTrafficEnded?.invoke()
     }
 
     /** Applies a live uplink-aware profile while keeping the audio sender untouched. */
@@ -423,6 +480,7 @@ class WebRtcCallMediaController(
     }
 
     private fun disposeInternal() {
+        stopTrafficStats()
         android.util.Log.w("CALLEND-DIAG", "media disposeInternal enter thread=" + Thread.currentThread().name + " inst=" + Integer.toHexString(System.identityHashCode(this)))
         hasLocalMedia = false
         hasRemoteMedia = false
