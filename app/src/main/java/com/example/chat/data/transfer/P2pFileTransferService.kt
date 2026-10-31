@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -134,6 +136,8 @@ class P2pFileTransferService(
         var signalingReady: Boolean = false,
         val queuedCandidates: MutableList<IceCandidate> = mutableListOf(),
         val pendingLocalCandidates: MutableList<IceCandidate> = mutableListOf(),
+        val receiveMutex: Mutex = Mutex(),
+        val sendMutex: Mutex = Mutex(),
     )
 
     private val appContext = context.applicationContext
@@ -521,6 +525,8 @@ class P2pFileTransferService(
     }
 
     private suspend fun sendRequested(session: Session, array: JSONArray?) {
+        session.sendMutex.lock()
+        try {
         val file = session.file
         val sourceChannel = session.sourceChannel
         if (file == null && sourceChannel == null) return
@@ -553,31 +559,37 @@ class P2pFileTransferService(
             session.monitorId?.let { transferMonitor.update(it, session.sentBytes, session.manifest.sizeBytes) }
             publish(session, "Sending")
         }
+        } finally {
+            session.sendMutex.unlock()
+        }
     }
 
-    private suspend fun receiveChunk(session: Session, bytes: ByteArray) {
-        if (bytes.size < 8 + 16) return
+    private suspend fun receiveChunk(session: Session, bytes: ByteArray) = session.receiveMutex.withLock {
+        if (bytes.size < 8 + 16) return@withLock
         try {
             val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
             val index = buffer.long
             if (index !in 0 until session.manifest.chunkCount) throw SecurityException("Invalid chunk index")
             val encrypted = ByteArray(buffer.remaining()).also(buffer::get)
             val ledger = session.ledger ?: throw IllegalStateException("Resume ledger missing")
-            if (!ledger.hasReceived(index)) {
-                val part = session.destination ?: throw IllegalStateException("Destination missing")
-                NativeP2pTransferProtocol.writeChunk(
-                    part, session.manifest, session.secret,
-                    NativeP2pTransferProtocol.EncryptedChunk(index, encrypted),
-                )
-                session.chunksSinceSync++
-                val willComplete = ledger.receivedCount() + 1L >= session.manifest.chunkCount
-                if (session.chunksSinceSync >= 16 || willComplete) {
-                    withContext(Dispatchers.IO) { NativeP2pTransferProtocol.syncFile(part) }
-                    session.chunksSinceSync = 0
+            val count = withContext(Dispatchers.IO) {
+                if (!ledger.hasReceived(index)) {
+                    val part = session.destination ?: throw IllegalStateException("Destination missing")
+                    NativeP2pTransferProtocol.writeChunk(
+                        part, session.manifest, session.secret,
+                        NativeP2pTransferProtocol.EncryptedChunk(index, encrypted),
+                    )
+                    session.chunksSinceSync++
+                    val willComplete = ledger.receivedCount() + 1L >= session.manifest.chunkCount
+                    if (session.chunksSinceSync >= 16 || willComplete) {
+                        NativeP2pTransferProtocol.syncFile(part)
+                        session.chunksSinceSync = 0
+                    }
+                    ledger.markReceived(index)
                 }
-                ledger.markReceived(index)
+                ledger.receivedCount()
             }
-            session.receivedBytes = ledger.receivedCount() * session.manifest.chunkBytes
+            session.receivedBytes = count * session.manifest.chunkBytes
             session.receivedBytes = minOf(session.receivedBytes, session.manifest.sizeBytes)
             session.monitorId?.let { transferMonitor.update(it, session.receivedBytes, session.manifest.sizeBytes) }
             publish(session, "Receiving")
@@ -591,7 +603,7 @@ class P2pFileTransferService(
         session.receiverFinalized = true
         val part = session.destination ?: return
         val target = session.finalDestination ?: return
-        if (!NativeP2pTransferProtocol.verifyCompletedFile(part, session.manifest)) {
+        if (!withContext(Dispatchers.IO) { NativeP2pTransferProtocol.verifyCompletedFile(part, session.manifest) }) {
             fail(session, "File integrity check failed; received file was discarded")
             part.delete()
             return
