@@ -679,6 +679,15 @@ object ServiceLocator {
             imageCompressor = { bytes, quality ->
                 com.example.chat.ui.media.ImageSendCompressor.compress(bytes, quality)
             },
+            adaptiveImageQuality = {
+                when (val up = networkMonitor.state.value.upstreamKbps) {
+                    in 1..80 -> 45
+                    in 81..250 -> 60
+                    in 251..700 -> 78
+                    in 701..Int.MAX_VALUE -> 85
+                    else -> 65
+                }
+            },
             apiAuthenticated = { apiBackend.isAuthenticated },
             apiUpload = { bytes, filename, onProgress ->
                 apiBackend.uploadMedia(
