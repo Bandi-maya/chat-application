@@ -48,7 +48,7 @@ class P2pFileTransferService(
     private val currentUserId: () -> String?,
     private val sendSignal: (targetUserId: String, data: Map<String, Any?>) -> Boolean,
     private val transferMonitor: TransferMonitor,
-    private val iceServers: () -> List<PeerConnection.IceServer> = { defaultIceServers() },
+    private val iceServers: suspend () -> List<PeerConnection.IceServer> = { defaultIceServers() },
 ) {
     data class PendingOffer(
         val transferId: String,
@@ -341,8 +341,8 @@ class P2pFileTransferService(
         fail(session, "Cancelled")
     }
 
-    private fun createPeer(session: Session): PeerConnection {
-        val config = PeerConnection.RTCConfiguration(iceServers()).apply {
+    private suspend fun createPeer(session: Session): PeerConnection {
+        val config = PeerConnection.RTCConfiguration(iceServers().ifEmpty { defaultIceServers() }).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             iceTransportsType = PeerConnection.IceTransportsType.ALL
             bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
@@ -613,6 +613,25 @@ class P2pFileTransferService(
         private const val MAX_BUFFERED_BYTES = 2L * 1024L * 1024L
         private fun b64(bytes: ByteArray) = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         private fun unb64(value: String) = Base64.decode(value, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        fun parseIceServers(raw: List<Map<String, Any?>>): List<PeerConnection.IceServer> {
+            return raw.mapNotNull { entry ->
+                val urls = when (val value = entry["urls"]) {
+                    is String -> listOf(value)
+                    is List<*> -> value.mapNotNull { it?.toString() }
+                    else -> emptyList()
+                }
+                if (urls.isEmpty()) return@mapNotNull null
+                val builder = PeerConnection.IceServer.builder(urls)
+                val username = entry["username"]?.toString()
+                val credential = entry["credential"]?.toString()
+                if (!username.isNullOrBlank() && credential != null) {
+                    builder.setUsername(username)
+                    builder.setPassword(credential)
+                }
+                builder.createIceServer()
+            }
+        }
+
         fun defaultIceServers(): List<PeerConnection.IceServer> = listOf(
             PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
             PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
