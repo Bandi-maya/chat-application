@@ -58,6 +58,7 @@ object ServiceLocator {
      *  Called once from ChatyApplication.onCreate. */
     fun init(context: Context) {
         appContext = context.applicationContext
+        appTrafficMonitor.start(appScope)
         com.example.chat.core.theme.ThemePresets.platformIsLightProvider = {
             (requireContext().resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) != android.content.res.Configuration.UI_MODE_NIGHT_YES
         }
@@ -130,6 +131,11 @@ object ServiceLocator {
     /** Persistent byte-accurate upload/download totals and live transfer snapshots. */
     val transferMonitor: com.example.chat.data.network.TransferMonitor by lazy {
         com.example.chat.data.network.TransferMonitor(requireContext())
+    }
+
+    /** Android per-UID byte counters include realtime sockets and protocol overhead. */
+    val appTrafficMonitor: com.example.chat.data.network.AppTrafficMonitor by lazy {
+        com.example.chat.data.network.AppTrafficMonitor(requireContext())
     }
 
     /** Runs once, from the apiBackend lazy initializer, so there is exactly one collector. Reconnects the
