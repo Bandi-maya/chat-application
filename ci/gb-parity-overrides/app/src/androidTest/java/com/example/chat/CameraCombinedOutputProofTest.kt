@@ -365,7 +365,21 @@ class CameraCombinedOutputProofTest {
                 // STRAIGHT color c = p/a. The old formula's extra *a (p*a =
                 // c*a^2) was also wrong for the same reason.
                 //   single: tinted*(1-a) + c*a    double: tinted*(1-a2) + c*a2
-                data class Chan(val ch: Char, val straight: Float, val tintedC: Float, val obsC: Float)
+                // Doubling model (run-128 root cause + empirical grounding): the
+                // artwork is a thin ring, so EVERY translucent texel is an
+                // antialiased edge and the old flatness gate matched zero texels.
+                // Convention MEASURED on the actual device path, not assumed
+                // (main 14:39): run-128's decoded cc-video.png vs cc-overlay.png
+                // at the 84 translucent texels fits tinted*(1-a)+p*a (texture
+                // PREMULTIPLIED) with max error 0.7, while the straight-alpha
+                // hypothesis misses by mean 54/max 64 - GLUtils.texImage2D does
+                // NOT un-premultiply on this path, and Bitmap.getPixel returns
+                // premultiplied channels. No vertical flip (flip hypotheses err
+                // >73). Opaque-texel codec noise is <=1.
+                //   single: tinted*(1-a) + p*a      double: tinted*(1-a2) + p*a2
+                //   a2 = 1-(1-a)^2  (two source-over applications of the same
+                //   texture sample: r2 = r1*(1-a) + p*a)
+                data class Chan(val ch: Char, val premult: Float, val tintedC: Float, val obsC: Float)
                 fun doublingSample(obs: (Int, Int) -> Int, perTexelAssert: Boolean): Pair<Int, Int> {
                     var checked = 0; var violations = 0
                     for (by in 0 until H step 2) {
@@ -375,15 +389,15 @@ class CameraCombinedOutputProofTest {
                             val oa = Color.alpha(ov)
                             if (oa !in 40..220) continue
                             val a = oa / 255f
-                            val a2 = a + a * (1f - a)
+                            val a2 = 1f - (1f - a) * (1f - a)
                             val vp = obs(bx, by)
-                            for ((ch, straight, tintedC, obsC) in listOf(
-                                Chan('r', Color.red(ov) / a, 0f, Color.red(vp).toFloat()),
-                                Chan('g', Color.green(ov) / a, 0f, Color.green(vp).toFloat()),
-                                Chan('b', Color.blue(ov) / a, 255f, Color.blue(vp).toFloat()),
+                            for ((ch, premult, tintedC, obsC) in listOf(
+                                Chan('r', Color.red(ov).toFloat(), 0f, Color.red(vp).toFloat()),
+                                Chan('g', Color.green(ov).toFloat(), 0f, Color.green(vp).toFloat()),
+                                Chan('b', Color.blue(ov).toFloat(), 255f, Color.blue(vp).toFloat()),
                             )) {
-                                val expSingle = tintedC * (1f - a) + straight * a
-                                val expDouble = tintedC * (1f - a2) + straight * a2
+                                val expSingle = tintedC * (1f - a) + premult * a
+                                val expDouble = tintedC * (1f - a2) + premult * a2
                                 val tol = Math.max(30f, Math.abs(expDouble - expSingle) * 0.5f)
                                 if (Math.abs(obsC - expSingle) > tol) {
                                     violations++
@@ -405,11 +419,11 @@ class CameraCombinedOutputProofTest {
                         val ov = ovBmp.getPixel(x, y)
                         val a = Color.alpha(ov) / 255f
                         if (a <= 0f) android.graphics.Color.rgb(0, 0, 255) else {
-                            val ae = if (double) a + a * (1f - a) else a
+                            val ae = if (double) 1f - (1f - a) * (1f - a) else a
                             android.graphics.Color.rgb(
-                                (Color.red(ov) / a * ae).toInt().coerceIn(0, 255),
-                                (Color.green(ov) / a * ae).toInt().coerceIn(0, 255),
-                                (255f * (1f - ae) + Color.blue(ov) / a * ae).toInt().coerceIn(0, 255),
+                                (Color.red(ov) * ae).toInt().coerceIn(0, 255),
+                                (Color.green(ov) * ae).toInt().coerceIn(0, 255),
+                                (255f * (1f - ae) + Color.blue(ov) * ae).toInt().coerceIn(0, 255),
                             )
                         }
                     }
