@@ -116,6 +116,7 @@ class P2pFileTransferService(
         val secret: ByteArray,
         val direction: TransferDirection,
         var sourceChannel: FileChannel? = null,
+        var sourceOwner: java.io.Closeable? = null,
         var peer: PeerConnection? = null,
         var channel: DataChannel? = null,
         var ledger: ChunkReceiptLedger? = null,
@@ -154,6 +155,7 @@ class P2pFileTransferService(
         targetUserId: String,
         file: File,
         mimeType: String,
+        sourceOwner: java.io.Closeable? = null,
         linkExpirySeconds: Long = 7L * 24L * 60L * 60L,
     ): String = withContext(Dispatchers.IO) {
         require(targetUserId.isNotBlank() && targetUserId != currentUserId()) { "Choose a valid recipient" }
@@ -215,7 +217,7 @@ class P2pFileTransferService(
         val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes,
             manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
         val session = Session(invite.transferId, targetUserId, null, manifest, invite.secret,
-            TransferDirection.upload, sourceChannel = source)
+            TransferDirection.upload, sourceChannel = source, sourceOwner = sourceOwner)
         sessions[invite.transferId] = session
         val kind = if (mimeType.startsWith("video/")) TransferKind.video else TransferKind.document
         session.monitorId = transferMonitor.begin(TransferDirection.upload, kind, manifest.sizeBytes, manifest.displayName)
@@ -521,7 +523,7 @@ class P2pFileTransferService(
         session.channel?.close()
         session.peer?.close()
         session.file?.let { runCatching { it.delete() } }
-        runCatching { session.sourceChannel?.close() }
+        runCatching { (session.sourceOwner ?: session.sourceChannel)?.close() }
     }
 
     fun disposeAll() {
@@ -585,7 +587,7 @@ class P2pFileTransferService(
         publish(session, "Failed", error = reason)
         session.channel?.close()
         session.peer?.close()
-        runCatching { session.sourceChannel?.close() }
+        runCatching { (session.sourceOwner ?: session.sourceChannel)?.close() }
         sessions.remove(session.id)
     }
 
