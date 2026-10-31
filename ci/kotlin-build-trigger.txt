@@ -1,13 +1,1 @@
-build 109: CameraEffect 5-arg LIBRARY_GROUP protected constructor (TRANSFORMATION_ARBITRARY)
-trigger-110: record-proof + non-restricted-ctor + fake-surface-output fix
-trigger-111: FGS end-call coalesced sync fix (CallForegroundService)
-trigger-112: crop requiredSize + crop capture-before-assert + nav dump evidence + FGS delivery diag logging
-trigger-113: FGS diag nullable fix rebuild (112 compile error e274322->fixed)
-trigger-114: reviewed batch - crop measured-bounds, sweep a11y fix, Portrait/Night hide-unsupported, video main-thread, guard 67, LENS/ZOOM-DIAG + combo diagtrigger-115: compile fix - ExperimentalComposeUiApi opt-in on crop dialog marker (override + branch copies)trigger-116: androidTest compile fixes - ExtensionMode.BOKEH typo, error() in elvis for nullable markertrigger-117: LENS-DIAG runCatching guard for JVM unit tests
-trigger-118: FGS stop-courier race fix (ACTION_STOP courier in CallForegroundService.stop)
-trigger-119: reviewed batch - calls shard isolation rename, video duplicate-bind fix, album tap evidence probes, grid-Microsoft.txt collection, FGS owner-scoped stop authority
-trigger-120: reviewed batch - FGS v2 caller-originated stop ownership + owner-scope regression coverage + 119 compile fix
-trigger-121: compile fix - StopDisposition enum to class level (120 unit-test compile failure) + main-thread TestLifecycleOwner harness repair
-trigger-122: reviewed batch - recorder quality selector mirrors production (b4c1e40), fresh-a11y passive refresh poll in AppRoot proof, locked-case desc stop selector override + guard 68
-trigger-123: CI isolation batch - media-emoji-perf shard split + qemu host diagnostics (run-smoke override) + ci-override allowlist
-trigger-124: combined reviewed batch - LensSheet/ModeStrip/AddedStyles fresh-poll DIAG telemetry + LocalVideoScope/ComposerFrontVideo section-scoped teardown proofs + zoom cancellation fix (12 commits, guard 72)
+125 - run-124 batch: VCR inset fix (Record-again under nav, pixel-proven), CFV HAL facing parse fix, CombinedOutput failure-frame dumps, album tap-diag loggers, emoji-perf backKb sample + artifact path fix, voice tap timed pixel/a11y series, guard 74 (74 total applied overrides / 2 files changed this batch)
