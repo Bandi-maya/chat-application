@@ -243,6 +243,32 @@ class WebRtcCallMediaController(
         return null
     }
 
+    /** Applies a live uplink-aware profile while keeping the audio sender untouched. */
+    override suspend fun applyNetworkProfile(profile: CallNetworkProfile) {
+        val capturer = videoCapturer
+        if (capturer != null) {
+            runCatching {
+                capturer.changeCaptureFormat(profile.width, profile.height, profile.frameRate)
+            }.onFailure {
+                android.util.Log.w("ChatyWebRTC", "Camera profile update deferred", it)
+            }
+        }
+        val peer = peerConnection ?: return
+        val sender = peer.senders.firstOrNull { it.track()?.kind() == "video" } ?: return
+        runCatching {
+            val parameters = sender.parameters
+            parameters.encodings.forEach { encoding ->
+                encoding.maxBitrateBps = profile.maxBitrateBps
+                encoding.maxFramerate = profile.frameRate
+            }
+            if (!sender.setParameters(parameters)) {
+                android.util.Log.w("ChatyWebRTC", "Video sender rejected adaptive bitrate profile")
+            }
+        }.onFailure {
+            android.util.Log.w("ChatyWebRTC", "Could not apply adaptive video bitrate", it)
+        }
+    }
+
     override suspend fun createOffer(isVideo: Boolean): String {
         val peer = peerConnection ?: throw IllegalStateException("No peer connection.")
         val constraints = MediaConstraints().apply {
