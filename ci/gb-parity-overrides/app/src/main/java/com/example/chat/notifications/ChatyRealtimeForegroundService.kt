@@ -13,7 +13,6 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.example.chat.MainActivity
-import com.example.chat.R
 import com.example.chat.ServiceLocator
 
 /**
@@ -73,7 +72,7 @@ class ChatyRealtimeForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle("Chaty is connected")
             .setContentText("Listening for messages and incoming calls")
             .setCategory(Notification.CATEGORY_SERVICE)
