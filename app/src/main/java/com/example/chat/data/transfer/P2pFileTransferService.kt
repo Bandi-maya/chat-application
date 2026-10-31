@@ -269,6 +269,11 @@ class P2pFileTransferService(
                 val activeReceiver = sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.download }
                 if (activeReceiver != null) {
                     val peer = activeReceiver.peer ?: return
+                    NativeP2pTransferProtocol.verifyManifest(
+                        activeReceiver.manifest,
+                        unb64(signal["manifest_auth"]?.toString() ?: ""),
+                        activeReceiver.secret,
+                    )
                     activeReceiver.remoteDescriptionSet = false
                     setRemoteDescription(peer, SessionDescription.Type.OFFER, signal["sdp"]?.toString() ?: return)
                     activeReceiver.remoteDescriptionSet = true
@@ -276,6 +281,7 @@ class P2pFileTransferService(
                     val answer = createDescription(peer, offer = false)
                     if (sendSignal(sender, mapOf("signal_type" to "file_transfer_answer", "call_id" to id, "transfer_id" to id, "sdp" to answer.description))) {
                         activeReceiver.signalingReady = true
+                        activeReceiver.restartAttempts = 0
                         flushLocalCandidates(activeReceiver)
                         publish(activeReceiver, "Reconnected — resuming")
                     }
@@ -292,6 +298,7 @@ class P2pFileTransferService(
                     session.remoteDescriptionSet = true
                 }
                 flushCandidates(session)
+                session.restartAttempts = 0
                 publish(session, "Connecting")
             }
             "file_transfer_ice" -> {
@@ -401,7 +408,10 @@ class P2pFileTransferService(
             }
             override fun onConnectionChange(state: PeerConnection.PeerConnectionState?) {
                 when (state) {
-                    PeerConnection.PeerConnectionState.CONNECTED -> publish(session, "Connected directly")
+                    PeerConnection.PeerConnectionState.CONNECTED -> {
+                        session.restartAttempts = 0
+                        publish(session, "Connected directly")
+                    }
                     PeerConnection.PeerConnectionState.DISCONNECTED -> {
                         publish(session, "Connection interrupted — retrying")
                         scope.launch {
