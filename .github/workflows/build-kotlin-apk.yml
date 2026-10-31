@@ -126,7 +126,7 @@ jobs:
             app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt \
             app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt \
             app/src/main/kotlin/com/example/chat/ui/AppRoot.kt \
-            app/src/main/kotlin/com/example/chat/domain/models/ChatMessage.kt \
+            app/src/main/java/com/example/chat/domain/models/ChatMessage.kt \
             app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt \
