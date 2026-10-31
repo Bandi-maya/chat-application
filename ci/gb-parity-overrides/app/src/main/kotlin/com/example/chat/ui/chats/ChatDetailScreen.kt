@@ -1183,7 +1183,7 @@ fun ChatDetailScreen(
 
     if (attachmentSheetOpen && galleryLease?.isValid == true) {
         // Opens half screen by default; pulling up grows it toward full height.
-        val attachmentSheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        val attachmentSheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             sheetState = attachmentSheetState,
             tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
