@@ -580,6 +580,31 @@ object ServiceLocator {
             }
         }
     }
+    /** Native direct file transfer over a dedicated WebRTC DataChannel. */
+    val p2pFileTransfers: com.example.chat.data.transfer.P2pFileTransferService by lazy {
+        com.example.chat.data.transfer.P2pFileTransferService(
+            context = requireContext(),
+            scope = appScope,
+            currentUserId = { apiBackend.currentUser?.id },
+            sendSignal = { targetUserId, data -> apiBackend.sendCallSignal(targetUserId, data) },
+            transferMonitor = transferMonitor,
+        ).also { service ->
+            apiBackend.addScopedCallSignalListener { expected, data ->
+                if (data["signal_type"]?.toString()?.startsWith("file_transfer_") == true) {
+                    appScope.launch {
+                        if (apiBackend.authSnapshot() === expected) {
+                            runCatching { service.handleRemoteSignal(data) }
+                                .onFailure { android.util.Log.w("ChatyP2P", "Transfer signal rejected", it) }
+                        }
+                    }
+                }
+            }
+            apiBackend.addAuthScopeListener {
+                service.disposeAll()
+            }
+        }
+    }
+
     val callPresentationController: com.example.chat.ui.calls.CallPresentationController by lazy {
         com.example.chat.ui.calls.CallPresentationController(callSignaling, callPresentationPrefs)
             .also { it.start() }
