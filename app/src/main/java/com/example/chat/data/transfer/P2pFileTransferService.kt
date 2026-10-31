@@ -118,6 +118,7 @@ class P2pFileTransferService(
     private data class Session(
         val id: String,
         val peerUserId: String,
+        val localUserId: String,
         val file: File?,
         val manifest: NativeP2pTransferProtocol.Manifest,
         val secret: ByteArray,
@@ -169,14 +170,15 @@ class P2pFileTransferService(
         mimeType: String,
         linkExpirySeconds: Long = 7L * 24L * 60L * 60L,
     ): String = withContext(Dispatchers.IO) {
-        require(targetUserId.isNotBlank() && targetUserId != currentUserId()) { "Choose a valid recipient" }
+        val localUserId = currentUserId() ?: throw SecurityException("Sign in before sending a file.")
+        require(targetUserId.isNotBlank() && targetUserId != localUserId) { "Choose a valid recipient" }
         val invite = NativeP2pTransferProtocol.createInvite()
         val manifest = NativeP2pTransferProtocol.createManifest(
             invite, file, mimeType, System.currentTimeMillis() / 1000L + linkExpirySeconds,
         )
         val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
         val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes, manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
-        val session = Session(invite.transferId, targetUserId, file, manifest, invite.secret.copyOf(),
+        val session = Session(invite.transferId, targetUserId, localUserId, file, manifest, invite.secret.copyOf(),
             TransferDirection.upload)
         sessions[invite.transferId] = session
         val monitorId = transferMonitor.begin(
@@ -192,7 +194,7 @@ class P2pFileTransferService(
             session.channel = channel
             observeChannel(session, channel, isSender = true)
             val offer = createDescription(peer, offer = true)
-            if (!sendSignal(targetUserId, mapOf(
+            if (!sendSignalScoped(session, mapOf(
                 "signal_type" to "file_transfer_offer",
                 "call_id" to invite.transferId,
                 "transfer_id" to invite.transferId,
@@ -229,7 +231,7 @@ class P2pFileTransferService(
         val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
         val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes,
             manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
-        val session = Session(invite.transferId, targetUserId, null, manifest, invite.secret.copyOf(),
+        val session = Session(invite.transferId, targetUserId, localUserId, null, manifest, invite.secret.copyOf(),
             TransferDirection.upload, sourceChannel = source, sourceOwner = sourceOwner)
         sessions[invite.transferId] = session
         val kind = if (mimeType.startsWith("video/")) TransferKind.video else TransferKind.document
@@ -301,7 +303,7 @@ class P2pFileTransferService(
                     activeReceiver.remoteDescriptionSet = true
                     flushCandidates(activeReceiver)
                     val answer = createDescription(peer, offer = false)
-                    if (sendSignal(sender, mapOf("signal_type" to "file_transfer_answer", "call_id" to id, "transfer_id" to id, "sdp" to answer.description))) {
+                    if (sendSignalScoped(activeReceiver, mapOf("signal_type" to "file_transfer_answer", "call_id" to id, "transfer_id" to id, "sdp" to answer.description))) {
                         activeReceiver.signalingReady = true
                         activeReceiver.restartAttempts = 0
                         flushLocalCandidates(activeReceiver)
@@ -385,7 +387,7 @@ class P2pFileTransferService(
             invite.secret.fill(0)
             throw IllegalStateException("Not enough free storage to receive this file.")
         }
-        val session = Session(invite.transferId, offer.senderId, null, manifest, invite.secret.copyOf(),
+        val session = Session(invite.transferId, offer.senderId, currentUserId() ?: throw SecurityException("Sign in before receiving a file."), null, manifest, invite.secret.copyOf(),
             TransferDirection.download, destination = null, finalDestination = destination)
         val partFile = File(destination.parentFile ?: appContext.filesDir, ".${invite.transferId}.part")
         session.destination = partFile
@@ -418,7 +420,7 @@ class P2pFileTransferService(
 
     fun cancel(transferId: String) {
         val session = sessions[transferId] ?: return
-        sendSignal(session.peerUserId, mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
+        sendSignalScoped(session, mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
         session.file?.let { runCatching { it.delete() } }
         fail(session, "Cancelled")
     }
@@ -697,7 +699,7 @@ class P2pFileTransferService(
         } else if (!session.restartInProgress && session.restartAttempts < MAX_ICE_RESTARTS) {
             session.restartAttempts++
             session.remoteDescriptionSet = false
-            sendSignal(session.peerUserId, mapOf(
+            sendSignalScoped(session, mapOf(
                 "signal_type" to "file_transfer_restart_request",
                 "call_id" to session.id,
                 "transfer_id" to session.id,
@@ -735,7 +737,7 @@ class P2pFileTransferService(
                     ),
                     "manifest_auth" to b64(auth),
                 )
-                sendSignal(session.peerUserId, payload)
+                sendSignalScoped(session, payload)
                 session.signalingReady = true
                 flushLocalCandidates(session)
                 publish(session, "Reconnecting directly…")
@@ -759,8 +761,13 @@ class P2pFileTransferService(
         pending.forEach { sendCandidate(session, it) }
     }
 
+    private fun sendSignalScoped(session: Session, data: Map<String, Any?>): Boolean {
+        if (currentUserId() != session.localUserId) return false
+        return sendSignal(session.peerUserId, data)
+    }
+
     private fun sendCandidate(session: Session, candidate: IceCandidate) {
-        sendSignal(session.peerUserId, mapOf("signal_type" to "file_transfer_ice", "call_id" to session.id, "transfer_id" to session.id, "candidate" to candidate.sdp, "sdp_mid" to candidate.sdpMid, "sdp_mline" to candidate.sdpMLineIndex))
+        sendSignalScoped(session, mapOf("signal_type" to "file_transfer_ice", "call_id" to session.id, "transfer_id" to session.id, "candidate" to candidate.sdp, "sdp_mid" to candidate.sdpMid, "sdp_mline" to candidate.sdpMLineIndex))
     }
 
     private fun fail(session: Session, reason: String) {
