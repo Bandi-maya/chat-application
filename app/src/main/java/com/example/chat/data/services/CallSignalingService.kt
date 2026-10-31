@@ -71,6 +71,20 @@ data class ChatyCallSession(
  *  RTCPeerConnectionState. */
 enum class CallTransportState { connected, disconnected, failed, closed, other }
 
+/** Adaptive video envelope selected from measured/current uplink capacity. Audio remains enabled. */
+enum class CallNetworkProfile(
+    val width: Int,
+    val height: Int,
+    val frameRate: Int,
+    val maxBitrateBps: Int,
+) {
+    ultraWeak(160, 90, 5, 70_000),
+    weak(320, 180, 8, 140_000),
+    balanced(480, 270, 15, 350_000),
+    strong(640, 360, 24, 700_000),
+    high(1280, 720, 30, 1_200_000),
+}
+
 /** Media engine seam over the WebRTC transport. The Android implementation
  *  (WebRtcCallMediaController) wraps org.webrtc; JVM tests substitute a fake.
  *  Every method mirrors the flutter_webrtc calls in
@@ -81,6 +95,9 @@ interface CallMediaController {
 
     /** _createMediaTransport: build the peer connection and open local media. */
     suspend fun prepare(isVideo: Boolean, lowData: Boolean, iceServers: List<Map<String, Any?>>)
+
+    /** Applies a live uplink-aware video profile without interrupting audio. */
+    suspend fun applyNetworkProfile(profile: CallNetworkProfile) { /* optional for JVM fakes */ }
 
     /** createOffer + setLocalDescription; returns the local SDP offer. */
     suspend fun createOffer(isVideo: Boolean): String
@@ -882,6 +899,26 @@ class CallSignalingService(
         currentSession = session.copy(isFrontCamera = !session.isFrontCamera)
         notifyChanged()
         }) return
+    }
+
+    /** Called whenever Android reports a new network estimate. Audio is never disabled;
+     * video is adapted to the available uplink and low-data preference. */
+    suspend fun onNetworkStatusChanged(upstreamKbps: Int, downstreamKbps: Int) {
+        val session = currentSession ?: return
+        if (!session.isActive || !session.isVideo || session.isDemo) return
+        val profile = when {
+            upstreamKbps in 1..69 -> CallNetworkProfile.ultraWeak
+            upstreamKbps in 70..179 -> CallNetworkProfile.weak
+            upstreamKbps in 180..449 -> CallNetworkProfile.balanced
+            upstreamKbps in 450..899 -> CallNetworkProfile.strong
+            upstreamKbps >= 900 -> CallNetworkProfile.high
+            else -> CallNetworkProfile.weak
+        }.let { selected ->
+            if (lowDataUsageEnabled() && selected.ordinal > CallNetworkProfile.balanced.ordinal) {
+                CallNetworkProfile.balanced
+            } else selected
+        }
+        media?.applyNetworkProfile(profile)
     }
 
     suspend fun setAudioRoute(route: AudioRouteType) {
