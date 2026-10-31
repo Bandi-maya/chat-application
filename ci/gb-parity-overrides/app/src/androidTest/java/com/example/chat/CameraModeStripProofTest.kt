@@ -288,6 +288,7 @@ class CameraModeStripProofTest {
      d.findObject(By.desc("Video camera mode")).click()
      assertTrue(d.wait(Until.hasObject(By.desc("Record video")),20000))
      d.findObject(By.desc("Record video")).click()
+     android.util.Log.w("MODESTRIP-DIAG","recordStart t="+System.currentTimeMillis()+" fakePosesSet="+(com.example.chat.ui.camera.CameraVideoNativeProof.fakeLensPoses!=null))
      Thread.sleep(1800)
      snap("recording")
      // Run-131 NPE here: Stop recording was absent from the served a11y tree
@@ -319,10 +320,24 @@ class CameraModeStripProofTest {
      return keep
     }
     com.example.chat.ui.camera.CameraVideoNativeProof.fakeLensPoses=listOf(pose)
+    android.util.Log.w("MODESTRIP-DIAG","fakeLensPoses installed t="+System.currentTimeMillis())
     val withLens=recordOnce()
     com.example.chat.ui.camera.CameraVideoNativeProof.fakeLensPoses=null
     // No real face on the emulator, so without the hook nothing composites.
     val bare=recordOnce()
+    // Run-133 failed the assertion below: center diff 2.48 vs corner 0.0, no root
+    // cause. Evidence-only discriminator, capture/apply timing vs actual output:
+    // sample both recordings at three offsets and log per-offset diffs. A diff that
+    // rises with time = lens applied after early frames were captured (timing
+    // race); flat-low at every offset = recorded output never baked. The 900us
+    // assertion itself is unchanged.
+    for (us in listOf(300000L,900000L,1500000L)) {
+     val ta=frameAt(withLens,us);val tb=frameAt(bare,us)
+     if(ta.width==tb.width && ta.height==tb.height){
+      val tw=ta.width.toFloat();val th=ta.height.toFloat()
+      android.util.Log.w("MODESTRIP-DIAG","lensframe us="+us+" centerDiff="+regionMeanDiff(ta,tb,tw*0.30f,th*0.20f,tw*0.70f,th*0.60f)+" cornerDiff="+regionMeanDiff(ta,tb,0f,0f,tw*0.15f,th*0.12f)+" size="+ta.width+"x"+ta.height)
+     } else android.util.Log.w("MODESTRIP-DIAG","lensframe us="+us+" sizeMismatch "+ta.width+"x"+ta.height+" vs "+tb.width+"x"+tb.height)
+    }
     val fa=frameAt(withLens,900000);val fb=frameAt(bare,900000)
     assertTrue("Frames decoded at same size",fa.width==fb.width && fa.height==fb.height)
     val w=fa.width.toFloat();val h=fa.height.toFloat()
