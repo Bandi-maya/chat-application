@@ -142,6 +142,16 @@ object ServiceLocator {
             networkMonitor.state.collect { status ->
                 if (status.online && !wasOnline) service.onNetworkRegained()
                 wasOnline = status.online
+                // Re-tune active video calls whenever Android reports a network handover
+                // or a changed link-bandwidth estimate. Voice remains the priority.
+                if (status.online && callSignaling.hasActiveSession) {
+                    runCatching {
+                        callSignaling.onNetworkStatusChanged(
+                            upstreamKbps = status.upstreamKbps,
+                            downstreamKbps = status.downstreamKbps,
+                        )
+                    }.onFailure { android.util.Log.w("ChatyNetwork", "Call adaptation skipped", it) }
+                }
             }
         }
     }
