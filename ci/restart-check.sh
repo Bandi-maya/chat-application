@@ -7,6 +7,13 @@
 PKG=com.logybyte.chat
 mkdir -p screenshots
 RES=0
+# Emulator exit/status capture (run-128: the emulator vanished silently during
+# gradle - qemu alive at gradle end, host RAM fine, zero console error - then
+# later shards lost the device). Record qemu/adb state at entry and exit so a
+# dead emulator is attributed in the log instead of failing adb calls opaquely.
+QEMU_PID=$(pgrep -f qemu-system | head -1 || true)
+echo "RESTART-QEMU entry pid=${QEMU_PID:-none} state=$([ -n "$QEMU_PID" ] && echo alive || echo missing)"
+adb devices -l | tr -d '\r' | sed 's/^/RESTART-ADB /'
 adb shell am force-stop $PKG
 USER_JSON='{&quot;id&quot;:&quot;synthetic-user-1&quot;,&quot;username&quot;:&quot;testuser&quot;,&quot;displayName&quot;:&quot;Test User&quot;,&quot;avatarInitials&quot;:&quot;T&quot;,&quot;avatarColorHex&quot;:&quot;0xFF6366F1&quot;,&quot;about&quot;:&quot;Synthetic&quot;,&quot;email&quot;:&quot;&quot;,&quot;phone&quot;:&quot;&quot;,&quot;avatarUrl&quot;:null}'
 cat > /tmp/chaty_api_backend.xml <<XMLEOF
@@ -55,5 +62,7 @@ set -- $PIDS
 adb logcat -d | tr -d '\r' | grep -q "FATAL EXCEPTION" && { echo "RESTART-FATAL present"; adb logcat -d | grep -A12 "FATAL EXCEPTION" | head -30; RES=1; }
 adb shell am force-stop $PKG
 adb shell "run-as $PKG rm -f shared_prefs/chaty_api_backend.xml" && echo "RESTART-CLEANUP seeded prefs removed"
+QEMU_PID2=$(pgrep -f qemu-system | head -1 || true)
+echo "RESTART-QEMU exit pid=${QEMU_PID2:-none} state=$([ -n "$QEMU_PID2" ] && echo alive || echo missing)"
 echo "RESTART-RESULT rc=$RES"
 exit $RES
