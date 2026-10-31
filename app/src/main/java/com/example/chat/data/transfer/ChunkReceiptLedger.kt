@@ -19,11 +19,12 @@ class ChunkReceiptLedger(
     private val atomic = AtomicFile(stateFile)
     private var dirtyCount = 0
     private val lock = Any()
-    private var received = load()
 
     init {
         require(chunkCount in 1..Int.MAX_VALUE.toLong()) { "Unsupported chunk count" }
     }
+
+    private var received = load()
 
     fun markReceived(index: Long) = synchronized(lock) {
         require(index in 0 until chunkCount)
@@ -60,6 +61,7 @@ class ChunkReceiptLedger(
 
     fun clear() = synchronized(lock) {
         received.clear()
+        dirtyCount = 0
         runCatching { atomic.delete() }
     }
 
@@ -67,6 +69,8 @@ class ChunkReceiptLedger(
         return try {
             // AtomicFile.openRead() restores its backup if the process died mid-commit.
             val bytes = atomic.openRead().use { it.readBytes() }
+            val maxBytes = ((chunkCount + 7L) / 8L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            if (bytes.size > maxBytes) throw IOException("Receipt bitmap is larger than expected")
             BitSet.valueOf(bytes).also {
                 if (it.length().toLong() > chunkCount) throw IOException("Receipt bitmap exceeds transfer geometry")
             }
