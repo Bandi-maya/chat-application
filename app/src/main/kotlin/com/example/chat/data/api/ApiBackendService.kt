@@ -1057,6 +1057,7 @@ class ApiBackendService(
         val effectiveContent = if (attachment != null) {
             val o = org.json.JSONObject()
             o.put("type", type.name)
+            o.put("id", attachment.id)
             o.put("url", attachment.url ?: org.json.JSONObject.NULL)
             o.put("name", attachment.name)
             o.put("size", attachment.size)
