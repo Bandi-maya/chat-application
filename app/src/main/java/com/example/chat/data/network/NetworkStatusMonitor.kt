@@ -14,7 +14,13 @@ import kotlinx.coroutines.flow.StateFlow
  * Requires ACCESS_NETWORK_STATE (normal permission, no prompt).
  */
 class NetworkStatusMonitor(context: Context) {
-    data class Status(val online: Boolean, val metered: Boolean)
+    data class Status(
+        val online: Boolean,
+        val metered: Boolean,
+        val downstreamKbps: Int = 0,
+        val upstreamKbps: Int = 0,
+        val transport: String = "unknown",
+    )
 
     private val cm = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val _state = MutableStateFlow(current())
@@ -43,6 +49,19 @@ class NetworkStatusMonitor(context: Context) {
     private fun current(): Status {
         val caps = cm.getNetworkCapabilities(cm.activeNetwork)
         val online = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
-        return Status(online, cm.isActiveNetworkMetered)
+        val transport = when {
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "cellular"
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "ethernet"
+            caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true -> "vpn"
+            else -> "unknown"
+        }
+        return Status(
+            online = online,
+            metered = cm.isActiveNetworkMetered,
+            downstreamKbps = caps?.linkDownstreamBandwidthKbps ?: 0,
+            upstreamKbps = caps?.linkUpstreamBandwidthKbps ?: 0,
+            transport = transport,
+        )
     }
 }
