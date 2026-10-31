@@ -39,7 +39,7 @@ class ComposerFrontVideoEntryProofTest {
                 class CamTruth(val dump: String, val frontId: String?, val backId: String?, val active: Set<String>)
                 fun cameraTruth(): CamTruth {
                     val dump = d.executeShellCommand("dumpsys media.camera")
-                    fun idFor(f: String) = Regex("internal/(\\d+)[^\\n]*static information: ==\\n\\s*Facing: " + f).find(dump)?.groupValues?.get(1)
+                    fun idFor(f: String) = Regex("internal/(\\d+)[^\\n]*static information: ==\\n(?:(?!== Camera HAL device)[^\\n]*\\n)*?\\s*Facing: " + f + "\\b").find(dump)?.groupValues?.get(1)
                     // Only the CURRENT "Active Camera Clients" block; the dumpsys
                     // events log below it is history and must not count.
                     val activeSection = dump.substringAfter("Active Camera Clients:", "").substringBefore("\n]", "")
