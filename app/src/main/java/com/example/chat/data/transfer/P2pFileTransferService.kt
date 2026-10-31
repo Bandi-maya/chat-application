@@ -155,7 +155,6 @@ class P2pFileTransferService(
         targetUserId: String,
         file: File,
         mimeType: String,
-        sourceOwner: java.io.Closeable? = null,
         linkExpirySeconds: Long = 7L * 24L * 60L * 60L,
     ): String = withContext(Dispatchers.IO) {
         require(targetUserId.isNotBlank() && targetUserId != currentUserId()) { "Choose a valid recipient" }
@@ -205,6 +204,7 @@ class P2pFileTransferService(
         displayName: String,
         sizeBytes: Long,
         mimeType: String,
+        sourceOwner: java.io.Closeable? = null,
         linkExpirySeconds: Long = 7L * 24L * 60L * 60L,
     ): String = withContext(Dispatchers.IO) {
         require(targetUserId.isNotBlank() && targetUserId != currentUserId()) { "Choose a valid recipient" }
