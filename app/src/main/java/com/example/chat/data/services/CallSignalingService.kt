@@ -77,12 +77,13 @@ enum class CallNetworkProfile(
     val height: Int,
     val frameRate: Int,
     val maxBitrateBps: Int,
+    val audioBitrateBps: Int,
 ) {
-    ultraWeak(160, 90, 5, 70_000),
-    weak(320, 180, 8, 140_000),
-    balanced(480, 270, 15, 350_000),
-    strong(640, 360, 24, 700_000),
-    high(1280, 720, 30, 1_200_000),
+    ultraWeak(160, 90, 5, 70_000, 12_000),
+    weak(320, 180, 8, 140_000, 16_000),
+    balanced(480, 270, 15, 350_000, 20_000),
+    strong(640, 360, 24, 700_000, 24_000),
+    high(1280, 720, 30, 1_200_000, 32_000),
 }
 
 /** Media engine seam over the WebRTC transport. The Android implementation
