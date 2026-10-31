@@ -74,7 +74,8 @@ object NativeP2pTransferProtocol {
             throw SecurityException("Unsupported transfer link")
         }
         val id = uri.path.removePrefix("/")
-        if (!id.matches(Regex("[0-9a-fA-F-]{36}"))) throw SecurityException("Invalid transfer id")
+        val canonicalId = runCatching { java.util.UUID.fromString(id).toString() }.getOrElse { throw SecurityException("Invalid transfer id") }
+        if (!canonicalId.equals(id, ignoreCase = true)) throw SecurityException("Invalid transfer id")
         val secret = decode(uri.rawFragment ?: throw SecurityException("Transfer link is incomplete"))
         if (secret.size != KEY_BYTES) throw SecurityException("Invalid transfer secret")
         return Invite(id, secret)
@@ -117,7 +118,7 @@ object NativeP2pTransferProtocol {
         mac.update(manifest.transferId.toByteArray(Charsets.UTF_8))
         mac.update(0.toByte())
         mac.update(manifest.displayName.toByteArray(Charsets.UTF_8))
-        mac.update(0)
+        mac.update(0.toByte())
         mac.update(manifest.mimeType.toByteArray(Charsets.UTF_8))
         mac.update(ByteBuffer.allocate(8 + 4 + 8).order(ByteOrder.BIG_ENDIAN)
             .putLong(manifest.sizeBytes).putInt(manifest.chunkBytes).putLong(manifest.expiresAtEpochSeconds).array())
