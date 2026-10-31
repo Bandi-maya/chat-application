@@ -98,6 +98,24 @@ class ApiMediaUploadClient(
     }
 
 
+    /**
+     * Account-scoped upload seam. The scope is checked before the request and
+     * again after it completes so a late response cannot be attached to a new
+     * signed-in account. Progress remains a count of bytes actually written.
+     */
+    fun uploadMedia(
+        expectedScope: ApiAccountScope,
+        isScopeCurrent: () -> Boolean,
+        filename: String,
+        bytes: ByteArray,
+        onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
+    ): Map<String, Any> {
+        if (!isScopeCurrent()) throw UploadException("Account changed before upload started.")
+        val result = uploadMedia(filename, bytes, onProgress)
+        if (!isScopeCurrent()) throw UploadException("Account changed while upload was in progress.")
+        return result
+    }
+
     /** Device transport over OkHttp, mirroring http.MultipartRequest: one
      *  'file' part, Bearer + x-tenant-id headers, no extra fields. */
     class OkHttpTransport : ProgressTransport {
