@@ -7,8 +7,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
@@ -459,8 +461,8 @@ class MediaInteractionProofTest {
                 ChatMessageBubble(messages[0], true, ThemePresets.whatsappIosLight,
                     mediaContent = {
                         androidx.compose.foundation.layout.Box(
-                            androidx.compose.ui.Modifier.pointerInput(Unit) {
-                                androidx.compose.foundation.gestures.awaitEachGesture {
+                            Modifier.pointerInput(Unit) {
+                                awaitEachGesture {
                                     while (true) {
                                         val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
                                         ev.changes.forEach { ch ->
@@ -470,7 +472,7 @@ class MediaInteractionProofTest {
                                     }
                                 }
                             }.pointerInput(Unit) {
-                                androidx.compose.foundation.gestures.awaitEachGesture {
+                                awaitEachGesture {
                                     while (true) {
                                         val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Final)
                                         ev.changes.forEach { ch ->
