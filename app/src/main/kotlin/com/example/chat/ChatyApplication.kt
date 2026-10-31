@@ -77,7 +77,8 @@ class ChatyApplication : Application() {
             ServiceLocator.refreshCallAlert()
             ServiceLocator.appScope.launch { ServiceLocator.appLock.onResumed() }
             val backend = ServiceLocator.apiBackend
-            if (backend.isAuthenticated) {
+            if (backend.isAuthenticated && !backend.isDemoSession) {
+                com.example.chat.notifications.ChatyRealtimeForegroundService.start(this@ChatyApplication)
                 backend.onAppResumed()
                 try { ServiceLocator.callLifecycle.onAppResumed() } catch (e: Exception) { android.util.Log.w("ChatyApplication", "call resume sync failed: $e") }
                 ServiceLocator.appScope.launch {
