@@ -129,7 +129,7 @@ class EmojiPackAssetsAndPerfTest {
         val probeAnim = probe("com.airbnb.lottie.compose.LottieAnimationKt")
         val probeFactory = probe("com.airbnb.lottie.LottieCompositionFactory")
         val cacheClear = runCatching {
-            val cls = loader.loadClass("com.airbnb.lottie.LottieCompositionCache")
+            val cls = loader.loadClass("com.airbnb.lottie.model.LottieCompositionCache") // 6.7.1 moved this class to the model package (airbnb/lottie-android v6.7.1 source: public, getInstance(), clear()); the old com.airbnb.lottie name no longer exists
             val inst = cls.getMethod("getInstance").invoke(null)
             cls.getMethod("clear").invoke(inst)
             "ok"
