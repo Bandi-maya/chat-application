@@ -1,1 +1,1 @@
-132 - recording contract-correct flow (assert at review + keep copy + discard-cleanup assertion + Stop guard) + mic a11y double-dispatch path probes + lottie 3-class loader probe + AddedStyles per-drag SCROLLSTEP + restart-check unambiguous kernel fallback
+133 - AddedStyles advancement-is-not-a-hit sweep fix (run-132 SCROLLHIT bounds=null root cause) + lottie model-package cache class (6.7.1 moved it) + media mic-reattach measured wait + restart sudo dmesg + emulator pre-post kill
