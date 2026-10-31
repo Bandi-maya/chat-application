@@ -3,6 +3,11 @@ package com.example.chat.ui
 import com.example.chat.ReleaseFeatures
 
 import android.widget.Toast
+import android.net.Uri
+import android.provider.OpenableColumns
+import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -74,6 +79,7 @@ fun ChatDetailHost(
     onOpenConversation: (Conversation) -> Unit = {},
 ) {
     val api = ServiceLocator.apiBackend
+    val p2pTransfers = ServiceLocator.p2pFileTransfers
     val prefs = ServiceLocator.preferencesController
     val repo = ServiceLocator.conversationsRepository
     val rt = ServiceLocator.richRealtime
@@ -118,6 +124,107 @@ fun ChatDetailHost(
     // Dart _captureAndSendPhoto (chat_detail_screen.dart:473): composer camera
     // icon opens the full-screen capture flow in chat mode.
     var chatCameraOpen by remember { mutableStateOf(false) }
+    var p2pReceiveMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var p2pReceiveLink by remember { mutableStateOf<String?>(null) }
+    val largeFilePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { selectedUri ->
+        if (selectedUri != null) scope.launch {
+            var stagedFile: File? = null
+            var transferId: String? = null
+            try {
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(selectedUri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val details = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    var name = "video"
+                    var size: Long? = null
+                    context.contentResolver.query(selectedUri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                            if (nameIndex >= 0) name = cursor.getString(nameIndex) ?: name
+                            if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) size = cursor.getLong(sizeIndex)
+                        }
+                    }
+                    name to size
+                }
+                val safeName = com.example.chat.data.services.ChatMediaService.safeFileName(details.first)
+                val mime = context.contentResolver.getType(selectedUri) ?: "application/octet-stream"
+                if (details.second != null && details.second!! > com.example.chat.data.transfer.NativeP2pTransferProtocol.MAX_FILE_BYTES) {
+                    throw IllegalStateException("Files larger than 100 GB are not supported.")
+                }
+                val stagingDir = File(context.filesDir, "p2p-outgoing").apply { mkdirs() }
+                if (details.second != null && android.os.StatFs(stagingDir.absolutePath).availableBytes < details.second!!) {
+                    throw IllegalStateException("Not enough free storage to stage this file.")
+                }
+                stagedFile = File(stagingDir, UUID.randomUUID().toString() + "_" + safeName)
+                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val input = context.contentResolver.openInputStream(selectedUri)
+                        ?: throw IllegalStateException("Cannot read the selected file.")
+                    input.use { source ->
+                        FileOutputStream(stagedFile!!).use { output ->
+                            val buffer = ByteArray(1024 * 1024)
+                            var total = 0L
+                            while (true) {
+                                val count = source.read(buffer)
+                                if (count < 0) break
+                                total += count
+                                if (total > com.example.chat.data.transfer.NativeP2pTransferProtocol.MAX_FILE_BYTES) {
+                                    throw IllegalStateException("Files larger than 100 GB are not supported.")
+                                }
+                                output.write(buffer, 0, count)
+                            }
+                            output.fd.sync()
+                        }
+                    }
+                }
+                val size = stagedFile!!.length()
+                if (size <= 0L) throw IllegalStateException("The selected file is empty.")
+                if (!isDirect || otherId == null) throw IllegalStateException("Large direct transfers are currently available in one-to-one chats.")
+                if (connection?.callsAllowed == false) throw IllegalStateException("Accept this contact connection before sending a large file.")
+                val link = p2pTransfers.offerFile(otherId, stagedFile!!, mime)
+                val invite = com.example.chat.data.transfer.NativeP2pTransferProtocol.parseInvite(link)
+                transferId = invite.transferId
+                val secretText = android.util.Base64.encodeToString(
+                    invite.secret,
+                    android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING,
+                )
+                // The invitation secret is MLS-encrypted before it is placed in chat content.
+                val encryptedInvite = ServiceLocator.mls.encryptPayload(
+                    conversation.id,
+                    mapOf("kind" to "chaty_p2p_invite_v1", "transfer_id" to invite.transferId, "secret" to secretText),
+                )
+                val attachment = com.example.chat.domain.models.MessageAttachment(
+                    id = invite.transferId,
+                    type = if (mime.startsWith("video/")) "video" else "document",
+                    name = safeName,
+                    size = com.example.chat.data.services.ChatMediaService.formatBytes(size),
+                    url = "chaty://transfer/" + invite.transferId,
+                )
+                val sent = api.sendMessage(
+                    conversation.id,
+                    "",
+                    type = if (mime.startsWith("video/")) com.example.chat.domain.models.MessageType.video else com.example.chat.domain.models.MessageType.document,
+                    attachment = attachment,
+                    extraMetadata = mapOf(
+                        "p2p_invite_ciphertext" to encryptedInvite.ciphertext,
+                        "p2p_invite_group" to encryptedInvite.groupId,
+                        "p2p_invite_epoch" to encryptedInvite.epoch,
+                        "p2p_transfer_version" to 1,
+                    ),
+                )
+                if (sent == null) throw IllegalStateException("The transfer offer was created but the chat message could not be sent.")
+                stagedFile = null
+                toast("Secure transfer link sent.")
+                rev++
+            } catch (e: Exception) {
+                transferId?.let { p2pTransfers.cancel(it) }
+                stagedFile?.let { runCatching { it.delete() } }
+                toast(e.message ?: "Could not start the large-file transfer.")
+            }
+        }
+    }
     val hostView = androidx.compose.ui.platform.LocalView.current
     val me = api.currentUser
     val myId = me?.id ?: ""
@@ -388,6 +495,10 @@ fun ChatDetailHost(
             when (action) {
                 com.example.chat.ui.chats.detail.AttachmentAction.image -> attachments.onMedia("image")
                 com.example.chat.ui.chats.detail.AttachmentAction.video -> attachments.onMedia("video")
+                com.example.chat.ui.chats.detail.AttachmentAction.largeFile -> {
+                    if (!isDirect || otherId == null) toast("Large direct transfers are available in one-to-one chats.")
+                    else largeFilePicker.launch(arrayOf("*/*"))
+                }
                 com.example.chat.ui.chats.detail.AttachmentAction.document -> attachments.onMedia("document")
                 com.example.chat.ui.chats.detail.AttachmentAction.audio -> attachments.onMedia("audio")
                 com.example.chat.ui.chats.detail.AttachmentAction.location -> attachments.onLocation()
@@ -429,8 +540,50 @@ fun ChatDetailHost(
         loadingMessages = loadingMessages,
         loadError = loadError,
         onRetryLoad = { loadNonce++ },
-        onMediaTap = { m -> viewerBounds = null; viewerMessage = m },
-        onMediaTapWithBounds = { m, rect -> viewerBounds = rect; viewerMessage = m },
+        onMediaTap = { m ->
+            val path = m.attachment?.url.orEmpty()
+            if (path.startsWith("chaty://transfer/") && m.senderId != myId) {
+                scope.launch {
+                    try {
+                        val ciphertext = m.metadata["p2p_invite_ciphertext"]?.toString()
+                            ?: throw SecurityException("This transfer invitation is incomplete.")
+                        val payload = ServiceLocator.mls.decryptPayload(conversation.id, ciphertext)
+                        if (payload["kind"] != "chaty_p2p_invite_v1") throw SecurityException("Invalid transfer invitation.")
+                        val id = path.substringAfterLast('/')
+                        if (payload["transfer_id"]?.toString() != id) throw SecurityException("Transfer invitation does not match this video.")
+                        val secret = payload["secret"]?.toString()?.takeIf { it.isNotBlank() }
+                            ?: throw SecurityException("Transfer invitation key is missing.")
+                        p2pReceiveLink = "chaty://transfer/" + id + "#" + secret
+                        p2pReceiveMessage = m
+                    } catch (e: Exception) { toast(e.message ?: "Unable to unlock this transfer invitation.") }
+                }
+            } else if (path.startsWith("chaty://transfer/")) {
+                toast("This is your outgoing transfer. Check Network & Data Usage for its live status.")
+            } else {
+                viewerBounds = null; viewerMessage = m
+            }
+        },
+        onMediaTapWithBounds = { m, rect ->
+            val path = m.attachment?.url.orEmpty()
+            if (path.startsWith("chaty://transfer/")) {
+                if (m.senderId != myId) {
+                    scope.launch {
+                        try {
+                            val ciphertext = m.metadata["p2p_invite_ciphertext"]?.toString()
+                                ?: throw SecurityException("This transfer invitation is incomplete.")
+                            val payload = ServiceLocator.mls.decryptPayload(conversation.id, ciphertext)
+                            if (payload["kind"] != "chaty_p2p_invite_v1") throw SecurityException("Invalid transfer invitation.")
+                            val id = path.substringAfterLast('/')
+                            if (payload["transfer_id"]?.toString() != id) throw SecurityException("Transfer invitation does not match this video.")
+                            val secret = payload["secret"]?.toString()?.takeIf { it.isNotBlank() }
+                                ?: throw SecurityException("Transfer invitation key is missing.")
+                            p2pReceiveLink = "chaty://transfer/" + id + "#" + secret
+                            p2pReceiveMessage = m
+                        } catch (e: Exception) { toast(e.message ?: "Unable to unlock this transfer invitation.") }
+                    }
+                } else toast("This is your outgoing transfer. Check Network & Data Usage for its live status.")
+            } else { viewerBounds = rect; viewerMessage = m }
+        },
         onViewOnceOpen = { m -> viewerBounds = null; viewerMessage = m },
         onCameraTap = { chatCameraOpen = true },
         onGalleryTap = { attachments.onMedia("image") },
@@ -585,6 +738,51 @@ fun ChatDetailHost(
 
     }
 
+    if (p2pReceiveMessage != null && p2pReceiveLink != null) {
+        val message = p2pReceiveMessage!!
+        AlertDialog(
+            shape = com.example.chat.ui.kit.ChatyModalShape,
+            onDismissRequest = { p2pReceiveMessage = null; p2pReceiveLink = null },
+            title = { Text("Receive " + (message.attachment?.name ?: "video") + "?") },
+            text = {
+                Column {
+                    Text((message.attachment?.size ?: "Large file") + " · Direct encrypted transfer")
+                    Text("The file will be saved in Chaty’s Movies folder.", color = Color(theme.secondaryTextColor))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { p2pReceiveMessage = null; p2pReceiveLink = null }) { Text("Not now") }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val link = p2pReceiveLink!!
+                    val name = com.example.chat.data.services.ChatMediaService.safeFileName(message.attachment?.name ?: "video")
+                    val directory = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
+                        ?: File(context.filesDir, "Movies")
+                    directory.mkdirs()
+                    val destination = File(directory, name)
+                    val offerId = link.substringAfter("chaty://transfer/").substringBefore('#')
+                    val offer = p2pTransfers.pendingOffers.value.firstOrNull { it.transferId == offerId }
+                    val required = offer?.sizeBytes ?: 0L
+                    val free = android.os.StatFs(directory.absolutePath).availableBytes
+                    if (required > 0 && free < required) {
+                        toast("Not enough free storage for this file.")
+                    } else if (destination.exists()) {
+                        toast("A file with that name already exists in Chaty Movies.")
+                    } else {
+                        scope.launch {
+                            try {
+                                p2pTransfers.acceptInvite(link, destination)
+                                toast("Receiving " + (message.attachment?.name ?: "file") + "…")
+                            } catch (e: Exception) { toast(e.message ?: "Could not receive this file.") }
+                            p2pReceiveMessage = null
+                            p2pReceiveLink = null
+                        }
+                    }
+                }) { Text("Receive") }
+            },
+        )
+    }
     if (gateOpen) {
         val st = connection ?: ContactConnectionStatus()
         AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
