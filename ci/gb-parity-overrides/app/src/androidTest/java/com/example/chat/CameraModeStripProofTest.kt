@@ -133,7 +133,14 @@ class CameraModeStripProofTest {
      capture("video-review");assertTrue("Stopping lands in the local review",review)
      assertFalse("No send is connected, so no use-video action",d.hasObject(By.text("Use video")))
      d.findObject(By.text("Record again")).click()
-     assertTrue("Retake asks before discarding the draft",d.wait(Until.hasObject(By.text("Discard this unsaved video?")),5000))
+     run {
+      // Fresh-tree poll (AppRoot-proven stale a11y cache for in-place composition
+      // updates such as this AlertDialog); timeout and assertion message unchanged.
+      val dl=android.os.SystemClock.uptimeMillis()+5000;var seenPrompt=false
+      while(android.os.SystemClock.uptimeMillis()<dl){if(android.os.Build.VERSION.SDK_INT>=33)ins.uiAutomation.clearCache();if(d.hasObject(By.text("Discard this unsaved video?"))){seenPrompt=true;break};Thread.sleep(250)}
+      if(!seenPrompt)capture("retake-prompt-miss")
+      assertTrue("Retake asks before discarding the draft",seenPrompt)
+     }
      d.findObject(By.text("Discard video")).click()
      assertTrue("Discarding the draft returns to an armed recorder",d.wait(Until.hasObject(By.desc("Record video")),20000))
      assertTrue("Mode strip returns after recording stops",d.wait(Until.hasObject(By.desc("Camera modes")),10000))
@@ -220,11 +227,20 @@ class CameraModeStripProofTest {
    ActivityScenario.launch<CameraOpeningProofActivity>(Intent(c,CameraOpeningProofActivity::class.java)).use {
     assertTrue(d.wait(Until.hasObject(By.desc("Take photo")),20000))
     // Select a real lens through the carousel tap path.
-    d.findObject(By.desc("Lenses camera mode"))?.click()
+    val lensesModeNode=d.findObject(By.desc("Lenses camera mode"))
+    android.util.Log.w("MODESTRIP-DIAG","lensesModeNodeFound="+(lensesModeNode!=null))
+    lensesModeNode?.click()
     val thumb=d.wait(Until.findObject(By.desc("Gold Crown lens thumbnail")),5000)
     assertTrue("Lens carousel offers the Gold Crown lens",thumb!=null)
     thumb!!.click()
-    assertTrue("Lens selection is marked in the carousel",d.wait(Until.hasObject(By.desc("Gold Crown lens thumbnail, in use")),5000))
+    run {
+     // Fresh-tree poll: same stale-cache shape as CameraLensSheetProofTest's in-use
+     // desc waits; on a real miss keep the actual tree as evidence.
+     val dl=android.os.SystemClock.uptimeMillis()+5000;var marked=false
+     while(android.os.SystemClock.uptimeMillis()<dl){if(android.os.Build.VERSION.SDK_INT>=33)ins.uiAutomation.clearCache();if(d.hasObject(By.desc("Gold Crown lens thumbnail, in use"))){marked=true;break};Thread.sleep(250)}
+     if(!marked)d.dumpWindowHierarchy(File(File(c.getExternalFilesDir(null),"screenshots").apply{mkdirs()},"camera-mode-strip-lens-miss.xml"))
+     assertTrue("Lens selection is marked in the carousel",marked)
+    }
     // Record WITH the lens composited (synthetic pose), then WITHOUT.
     fun recordOnce():File{
      val dir=File(c.cacheDir,"camera-video")
