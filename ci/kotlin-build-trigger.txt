@@ -1,1 +1,1 @@
-130 - compile fixes: a11y ACTION_CLICK via UiAutomation (UiObject2.performAction does not exist) + emoji Lottie cache clear via reflection; carries corrected premultiplied cc doubling model + full 129 batch (ModeStrip overlap fix, evidence edits, qemu capture)
+131 - corrected cc doubling model (straight-readback*a = texture sample; 128+130 frames 0 violations, single/double/missing controls) + camera-video lifecycle file-watch + emoji cache probe via target classloader + restart-check kernel kill capture
