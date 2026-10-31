@@ -631,9 +631,7 @@ object ServiceLocator {
                     }
                 }
             }
-            apiBackend.addAuthScopeListener {
-                service.disposeAll()
-            }
+            apiBackend.addAuthScopeListener { _ -> service.disposeAll() }
         }
     }
 
