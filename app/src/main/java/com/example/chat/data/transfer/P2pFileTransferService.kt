@@ -347,6 +347,9 @@ class P2pFileTransferService(
         NativeP2pTransferProtocol.verifyManifest(
             manifest, unb64(signal["manifest_auth"]?.toString() ?: ""), invite.secret,
         )
+        destination.parentFile?.mkdirs()
+        val availableBytes = android.os.StatFs((destination.parentFile ?: appContext.filesDir).absolutePath).availableBytes
+        if (availableBytes < manifest.sizeBytes) throw IllegalStateException("Not enough free storage to receive this file.")
         val session = Session(invite.transferId, offer.senderId, null, manifest, invite.secret.copyOf(),
             TransferDirection.download, destination = null, finalDestination = destination)
         val partFile = File(destination.parentFile ?: appContext.filesDir, ".${invite.transferId}.part")
@@ -569,6 +572,7 @@ class P2pFileTransferService(
         session.channel?.send(DataChannel.Buffer(ByteBuffer.wrap(JSONObject().put("kind", "complete").toString().toByteArray()), false))
         session.monitorId?.let { transferMonitor.finish(it) }
         publish(session, "Received and verified", target.absolutePath)
+        session.secret.fill(0)
         session.channel?.close()
         session.peer?.close()
         sessions.remove(session.id)
@@ -581,6 +585,7 @@ class P2pFileTransferService(
         session.peer?.close()
         session.file?.let { runCatching { it.delete() } }
         runCatching { (session.sourceOwner ?: session.sourceChannel)?.close() }
+        session.secret.fill(0)
         sessions.remove(session.id)
     }
 
@@ -704,6 +709,7 @@ class P2pFileTransferService(
         session.channel?.close()
         session.peer?.close()
         runCatching { (session.sourceOwner ?: session.sourceChannel)?.close() }
+        session.secret.fill(0)
         sessions.remove(session.id)
     }
 
