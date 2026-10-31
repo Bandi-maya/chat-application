@@ -44,6 +44,8 @@ import com.example.chat.domain.models.ConnectionHealthState
 import com.example.chat.domain.models.NetworkTransportType
 import com.example.chat.domain.models.RealtimeSocketStatus
 import com.example.chat.data.network.NetworkStatusMonitor
+import com.example.chat.data.network.TransferItem
+import com.example.chat.data.network.TransferStatus
 import com.example.chat.data.transfer.P2pFileTransferService
 
 /** Port of lib/ui/core/connection/connection_detail_sheet.dart: connection
@@ -59,6 +61,7 @@ fun ConnectionDetailSheetContent(
     onDismiss: () -> Unit,
     networkStatus: NetworkStatusMonitor.Status? = null,
     p2pTransferStates: List<P2pFileTransferService.TransferState> = emptyList(),
+    liveTransfers: List<TransferItem> = emptyList(),
 ) {
     val statusColor = when (state.health) {
         ConnectionHealth.excellent -> connectionExcellent
@@ -199,6 +202,19 @@ fun ConnectionDetailSheetContent(
             labelColor = foregroundSecondary,
             valueColor = foreground,
         )
+        liveTransfers.filter { it.status in setOf(TransferStatus.active, TransferStatus.paused, TransferStatus.queued) }.takeLast(3).forEach { transfer ->
+            Column(Modifier.fillMaxWidth().padding(start = 28.dp, top = 4.dp, bottom = 4.dp)) {
+                Text(transfer.name, color = foreground, fontSize = 12.sp, fontWeight = FontWeight.W600)
+                val speed = if (transfer.bytesPerSecond > 0) com.example.chat.data.services.ChatMediaService.formatBytes(transfer.bytesPerSecond) + "/s" else "Waiting for data"
+                val remaining = transfer.remainingBytes?.let { com.example.chat.data.services.ChatMediaService.formatBytes(it) } ?: "Unknown"
+                val eta = transfer.etaSeconds?.let { seconds ->
+                    if (seconds >= 3600) "${seconds / 3600}h ${(seconds % 3600) / 60}m"
+                    else if (seconds >= 60) "${seconds / 60}m ${seconds % 60}s"
+                    else "${seconds}s"
+                } ?: "Calculating…"
+                Text("$speed · $remaining left · ETA $eta", color = foregroundSecondary, fontSize = 11.sp)
+            }
+        }
         p2pTransferStates.takeLast(3).forEach { transfer ->
             Column(Modifier.fillMaxWidth().padding(start = 28.dp, top = 3.dp, bottom = 3.dp)) {
                 Text(transfer.fileName, color = foreground, fontSize = 12.sp, fontWeight = FontWeight.W600)
