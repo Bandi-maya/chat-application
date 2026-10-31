@@ -468,7 +468,7 @@ class MediaInteractionProofTest {
                                         ev.changes.forEach { ch ->
                                             android.util.Log.i("ALBUM-PROBE", "evt Initial type=" + ev.type + " pos=" + ch.position + " consumed=" + ch.isConsumed)
                                         }
-                                        if (ev.type == androidx.compose.ui.input.pointer.PointerEventType.Up || ev.type == androidx.compose.ui.input.pointer.PointerEventType.Cancel) break
+                                        if (ev.type == androidx.compose.ui.input.pointer.PointerEventType.Release) break
                                     }
                                 }
                             }.pointerInput(Unit) {
@@ -478,7 +478,7 @@ class MediaInteractionProofTest {
                                         ev.changes.forEach { ch ->
                                             android.util.Log.i("ALBUM-PROBE", "evt Final type=" + ev.type + " pos=" + ch.position + " consumed=" + ch.isConsumed)
                                         }
-                                        if (ev.type == androidx.compose.ui.input.pointer.PointerEventType.Up || ev.type == androidx.compose.ui.input.pointer.PointerEventType.Cancel) break
+                                        if (ev.type == androidx.compose.ui.input.pointer.PointerEventType.Release) break
                                     }
                                 }
                             },
