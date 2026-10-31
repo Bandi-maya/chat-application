@@ -232,7 +232,25 @@ class CameraModeStripProofTest {
     lensesModeNode?.click()
     val thumb=d.wait(Until.findObject(By.desc("Gold Crown lens thumbnail")),5000)
     assertTrue("Lens carousel offers the Gold Crown lens",thumb!=null)
-    thumb!!.click()
+    // Settle gate: run-124 LENS-DIAG evidence proved taps injected from
+    // mid-animation a11y bounds land one slot off (tap on the Gold Crown node
+    // delivered onTap index=1 glasses while the snap watcher logged
+    // firstVisible=1+99). Wait for the node's fresh bounds to be stable across
+    // two reads before injecting the tap. Assertion below is unchanged.
+    run {
+     var last=thumb!!.visibleBounds
+     val sdl=android.os.SystemClock.uptimeMillis()+8000
+     while(android.os.SystemClock.uptimeMillis()<sdl){
+      Thread.sleep(300)
+      if(android.os.Build.VERSION.SDK_INT>=33)ins.uiAutomation.clearCache()
+      val fresh=d.findObject(By.desc("Gold Crown lens thumbnail"))?:continue
+      val b=fresh.visibleBounds
+      if(b==last)break
+      last=b
+     }
+    }
+    if(android.os.Build.VERSION.SDK_INT>=33)ins.uiAutomation.clearCache()
+    (d.findObject(By.desc("Gold Crown lens thumbnail"))?:thumb!!).click()
     run {
      // Fresh-tree poll: same stale-cache shape as CameraLensSheetProofTest's in-use
      // desc waits; on a real miss keep the actual tree as evidence.
