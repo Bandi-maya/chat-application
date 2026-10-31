@@ -250,7 +250,21 @@ class CameraModeStripProofTest {
      }
     }
     if(android.os.Build.VERSION.SDK_INT>=33)ins.uiAutomation.clearCache()
-    (d.findObject(By.desc("Gold Crown lens thumbnail"))?:thumb!!).click()
+    run {
+     // Fresh-bounds coordinate tap (run-127 evidence: the settle-gated
+     // UiObject2.click() produced NO select() in LENS-DIAG and the miss dump
+     // showed the carousel dismissed - the injected coordinates came from a
+     // cached snapshot's bounds). Re-query after the cache clear, inject at the
+     // freshly-read center, and log coordinates + post-tap carousel presence
+     // for hit/dismiss discrimination. Coordinate path, target and all
+     // assertions unchanged.
+     val tapTarget=d.findObject(By.desc("Gold Crown lens thumbnail"))?:thumb!!
+     val tb=tapTarget.visibleBounds
+     android.util.Log.w("MODESTRIP-DIAG","tapTarget bounds="+tb.toShortString()+" center=("+tb.centerX()+","+tb.centerY()+") preCarousel="+d.hasObject(By.descContains("lens thumbnail")))
+     d.click(tb.centerX(),tb.centerY())
+     Thread.sleep(500)
+     android.util.Log.w("MODESTRIP-DIAG","postTap carouselPresent="+d.hasObject(By.descContains("lens thumbnail")))
+    }
     run {
      // Fresh-tree poll: same stale-cache shape as CameraLensSheetProofTest's in-use
      // desc waits; on a real miss keep the actual tree as evidence.
