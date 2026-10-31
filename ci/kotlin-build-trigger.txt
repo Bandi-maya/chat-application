@@ -1,1 +1,1 @@
-131 - corrected cc doubling model (straight-readback*a = texture sample; 128+130 frames 0 violations, single/double/missing controls) + camera-video lifecycle file-watch + emoji cache probe via target classloader + restart-check kernel kill capture
+132 - recording contract-correct flow (assert at review + keep copy + discard-cleanup assertion + Stop guard) + mic a11y double-dispatch path probes + lottie 3-class loader probe + AddedStyles per-drag SCROLLSTEP + restart-check unambiguous kernel fallback
