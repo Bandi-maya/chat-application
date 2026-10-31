@@ -65,7 +65,7 @@ class CameraModeStripProofTest {
       capture("before-$name")
       run {
        node.click()
-       val active=if(name=="Night")"Night · hold still while capturing"else"Portrait · device background blur"
+       val active=if(name=="Night")"Night Â· hold still while capturing"else"Portrait Â· device background blur"
        val activated=d.wait(Until.hasObject(By.text(active)),12000)
        capture("after-$name")
        assertTrue("Advertised $name enters OEM mode or must report explicit fallback",activated||d.hasObject(By.textContains("$name unavailable. Photo restored.")))
@@ -276,18 +276,31 @@ class CameraModeStripProofTest {
     // Record WITH the lens composited (synthetic pose), then WITHOUT.
     fun recordOnce():File{
      val dir=File(c.cacheDir,"camera-video")
+     // Lifecycle evidence (run-130: full record/discard flow completed but no
+     // mp4 at the assert). Contract question (main 16:09): CameraVideoSession
+     // deletes reviewFile on discard - if the asserted file IS the review file,
+     // post-discard absence is correct cleanup and the assertion POINT is
+     // wrong; if the file never appears after stop, recording/encoding failed.
+     // Snapshot the dir per stage to discriminate. Assertions unchanged.
+     val lifecycle=StringBuilder()
+     fun snap(stage:String){ val l=dir.listFiles()?.sortedBy{it.name}?.joinToString(","){it.name+":"+it.length()}?:"<none>"; lifecycle.append(stage).append(" -> ").append(l).append('\n'); android.util.Log.w("MODESTRIP-DIAG","lifecycle "+stage+" -> "+l) }
      val before=dir.listFiles()?.filter{it.extension=="mp4"}?.map{it.name}?.toSet() ?: emptySet()
      d.findObject(By.desc("Video camera mode")).click()
      assertTrue(d.wait(Until.hasObject(By.desc("Record video")),20000))
      d.findObject(By.desc("Record video")).click()
      Thread.sleep(1800)
+     snap("recording")
      d.findObject(By.desc("Stop recording")).click()
      assertTrue(d.wait(Until.hasObject(By.text("Record again")),20000))
+     snap("stopped-review")
      d.findObject(By.text("Record again")).click()
      assertTrue(d.wait(Until.hasObject(By.text("Discard this unsaved video?")),5000))
      d.findObject(By.text("Discard video")).click()
      assertTrue(d.wait(Until.hasObject(By.desc("Record video")),20000))
+     snap("post-discard")
      val v=latestVideo(before)
+     snap("at-assert")
+     File(File(c.getExternalFilesDir(null),"screenshots").apply{mkdirs()},"camera-video-lifecycle.txt").appendText(lifecycle.toString())
      assertTrue("Recorded video file exists",v!=null && v.length()>0)
      return v!!
     }
