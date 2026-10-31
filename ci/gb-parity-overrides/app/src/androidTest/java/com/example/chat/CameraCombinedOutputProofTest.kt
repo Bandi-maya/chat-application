@@ -352,48 +352,84 @@ class CameraCombinedOutputProofTest {
                                 Color.red(pp) > 180 && Color.green(pp) < 80 && Color.blue(pp) < 80,
                             )
                         }
-                        // Translucency: single-application alpha math (see
-                        // the premultiplied note below); a twice-painted
-                        // overlay predicts visibly more deposit in channels
-                        // where the tinted frame is dark.
-                        if (oa in 40..220 && doublingChecked < 25) {
-                            // Flatness gate: LINEAR texture filtering blends
-                            // neighboring texels, so only assert where the 4
-                            // neighbors share this texel's alpha (+-16).
-                            var flat = true
-                            for (nb in intArrayOf(-1, 1)) {
-                                if (bx + nb !in 0 until W || by + nb !in 0 until H) { flat = false; break }
-                                if (Math.abs(Color.alpha(ovBmp.getPixel(bx + nb, by)) - oa) > 16) { flat = false; break }
-                                if (Math.abs(Color.alpha(ovBmp.getPixel(bx, by + nb)) - oa) > 16) { flat = false; break }
-                            }
-                            if (!flat) continue
-                            // Bitmap storage is premultiplied: getPixel returns
-                            // p = c*a. The shader mixes tinted*(1-a) + p*a.
-                            // A twice-painted overlay has a' = a + a(1-a) and
-                            // p' = p*(2-a), a visibly heavier deposit.
+                    }
+                }
+                // Doubling model (run-128 root cause): the artwork is a thin ring,
+                // so EVERY translucent texel is an antialiased edge and the old
+                // flatness gate matched zero texels - the check could never run.
+                // Grounded in ColorLensSurfaceProcessor: the overlay texture is
+                // frame-sized and drawn through an identity fullscreen quad, so
+                // GL_LINEAR samples exact texels (rotation is a texel
+                // permutation, no neighbor blending); GLUtils.texImage2D
+                // un-premultiplies, so the shader blends source-over with
+                // STRAIGHT color c = p/a. The old formula's extra *a (p*a =
+                // c*a^2) was also wrong for the same reason.
+                //   single: tinted*(1-a) + c*a    double: tinted*(1-a2) + c*a2
+                data class Chan(val ch: Char, val straight: Float, val tintedC: Float, val obsC: Float)
+                fun doublingSample(obs: (Int, Int) -> Int, perTexelAssert: Boolean): Pair<Int, Int> {
+                    var checked = 0; var violations = 0
+                    for (by in 0 until H step 2) {
+                        for (bx in 0 until W step 2) {
+                            if (checked >= 25) continue
+                            val ov = ovBmp.getPixel(bx, by)
+                            val oa = Color.alpha(ov)
+                            if (oa !in 40..220) continue
                             val a = oa / 255f
-                            val vp = video.getPixel(bx, iyVideo)
                             val a2 = a + a * (1f - a)
-                            for ((ch, ovP, tintedC) in listOf(
-                                Triple('r', Color.red(ov).toFloat(), 0f),
-                                Triple('g', Color.green(ov).toFloat(), 0f),
-                                Triple('b', Color.blue(ov).toFloat(), 255f),
+                            val vp = obs(bx, by)
+                            for ((ch, straight, tintedC, obsC) in listOf(
+                                Chan('r', Color.red(ov) / a, 0f, Color.red(vp).toFloat()),
+                                Chan('g', Color.green(ov) / a, 0f, Color.green(vp).toFloat()),
+                                Chan('b', Color.blue(ov) / a, 255f, Color.blue(vp).toFloat()),
                             )) {
-                                val expSingle = tintedC * (1f - a) + ovP * a
-                                val expDouble = tintedC * (1f - a2) + ovP * (2f - a) * a2
-                                val obs = when (ch) {
-                                    'r' -> Color.red(vp); 'g' -> Color.green(vp); else -> Color.blue(vp)
-                                }.toFloat()
+                                val expSingle = tintedC * (1f - a) + straight * a
+                                val expDouble = tintedC * (1f - a2) + straight * a2
                                 val tol = Math.max(30f, Math.abs(expDouble - expSingle) * 0.5f)
-                                assertTrue(
-                                    "translucent texel ($bx,$by) $ch: single-apply expected ${expSingle.toInt()}, double-apply ${expDouble.toInt()}, observed ${obs.toInt()}",
-                                    Math.abs(obs - expSingle) <= tol,
-                                )
+                                if (Math.abs(obsC - expSingle) > tol) {
+                                    violations++
+                                    if (perTexelAssert) assertTrue(
+                                        "translucent texel ($bx,$by) $ch: single-apply expected ${expSingle.toInt()}, double-apply ${expDouble.toInt()}, observed ${obsC.toInt()}",
+                                        false,
+                                    )
+                                }
                             }
-                            doublingChecked++
+                            checked++
+                        }
+                    }
+                    return checked to violations
+                }
+                fun synthFrame(double: Boolean, present: Boolean): (Int, Int) -> Int = { x, y ->
+                    if (!present) {
+                        android.graphics.Color.rgb(0, 0, 255)
+                    } else {
+                        val ov = ovBmp.getPixel(x, y)
+                        val a = Color.alpha(ov) / 255f
+                        if (a <= 0f) android.graphics.Color.rgb(0, 0, 255) else {
+                            val ae = if (double) a + a * (1f - a) else a
+                            android.graphics.Color.rgb(
+                                (Color.red(ov) / a * ae).toInt().coerceIn(0, 255),
+                                (Color.green(ov) / a * ae).toInt().coerceIn(0, 255),
+                                (255f * (1f - ae) + Color.blue(ov) / a * ae).toInt().coerceIn(0, 255),
+                            )
                         }
                     }
                 }
+                doublingChecked = doublingSample({ x, y -> video.getPixel(x, mapY(y, videoFlipped)) }, true).first
+                // Controls: the model must PASS a known single-painted frame and
+                // FAIL a twice-painted frame and a missing overlay, so it cannot
+                // go vacuously green or red.
+                assertTrue(
+                    "doubling model false-fails a known single-painted frame",
+                    doublingSample(synthFrame(double = false, present = true), false).second == 0,
+                )
+                assertTrue(
+                    "doubling model misses a twice-painted overlay",
+                    doublingSample(synthFrame(double = true, present = true), false).second > 0,
+                )
+                assertTrue(
+                    "doubling model misses a missing overlay",
+                    doublingSample(synthFrame(double = false, present = false), false).second > 0,
+                )
                 Log.i(TAG, "presenceChecked=$presenceChecked doublingChecked=$doublingChecked")
                 assertTrue("lens artwork must have opaque texels on the frame", presenceChecked > 0)
                 assertTrue("lens artwork must have translucent texels for the doubling check", doublingChecked > 0)
