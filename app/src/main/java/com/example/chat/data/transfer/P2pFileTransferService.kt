@@ -127,6 +127,8 @@ class P2pFileTransferService(
         var sentBytes: Long = 0,
         var receivedBytes: Long = 0,
         var receiverFinalized: Boolean = false,
+        var restartAttempts: Int = 0,
+        var restartInProgress: Boolean = false,
         var remoteDescriptionSet: Boolean = false,
         var signalingReady: Boolean = false,
         val queuedCandidates: MutableList<IceCandidate> = mutableListOf(),
@@ -264,8 +266,23 @@ class P2pFileTransferService(
                 if (signal["sdp"]?.toString().orEmpty().length !in 1..256_000) return
                 if (manifest.displayName.length > 180 || manifest.mimeType.length > 120) return
                 val offer = PendingOffer(id, sender, manifest.displayName, manifest.sizeBytes, manifest.mimeType, manifest.expiresAtEpochSeconds)
-                incoming[id] = offer to signal
-                _pendingOffers.value = incoming.values.map { it.first }.sortedByDescending { it.expiresAtEpochSeconds }
+                val activeReceiver = sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.download }
+                if (activeReceiver != null) {
+                    val peer = activeReceiver.peer ?: return
+                    activeReceiver.remoteDescriptionSet = false
+                    setRemoteDescription(peer, SessionDescription.Type.OFFER, signal["sdp"]?.toString() ?: return)
+                    activeReceiver.remoteDescriptionSet = true
+                    flushCandidates(activeReceiver)
+                    val answer = createDescription(peer, offer = false)
+                    if (sendSignal(sender, mapOf("signal_type" to "file_transfer_answer", "call_id" to id, "transfer_id" to id, "sdp" to answer.description))) {
+                        activeReceiver.signalingReady = true
+                        flushLocalCandidates(activeReceiver)
+                        publish(activeReceiver, "Reconnected — resuming")
+                    }
+                } else {
+                    incoming[id] = offer to signal
+                    _pendingOffers.value = incoming.values.map { it.first }.sortedByDescending { it.expiresAtEpochSeconds }
+                }
             }
             "file_transfer_answer" -> {
                 val session = sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.upload } ?: return
@@ -287,6 +304,9 @@ class P2pFileTransferService(
                     if (queue.size < 256) queue.add(ice)
                 } else if (!session.remoteDescriptionSet) session.queuedCandidates.add(ice)
                 else session.peer?.addIceCandidate(ice)
+            }
+            "file_transfer_restart_request" -> {
+                sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.upload }?.let { restartIce(it) }
             }
             "file_transfer_cancel" -> {
                 sessions[id]?.takeIf { it.peerUserId == sender }?.let { fail(it, "Sender cancelled this transfer") }
@@ -382,15 +402,21 @@ class P2pFileTransferService(
             override fun onConnectionChange(state: PeerConnection.PeerConnectionState?) {
                 when (state) {
                     PeerConnection.PeerConnectionState.CONNECTED -> publish(session, "Connected directly")
-                    PeerConnection.PeerConnectionState.DISCONNECTED -> publish(session, "Connection interrupted — retrying")
-                    PeerConnection.PeerConnectionState.FAILED -> fail(session, "Direct connection failed. Retry on a different network.")
+                    PeerConnection.PeerConnectionState.DISCONNECTED -> {
+                        publish(session, "Connection interrupted — retrying")
+                        scope.launch {
+                            kotlinx.coroutines.delay(3_000)
+                            if (session.peer?.connectionState() == PeerConnection.PeerConnectionState.DISCONNECTED) requestIceRestart(session)
+                        }
+                    }
+                    PeerConnection.PeerConnectionState.FAILED -> requestIceRestart(session)
                     PeerConnection.PeerConnectionState.CLOSED -> Unit
                     else -> Unit
                 }
             }
             override fun onSignalingChange(state: PeerConnection.SignalingState?) {}
             override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
-                if (state == PeerConnection.IceConnectionState.FAILED) fail(session, "ICE connection failed")
+                if (state == PeerConnection.IceConnectionState.FAILED) requestIceRestart(session)
             }
             override fun onIceConnectionReceivingChange(receiving: Boolean) {}
             override fun onIceGatheringChange(state: PeerConnection.IceGatheringState?) {}
@@ -558,7 +584,7 @@ class P2pFileTransferService(
         _pendingOffers.value = emptyList()
     }
 
-    private suspend fun createDescription(peer: PeerConnection, offer: Boolean): SessionDescription =
+    private suspend fun createDescription(peer: PeerConnection, offer: Boolean, iceRestart: Boolean = false): SessionDescription =
             suspendCancellableCoroutine { continuation ->
                 val observer = object : SdpObserver {
                     override fun onCreateSuccess(description: SessionDescription?) {
@@ -574,7 +600,10 @@ class P2pFileTransferService(
                     override fun onSetSuccess() {}
                     override fun onSetFailure(error: String?) {}
                 }
-                if (offer) peer.createOffer(observer, MediaConstraints()) else peer.createAnswer(observer, MediaConstraints())
+                val constraints = MediaConstraints().apply {
+                    if (iceRestart) mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+                }
+                if (offer) peer.createOffer(observer, constraints) else peer.createAnswer(observer, constraints)
             }
 
     private suspend fun setRemoteDescription(peer: PeerConnection, type: SessionDescription.Type, sdp: String) {
@@ -585,6 +614,61 @@ class P2pFileTransferService(
                 override fun onCreateSuccess(p0: SessionDescription?) {}
                 override fun onCreateFailure(error: String?) {}
             }, SessionDescription(type, sdp))
+        }
+    }
+
+    private fun requestIceRestart(session: Session) {
+        if (session.direction == TransferDirection.upload) {
+            restartIce(session)
+        } else if (!session.restartInProgress && session.restartAttempts < MAX_ICE_RESTARTS) {
+            session.restartAttempts++
+            session.remoteDescriptionSet = false
+            sendSignal(session.peerUserId, mapOf(
+                "signal_type" to "file_transfer_restart_request",
+                "call_id" to session.id,
+                "transfer_id" to session.id,
+            ))
+            publish(session, "Waiting for sender to reconnect")
+        }
+    }
+
+    private fun restartIce(session: Session) {
+        if (session.restartInProgress || session.restartAttempts >= MAX_ICE_RESTARTS) {
+            if (session.restartAttempts >= MAX_ICE_RESTARTS) publish(session, "Connection could not recover", error = "Retry the transfer from the chat.")
+            return
+        }
+        session.restartInProgress = true
+        session.restartAttempts++
+        scope.launch {
+            try {
+                val peer = session.peer ?: throw IllegalStateException("Transfer peer is unavailable")
+                session.remoteDescriptionSet = false
+                session.signalingReady = false
+                val offer = createDescription(peer, offer = true, iceRestart = true)
+                val manifest = session.manifest
+                val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, session.secret)
+                val payload = mapOf(
+                    "signal_type" to "file_transfer_offer",
+                    "call_id" to session.id,
+                    "transfer_id" to session.id,
+                    "sdp" to offer.description,
+                    "manifest" to mapOf(
+                        "transfer_id" to manifest.transferId, "name" to manifest.displayName,
+                        "mime" to manifest.mimeType, "size" to manifest.sizeBytes,
+                        "chunk" to manifest.chunkBytes, "sha256" to manifest.sha256Hex,
+                        "nonce" to b64(manifest.noncePrefix), "expires" to manifest.expiresAtEpochSeconds,
+                    ),
+                    "manifest_auth" to b64(auth),
+                )
+                sendSignal(session.peerUserId, payload)
+                session.signalingReady = true
+                flushLocalCandidates(session)
+                publish(session, "Reconnecting directly…")
+            } catch (error: Throwable) {
+                if (session.restartAttempts >= MAX_ICE_RESTARTS) fail(session, error.message ?: "Unable to reconnect")
+            } finally {
+                session.restartInProgress = false
+            }
         }
     }
 
@@ -628,6 +712,7 @@ class P2pFileTransferService(
 
     companion object {
         private const val MAX_BUFFERED_BYTES = 2L * 1024L * 1024L
+        private const val MAX_ICE_RESTARTS = 5
         private fun b64(bytes: ByteArray) = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         private fun unb64(value: String) = Base64.decode(value, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         fun parseIceServers(raw: List<Map<String, Any?>>): List<PeerConnection.IceServer> {
