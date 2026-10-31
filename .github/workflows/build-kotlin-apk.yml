@@ -100,7 +100,8 @@ jobs:
               if not source.is_file():
                   continue
               relative = source.relative_to(root)
-              if not relative.parts or relative.parts[0] not in ("app", "ci"):
+              allowed_ci = {"ci/test-shards.py", "ci/run-smoke.sh"}
+              if not relative.parts or (relative.parts[0] != "app" and str(relative) not in allowed_ci):
                   raise SystemExit(f"Unexpected override path: {relative}")
               target = Path(*relative.parts)
               target.parent.mkdir(parents=True, exist_ok=True)
@@ -313,7 +314,8 @@ jobs:
               if not source.is_file():
                   continue
               relative = source.relative_to(root)
-              if not relative.parts or relative.parts[0] not in ("app", "ci"):
+              allowed_ci = {"ci/test-shards.py", "ci/run-smoke.sh"}
+              if not relative.parts or (relative.parts[0] != "app" and str(relative) not in allowed_ci):
                   raise SystemExit(f"Unexpected override path: {relative}")
               target = Path(*relative.parts)
               target.parent.mkdir(parents=True, exist_ok=True)
