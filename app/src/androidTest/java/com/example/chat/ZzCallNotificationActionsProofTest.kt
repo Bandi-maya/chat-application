@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import com.example.chat.data.services.CallForegroundService
 import com.example.chat.data.services.CallSessionState
 import com.example.chat.notifications.CallActionReceiver
@@ -247,8 +249,7 @@ class CallNotificationActionsProofTest {
             for (i in 1..6) {
                 val immediate = i >= 5
                 val t0 = System.currentTimeMillis()
-                val launched = com.example.chat.ui.calls.runCallAction({ cycleLog.append("cycle").append(i).append(" action-failed
-") }) {
+                val launched = com.example.chat.ui.calls.runCallAction({ cycleLog.append("cycle").append(i).append(" action-failed\n") }) {
                     service.initiateCall("synthetic-peer-$i", "Cycle $i", isVideo = false)
                 }
                 if (!immediate) {
