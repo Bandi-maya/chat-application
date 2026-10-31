@@ -569,7 +569,7 @@ fun ChatMessageBubble(
                                 val attachment = message.attachment!!
                                 val tap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() }
                                 if (attachment.url?.startsWith("chaty://transfer/") == true &&
-                                    !message.metadata["p2p_invite_ciphertext"].toString().isNullOrBlank()
+                                    message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true
                                 ) {
                                     P2pVideoInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
                                 } else {
