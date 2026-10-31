@@ -527,8 +527,7 @@ fun ChatDetailHost(
         onMediaTap = { m ->
             val path = m.attachment?.url.orEmpty()
             if (path.startsWith("chaty://transfer/")) {
-                val localDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
-                    ?: File(context.filesDir, "Movies")
+                val localDir = File(context.filesDir, "p2p-received")
                 val localName = com.example.chat.data.services.ChatMediaService.safeFileName(m.attachment?.name ?: "video")
                 val knownFile = p2pTransfers.transfers.value.firstOrNull {
                     it.transferId == path.substringAfterLast('/') && it.status == "Received and verified"
@@ -784,8 +783,7 @@ fun ChatDetailHost(
                 TextButton(onClick = {
                     val link = p2pReceiveLink!!
                     val name = com.example.chat.data.services.ChatMediaService.safeFileName(message.attachment?.name ?: "video")
-                    val directory = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
-                        ?: File(context.filesDir, "Movies")
+                    val directory = File(context.filesDir, "p2p-received")
                     directory.mkdirs()
                     val destination = File(directory, name)
                     val offerId = link.substringAfter("chaty://transfer/").substringBefore('#')
