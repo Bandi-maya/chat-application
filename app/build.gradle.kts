@@ -12,14 +12,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-// Push notifications (messages + incoming calls when the app is closed) need Firebase. Download
-// google-services.json from the Firebase console (Android app id com.example.chat) into app/.
-// Without it the build still works, but pushes are not received.
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
-} else {
-    logger.warn("app/google-services.json not found: Firebase push notifications are disabled in this build.")
-}
+// Notifications and incoming call alerts use Chaty's authenticated custom WebSocket.
 
 // Only public client routing keys are read. Never embed credentials in these values.
 val routingKeys = setOf("REST_API_BASE_URL", "TENANT_ID", "WEBSOCKET_URL")
@@ -128,9 +121,6 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha07")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    // FCM transport: active when app/google-services.json is present (see the plugin note above).
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-    implementation("com.google.firebase:firebase-messaging")
     // Required by the uniffi-generated Kotlin bindings (JNA native calls).
     implementation("net.java.dev.jna:jna:5.14.0@aar")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
