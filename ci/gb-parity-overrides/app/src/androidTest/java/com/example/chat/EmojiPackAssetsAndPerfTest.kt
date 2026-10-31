@@ -68,9 +68,20 @@ class EmojiPackAssetsAndPerfTest {
         return (Debug.getNativeHeapAllocatedSize() + Runtime.getRuntime().let { it.totalMemory() - it.freeMemory() }) / 1024
     }
 
+    /** Evidence-only split of heapKb(): (nativeKb, managedKb) with the same GC
+     *  discipline. Discriminates native-side retention (decoded drawable
+     *  buffers) from managed-heap retention; assertions keep using the sums. */
+    private fun heapPartsKb(): Pair<Long, Long> {
+        System.gc(); Thread.sleep(300); System.gc()
+        val nativeKb = Debug.getNativeHeapAllocatedSize() / 1024
+        val managedKb = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1024
+        return nativeKb to managedKb
+    }
+
     private fun gridRun(pack: String): Triple<Long, Long, Long> {
-        val before = heapKb()
+        val beforeP = heapPartsKb(); val before = beforeP.first + beforeP.second
         var peak = 0L; var off = 0L; var back = 0L
+        var peakP = 0L to 0L; var offP = 0L to 0L; var backP = 0L to 0L
         ActivityScenario.launch<EmojiPackGridFixtureActivity>(
             Intent(ctx, EmojiPackGridFixtureActivity::class.java).putExtra("pack", pack),
         ).use {
@@ -80,15 +91,21 @@ class EmojiPackAssetsAndPerfTest {
                 val p = EmojiPackGridProbe.phase
                 if (p != phase) {
                     phase = p
-                    if (p == "scrolledOff") { Thread.sleep(3_000); off = heapKb() }
-                    if (p == "back") { Thread.sleep(2_000); back = heapKb() }
+                    if (p == "scrolledOff") { Thread.sleep(3_000); offP = heapPartsKb(); off = offP.first + offP.second }
+                    if (p == "back") { Thread.sleep(2_000); backP = heapPartsKb(); back = backP.first + backP.second }
                 } else if (p == "visible") {
-                    Thread.sleep(5_000); peak = heapKb()
+                    Thread.sleep(5_000); peakP = heapPartsKb(); peak = peakP.first + peakP.second
                 }
                 Thread.sleep(200)
             }
         }
-        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back")
+        // Post-close sample (evidence only): after the fixture activity is
+        // destroyed, memory that drops was composition-lifecycle-bound; memory
+        // that stays is process-global retention. Sums stay the returned
+        // Triple's inputs; the splits only enrich the evidence file.
+        Thread.sleep(3_000)
+        val closedP = heapPartsKb(); val closed = closedP.first + closedP.second
+        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back closedKb=$closed beforeSplitKb=${beforeP.first}/${beforeP.second} visibleSplitKb=${peakP.first}/${peakP.second} offSplitKb=${offP.first}/${offP.second} backSplitKb=${backP.first}/${backP.second} closedSplitKb=${closedP.first}/${closedP.second} (split=nativeKb/managedKb)")
         assertEquals("grid did not finish all phases for $pack", "done", EmojiPackGridProbe.phase)
         return Triple(peak - before, off - before, back - before)
     }
