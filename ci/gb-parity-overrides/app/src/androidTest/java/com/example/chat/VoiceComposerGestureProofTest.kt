@@ -85,6 +85,25 @@ class VoiceComposerGestureProofTest {
             capture("tap-toggle-$style2")
         }
     }
+    @Test fun micA11yActionClickTogglesModeWithoutRecordingInBothStyles() {
+        for (style2 in listOf(false, true)) runStyle(style2) {
+            // TalkBack/keyboard path: activate the published ACTION_CLICK instead
+            // of injecting coordinates (run-127 proof the mic node published no
+            // click action). The a11y action must invoke the mode toggle ONLY;
+            // hold/record is gesture-only, so uploads/sends/deletes stay 0.
+            val mic = device.wait(Until.findObject(By.descStartsWith("Microphone mode.")), 10000)
+                ?: throw AssertionError("mic node missing")
+            assertTrue("mic node must publish ACTION_CLICK",
+                mic.performAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK))
+            assertTrue(device.wait(Until.hasObject(By.descStartsWith("Video mode.")), 12000))
+            status("recording=false;locked=false;busy=false;uploads=0;sends=0;deletes=0")
+            val vid = device.findObject(By.descStartsWith("Video mode."))
+            assertTrue(vid.performAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK))
+            assertTrue(device.wait(Until.hasObject(By.descStartsWith("Microphone mode.")), 12000))
+            status("recording=false;locked=false;busy=false;uploads=0;sends=0;deletes=0")
+            capture("a11y-toggle-$style2")
+        }
+    }
     @Test fun holdThenLockAndDeleteNeverUploadsInBothStyles() {
         for (style2 in listOf(false, true)) runStyle(style2) {
             val r = device.findObject(By.descStartsWith("Microphone mode.")).visibleBounds
