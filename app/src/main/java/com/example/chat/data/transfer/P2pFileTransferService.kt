@@ -209,7 +209,10 @@ class P2pFileTransferService(
             "file_transfer_answer" -> {
                 val session = sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.upload } ?: return
                 val sdp = signal["sdp"]?.toString().orEmpty()
-                if (sdp.isNotBlank()) setRemoteDescription(session.peer ?: return, SessionDescription.Type.ANSWER, sdp)
+                if (sdp.isNotBlank()) {
+                    setRemoteDescription(session.peer ?: return, SessionDescription.Type.ANSWER, sdp)
+                    session.remoteDescriptionSet = true
+                }
                 flushCandidates(session)
                 publish(session, "Connecting")
             }
@@ -398,7 +401,7 @@ class P2pFileTransferService(
                 publish(session, "Network backpressure — waiting")
                 break
             }
-            session.sentBytes += minOf(session.manifest.chunkBytes.toLong(), session.manifest.sizeBytes - index * session.manifest.chunkBytes)
+            session.sentBytes = minOf(session.manifest.sizeBytes, session.sentBytes + minOf(session.manifest.chunkBytes.toLong(), session.manifest.sizeBytes - index * session.manifest.chunkBytes))
             session.monitorId?.let { transferMonitor.update(it, session.sentBytes, session.manifest.sizeBytes) }
             publish(session, "Sending")
         }
@@ -452,6 +455,14 @@ class P2pFileTransferService(
         publish(session, "Sent")
         session.channel?.close()
         session.peer?.close()
+        session.file?.let { runCatching { it.delete() } }
+    }
+
+    fun disposeAll() {
+        sessions.values.toList().forEach { fail(it, "Account signed out") }
+        incoming.clear()
+        incomingCandidates.clear()
+        _pendingOffers.value = emptyList()
     }
 
     private suspend fun createDescription(peer: PeerConnection, offer: Boolean): SessionDescription =
@@ -505,6 +516,7 @@ class P2pFileTransferService(
         publish(session, "Failed", error = reason)
         session.channel?.close()
         session.peer?.close()
+        session.file?.let { runCatching { it.delete() } }
         sessions.remove(session.id)
     }
 
