@@ -290,19 +290,33 @@ class CameraModeStripProofTest {
      d.findObject(By.desc("Record video")).click()
      Thread.sleep(1800)
      snap("recording")
+     // Run-131 NPE here: Stop recording was absent from the served a11y tree
+     // 1.8s after the Record tap while the mp4 grew (emulator a11y publish
+     // lag, same family as the mic desc lag). Guard with the same measured
+     // 20s Until-wait the sibling steps use; flow unchanged otherwise.
+     assertTrue("Stop recording must appear after recording starts",d.wait(Until.hasObject(By.desc("Stop recording")),20000))
      d.findObject(By.desc("Stop recording")).click()
      assertTrue(d.wait(Until.hasObject(By.text("Record again")),20000))
      snap("stopped-review")
+     // Contract (main 17:25): prove the take BEFORE the discard flow, and keep
+     // discard cleanup covered. The review file is asserted at review and
+     // copied for the pixel decode; discard is then asserted to REMOVE the
+     // review file (CameraVideoSession deletes reviewFile on discard:
+     // lines 213/298/321). The pre-131 assert-after-discard conflicted with
+     // that cleanup contract.
+     val v=latestVideo(before)
+     snap("at-review-assert")
+     assertTrue("Recorded video file exists at review",v!=null && v.length()>0)
+     val keep=File(c.cacheDir,"camera-video-keep-"+System.currentTimeMillis()+".mp4")
+     v!!.copyTo(keep,overwrite=true)
      d.findObject(By.text("Record again")).click()
      assertTrue(d.wait(Until.hasObject(By.text("Discard this unsaved video?")),5000))
      d.findObject(By.text("Discard video")).click()
      assertTrue(d.wait(Until.hasObject(By.desc("Record video")),20000))
      snap("post-discard")
-     val v=latestVideo(before)
-     snap("at-assert")
+     assertTrue("Discard removes the unsaved review file",!v.exists())
      File(File(c.getExternalFilesDir(null),"screenshots").apply{mkdirs()},"camera-video-lifecycle.txt").appendText(lifecycle.toString())
-     assertTrue("Recorded video file exists",v!=null && v.length()>0)
-     return v!!
+     return keep
     }
     com.example.chat.ui.camera.CameraVideoNativeProof.fakeLensPoses=listOf(pose)
     val withLens=recordOnce()
