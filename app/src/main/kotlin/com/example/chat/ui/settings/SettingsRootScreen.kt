@@ -104,7 +104,7 @@ enum class SettingsDestination {
     Conversation, Effects, Universal, HomeShortcuts, Notifications, Automation,
     Calls, StorageMedia, Permissions, BackupRestore, WasteCleaning, About,
     PrivacyPolicy, ShareChaty,
-    EditProfile, SearchSettings, QrCode,
+    EditProfile, SearchSettings, QrCode, NetworkUsage,
 }
 
 /** Dart ProfileMediaSource. */
@@ -152,6 +152,7 @@ private val allRootGroups: List<RootGroup> = listOf(
         RootRow(SettingsDestination.Calls, Icons.Outlined.Call, { LocalAppColors.current.warning }, "Call Settings", "Call privacy, incoming call controls & call appearance"),
     )),
     RootGroup("Storage and system", listOf(
+        RootRow(SettingsDestination.NetworkUsage, Icons.Rounded.Storage, { LocalAppColors.current.info }, "Network & Data Usage", "Live upload/download progress, remaining data, speed and usage totals"),
         RootRow(SettingsDestination.StorageMedia, Icons.Rounded.Storage, { LocalAppColors.current.accent }, "Storage & Media", "Auto-download quality, media limits & cache retention"),
         RootRow(SettingsDestination.Permissions, Icons.Outlined.AdminPanelSettings, { LocalAppColors.current.primary }, "System Permissions & Hardware", "Camera, microphone, storage, battery & OS access"),
         RootRow(SettingsDestination.BackupRestore, Icons.Outlined.Backup, { LocalAppColors.current.info }, "Backup and restore", "Export and restore Chaty settings safely"),
