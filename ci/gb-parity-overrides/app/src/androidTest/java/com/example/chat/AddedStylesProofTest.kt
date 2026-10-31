@@ -392,7 +392,18 @@ class AddedStylesProofTest {
     }
 
     private fun clickText(text: String, timeoutMs: Long = 10000): UiObject2 {
-        assertTrue("'$text' not reachable", scrollToText(text))
+        // Reachability evidence (run-128: the miss tree lacked the row entirely
+        // with a window signature identical to the hit case - visible hierarchy
+        // only). On a miss, record the full active-window tree, whether ANY
+        // merged-tree node still matches, and the scrollable inventory, so
+        // product reachability can be judged from artifacts. Assertion unchanged.
+        if (!scrollToText(text)) {
+            dumpTree("not-reachable-" + text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40))
+            val matches = try { device.findObjects(By.textContains(text.take(24))).size } catch (_: Exception) { -1 }
+            val scrollBounds = scrollables().mapNotNull { try { it.visibleBounds.toShortString() } catch (_: Exception) { null } }
+            android.util.Log.w("AddedStyles", "SCROLLMISS-DIAG text='" + text + "' mergedMatches=" + matches + " scrollables=" + scrollBounds)
+            assertTrue("'$text' not reachable", false)
+        }
         // Fresh-tree find: this emulator build can serve a stale accessibility
         // cache for in-place lazy-list updates (AppRoot-proven shape:
         // scrollToText's fresh machinery saw the node while a plain Until wait
