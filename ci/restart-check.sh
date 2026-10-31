@@ -17,7 +17,15 @@ adb devices -l | tr -d '\r' | sed 's/^/RESTART-ADB /'
 # Kill-mechanism evidence (run-130: RESTART-QEMU proves the qemu PROCESS exits;
 # whether the kernel OOM-killed it is unresolved). host-dmesg-tail exists but
 # ends early; grep the ring buffer for kill signatures explicitly.
-dmesg 2>/dev/null | grep -iE 'oom|killed process|out of memory|segfault' | tail -5 | sed 's/^/RESTART-KERNEL /' || echo "RESTART-KERNEL dmesg unavailable-or-no-matches"
+# (run-131: the earlier one-liner could not distinguish no-matches from
+# dmesg-unavailable because the pipeline exit status was sed's.)
+DMESG_OUT=$(dmesg 2>/dev/null)
+if [ -z "$DMESG_OUT" ]; then
+  echo "RESTART-KERNEL dmesg-unavailable"
+else
+  KLINE=$(echo "$DMESG_OUT" | grep -iE 'oom|killed process|out of memory|segfault' | tail -5)
+  if [ -n "$KLINE" ]; then echo "$KLINE" | sed 's/^/RESTART-KERNEL /'; else echo "RESTART-KERNEL no-matches"; fi
+fi
 adb shell am force-stop $PKG
 USER_JSON='{&quot;id&quot;:&quot;synthetic-user-1&quot;,&quot;username&quot;:&quot;testuser&quot;,&quot;displayName&quot;:&quot;Test User&quot;,&quot;avatarInitials&quot;:&quot;T&quot;,&quot;avatarColorHex&quot;:&quot;0xFF6366F1&quot;,&quot;about&quot;:&quot;Synthetic&quot;,&quot;email&quot;:&quot;&quot;,&quot;phone&quot;:&quot;&quot;,&quot;avatarUrl&quot;:null}'
 cat > /tmp/chaty_api_backend.xml <<XMLEOF
