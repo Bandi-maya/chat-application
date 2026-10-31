@@ -17,21 +17,22 @@ class ChatyApplication : Application() {
         super.onCreate()
         UniffiMlsEngine.install()
         ServiceLocator.init(this)
-        // Dart main.dart:206: FirebaseNotificationService().initialize() at startup, best-effort
-        // ("Chaty Firebase bootstrap skipped" on failure): eager getToken() plus the refresh
-        // listener, unauthenticated included; api-hub registration stays auth-guarded inside
-        // the registrar exactly like Dart's _registerWithBackends. Touching fcmRegistrar here
-        // also installs it into FcmRegistrarHolder before any early onNewToken can arrive.
-        // Inert until a real google-services.json lands (token fetch then throws and is logged).
+        // Keep the custom-backend WebSocket alive without Firebase. The backend owns one
+        // account-scoped socket; the foreground service only preserves process execution.
+        // Auth transitions start it for real accounts and stop it immediately on sign-out/demo.
         try {
-            // apiBackend before fcmRegistrar: initialize() fires the FCM sync hook
-            // synchronously on a restored session; touching apiBackend first lets that
-            // hook construct the registrar through apiBackendUnderConstruction instead of
-            // re-entering the fcmRegistrar lazy from inside its own initializer.
-            ServiceLocator.apiBackend
-            ServiceLocator.fcmRegistrar.fetchAndRegisterToken()
+            val backend = ServiceLocator.apiBackend
+            backend.addAuthScopeListener { account ->
+                val shouldConnect = !account.userId.isNullOrBlank() &&
+                    backend.isAuthenticated && !backend.isDemoSession
+                if (shouldConnect) {
+                    com.example.chat.notifications.ChatyRealtimeForegroundService.start(this)
+                } else {
+                    com.example.chat.notifications.ChatyRealtimeForegroundService.stop(this)
+                }
+            }
         } catch (e: Exception) {
-            android.util.Log.w("ChatyApplication", "Chaty Firebase bootstrap skipped: $e")
+            android.util.Log.w("ChatyApplication", "Realtime notification service bootstrap skipped: $e")
         }
         // Ring / notify even when no screen is open (process started by a push or kept alive).
         try {
