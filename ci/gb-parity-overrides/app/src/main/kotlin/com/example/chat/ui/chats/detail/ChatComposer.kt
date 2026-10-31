@@ -699,7 +699,14 @@ private fun ComposerActionButton(
                 // recording. Visuals and gesture handling are unchanged.
                 if (onTap != null) {
                     this.role = Role.Button
-                    this.onClick(label = null) { onTap(); true }
+                    // MicGestureDiag (bounded, DEBUG-only): run-131 saw ONE a11y
+                    // ACTION_CLICK produce TWO toggle callbacks 432ms apart.
+                    // This tag discriminates the semantics-dispatch path from
+                    // the pointer path (logged below) at the next occurrence.
+                    this.onClick(label = null) {
+                        if (com.example.chat.BuildConfig.DEBUG && (semanticsLabel.startsWith("Microphone mode") || semanticsLabel.startsWith("Video mode"))) android.util.Log.i("MicGestureDiag", "mic semanticsOnClick dispatch t=" + System.currentTimeMillis())
+                        onTap(); true
+                    }
                 }
             }
             .pointerInput(enabled) {
@@ -712,6 +719,7 @@ private fun ComposerActionButton(
                     },
                     onTap = {
                         if (emphasized) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (com.example.chat.BuildConfig.DEBUG && (semanticsLabel.startsWith("Microphone mode") || semanticsLabel.startsWith("Video mode"))) android.util.Log.i("MicGestureDiag", "mic pointerTap dispatch t=" + System.currentTimeMillis())
                         onTap?.invoke()
                     },
                 )
@@ -802,7 +810,7 @@ private fun SendMicMorph(
     }
 }
 
-/** Dart composer TextField port: hint 'Message…  /task or #reply', dense
+/** Dart composer TextField port: hint 'Messageâ¦  /task or #reply', dense
  *  padding (default h12/v11), 14sp * fontScale, min 1 / max 5 lines. */
 @Composable
 private fun ComposerTextField(
@@ -839,7 +847,7 @@ private fun ComposerTextField(
         Box(Modifier.weight(1f)) {
             if (text.isEmpty()) {
                 Text(
-                    "Message…  /task or #reply",
+                    "Messageâ¦  /task or #reply",
                     color = Color(theme.secondaryTextColor),
                     fontSize = fontSize,
                     maxLines = 1,
