@@ -269,6 +269,15 @@ class P2pFileTransferService(
                 val activeReceiver = sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.download }
                 if (activeReceiver != null) {
                     val peer = activeReceiver.peer ?: return
+                    val currentManifest = activeReceiver.manifest
+                    if (manifest.transferId != currentManifest.transferId ||
+                        manifest.displayName != currentManifest.displayName ||
+                        manifest.mimeType != currentManifest.mimeType ||
+                        manifest.sizeBytes != currentManifest.sizeBytes ||
+                        manifest.chunkBytes != currentManifest.chunkBytes ||
+                        manifest.sha256Hex != currentManifest.sha256Hex ||
+                        !manifest.noncePrefix.contentEquals(currentManifest.noncePrefix)
+                    ) return
                     NativeP2pTransferProtocol.verifyManifest(
                         activeReceiver.manifest,
                         unb64(signal["manifest_auth"]?.toString() ?: ""),
