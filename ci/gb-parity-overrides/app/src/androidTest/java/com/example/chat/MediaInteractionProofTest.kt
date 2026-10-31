@@ -458,8 +458,32 @@ class MediaInteractionProofTest {
             scenario.onActivity { it.setContent { MaterialTheme {
                 ChatMessageBubble(messages[0], true, ThemePresets.whatsappIosLight,
                     mediaContent = {
-                        com.example.chat.ui.chats.detail.CompactMediaAlbum(messages, null, null, null,
-                            onOpen = { item, _ -> opened.set(item.id) }, onMenu = { item, _ -> menued.set(item.id) })
+                        androidx.compose.foundation.layout.Box(
+                            androidx.compose.ui.Modifier.pointerInput(Unit) {
+                                androidx.compose.foundation.gestures.awaitEachGesture {
+                                    while (true) {
+                                        val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                                        ev.changes.forEach { ch ->
+                                            android.util.Log.i("ALBUM-PROBE", "evt Initial type=" + ev.type + " pos=" + ch.position + " consumed=" + ch.isConsumed)
+                                        }
+                                        if (ev.type == androidx.compose.ui.input.pointer.PointerEventType.Up || ev.type == androidx.compose.ui.input.pointer.PointerEventType.Cancel) break
+                                    }
+                                }
+                            }.pointerInput(Unit) {
+                                androidx.compose.foundation.gestures.awaitEachGesture {
+                                    while (true) {
+                                        val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Final)
+                                        ev.changes.forEach { ch ->
+                                            android.util.Log.i("ALBUM-PROBE", "evt Final type=" + ev.type + " pos=" + ch.position + " consumed=" + ch.isConsumed)
+                                        }
+                                        if (ev.type == androidx.compose.ui.input.pointer.PointerEventType.Up || ev.type == androidx.compose.ui.input.pointer.PointerEventType.Cancel) break
+                                    }
+                                }
+                            },
+                        ) {
+                            com.example.chat.ui.chats.detail.CompactMediaAlbum(messages, null, null, null,
+                                onOpen = { item, _ -> opened.set(item.id) }, onMenu = { item, _ -> menued.set(item.id) })
+                        }
                     })
             } } }
             waitText("Compact album caption")
