@@ -783,7 +783,39 @@ object ServiceLocator {
             store = mediaCache,
             isOnline = { networkMonitor.state.value.online },
             lookup = { ref -> trustedAttachmentFor(ref) },
-            download = { url -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { downloader.open(url) } },
+            download = { url ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val transferId = transferMonitor.begin(
+                        com.example.chat.data.network.TransferDirection.download,
+                        com.example.chat.data.network.TransferKind.other,
+                        null,
+                        "Attachment",
+                    )
+                    try {
+                        val source = downloader.open(url) { sent, total ->
+                            transferMonitor.update(transferId, sent, total)
+                        }
+                        object : java.io.FilterInputStream(source) {
+                            private var reachedEof = false
+                            override fun read(): Int = super.read().also { if (it < 0) reachedEof = true }
+                            override fun read(b: ByteArray, off: Int, len: Int): Int =
+                                super.read(b, off, len).also { if (it < 0) reachedEof = true }
+                            override fun close() {
+                                try { super.close() } finally {
+                                    transferMonitor.finish(
+                                        transferId,
+                                        if (reachedEof) com.example.chat.data.network.TransferStatus.completed
+                                        else com.example.chat.data.network.TransferStatus.failed,
+                                    )
+                                }
+                            }
+                        }
+                    } catch (error: Throwable) {
+                        transferMonitor.finish(transferId, com.example.chat.data.network.TransferStatus.failed)
+                        throw error
+                    }
+                }
+            },
         )
     }
 
