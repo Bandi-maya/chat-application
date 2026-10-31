@@ -207,7 +207,12 @@ fun ChatDetailHost(
                     name to size
                 }
                 val safeName = com.example.chat.data.services.ChatMediaService.safeFileName(details.first)
-                val mime = context.contentResolver.getType(selectedUri) ?: "application/octet-stream"
+                val reportedMime = context.contentResolver.getType(selectedUri) ?: "application/octet-stream"
+                val extension = safeName.substringAfterLast('.', "").lowercase()
+                val isVideoFile = reportedMime.startsWith("video/") || extension in setOf("mp4", "mkv", "mov", "webm", "m4v", "avi", "3gp", "mpeg", "mpg")
+                val mime = if (isVideoFile && !reportedMime.startsWith("video/")) {
+                    when (extension) { "mkv" -> "video/x-matroska"; "3gp" -> "video/3gpp"; else -> "video/mp4" }
+                } else reportedMime
                 if (!isDirect || otherId == null) throw IllegalStateException("Large direct transfers are currently available in one-to-one chats.")
                 if (connection?.callsAllowed == false) throw IllegalStateException("Accept this contact connection before sending a large file.")
                 val descriptor = context.contentResolver.openFileDescriptor(selectedUri, "r")
@@ -234,7 +239,7 @@ fun ChatDetailHost(
                 )
                 val attachment = com.example.chat.domain.models.MessageAttachment(
                     id = transferId!!,
-                    type = if (mime.startsWith("video/")) "video" else "document",
+                    type = if (isVideoFile) "video" else "document",
                     name = safeName,
                     size = com.example.chat.data.services.ChatMediaService.formatBytes(size),
                     url = "chaty://transfer/" + transferId,
@@ -242,7 +247,7 @@ fun ChatDetailHost(
                 val sent = api.sendMessage(
                     conversation.id,
                     "",
-                    type = if (mime.startsWith("video/")) com.example.chat.domain.models.MessageType.video else com.example.chat.domain.models.MessageType.document,
+                    type = if (isVideoFile) com.example.chat.domain.models.MessageType.video else com.example.chat.domain.models.MessageType.document,
                     attachment = attachment,
                     extraMetadata = mapOf(
                         "p2p_invite_ciphertext" to encryptedInvite.ciphertext,
