@@ -6,8 +6,6 @@ import android.widget.Toast
 import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.File
-import java.io.FileOutputStream
-import java.util.UUID
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -188,7 +186,7 @@ fun ChatDetailHost(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { selectedUri ->
         if (selectedUri != null) scope.launch {
-            var stagedFile: File? = null
+            var sourceOwner: android.os.ParcelFileDescriptor.AutoCloseInputStream? = null
             var transferId: String? = null
             try {
                 runCatching {
@@ -209,56 +207,36 @@ fun ChatDetailHost(
                 }
                 val safeName = com.example.chat.data.services.ChatMediaService.safeFileName(details.first)
                 val mime = context.contentResolver.getType(selectedUri) ?: "application/octet-stream"
-                if (details.second != null && details.second!! > com.example.chat.data.transfer.NativeP2pTransferProtocol.MAX_FILE_BYTES) {
-                    throw IllegalStateException("Files larger than 100 GB are not supported.")
-                }
-                val stagingDir = File(context.filesDir, "p2p-outgoing").apply { mkdirs() }
-                if (details.second != null && android.os.StatFs(stagingDir.absolutePath).availableBytes < details.second!!) {
-                    throw IllegalStateException("Not enough free storage to stage this file.")
-                }
-                stagedFile = File(stagingDir, UUID.randomUUID().toString() + "_" + safeName)
-                withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    val input = context.contentResolver.openInputStream(selectedUri)
-                        ?: throw IllegalStateException("Cannot read the selected file.")
-                    input.use { source ->
-                        FileOutputStream(stagedFile!!).use { output ->
-                            val buffer = ByteArray(1024 * 1024)
-                            var total = 0L
-                            while (true) {
-                                val count = source.read(buffer)
-                                if (count < 0) break
-                                total += count
-                                if (total > com.example.chat.data.transfer.NativeP2pTransferProtocol.MAX_FILE_BYTES) {
-                                    throw IllegalStateException("Files larger than 100 GB are not supported.")
-                                }
-                                output.write(buffer, 0, count)
-                            }
-                            output.fd.sync()
-                        }
-                    }
-                }
-                val size = stagedFile!!.length()
-                if (size <= 0L) throw IllegalStateException("The selected file is empty.")
                 if (!isDirect || otherId == null) throw IllegalStateException("Large direct transfers are currently available in one-to-one chats.")
                 if (connection?.callsAllowed == false) throw IllegalStateException("Accept this contact connection before sending a large file.")
-                val link = p2pTransfers.offerFile(otherId, stagedFile!!, mime)
+                val descriptor = context.contentResolver.openFileDescriptor(selectedUri, "r")
+                    ?: throw IllegalStateException("The selected file provider did not return a readable descriptor.")
+                sourceOwner = android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor)
+                val channel = sourceOwner!!.channel
+                val size = details.second?.takeIf { it > 0L } ?: channel.size()
+                if (size !in 1..com.example.chat.data.transfer.NativeP2pTransferProtocol.MAX_FILE_BYTES) {
+                    throw IllegalStateException("This file is empty, not seekable, or larger than 100 GB.")
+                }
+                val link = p2pTransfers.offerFile(otherId, channel, safeName, size, mime, sourceOwner = sourceOwner)
+                sourceOwner = null // service owns the file descriptor until transfer completion
                 val invite = com.example.chat.data.transfer.NativeP2pTransferProtocol.parseInvite(link)
                 transferId = invite.transferId
                 val secretText = android.util.Base64.encodeToString(
                     invite.secret,
                     android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING,
                 )
+                invite.secret.fill(0)
                 // The invitation secret is MLS-encrypted before it is placed in chat content.
                 val encryptedInvite = ServiceLocator.mls.encryptPayload(
                     conversation.id,
-                    mapOf("kind" to "chaty_p2p_invite_v1", "transfer_id" to invite.transferId, "secret" to secretText),
+                    mapOf("kind" to "chaty_p2p_invite_v1", "transfer_id" to transferId, "secret" to secretText),
                 )
                 val attachment = com.example.chat.domain.models.MessageAttachment(
-                    id = invite.transferId,
+                    id = transferId!!,
                     type = if (mime.startsWith("video/")) "video" else "document",
                     name = safeName,
                     size = com.example.chat.data.services.ChatMediaService.formatBytes(size),
-                    url = "chaty://transfer/" + invite.transferId,
+                    url = "chaty://transfer/" + transferId,
                 )
                 val sent = api.sendMessage(
                     conversation.id,
@@ -273,12 +251,11 @@ fun ChatDetailHost(
                     ),
                 )
                 if (sent == null) throw IllegalStateException("The transfer offer was created but the chat message could not be sent.")
-                stagedFile = null
                 toast("Secure transfer link sent.")
                 rev++
             } catch (e: Exception) {
                 transferId?.let { p2pTransfers.cancel(it) }
-                stagedFile?.let { runCatching { it.delete() } }
+                runCatching { sourceOwner?.close() }
                 toast(e.message ?: "Could not start the large-file transfer.")
             }
         }
