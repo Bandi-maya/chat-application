@@ -782,7 +782,7 @@ fun ChatDetailHost(
                     Text((message.attachment?.size ?: "Large file") + " · Encrypted peer transfer")
                     Text("Estimated download: about " + (message.attachment?.size ?: "the full file size") + ". Retries may use additional data.", color = Color(theme.secondaryTextColor))
                     Text("The file is saved in Chaty’s private storage and can be played inside the app.", color = Color(theme.secondaryTextColor))
-                    if (liveNetworkStatus.metered) Text("You are on a metered connection.", color = Color(theme.warningColor))
+                    if (liveNetworkStatus.metered) Text("You are on a metered connection.", color = Color(theme.secondaryTextColor))
                 }
             },
             dismissButton = {
