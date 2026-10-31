@@ -903,13 +903,21 @@ class CallSignalingService(
 
     /** Called whenever Android reports a new network estimate. Audio is never disabled;
      * video is adapted to the available uplink and low-data preference. */
-    suspend fun onNetworkStatusChanged(upstreamKbps: Int, downstreamKbps: Int) {
+    suspend fun onNetworkStatusChanged(
+        upstreamKbps: Int,
+        downstreamKbps: Int,
+        packetLossPercent: Double = 0.0,
+        roundTripTimeMs: Long = 0L,
+    ) {
         val session = currentSession ?: return
         if (!session.isActive || !session.isVideo || session.isDemo) return
         val profile = when {
-            upstreamKbps in 1..69 -> CallNetworkProfile.ultraWeak
-            upstreamKbps in 70..179 -> CallNetworkProfile.weak
-            upstreamKbps in 180..449 -> CallNetworkProfile.balanced
+            packetLossPercent >= 12.0 || roundTripTimeMs >= 1_500L || upstreamKbps in 1..69 ->
+                CallNetworkProfile.ultraWeak
+            packetLossPercent >= 6.0 || roundTripTimeMs >= 900L || upstreamKbps in 70..179 ->
+                CallNetworkProfile.weak
+            packetLossPercent >= 3.0 || roundTripTimeMs >= 550L || upstreamKbps in 180..449 ->
+                CallNetworkProfile.balanced
             upstreamKbps in 450..899 -> CallNetworkProfile.strong
             upstreamKbps >= 900 -> CallNetworkProfile.high
             else -> CallNetworkProfile.weak
