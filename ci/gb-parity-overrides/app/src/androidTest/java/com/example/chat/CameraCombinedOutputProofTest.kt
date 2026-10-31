@@ -368,24 +368,25 @@ class CameraCombinedOutputProofTest {
                 // Doubling model (run-128 root cause + empirical grounding): the
                 // artwork is a thin ring, so EVERY translucent texel is an
                 // antialiased edge and the old flatness gate matched zero texels.
-                // Convention MEASURED on the actual device path, not assumed
-                // (main 14:39): run-128's decoded cc-video.png vs this test's own
-                // cc-overlay.png readback fits obs = tinted*(1-a) + read*a at all
-                // 84 translucent texels with max error 0.7 (straight-alpha
-                // hypothesis misses by mean 54/max 64; either flip hypothesis
-                // >73; opaque-texel codec noise <=1). This is a measured identity
-                // between the shader's sampled value and the test's Bitmap
-                // readback channel - where premultiplication lives across
-                // storage/upload/sample/readback is NOT claimed and does not
-                // matter to this assertion.
-                // Double application derived from the shader itself with the
-                // SAME source sample s in both passes (mix(tinted, s, a)):
+                // Convention MEASURED end-to-end on the actual device path
+                // (130's own failure message completes the chain): this test's
+                // Bitmap readback is STRAIGHT (readback 227 at alpha 63;
+                // "expected 56" = 227*a), while the shader's texture sample is
+                // the PREMULTIPLIED form sample = readback*a ("observed 14" =
+                // 227*a^2). Both 128 and 130 decoded frames fit
+                //   obs = tinted*(1-a) + readback*a*a
+                // at every translucent texel (max error 0.7 / 0.65; flip
+                // hypotheses >73; opaque codec noise <=1). Where
+                // premultiplication enters across storage/upload/sample is not
+                // claimed; the readback<->sample identity is what's measured.
+                // Double application derived from the shader (mix(tinted, s, a))
+                // with the SAME sample s = readback*a in both passes:
                 //   r1 = t*(1-a) + s*a
-                //   r2 = r1*(1-a) + s*a = t*(1-a)^2 + s*a*(2-a)
-                // The aggregate form t*(1-a2) + s*a2, a2 = 1-(1-a)^2, is valid
-                // ONLY because s is constant across passes (same overlay texel);
-                // it would not hold if the sample changed between steps.
-                //   single: tinted*(1-a) + p*a      double: tinted*(1-a2) + p*a2
+                //   r2 = r1*(1-a) + s*a = t*(1-a)^2 + s*a*(2-a) = t*(1-a2) + s*a2
+                // The aggregate form holds ONLY because s is constant across
+                // passes (same overlay texel).
+                //   single: tinted*(1-a) + c*a^2      double: tinted*(1-a2) + c*a*a2
+                //   (c = straight readback channel, a2 = 1-(1-a)^2)
                 data class Chan(val ch: Char, val premult: Float, val tintedC: Float, val obsC: Float)
                 fun doublingSample(obs: (Int, Int) -> Int, perTexelAssert: Boolean): Pair<Int, Int> {
                     var checked = 0; var violations = 0
@@ -399,9 +400,9 @@ class CameraCombinedOutputProofTest {
                             val a2 = 1f - (1f - a) * (1f - a)
                             val vp = obs(bx, by)
                             for ((ch, premult, tintedC, obsC) in listOf(
-                                Chan('r', Color.red(ov).toFloat(), 0f, Color.red(vp).toFloat()),
-                                Chan('g', Color.green(ov).toFloat(), 0f, Color.green(vp).toFloat()),
-                                Chan('b', Color.blue(ov).toFloat(), 255f, Color.blue(vp).toFloat()),
+                                Chan('r', Color.red(ov) * a, 0f, Color.red(vp).toFloat()),
+                                Chan('g', Color.green(ov) * a, 0f, Color.green(vp).toFloat()),
+                                Chan('b', Color.blue(ov) * a, 255f, Color.blue(vp).toFloat()),
                             )) {
                                 val expSingle = tintedC * (1f - a) + premult * a
                                 val expDouble = tintedC * (1f - a2) + premult * a2
@@ -428,9 +429,9 @@ class CameraCombinedOutputProofTest {
                         if (a <= 0f) android.graphics.Color.rgb(0, 0, 255) else {
                             val ae = if (double) 1f - (1f - a) * (1f - a) else a
                             android.graphics.Color.rgb(
-                                (Color.red(ov) * ae).toInt().coerceIn(0, 255),
-                                (Color.green(ov) * ae).toInt().coerceIn(0, 255),
-                                (255f * (1f - ae) + Color.blue(ov) * ae).toInt().coerceIn(0, 255),
+                                (Color.red(ov) * a * ae).toInt().coerceIn(0, 255),
+                                (Color.green(ov) * a * ae).toInt().coerceIn(0, 255),
+                                (255f * (1f - ae) + Color.blue(ov) * a * ae).toInt().coerceIn(0, 255),
                             )
                         }
                     }
