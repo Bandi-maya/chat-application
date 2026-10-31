@@ -729,7 +729,7 @@ fun ChatDetailHost(
         com.example.chat.ui.chats.detail.MediaViewerScreen(
             theme = theme,
             title = localP2pFile.name,
-            type = if (localP2pFile.extension.lowercase() in setOf("mp4", "mkv", "mov", "webm")) "video" else "document",
+            type = "video",
             size = com.example.chat.data.services.ChatMediaService.formatBytes(localP2pFile.length()),
             storagePath = localP2pFile.toURI().toString(),
             createSignedUrl = { path, _ -> path },
