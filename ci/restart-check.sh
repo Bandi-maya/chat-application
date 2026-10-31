@@ -31,8 +31,16 @@ fi
 # cgroup OOM-kill counters survive ring-buffer loss: oom_kill in memory.events is
 # monotonic. Entry/exit delta attributes a qemu kill even when dmesg shows nothing
 # (run-133: real no-matches with a readable buffer).
-OOM_ENTRY=$(awk '/^oom_kill /{print $2}' /sys/fs/cgroup/memory.events 2>/dev/null)
+# /proc/vmstat oom_kill: monotonic, present regardless of cgroup version
+# (run-134: the root /sys/fs/cgroup/memory.events read returned 'unavailable'
+# on every shard). Boundary preserved: VM-wide counter - a delta attributes AN
+# OOM kill in the window, never a specific victim.
+OOM_ENTRY=$(awk '/^oom_kill /{print $2}' /proc/vmstat 2>/dev/null)
 echo "RESTART-OOM entry oom_kill=${OOM_ENTRY:-unavailable}"
+# Layout inspection instead of a guessed path: record the actual cgroup mode
+# and this job's delegated path for any future per-cgroup probe.
+echo "RESTART-CGROUP fs=$(stat -fc %T /sys/fs/cgroup 2>/dev/null) self=$(head -2 /proc/self/cgroup 2>/dev/null | tr '
+' ';') rootevents=$(ls /sys/fs/cgroup/memory.events 2>/dev/null || echo absent)"
 adb shell am force-stop $PKG
 USER_JSON='{&quot;id&quot;:&quot;synthetic-user-1&quot;,&quot;username&quot;:&quot;testuser&quot;,&quot;displayName&quot;:&quot;Test User&quot;,&quot;avatarInitials&quot;:&quot;T&quot;,&quot;avatarColorHex&quot;:&quot;0xFF6366F1&quot;,&quot;about&quot;:&quot;Synthetic&quot;,&quot;email&quot;:&quot;&quot;,&quot;phone&quot;:&quot;&quot;,&quot;avatarUrl&quot;:null}'
 cat > /tmp/chaty_api_backend.xml <<XMLEOF
@@ -81,7 +89,7 @@ set -- $PIDS
 adb logcat -d | tr -d '\r' | grep -q "FATAL EXCEPTION" && { echo "RESTART-FATAL present"; adb logcat -d | grep -A12 "FATAL EXCEPTION" | head -30; RES=1; }
 adb shell am force-stop $PKG
 adb shell "run-as $PKG rm -f shared_prefs/chaty_api_backend.xml" && echo "RESTART-CLEANUP seeded prefs removed"
-OOM_EXIT=$(awk '/^oom_kill /{print $2}' /sys/fs/cgroup/memory.events 2>/dev/null)
+OOM_EXIT=$(awk '/^oom_kill /{print $2}' /proc/vmstat 2>/dev/null)
 echo "RESTART-OOM exit oom_kill=${OOM_EXIT:-unavailable} entry=${OOM_ENTRY:-unavailable}"
 QEMU_PID2=$(pgrep -f qemu-system | head -1 || true)
 echo "RESTART-QEMU exit pid=${QEMU_PID2:-none} state=$([ -n "$QEMU_PID2" ] && echo alive || echo missing)"
