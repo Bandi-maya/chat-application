@@ -105,7 +105,18 @@ class EmojiPackAssetsAndPerfTest {
         // Triple's inputs; the splits only enrich the evidence file.
         Thread.sleep(3_000)
         val closedP = heapPartsKb(); val closed = closedP.first + closedP.second
-        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back closedKb=$closed beforeSplitKb=${beforeP.first}/${beforeP.second} visibleSplitKb=${peakP.first}/${peakP.second} offSplitKb=${offP.first}/${offP.second} backSplitKb=${backP.first}/${backP.second} closedSplitKb=${closedP.first}/${closedP.second} (split=nativeKb/managedKb)")
+        // Cache-ownership discrimination (evidence-only): run-128 measured +158MB
+        // native retained after close with managed flat. The rendered path is the
+        // Noto Lottie Url spec (AnimatedEmojiView ignores emojiStyle; the fixture's
+        // pack extra selects nothing on this path), whose compositions live in
+        // Lottie's process-global LottieCompositionCache. Clearing that cache AFTER
+        // the closed sample and re-measuring attributes the retention: a drop is
+        // cache-owned; no drop means per-drawable or other references survive
+        // composition. Assertions unchanged; this only enriches the evidence file.
+        Thread.sleep(1_000)
+        com.airbnb.lottie.LottieCompositionCache.getInstance().clear()
+        val clearedP = heapPartsKb(); val cleared = clearedP.first + clearedP.second
+        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back closedKb=$closed beforeSplitKb=${beforeP.first}/${beforeP.second} visibleSplitKb=${peakP.first}/${peakP.second} offSplitKb=${offP.first}/${offP.second} backSplitKb=${backP.first}/${backP.second} closedSplitKb=${closedP.first}/${closedP.second} clearedKb=$cleared clearedSplitKb=${clearedP.first}/${clearedP.second} (split=nativeKb/managedKb)")
         assertEquals("grid did not finish all phases for $pack", "done", EmojiPackGridProbe.phase)
         return Triple(peak - before, off - before, back - before)
     }
