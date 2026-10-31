@@ -228,6 +228,21 @@ class AddedStylesProofTest {
      * two consecutive drags leave the visible text set unchanged (end reached).
      */
     private fun scrollToText(text: String, maxDrags: Int = 44): Boolean {
+        val hit = scrollToTextInner(text, maxDrags)
+        if (hit) {
+            // Hit-point evidence (run-127: a fresh sweep hit vanished before
+            // clickText's poll - the miss tree showed the settings root without
+            // the row). Record WHERE the hit was seen for comparison with the
+            // miss-time tree; search behavior and assertions unchanged.
+            val (sig, sample) = windowSig()
+            val node = try { device.findObject(By.text(text)) } catch (_: Exception) { null }
+            val bounds = try { node?.visibleBounds?.toShortString() ?: "null" } catch (_: Exception) { "stale" }
+            android.util.Log.w("AddedStyles", "SCROLLHIT-DIAG text='" + text + "' bounds=" + bounds + " sig=" + sig + " sample=[" + sample + "]")
+        }
+        return hit
+    }
+
+    private fun scrollToTextInner(text: String, maxDrags: Int = 44): Boolean {
         if (freshHasText(text, 4000)) return true
         val (initialSig, initialSample) = windowSig()
         var budget = maxDrags
@@ -395,7 +410,8 @@ class AddedStylesProofTest {
         }
         if (obj == null) {
             if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.clearCache()
-            android.util.Log.w("AddedStyles", "CLICKTEXT-DIAG miss text='" + text + "' freshHasAfterClear=" + device.hasObject(By.text(text)))
+            val (missSig, missSample) = windowSig()
+            android.util.Log.w("AddedStyles", "CLICKTEXT-DIAG miss text='" + text + "' freshHasAfterClear=" + device.hasObject(By.text(text)) + " sig=" + missSig + " sample=[" + missSample + "]")
             dumpTree("clicktext-miss")
             capture("clicktext-miss")
             throw AssertionError("'$text' not found after scroll")
