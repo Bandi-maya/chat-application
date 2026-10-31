@@ -246,7 +246,10 @@ jobs:
   runtime-smoke:
     needs: [build, gate]
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Job bound grounded in run-133 measured runner phases: core-ui 39.5min,
+    # calls-camera 18.1, all other shards <=8.7. 60 for core-ui leaves 12min of
+    # post-step/upload margin over its 48min step bound; 45 stays for the rest.
+    timeout-minutes: ${{ matrix.shard == 'core-ui' && 60 || 45 }}
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -351,6 +354,12 @@ jobs:
           printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
       - name: Runtime bootstrap smoke (emulator)
         uses: reactivecircus/android-emulator-runner@v2
+        # Step bound: run-131's Terminate Emulator post-phase hung INSIDE this
+        # step's execution until the job timeout cancelled the shard, taking the
+        # evidence uploads with it (a step timeout fails the step instead, so the
+        # always() upload steps still run). Bounds from run-133 measured phases:
+        # core-ui 39.5min -> 48 (+21%); calls-camera 18.1 -> 25 (+38%); <=8.7 rest.
+        timeout-minutes: ${{ matrix.shard == 'core-ui' && 48 || 25 }}
         with:
           api-level: 34
           target: default
@@ -436,17 +445,6 @@ jobs:
             t="screenshots/real-host-hold-$k-toggle-timing.txt"
             [ -f "$t" ] && { echo "TIMING-BEGIN $k"; cat "$t"; echo; echo "TIMING-END $k"; } || echo "TIMING-MISSING $k"
           done
-      - name: Stop emulator before post-actions
-        if: always()
-        run: |
-          # Run-132: the emulator-runner post "Terminate Emulator" step hung ~25min after
-          # OK(46 tests) until the 45-min job timeout cancelled a passing shard. Kill the
-          # emulator here - after all evidence capture and uploads - so the post-action
-          # has nothing to wait on. Evidence steps above still run first.
-          adb emu kill || true
-          for i in $(seq 1 15); do pgrep -f qemu-system >/dev/null || break; sleep 2; done
-          pkill -9 -f qemu-system || true
-          exit 0
 
   # Bounded infrastructure experiment (authorized 19:23): re-run ONLY the two
   # 175 lost shards (media, emoji-real) serially on one runner - one emulator
