@@ -34,6 +34,18 @@ class ApiMediaUploadClient(
         ): Response
     }
 
+    /** Optional progress-capable seam; existing JVM fakes remain source-compatible. */
+    interface ProgressTransport : Transport {
+        fun uploadWithProgress(
+            url: String,
+            authorization: String,
+            tenantId: String,
+            filename: String,
+            fileBytes: ByteArray,
+            onProgress: (transferred: Long, total: Long) -> Unit,
+        ): Response
+    }
+
     data class Response(val statusCode: Int, val body: String)
 
     class UploadException(message: String) : Exception(message)
@@ -46,21 +58,23 @@ class ApiMediaUploadClient(
     /** Byte-array form for callers that already hold the payload
      *  (ChatMediaService's post-compression bytes; the wire body is the
      *  same multipart part either way). */
-    fun uploadMedia(filename: String, bytes: ByteArray): Map<String, Any> {
+    fun uploadMedia(
+        filename: String,
+        bytes: ByteArray,
+        onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
+    ): Map<String, Any> {
         val bearer = token() ?: throw UploadException("Not authenticated")
         val base = restApiBaseUrl().trimEnd('/')
 
         val response: Response = try {
-            val primary = transport.upload(
-                "$base/chat/upload", "Bearer $bearer", tenantId(), filename, bytes,
-            )
-            if (primary.statusCode == 404) {
-                transport.upload(
-                    "$base/api/v1/chat/upload", "Bearer $bearer", tenantId(), filename, bytes,
-                )
-            } else {
-                primary
-            }
+            fun send(url: String): Response =
+                if (onProgress != null && transport is ProgressTransport) {
+                    transport.uploadWithProgress(url, "Bearer $bearer", tenantId(), filename, bytes, onProgress)
+                } else {
+                    transport.upload(url, "Bearer $bearer", tenantId(), filename, bytes)
+                }
+            val primary = send("$base/chat/upload")
+            if (primary.statusCode == 404) send("$base/api/v1/chat/upload") else primary
         } catch (e: UploadException) {
             throw e
         } catch (e: Exception) {
@@ -86,7 +100,7 @@ class ApiMediaUploadClient(
 
     /** Device transport over OkHttp, mirroring http.MultipartRequest: one
      *  'file' part, Bearer + x-tenant-id headers, no extra fields. */
-    class OkHttpTransport : Transport {
+    class OkHttpTransport : ProgressTransport {
         private val client = okhttp3.OkHttpClient()
 
         override fun upload(
@@ -95,15 +109,36 @@ class ApiMediaUploadClient(
             tenantId: String,
             filename: String,
             fileBytes: ByteArray,
+        ): Response = uploadWithProgress(url, authorization, tenantId, filename, fileBytes) { _, _ -> }
+
+        override fun uploadWithProgress(
+            url: String,
+            authorization: String,
+            tenantId: String,
+            filename: String,
+            fileBytes: ByteArray,
+            onProgress: (Long, Long) -> Unit,
         ): Response {
-            val body = okhttp3.MultipartBody.Builder()
+            val multipart = okhttp3.MultipartBody.Builder()
                 .setType(okhttp3.MultipartBody.FORM)
-                .addFormDataPart(
-                    "file",
-                    filename,
-                    okhttp3.RequestBody.create(null, fileBytes),
-                )
+                .addFormDataPart("file", filename, okhttp3.RequestBody.create(null, fileBytes))
                 .build()
+            val total = multipart.contentLength()
+            val body = object : okhttp3.RequestBody() {
+                override fun contentType() = multipart.contentType()
+                override fun contentLength() = total
+                override fun writeTo(sink: okio.BufferedSink) {
+                    var transferred = 0L
+                    val forwarding = object : okio.ForwardingSink(sink) {
+                        override fun write(source: okio.Buffer, byteCount: Long) {
+                            super.write(source, byteCount)
+                            transferred += byteCount
+                            onProgress(transferred, total)
+                        }
+                    }
+                    multipart.writeTo(okio.buffer(forwarding))
+                }
+            }
             val request = okhttp3.Request.Builder()
                 .url(url)
                 .header("Authorization", authorization)
