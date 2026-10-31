@@ -544,8 +544,9 @@ class P2pFileTransferService(
                 if (file != null) NativeP2pTransferProtocol.encryptChunk(file, session.manifest, session.secret, index)
                 else NativeP2pTransferProtocol.encryptChunk(sourceChannel!!, session.manifest, session.secret, index)
             }
-            val packet = ByteBuffer.allocate(8 + encrypted.ciphertextAndTag.size).order(ByteOrder.BIG_ENDIAN)
+            val packet = ByteBuffer.allocate(8 + encrypted.nonce.size + encrypted.ciphertextAndTag.size).order(ByteOrder.BIG_ENDIAN)
             packet.putLong(index)
+            packet.put(encrypted.nonce)
             packet.put(encrypted.ciphertextAndTag)
             packet.flip()
             if (!channel.send(DataChannel.Buffer(packet, true))) {
@@ -565,11 +566,12 @@ class P2pFileTransferService(
     }
 
     private suspend fun receiveChunk(session: Session, bytes: ByteArray) = session.receiveMutex.withLock {
-        if (bytes.size < 8 + 16) return@withLock
+        if (bytes.size < 8 + 12 + 16) return@withLock
         try {
             val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
             val index = buffer.long
             if (index !in 0 until session.manifest.chunkCount) throw SecurityException("Invalid chunk index")
+            val nonce = ByteArray(12).also(buffer::get)
             val encrypted = ByteArray(buffer.remaining()).also(buffer::get)
             val ledger = session.ledger ?: throw IllegalStateException("Resume ledger missing")
             val count = withContext(Dispatchers.IO) {
@@ -577,7 +579,7 @@ class P2pFileTransferService(
                     val part = session.destination ?: throw IllegalStateException("Destination missing")
                     NativeP2pTransferProtocol.writeChunk(
                         part, session.manifest, session.secret,
-                        NativeP2pTransferProtocol.EncryptedChunk(index, encrypted),
+                        NativeP2pTransferProtocol.EncryptedChunk(index, nonce, encrypted),
                     )
                     session.chunksSinceSync++
                     val willComplete = ledger.receivedCount() + 1L >= session.manifest.chunkCount
