@@ -410,7 +410,7 @@ class P2pFileTransferService(
                 when (state) {
                     PeerConnection.PeerConnectionState.CONNECTED -> {
                         session.restartAttempts = 0
-                        publish(session, "Connected directly")
+                        publish(session, "Secure channel connected")
                     }
                     PeerConnection.PeerConnectionState.DISCONNECTED -> {
                         publish(session, "Connection interrupted — retrying")
