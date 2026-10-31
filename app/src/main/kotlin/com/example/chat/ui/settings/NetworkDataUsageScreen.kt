@@ -115,6 +115,9 @@ fun NetworkDataUsageScreen(onBack: () -> Unit) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    OutlinedButton(onClick = { ServiceLocator.appTrafficMonitor.resetTotals() }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Reset total app traffic")
+                    }
                 }
             }
         }
