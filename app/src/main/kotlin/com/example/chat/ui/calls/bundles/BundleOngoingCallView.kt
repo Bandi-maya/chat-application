@@ -628,7 +628,6 @@ private fun VivoIqooOngoingCall(
     }
 }
 
-@Composable
 // -------------------------------------------------------------------------------------------------
 // 07 — AZURE RING VERTICAL ONGOING CALL (reference active-call grid, tentative same
 // family): teal gradient, big caller id + status chip + timer, 3-column control grid,
@@ -928,6 +927,7 @@ private fun NextcloudTalkOngoingCall(
     }
 }
 
+@Composable
 fun ControlIconButton(
     icon: ImageVector,
     isActive: Boolean,
