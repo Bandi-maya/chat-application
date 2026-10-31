@@ -4,3 +4,4 @@ Single-commit implementation: gallery direct-send, local reactions, per-icon var
 Run CI after single-commit tree correction.
 CI gate handles rewritten commit parents; rerun implementation verification.
 Gallery opens expanded with full-height viewport; voice note progress scrubs; day separators added; CI runtime override count aligned.
+Firebase transport removed; authenticated WebSocket foreground service maintains message and incoming-call notifications without FCM.
