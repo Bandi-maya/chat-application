@@ -262,6 +262,8 @@ class P2pFileTransferService(
         val kind = signal["signal_type"]?.toString() ?: return
         if (!kind.startsWith("file_transfer_")) return
         val id = signal["transfer_id"]?.toString() ?: return
+        if (signal["call_id"]?.toString() != id) return
+        if (id.length > 64 || senderIdInvalid(signal["sender_id"]?.toString() ?: signal["caller_id"]?.toString())) return
         val sender = (signal["sender_id"] ?: signal["caller_id"])?.toString() ?: return
         if (sender.isBlank() || sender == currentUserId()) return
         when (kind) {
@@ -481,7 +483,12 @@ class P2pFileTransferService(
             }
             override fun onMessage(buffer: DataChannel.Buffer) {
                 if (buffer.binary) {
-                    val bytes = ByteArray(buffer.data.remaining())
+                    val size = buffer.data.remaining()
+                    if (size < 8 + 12 + 16 || size > session.manifest.chunkBytes + 8 + 12 + 16) {
+                        scope.launch { fail(session, "Invalid transfer chunk frame") }
+                        return
+                    }
+                    val bytes = ByteArray(size)
                     buffer.data.get(bytes)
                     if (!isSender) scope.launch { receiveChunk(session, bytes) }
                     return
@@ -767,6 +774,8 @@ class P2pFileTransferService(
         )
         _transfers.value = (_transfers.value.filterNot { it.transferId == session.id } + item).takeLast(40)
     }
+
+    private fun senderIdInvalid(value: String?): Boolean = value.isNullOrBlank() || value.length > 256
 
     private fun refreshPending() {
         _pendingOffers.value = incoming.values.map { it.first }.sortedByDescending { it.expiresAtEpochSeconds }
