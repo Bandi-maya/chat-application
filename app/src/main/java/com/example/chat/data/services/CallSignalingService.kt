@@ -639,10 +639,13 @@ class CallSignalingService(
                 currentSession = session.copy(state = CallSessionState.declined, endedAt = now())
                 detached = media; media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
                         localDescriptionSignaled = false; pendingLocalCandidates.clear()
+                android.util.Log.w("CALLEND-DIAG", "decline detached media=" + (detached != null) + " id=" + Integer.toHexString(session.callId.hashCode()))
                 notifyChanged()
             }
         }) return
+        android.util.Log.w("CALLEND-DIAG", "media dispose begin (decline)")
         detached?.dispose()
+        android.util.Log.w("CALLEND-DIAG", "media dispose end (decline)")
     }
 
     /** Dart endCall: idempotent per call id. */
@@ -653,6 +656,7 @@ class CallSignalingService(
         if (session == null || session.state.isTerminal) {
             return
         }
+        android.util.Log.w("CALLEND-DIAG", "endCall enter reason=" + reason + " state=" + session.state + " id=" + Integer.toHexString(session.callId.hashCode()) + " demo=" + session.isDemo)
         if (session.isDemo) {
             ringTimeoutJob?.cancel()
             stopDurationTimer()
@@ -698,10 +702,13 @@ class CallSignalingService(
                 currentSession = session.copy(state = CallSessionState.ended, endedAt = now())
                 detached = media; media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
                         localDescriptionSignaled = false; pendingLocalCandidates.clear()
+                android.util.Log.w("CALLEND-DIAG", "endCallSession detached media=" + (detached != null) + " id=" + Integer.toHexString(session.callId.hashCode()))
                 notifyChanged()
             }
         }) return
+        android.util.Log.w("CALLEND-DIAG", "media dispose begin")
         detached?.dispose()
+        android.util.Log.w("CALLEND-DIAG", "media dispose end")
     }
 
     /** Demo walk: initiating -> ringing (1.2s) -> connected (1.8s), or a held
