@@ -586,7 +586,7 @@ object ServiceLocator {
             context = requireContext(),
             scope = appScope,
             currentUserId = { apiBackend.currentUser?.id },
-            sendSignal = { targetUserId, data -> apiBackend.sendCallSignal(targetUserId, data) },
+            sendSignal = { targetUserId, data -> apiBackend.sendCallSignal(targetUserId, data); true },
             transferMonitor = transferMonitor,
         ).also { service ->
             apiBackend.addScopedCallSignalListener { expected, data ->
