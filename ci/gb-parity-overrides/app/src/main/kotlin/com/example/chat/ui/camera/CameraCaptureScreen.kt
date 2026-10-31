@@ -1083,13 +1083,21 @@ fun ChatyCameraCaptureScreen(
                         result.addListener({ try { result.get(); zoomRatio = clampCameraZoom(requested,minZoom,maxZoom)
                             if (com.example.chat.BuildConfig.DEBUG) Log.i("ZOOM-DIAG", "accepted ratio=" + zoomRatio) }
                             catch (e: Exception) {
-                                // Clamp the offered range to what the camera accepted,
-                                // so the failed preset disappears instead of failing again.
-                                workingMaxZoom = maxOf(minZoom, zoomRatio)
-                                scannerError = "Zoom is unavailable on this camera."
+                                // A superseded drag request is cancelled by CameraX, not
+                                // a camera capability failure: collapsing workingMax here
+                                // hid the slider mid-drag (run 122 ZOOM-DIAG evidence:
+                                // OperationCanceledException for 1.17x while 1.36x was
+                                // accepted 0.3s later on the same camera).
+                                val cancelled = generateSequence(e as Throwable?) { it.cause }.any { it is androidx.camera.core.CameraControl.OperationCanceledException }
+                                if (!cancelled) {
+                                    // Clamp the offered range to what the camera accepted,
+                                    // so the failed preset disappears instead of failing again.
+                                    workingMaxZoom = maxOf(minZoom, zoomRatio)
+                                    scannerError = "Zoom is unavailable on this camera."
+                                }
                                 // A rejection here is a failed REQUEST, not proof of
                                 // missing camera capability - log the exact error.
-                                if (com.example.chat.BuildConfig.DEBUG) Log.i("ZOOM-DIAG", "rejected requested=" + requested + " error=" + e.javaClass.simpleName + ":" + e.message + " workingMax->" + workingMaxZoom)
+                                if (com.example.chat.BuildConfig.DEBUG) Log.i("ZOOM-DIAG", "rejected requested=" + requested + " error=" + e.javaClass.simpleName + ":" + e.message + " cancelled=" + cancelled + (if (cancelled) "" else " workingMax->" + workingMaxZoom))
                             }
                         }, ContextCompat.getMainExecutor(context))
                     }
