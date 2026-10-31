@@ -130,6 +130,7 @@ fun ChatDetailHost(
     var chatCameraOpen by remember { mutableStateOf(false) }
     var p2pReceiveMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var p2pReceiveLink by remember { mutableStateOf<String?>(null) }
+    var p2pLocalViewer by remember { mutableStateOf<File?>(null) }
     val hostView = androidx.compose.ui.platform.LocalView.current
     val me = api.currentUser
     val myId = me?.id ?: ""
@@ -548,8 +549,17 @@ fun ChatDetailHost(
         onRetryLoad = { loadNonce++ },
         onMediaTap = { m ->
             val path = m.attachment?.url.orEmpty()
-            if (path.startsWith("chaty://transfer/") && m.senderId != myId) {
-                scope.launch {
+            if (path.startsWith("chaty://transfer/")) {
+                val localDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
+                    ?: File(context.filesDir, "Movies")
+                val localName = com.example.chat.data.services.ChatMediaService.safeFileName(m.attachment?.name ?: "video")
+                val knownFile = p2pTransfers.transfers.value.firstOrNull {
+                    it.transferId == path.substringAfterLast('/') && it.status == "Received and verified"
+                }?.localFilePath?.let(::File)?.takeIf { it.isFile } ?: File(localDir, localName).takeIf { it.isFile }
+                if (knownFile != null) {
+                    p2pLocalViewer = knownFile
+                } else if (m.senderId != myId) {
+                    scope.launch {
                     try {
                         val ciphertext = m.metadata["p2p_invite_ciphertext"]?.toString()
                             ?: throw SecurityException("This transfer invitation is incomplete.")
@@ -562,9 +572,8 @@ fun ChatDetailHost(
                         p2pReceiveLink = "chaty://transfer/" + id + "#" + secret
                         p2pReceiveMessage = m
                     } catch (e: Exception) { toast(e.message ?: "Unable to unlock this transfer invitation.") }
-                }
-            } else if (path.startsWith("chaty://transfer/")) {
-                toast("This is your outgoing transfer. Check Network & Data Usage for its live status.")
+                    }
+                } else toast("This is your outgoing transfer. Check Network & Data Usage for its live status.")
             } else {
                 viewerBounds = null; viewerMessage = m
             }
@@ -572,7 +581,14 @@ fun ChatDetailHost(
         onMediaTapWithBounds = { m, rect ->
             val path = m.attachment?.url.orEmpty()
             if (path.startsWith("chaty://transfer/")) {
-                if (m.senderId != myId) {
+                val localDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
+                    ?: File(context.filesDir, "Movies")
+                val localName = com.example.chat.data.services.ChatMediaService.safeFileName(m.attachment?.name ?: "video")
+                val knownFile = p2pTransfers.transfers.value.firstOrNull {
+                    it.transferId == path.substringAfterLast('/') && it.status == "Received and verified"
+                }?.localFilePath?.let(::File)?.takeIf { it.isFile } ?: File(localDir, localName).takeIf { it.isFile }
+                if (knownFile != null) p2pLocalViewer = knownFile
+                else if (m.senderId != myId) {
                     scope.launch {
                         try {
                             val ciphertext = m.metadata["p2p_invite_ciphertext"]?.toString()
@@ -731,6 +747,34 @@ fun ChatDetailHost(
         messages.firstOrNull { it.id == requested.id && !it.isDeletedForEveryone && !it.isDeletedForMe && !it.isRevokedBySender }
     }
     val va = vm?.attachment
+    val localP2pFile = p2pLocalViewer
+    if (localP2pFile != null && localP2pFile.isFile) {
+        androidx.activity.compose.BackHandler { p2pLocalViewer = null }
+        com.example.chat.ui.chats.detail.MediaViewerScreen(
+            theme = theme,
+            title = localP2pFile.name,
+            type = if (localP2pFile.extension.lowercase() in setOf("mp4", "mkv", "mov", "webm")) "video" else "document",
+            size = com.example.chat.data.services.ChatMediaService.formatBytes(localP2pFile.length()),
+            storagePath = localP2pFile.toURI().toString(),
+            createSignedUrl = { path, _ -> path },
+            onBack = { p2pLocalViewer = null },
+            providedModel = localP2pFile.toURI().toString(),
+            ownedActions = true,
+            onOwnedOpen = {
+                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", localP2pFile)
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, "video/*")
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                context.startActivity(intent)
+            },
+            onOwnedShare = {
+                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", localP2pFile)
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).setType("video/*")
+                    .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                context.startActivity(android.content.Intent.createChooser(intent, "Share video"))
+            },
+        )
+    }
     if (vm != null && va != null) {
         androidx.activity.compose.BackHandler { viewerMessage = null }
         androidx.compose.runtime.key(attachmentBinding.session, conversation.id, vm.id) {
