@@ -1343,10 +1343,15 @@ class ApiBackendService(
     /** Byte-array form used by ChatMediaService's post-compression payload;
      *  Dart uploads the (possibly compressed) File, whose filename is the
      *  attachment name - here the name travels alongside the bytes. */
-    suspend fun uploadMedia(filename: String, bytes: ByteArray, expectedScope: ApiAccountScope? = null): Map<String, Any> {
+    suspend fun uploadMedia(
+        filename: String,
+        bytes: ByteArray,
+        expectedScope: ApiAccountScope? = null,
+        onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
+    ): Map<String, Any> {
         val expected = expectedScope ?: authSnapshot()      // captured ONCE: primary, 404 retry and result check share it
         return withContext(Dispatchers.IO) {
-            mediaUpload.uploadMedia(expected, { authSnapshot() === expected }, filename, bytes)
+            mediaUpload.uploadMedia(expected, { authSnapshot() === expected }, filename, bytes, onProgress)
         }
     }
 
