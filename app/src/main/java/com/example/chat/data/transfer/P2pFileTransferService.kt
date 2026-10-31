@@ -287,14 +287,29 @@ class P2pFileTransferService(
                 } else if (!session.remoteDescriptionSet) session.queuedCandidates.add(ice)
                 else session.peer?.addIceCandidate(ice)
             }
-            "file_transfer_cancel" -> sessions[id]?.takeIf { it.peerUserId == sender }?.let { fail(it, "Sender cancelled this transfer") }
+            "file_transfer_cancel" -> {
+                sessions[id]?.takeIf { it.peerUserId == sender }?.let { fail(it, "Sender cancelled this transfer") }
+                val pending = incoming[id]?.first
+                if (pending?.senderId == sender) {
+                    incoming.remove(id)
+                    incomingCandidates.remove(id)
+                    refreshPending()
+                }
+            }
         }
     }
 
     /** User taps Receive on the in-chat transfer card and selects a private destination. */
     suspend fun acceptInvite(link: String, destination: File): Boolean {
         val invite = NativeP2pTransferProtocol.parseInvite(link)
-        val (offer, signal) = incoming[invite.transferId] ?: throw IllegalStateException("Transfer offer is not available yet. Open the chat while online and try again.")
+        var pending = incoming[invite.transferId]
+        var waitSteps = 0
+        while (pending == null && waitSteps < 20) {
+            kotlinx.coroutines.delay(500)
+            pending = incoming[invite.transferId]
+            waitSteps++
+        }
+        val (offer, signal) = pending ?: throw IllegalStateException("The sender is not online yet. Keep Chaty open and try again when the offer arrives.")
         if (offer.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L) {
             incoming.remove(invite.transferId); refreshPending()
             throw SecurityException("This transfer link has expired")
