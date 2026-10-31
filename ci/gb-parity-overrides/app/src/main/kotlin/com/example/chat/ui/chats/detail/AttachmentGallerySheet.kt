@@ -58,7 +58,6 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
     onCamera: () -> Unit, onReviewImages: ((List<Uri>) -> Unit)?,
     onDirectSendImages: ((List<Uri>) -> Unit)? = null, maxSelection: Int = 30,
     secondReference: Boolean = false, onVoiceNote: () -> Unit = {},
-    isExpanded: Boolean = false, onToggleExpansion: ((Boolean) -> Unit)? = null,
     // Host-driven: opens half screen; the sheet grows when the user pulls up.
     heightFraction: Float = 0.5f,
     // Deterministic fixture injection. Production never provides items here.
@@ -93,12 +92,6 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
             .background(Color(theme.secondaryTextColor).copy(alpha = 0.4f), CircleShape))
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Gallery", color = foreground, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-            if (onToggleExpansion != null) {
-                IconButton(onClick = { onToggleExpansion(!isExpanded) }, modifier = Modifier.size(40.dp)) {
-                    Icon(if (isExpanded) Icons.Rounded.ExpandMore else Icons.Rounded.ExpandLess,
-                        contentDescription = if (isExpanded) "Collapse gallery" else "Expand gallery", tint = foreground)
-                }
-            }
             TextButton(onClick = { onAction(AttachmentAction.image) }) { Text("Browse") }
             if (selected.isNotEmpty()) {
                 if (onReviewImages != null) OutlinedButton(onClick = { onReviewImages(selected.toList()) }) { Text("Review") }
