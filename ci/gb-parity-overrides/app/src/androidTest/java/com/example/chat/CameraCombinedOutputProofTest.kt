@@ -155,6 +155,46 @@ class CameraCombinedOutputProofTest {
         }
     }
 
+    /** Evidence-only failure dumps: write acquired frames to the px artifact dir.
+     *  Assertions and their order are unchanged; dumps run only on the failure path. */
+    private fun dumpFrame(name: String, bmp: Bitmap) {
+        try {
+            val dir = java.io.File(
+                androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                    .targetContext.getExternalFilesDir(null),
+                "screenshots",
+            )
+            dir.mkdirs()
+            java.io.FileOutputStream(java.io.File(dir, name)).use {
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            Log.i(TAG, "CC-DUMP wrote $name")
+        } catch (e: Exception) { Log.w(TAG, "CC-DUMP $name failed: " + e.message) }
+    }
+
+    /** Coarse dominant-channel grid (R/G/B/.) so the actual marker landing is in logcat. */
+    private fun logColorMap(label: String, bmp: Bitmap) {
+        val sb = StringBuilder()
+        var y = 19
+        while (y < bmp.height) {
+            var x = 19
+            while (x < bmp.width) {
+                val c = bmp.getPixel(x, y)
+                val r = Color.red(c); val g = Color.green(c); val b = Color.blue(c)
+                sb.append(
+                    if (r > 150 && g < 120 && b < 120) 'R'
+                    else if (g > 150 && r < 120 && b < 120) 'G'
+                    else if (b > 150 && r < 120 && g < 120) 'B'
+                    else '.'
+                )
+                x += 40
+            }
+            sb.append('|')
+            y += 40
+        }
+        Log.i(TAG, "CC-MAP " + label + " " + sb)
+    }
+
     private fun acquireBitmap(reader: ImageReader): Bitmap {
         var img: Image? = null
         for (i in 0..19) {
@@ -322,6 +362,11 @@ class CameraCombinedOutputProofTest {
                 Log.i(TAG, "presenceChecked=$presenceChecked doublingChecked=$doublingChecked")
                 assertTrue("lens artwork must have opaque texels on the frame", presenceChecked > 0)
                 assertTrue("lens artwork must have translucent texels for the doubling check", doublingChecked > 0)
+            } catch (t: Throwable) {
+                dumpFrame("cc-video.png", video); dumpFrame("cc-preview.png", preview)
+                harness.overlayBitmap()?.let { dumpFrame("cc-overlay.png", it) }
+                logColorMap("video", video); logColorMap("preview", preview)
+                throw t
             } finally {
                 video.recycle(); preview.recycle()
             }
@@ -354,6 +399,10 @@ class CameraCombinedOutputProofTest {
                 // blue -> (266,209).
                 expectDominant(video, 53, 30, 'g', "rotated green")
                 expectDominant(video, 266, 209, 'b', "rotated blue")
+            } catch (t: Throwable) {
+                dumpFrame("pt-video.png", video); dumpFrame("pt-preview.png", preview)
+                logColorMap("video", video); logColorMap("preview", preview)
+                throw t
             } finally {
                 video.recycle(); preview.recycle()
             }
