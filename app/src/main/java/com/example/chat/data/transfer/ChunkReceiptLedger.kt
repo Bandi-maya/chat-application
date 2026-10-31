@@ -17,7 +17,7 @@ class ChunkReceiptLedger(
     private val chunkCount: Long,
 ) {
     private val atomic = AtomicFile(stateFile)
-    private val ledgerFile = stateFile
+    private var dirtyCount = 0
     private val lock = Any()
     private var received = load()
 
@@ -29,7 +29,8 @@ class ChunkReceiptLedger(
         require(index in 0 until chunkCount)
         if (!received[index.toInt()]) {
             received.set(index.toInt())
-            persist()
+            dirtyCount++
+            if (dirtyCount >= CHECKPOINT_EVERY_CHUNKS || isCompleteLocked()) persist()
         }
     }
 
@@ -54,27 +55,30 @@ class ChunkReceiptLedger(
 
     fun receivedCount(): Long = synchronized(lock) { received.cardinality().toLong() }
 
+    /** Force a durable checkpoint when pausing or leaving the transfer screen. */
+    fun flush() = synchronized(lock) { if (dirtyCount > 0) persist() }
+
     fun clear() = synchronized(lock) {
         received.clear()
         runCatching { atomic.delete() }
     }
 
     private fun load(): BitSet {
-        if (!stateFileExists()) return BitSet()
         return try {
+            // AtomicFile.openRead() restores its backup if the process died mid-commit.
             val bytes = atomic.openRead().use { it.readBytes() }
             BitSet.valueOf(bytes).also {
                 if (it.length().toLong() > chunkCount) throw IOException("Receipt bitmap exceeds transfer geometry")
             }
+        } catch (_: java.io.FileNotFoundException) {
+            BitSet()
         } catch (_: Exception) {
             runCatching { atomic.delete() }
             BitSet()
         }
     }
 
-    private fun stateFileExists(): Boolean = runCatching {
-        ledgerFile.exists()
-    }.getOrDefault(false)
+    private fun isCompleteLocked(): Boolean = received.nextClearBit(0).toLong() >= chunkCount
 
     private fun persist() {
         var stream: java.io.FileOutputStream? = null
@@ -83,9 +87,12 @@ class ChunkReceiptLedger(
             stream.write(received.toByteArray())
             stream.fd.sync()
             atomic.finishWrite(stream)
+            dirtyCount = 0
         } catch (error: Exception) {
             if (stream != null) atomic.failWrite(stream)
             throw IOException("Unable to persist transfer resume state", error)
         }
     }
+
+    private companion object { const val CHECKPOINT_EVERY_CHUNKS = 16 }
 }
