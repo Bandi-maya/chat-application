@@ -3,9 +3,29 @@
 # so a multi-line inline script cannot propagate the gradle exit code).
 mkdir -p screenshots
 adb logcat -c || true
-(adb logcat -v threadtime > screenshots/logcat-full.txt 2>&1 &) 
+# Job-lifetime process watch: timestamp qemu presence/RSS every 5s so a guest
+# death is placed on the test timeline (run-127 emoji-real: logcat ended
+# 06:39:25, qemu RSS froze, then qemu vanished) - discriminates crash vs kill.
+( while true; do
+    line=$(ps -eo pid,rss,command 2>/dev/null | grep -i "[q]emu" | head -3 | tr '\n' '|')
+    if [ -z "$line" ]; then echo "$(date +%H:%M:%S) QEMU-GONE" >> screenshots/qemu-watch.txt; else echo "$(date +%H:%M:%S) $line" >> screenshots/qemu-watch.txt; fi
+    sleep 5
+  done ) &
+QWATCH=$!
+# Logcat reconnect: if the stream dies while the emulator is still up (run-127
+# emoji-real logcat ended mid-run), restart it and mark the gap.
+( while true; do
+    adb logcat -v threadtime >> screenshots/logcat-full.txt 2>&1
+    echo "$(date +%H:%M:%S) LOGCAT-STREAM-ENDED rc=$?" >> screenshots/qemu-watch.txt
+    pgrep -f qemu >/dev/null 2>&1 || break
+    sleep 2
+  done ) &
+LOGCATW=$!
 gradle :app:connectedDebugAndroidTest --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
 rc=$?
+kill $QWATCH $LOGCATW 2>/dev/null || true
+echo "--- qemu/logcat watch (job-lifetime) ---"
+tail -30 screenshots/qemu-watch.txt 2>/dev/null || true
 # Permission restore belongs outside instrumentation: pm revoke kills the app process.
 if adb shell test -f /sdcard/Android/data/com.logybyte.chat/files/camera-permission-cleanup; then
   adb shell rm /sdcard/Android/data/com.logybyte.chat/files/camera-permission-cleanup
