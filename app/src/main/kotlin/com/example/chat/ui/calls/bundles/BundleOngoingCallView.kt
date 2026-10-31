@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -24,7 +25,7 @@ import com.example.chat.data.services.CallVideoSurfaceProvider
 import com.example.chat.data.services.ChatyCallSession
 
 /**
- * Universal Unified Ongoing Call Presentation for the 6 Experience Bundles.
+ * Universal Unified Ongoing Call Presentation for the Call Experience Bundles.
  */
 @Composable
 fun BundleOngoingCallView(
@@ -51,6 +52,9 @@ fun BundleOngoingCallView(
         CallBundleId.GOOGLE_PHONE_CLASSIC -> GoogleClassicOngoingCall(tokens, session, callDurationSeconds, isMuted, isSpeaker, isCameraOn, onToggleMute, onToggleSpeaker, onToggleCamera, onSwitchCamera, onEndCall, onInviteParticipant, onMinimize)
         CallBundleId.VIVO_IQOO -> VivoIqooOngoingCall(tokens, session, callDurationSeconds, isMuted, isSpeaker, isCameraOn, onToggleMute, onToggleSpeaker, onToggleCamera, onSwitchCamera, onEndCall, onInviteParticipant, onMinimize)
         CallBundleId.CHATY_DEFAULT -> ChatyDefaultOngoingCall(tokens, session, callDurationSeconds, isMuted, isSpeaker, isCameraOn, onToggleMute, onToggleSpeaker, onToggleCamera, onSwitchCamera, onEndCall, onInviteParticipant, onMinimize)
+        CallBundleId.AZURE_RING_VERTICAL -> AzureRingVerticalOngoingCall(tokens, session, callDurationSeconds, isMuted, isSpeaker, isCameraOn, onToggleMute, onToggleSpeaker, onToggleCamera, onSwitchCamera, onEndCall, onInviteParticipant, onMinimize)
+        CallBundleId.MONO_CHEVRON_DARK -> MonoChevronDarkOngoingCall(tokens, session, callDurationSeconds, isMuted, isSpeaker, isCameraOn, onToggleMute, onToggleSpeaker, onToggleCamera, onSwitchCamera, onEndCall, onInviteParticipant, onMinimize)
+        CallBundleId.NEXTCLOUD_TALK -> NextcloudTalkOngoingCall(tokens, session, callDurationSeconds, isMuted, isSpeaker, isCameraOn, onToggleMute, onToggleSpeaker, onToggleCamera, onSwitchCamera, onEndCall, onInviteParticipant, onMinimize)
     }
 }
 
@@ -625,6 +629,305 @@ private fun VivoIqooOngoingCall(
 }
 
 @Composable
+// -------------------------------------------------------------------------------------------------
+// 07 — AZURE RING VERTICAL ONGOING CALL (reference active-call grid, tentative same
+// family): teal gradient, big caller id + status chip + timer, 3-column control grid,
+// big red end button. Only real Chaty call actions are rendered (no Notes/Record/Hold).
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun AzureRingVerticalOngoingCall(
+    tokens: CallBundleThemeTokens,
+    session: ChatyCallSession,
+    duration: Int,
+    isMuted: Boolean,
+    isSpeaker: Boolean,
+    isCameraOn: Boolean,
+    onToggleMute: () -> Unit,
+    onToggleSpeaker: () -> Unit,
+    onToggleCamera: () -> Unit,
+    onSwitchCamera: () -> Unit,
+    onEndCall: () -> Unit,
+    onInviteParticipant: () -> Unit,
+    onMinimize: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF1E6E8C), Color(0xFF155E63), tokens.surfaceBackground),
+                ),
+            )
+            .padding(24.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(top = 44.dp),
+            ) {
+                Text(
+                    session.remoteDisplayName,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Light,
+                    color = Color.White,
+                )
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White.copy(alpha = 0.14f),
+                ) {
+                    Text(
+                        text = (if (session.isVideo) "HD Video  " else "HD Voice  ") + formatDuration(duration),
+                        fontSize = 13.sp,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                ) {
+                    AzureGridButton(if (isMuted) Icons.Rounded.MicOff else Icons.Rounded.Mic, "Mute", isMuted, onToggleMute)
+                    AzureGridButton(Icons.Rounded.PersonAdd, "Add call", false, onInviteParticipant)
+                    AzureGridButton(if (isCameraOn) Icons.Rounded.Videocam else Icons.Rounded.VideocamOff, "Video", isCameraOn, onToggleCamera)
+                }
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AzureGridButton(if (isSpeaker) Icons.Rounded.VolumeUp else Icons.Rounded.Hearing, "Speaker", isSpeaker, onToggleSpeaker)
+                    Box(
+                        modifier = Modifier
+                            .size(68.dp)
+                            .background(tokens.declineColor, CircleShape)
+                            .clickable { onEndCall() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Rounded.CallEnd, "End call", tint = Color.White, modifier = Modifier.size(30.dp))
+                    }
+                    AzureGridButton(Icons.Rounded.PictureInPicture, "Minimize", false, onMinimize)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AzureGridButton(
+    icon: ImageVector,
+    label: String,
+    isActive: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() },
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (isActive) Color(0xFF9FD8FF) else Color.White,
+            modifier = Modifier.size(28.dp),
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = label,
+            color = if (isActive) Color(0xFF9FD8FF) else Color.White.copy(alpha = 0.85f),
+            fontSize = 12.sp,
+        )
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// 08 — MONO CHEVRON DARK ONGOING CALL: minimal dark active screen.
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun MonoChevronDarkOngoingCall(
+    tokens: CallBundleThemeTokens,
+    session: ChatyCallSession,
+    duration: Int,
+    isMuted: Boolean,
+    isSpeaker: Boolean,
+    isCameraOn: Boolean,
+    onToggleMute: () -> Unit,
+    onToggleSpeaker: () -> Unit,
+    onToggleCamera: () -> Unit,
+    onSwitchCamera: () -> Unit,
+    onEndCall: () -> Unit,
+    onInviteParticipant: () -> Unit,
+    onMinimize: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(tokens.surfaceBackground)
+            .padding(24.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(top = 52.dp),
+            ) {
+                Text(session.remoteDisplayName, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = tokens.primaryText)
+                Spacer(Modifier.height(6.dp))
+                Text(formatDuration(duration), fontSize = 15.sp, color = tokens.secondaryText)
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    ControlIconButton(if (isMuted) Icons.Rounded.MicOff else Icons.Rounded.Mic, isMuted, tokens.primaryAccent, onToggleMute)
+                    ControlIconButton(if (isSpeaker) Icons.Rounded.VolumeUp else Icons.Rounded.Hearing, isSpeaker, tokens.primaryAccent, onToggleSpeaker)
+                    ControlIconButton(if (isCameraOn) Icons.Rounded.Videocam else Icons.Rounded.VideocamOff, isCameraOn, tokens.primaryAccent, onToggleCamera)
+                }
+                Spacer(Modifier.height(28.dp))
+                Box(
+                    modifier = Modifier
+                        .size(68.dp)
+                        .background(tokens.declineColor, CircleShape)
+                        .clickable { onEndCall() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.CallEnd, "End call", tint = Color.White, modifier = Modifier.size(30.dp))
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// 09 — NEXTCLOUD TALK ONGOING CALL (reference: teal header, dark slate body, bottom
+// control bar). Only real Chaty call actions are rendered.
+// -------------------------------------------------------------------------------------------------
+@Composable
+private fun NextcloudTalkOngoingCall(
+    tokens: CallBundleThemeTokens,
+    session: ChatyCallSession,
+    duration: Int,
+    isMuted: Boolean,
+    isSpeaker: Boolean,
+    isCameraOn: Boolean,
+    onToggleMute: () -> Unit,
+    onToggleSpeaker: () -> Unit,
+    onToggleCamera: () -> Unit,
+    onSwitchCamera: () -> Unit,
+    onEndCall: () -> Unit,
+    onInviteParticipant: () -> Unit,
+    onMinimize: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(tokens.surfaceBackground),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(tokens.primaryAccent)
+                .padding(top = 44.dp, bottom = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(session.remoteDisplayName, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Spacer(Modifier.height(2.dp))
+            Text(formatDuration(duration), fontSize = 14.sp, color = Color.White.copy(alpha = 0.85f))
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF2C3E4A)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "N" },
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = tokens.secondaryText,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 40.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(tokens.declineColor, CircleShape)
+                    .clickable { onEndCall() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.CallEnd, "End call", tint = Color.White, modifier = Modifier.size(28.dp))
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(tokens.primaryAccent)
+                .padding(vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (isSpeaker) Icons.Rounded.VolumeUp else Icons.Rounded.Hearing,
+                "Speaker",
+                tint = if (isSpeaker) Color.White else Color.White.copy(alpha = 0.55f),
+                modifier = Modifier
+                    .size(26.dp)
+                    .clickable { onToggleSpeaker() },
+            )
+            Icon(
+                if (isCameraOn) Icons.Rounded.Videocam else Icons.Rounded.VideocamOff,
+                "Video",
+                tint = if (isCameraOn) Color.White else Color.White.copy(alpha = 0.55f),
+                modifier = Modifier
+                    .size(26.dp)
+                    .clickable { onToggleCamera() },
+            )
+            Icon(
+                if (isMuted) Icons.Rounded.MicOff else Icons.Rounded.Mic,
+                "Mute",
+                tint = if (isMuted) Color.White else Color.White.copy(alpha = 0.55f),
+                modifier = Modifier
+                    .size(26.dp)
+                    .clickable { onToggleMute() },
+            )
+        }
+    }
+}
+
 fun ControlIconButton(
     icon: ImageVector,
     isActive: Boolean,
@@ -649,4 +952,5 @@ fun ControlIconButton(
         )
     }
 }
+
 
