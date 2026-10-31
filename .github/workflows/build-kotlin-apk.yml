@@ -77,6 +77,7 @@ jobs:
                    '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
               ],
               'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
+              'build.gradle.kts': [('    id("com.google.gms.google-services") version "4.4.2" apply false\\n', '')],
           }
           for rel, pairs in subs.items():
               p = pathlib.Path(rel)
