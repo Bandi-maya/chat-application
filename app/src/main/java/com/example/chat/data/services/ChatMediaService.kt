@@ -1,6 +1,10 @@
 package com.example.chat.data.services
 
 import com.example.chat.data.remote.SupabaseStorageClient
+import com.example.chat.data.network.TransferDirection
+import com.example.chat.data.network.TransferKind
+import com.example.chat.data.network.TransferMonitor
+import com.example.chat.data.network.TransferStatus
 import com.example.chat.domain.models.MessageAttachment
 import java.util.UUID
 
@@ -32,7 +36,12 @@ class ChatMediaService(
     private val apiAuthenticated: () -> Boolean = { false },
     /** Dart api.uploadMedia(file): custom-backend multipart upload returning
      *  the server data map; null while no API backend is registered. */
-    private val apiUpload: (suspend (bytes: ByteArray, filename: String) -> Map<String, Any>)? = null,
+    private val apiUpload: (suspend (
+        bytes: ByteArray,
+        filename: String,
+        onProgress: (transferred: Long, total: Long) -> Unit,
+    ) -> Map<String, Any>)? = null,
+    private val transferMonitor: TransferMonitor? = null,
 ) {
     /** Exact port of pickAndUploadMultiple's limit enforcement. */
     fun enforceShareLimit(count: Int, maxFiles: Int? = null) {
@@ -89,15 +98,29 @@ class ChatMediaService(
         if (apiAuthenticated()) {
             val uploader = apiUpload
             if (uploader != null) {
-                val uploaded = uploader(payload, rawName)
-                return MessageAttachment(
+                val transferId = transferMonitor?.begin(
+                    TransferDirection.upload, transferKind(type), size, rawName,
+                )
+                try {
+                    val uploaded = uploader(payload, rawName) { sent, total ->
+                        if (transferId != null) transferMonitor?.update(transferId, sent, total)
+                    }
+                    if (transferId != null) {
+                        transferMonitor?.update(transferId, size, size)
+                        transferMonitor?.finish(transferId)
+                    }
+                    return MessageAttachment(
                     id = UUID.randomUUID().toString(),
                     type = type,
                     name = rawName,
                     size = formatBytes(size),
                     url = uploaded["url"]?.toString() ?: "",
                     durationSeconds = durationSeconds,
-                )
+                    )
+                } catch (error: Throwable) {
+                    if (transferId != null) transferMonitor?.finish(transferId, TransferStatus.failed)
+                    throw error
+                }
             }
         }
 
@@ -106,7 +129,21 @@ class ChatMediaService(
         val safeName = safeFileName(rawName)
         val objectPath = "$authUserId/$conversationId/${UUID.randomUUID()}_$safeName"
 
-        storage.upload(BUCKET, objectPath, payload, effectiveMime)
+        val transferId = transferMonitor?.begin(
+            TransferDirection.upload, transferKind(type), size, rawName,
+        )
+        try {
+            storage.upload(BUCKET, objectPath, payload, effectiveMime) { sent, total ->
+                if (transferId != null) transferMonitor?.update(transferId, sent, total)
+            }
+            if (transferId != null) {
+                transferMonitor?.update(transferId, size, size)
+                transferMonitor?.finish(transferId)
+            }
+        } catch (error: Throwable) {
+            if (transferId != null) transferMonitor?.finish(transferId, TransferStatus.failed)
+            throw error
+        }
 
         return MessageAttachment(
             id = UUID.randomUUID().toString(),
@@ -116,6 +153,15 @@ class ChatMediaService(
             url = objectPath,
             durationSeconds = durationSeconds,
         )
+    }
+
+    private fun transferKind(type: String): TransferKind = when (type.lowercase()) {
+        "image" -> TransferKind.image
+        "video" -> TransferKind.video
+        "audio" -> TransferKind.audio
+        "document" -> TransferKind.document
+        "text" || "message" -> TransferKind.message
+        else -> TransferKind.other
     }
 
     /** Exact port of _maxBytes. */
