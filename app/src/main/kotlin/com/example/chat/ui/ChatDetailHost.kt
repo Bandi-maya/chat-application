@@ -60,6 +60,7 @@ import com.example.chat.ui.chats.home.parseAvatarColorHex
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /** Real host for ChatDetailScreen. Mirrors how Dart ChatDetailScreen wires its
@@ -126,6 +127,59 @@ fun ChatDetailHost(
     var chatCameraOpen by remember { mutableStateOf(false) }
     var p2pReceiveMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var p2pReceiveLink by remember { mutableStateOf<String?>(null) }
+    val hostView = androidx.compose.ui.platform.LocalView.current
+    val me = api.currentUser
+    val myId = me?.id ?: ""
+    val live = api.conversations.firstOrNull { it.id == conversation.id } ?: conversation
+    val messages = api.getMessages(conversation.id)
+    // Refresh epoch outside the auth lock, then confirm the SAME captured account and pure epoch together.
+    fun captureMediaBinding(): com.example.chat.ui.chats.detail.AttachmentConsumerBinding? {
+        val account = api.authSnapshot()
+        val stamp = ServiceLocator.attachmentResolver.currentSession() ?: return null
+        var coherent = false
+        api.withAuthScope(account) { coherent = ServiceLocator.attachmentResolver.isEpochCurrent(stamp) }
+        if (!coherent) return null
+        return com.example.chat.ui.chats.detail.AttachmentConsumerBinding(stamp, ServiceLocator.attachmentResolver,
+            { ServiceLocator.attachmentResolver.currentSession() },
+            deliverIfCurrent = { block ->
+                var delivered = false
+                api.withAuthScope(account) {
+                    if (ServiceLocator.attachmentResolver.isEpochCurrent(stamp)) { block(); delivered = true }
+                }
+                delivered
+            },
+        ) { message ->
+            val path = message.attachment?.url ?: throw IllegalStateException("Missing media path")
+            ServiceLocator.chatMedia.createSignedUrl(path, 3600) { account.baseUrl }
+        }
+    }
+    var capturedMedia by remember { mutableStateOf(captureMediaBinding()) }
+    LaunchedEffect(conversation.id) {
+        while (true) {
+            val next = captureMediaBinding()
+            if (next?.session != capturedMedia?.session) capturedMedia = next
+            kotlinx.coroutines.delay(150)
+        }
+    }
+    val mediaStamp = capturedMedia?.session
+    val attachmentBinding = capturedMedia ?: com.example.chat.ui.chats.detail.AttachmentConsumerBinding(
+        "", ServiceLocator.attachmentResolver, { null }, deliverIfCurrent = { _ -> false },
+    ) { throw IllegalStateException("Media identity unavailable") }
+
+    val isDirect = live.type == ConversationType.direct
+    val otherId = live.participantIds.firstOrNull { it != myId }
+    val other = api.users.firstOrNull { it.id == otherId }
+    val conv = prefs.conversation
+    val privacy = prefs.privacy
+    fun gbB(k: String, d: Boolean) = prefs.gbBool(k, d)
+
+    var connection by remember(conversation.id) { mutableStateOf<ContactConnectionStatus?>(null) }
+    suspend fun refreshConnection() {
+        if (isDirect && otherId != null) {
+            try { connection = ServiceLocator.contactRelationships.connectionStatus(otherId) } catch (_: Exception) {}
+        }
+    }
+    LaunchedEffect(conversation.id, otherId) { refreshConnection() }
     val largeFilePicker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { selectedUri ->
@@ -225,59 +279,6 @@ fun ChatDetailHost(
             }
         }
     }
-    val hostView = androidx.compose.ui.platform.LocalView.current
-    val me = api.currentUser
-    val myId = me?.id ?: ""
-    val live = api.conversations.firstOrNull { it.id == conversation.id } ?: conversation
-    val messages = api.getMessages(conversation.id)
-    // Refresh epoch outside the auth lock, then confirm the SAME captured account and pure epoch together.
-    fun captureMediaBinding(): com.example.chat.ui.chats.detail.AttachmentConsumerBinding? {
-        val account = api.authSnapshot()
-        val stamp = ServiceLocator.attachmentResolver.currentSession() ?: return null
-        var coherent = false
-        api.withAuthScope(account) { coherent = ServiceLocator.attachmentResolver.isEpochCurrent(stamp) }
-        if (!coherent) return null
-        return com.example.chat.ui.chats.detail.AttachmentConsumerBinding(stamp, ServiceLocator.attachmentResolver,
-            { ServiceLocator.attachmentResolver.currentSession() },
-            deliverIfCurrent = { block ->
-                var delivered = false
-                api.withAuthScope(account) {
-                    if (ServiceLocator.attachmentResolver.isEpochCurrent(stamp)) { block(); delivered = true }
-                }
-                delivered
-            },
-        ) { message ->
-            val path = message.attachment?.url ?: throw IllegalStateException("Missing media path")
-            ServiceLocator.chatMedia.createSignedUrl(path, 3600) { account.baseUrl }
-        }
-    }
-    var capturedMedia by remember { mutableStateOf(captureMediaBinding()) }
-    LaunchedEffect(conversation.id) {
-        while (true) {
-            val next = captureMediaBinding()
-            if (next?.session != capturedMedia?.session) capturedMedia = next
-            kotlinx.coroutines.delay(150)
-        }
-    }
-    val mediaStamp = capturedMedia?.session
-    val attachmentBinding = capturedMedia ?: com.example.chat.ui.chats.detail.AttachmentConsumerBinding(
-        "", ServiceLocator.attachmentResolver, { null }, deliverIfCurrent = { _ -> false },
-    ) { throw IllegalStateException("Media identity unavailable") }
-
-    val isDirect = live.type == ConversationType.direct
-    val otherId = live.participantIds.firstOrNull { it != myId }
-    val other = api.users.firstOrNull { it.id == otherId }
-    val conv = prefs.conversation
-    val privacy = prefs.privacy
-    fun gbB(k: String, d: Boolean) = prefs.gbBool(k, d)
-
-    var connection by remember(conversation.id) { mutableStateOf<ContactConnectionStatus?>(null) }
-    suspend fun refreshConnection() {
-        if (isDirect && otherId != null) {
-            try { connection = ServiceLocator.contactRelationships.connectionStatus(otherId) } catch (_: Exception) {}
-        }
-    }
-    LaunchedEffect(conversation.id, otherId) { refreshConnection() }
     var gateOpen by remember { mutableStateOf(false) }
     var blockConfirm by remember { mutableStateOf(false) }
     var forwardMessage by remember { mutableStateOf<ChatMessage?>(null) }
