@@ -55,7 +55,7 @@ class ChatyRealtimeForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Chaty message connection", NotificationManager.IMPORTANCE_MIN).apply {
+                NotificationChannel(CHANNEL_ID, "Chaty message connection", NotificationManager.IMPORTANCE_LOW).apply {
                     description = "Keeps real-time Chaty messages and incoming call alerts connected."
                     setShowBadge(false)
                 },
@@ -80,7 +80,7 @@ class ChatyRealtimeForegroundService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 
