@@ -196,6 +196,7 @@ class CallSignalingService(
 
     private var cachedRemoteOfferSdp: String? = null
     private var media: CallMediaController? = null
+    private var lastAppliedNetworkProfile: CallNetworkProfile? = null
     private var callAccountScope: Any? = null
     private fun requireCallScope(expected: Any?) {
         if (!accountScopeValid(expected)) throw kotlinx.coroutines.CancellationException("Call account scope changed")
@@ -926,7 +927,10 @@ class CallSignalingService(
                 CallNetworkProfile.balanced
             } else selected
         }
-        media?.applyNetworkProfile(profile)
+        if (profile != lastAppliedNetworkProfile) {
+            lastAppliedNetworkProfile = profile
+            media?.applyNetworkProfile(profile)
+        }
     }
 
     suspend fun setAudioRoute(route: AudioRouteType) {
@@ -971,6 +975,7 @@ class CallSignalingService(
         val iceServers = iceServersProvider()
         requireCallIdentity(expectedAccount, callId)
         val peer = mediaFactory()
+        lastAppliedNetworkProfile = null
         if (!guardCall(expectedAccount, callId) { media = peer }) { peer.dispose(); throw kotlinx.coroutines.CancellationException("Call changed") }
 
         peer.onLocalIceCandidate = { candidate, sdpMid, sdpMLineIndex ->
