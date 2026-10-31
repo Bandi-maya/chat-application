@@ -1379,7 +1379,7 @@ private fun P2pVideoInviteCard(
             Text(attachment.name, color = textColor, fontWeight = FontWeight.W700, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(attachment.size, color = textColor.copy(alpha = 0.68f), fontSize = 11.sp)
             Text(
-                if (isMe) "Secure direct transfer · waiting" else "Secure direct transfer · tap to receive",
+                if (isMe) "Encrypted peer transfer · waiting" else "Encrypted peer transfer · tap to receive",
                 color = accentColor,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.W700,
