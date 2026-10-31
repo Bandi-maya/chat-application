@@ -78,8 +78,21 @@ class EmojiPackAssetsAndPerfTest {
         return nativeKb to managedKb
     }
 
+    /** Attribution evidence, not a cause claim: dumpsys meminfo rows per phase.
+     *  heapPartsKb() splits native vs managed; this names WHICH native bucket
+     *  (Native Heap / Graphics / GL) carries retained memory so a later fix can
+     *  target the right owner. Log + evidence file only; assertions unchanged. */
+    private fun meminfoRows(): String {
+        val out = sh("dumpsys meminfo ${ctx.packageName}")
+        return listOf("Native Heap", "Graphics", "GL dev", "EGL mtrack", "GL mtrack", "Unknown").joinToString(" | ") { name ->
+            out.lines().firstOrNull { it.trimStart().startsWith(name) }?.trim()?.replace(Regex("\\s+"), " ") ?: "$name ?"
+        }
+    }
+
     private fun gridRun(pack: String): Triple<Long, Long, Long> {
         val beforeP = heapPartsKb(); val before = beforeP.first + beforeP.second
+        val mi = linkedMapOf<String, String>()
+        mi["before"] = meminfoRows()
         var peak = 0L; var off = 0L; var back = 0L
         var peakP = 0L to 0L; var offP = 0L to 0L; var backP = 0L to 0L
         ActivityScenario.launch<EmojiPackGridFixtureActivity>(
@@ -91,10 +104,10 @@ class EmojiPackAssetsAndPerfTest {
                 val p = EmojiPackGridProbe.phase
                 if (p != phase) {
                     phase = p
-                    if (p == "scrolledOff") { Thread.sleep(3_000); offP = heapPartsKb(); off = offP.first + offP.second }
-                    if (p == "back") { Thread.sleep(2_000); backP = heapPartsKb(); back = backP.first + backP.second }
+                    if (p == "scrolledOff") { Thread.sleep(3_000); offP = heapPartsKb(); off = offP.first + offP.second; mi["off"] = meminfoRows() }
+                    if (p == "back") { Thread.sleep(2_000); backP = heapPartsKb(); back = backP.first + backP.second; mi["back"] = meminfoRows() }
                 } else if (p == "visible") {
-                    Thread.sleep(5_000); peakP = heapPartsKb(); peak = peakP.first + peakP.second
+                    Thread.sleep(5_000); peakP = heapPartsKb(); peak = peakP.first + peakP.second; mi["visible"] = meminfoRows()
                 }
                 Thread.sleep(200)
             }
@@ -105,6 +118,7 @@ class EmojiPackAssetsAndPerfTest {
         // Triple's inputs; the splits only enrich the evidence file.
         Thread.sleep(3_000)
         val closedP = heapPartsKb(); val closed = closedP.first + closedP.second
+        mi["closed"] = meminfoRows()
         // Cache-ownership discrimination (evidence-only): run-128 measured +158MB
         // native retained after close with managed flat. The rendered path is the
         // Noto Lottie Url spec (AnimatedEmojiView ignores emojiStyle; the fixture's
@@ -136,7 +150,9 @@ class EmojiPackAssetsAndPerfTest {
         }.getOrElse { "fail:" + (it.cause ?: it).javaClass.simpleName }
         android.util.Log.w("EmojiPerf", "LOTTIE-PROBE animKt=" + probeAnim + " factory=" + probeFactory + " cacheClear=" + cacheClear)
         val clearedP = heapPartsKb(); val cleared = clearedP.first + clearedP.second
-        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back closedKb=$closed beforeSplitKb=${beforeP.first}/${beforeP.second} visibleSplitKb=${peakP.first}/${peakP.second} offSplitKb=${offP.first}/${offP.second} backSplitKb=${backP.first}/${backP.second} closedSplitKb=${closedP.first}/${closedP.second} probeAnimKt=$probeAnim probeFactory=$probeFactory cacheClear=$cacheClear clearedKb=$cleared clearedSplitKb=${clearedP.first}/${clearedP.second} (split=nativeKb/managedKb)")
+        mi["cleared"] = meminfoRows()
+        mi.forEach { (k, v) -> android.util.Log.w("EmojiPerf", "MEMINFO-DIAG pack=" + pack + " phase=" + k + " " + v) }
+        File(java.io.File(ctx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "grid-$pack.txt").writeText("pack=$pack beforeKb=$before visibleKb=$peak scrolledOffKb=$off backKb=$back closedKb=$closed beforeSplitKb=${beforeP.first}/${beforeP.second} visibleSplitKb=${peakP.first}/${peakP.second} offSplitKb=${offP.first}/${offP.second} backSplitKb=${backP.first}/${backP.second} closedSplitKb=${closedP.first}/${closedP.second} probeAnimKt=$probeAnim probeFactory=$probeFactory cacheClear=$cacheClear clearedKb=$cleared clearedSplitKb=${clearedP.first}/${clearedP.second} (split=nativeKb/managedKb) meminfo=" + mi.entries.joinToString(" ") { (k, v) -> k + "{" + v + "}" })
         assertEquals("grid did not finish all phases for $pack", "done", EmojiPackGridProbe.phase)
         return Triple(peak - before, off - before, back - before)
     }
