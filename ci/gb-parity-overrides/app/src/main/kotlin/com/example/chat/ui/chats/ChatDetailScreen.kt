@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -789,7 +790,31 @@ fun ChatDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
-                    items(timelineRows, key = { it.anchor.id }) { row ->
+                    itemsIndexed(timelineRows, key = { _, row -> row.anchor.id }) { index, row ->
+                        val currentDay = row.anchor.createdAt.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                        val previousDay = timelineRows.getOrNull(index - 1)?.anchor?.createdAt
+                            ?.atZone(java.time.ZoneId.systemDefault())?.toLocalDate()
+                        if (index == 0 || currentDay != previousDay) {
+                            val dayLabel = when (currentDay) {
+                                java.time.LocalDate.now() -> "Today"
+                                java.time.LocalDate.now().minusDays(1) -> "Yesterday"
+                                else -> currentDay.format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMM d"))
+                            }
+                            Box(
+                                Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    dayLabel,
+                                    color = Color(theme.secondaryTextColor),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.W600,
+                                    modifier = Modifier
+                                        .background(Color(theme.cardColor).copy(alpha = 0.92f), RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 12.dp, vertical = 5.dp),
+                                )
+                            }
+                        }
                         val message = row.anchor
                         val isMine = message.senderId == currentUserId
                         val bubble = ChatMessageBubble(
