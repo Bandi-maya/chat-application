@@ -193,7 +193,7 @@ fun ConnectionDetailSheetContent(
             )
         }
         MetricRow(
-            label = "Direct file transfers",
+            label = "Peer file transfers",
             value = p2pTransferStates.count { it.status !in setOf("Sent", "Received and verified", "Failed", "Cancelled") }.toString(),
             icon = Icons.Rounded.Sync,
             labelColor = foregroundSecondary,
