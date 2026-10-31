@@ -541,7 +541,30 @@ object ServiceLocator {
             signalSender = com.example.chat.data.services.CallSignalSender { targetUserId, data ->
                 apiBackend.sendCallSignal(targetUserId, data)
             },
-            mediaFactory = { com.example.chat.data.services.WebRtcCallMediaController(requireContext()) },
+            mediaFactory = {
+                val uploadId = transferMonitor.begin(
+                    com.example.chat.data.network.TransferDirection.upload,
+                    com.example.chat.data.network.TransferKind.call,
+                    null,
+                    "Live call",
+                )
+                val downloadId = transferMonitor.begin(
+                    com.example.chat.data.network.TransferDirection.download,
+                    com.example.chat.data.network.TransferKind.call,
+                    null,
+                    "Live call",
+                )
+                com.example.chat.data.services.WebRtcCallMediaController(requireContext()).also { media ->
+                    media.onTrafficBytes = { uploaded, downloaded ->
+                        transferMonitor.update(uploadId, uploaded)
+                        transferMonitor.update(downloadId, downloaded)
+                    }
+                    media.onTrafficEnded = {
+                        transferMonitor.finish(uploadId)
+                        transferMonitor.finish(downloadId)
+                    }
+                }
+            },
             // GAP (no invention): api branch persists terminal call records via
             // dataStore.addCallRecord; no custom-backend call-history endpoint is
             // verified, and CallHistoryService here is Postgrest-backed. Sink is a
