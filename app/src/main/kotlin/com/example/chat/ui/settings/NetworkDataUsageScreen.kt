@@ -37,6 +37,7 @@ fun NetworkDataUsageScreen(onBack: () -> Unit) {
     val monitor = ServiceLocator.transferMonitor
     val transfers by monitor.items.collectAsState()
     val totals by monitor.totals.collectAsState()
+    val appTraffic by ServiceLocator.appTrafficMonitor.state.collectAsState()
     val network by ServiceLocator.networkMonitor.state.collectAsState()
     val active = transfers.filter { it.status == TransferStatus.active || it.status == TransferStatus.paused || it.status == TransferStatus.queued }
 
@@ -91,6 +92,29 @@ fun NetworkDataUsageScreen(onBack: () -> Unit) {
                 UsageRow("Other", totals.otherBytes)
                 OutlinedButton(onClick = { monitor.resetTotals() }, modifier = Modifier.fillMaxWidth()) {
                     Text("Reset usage totals")
+                }
+            }
+        }
+
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Total Chaty network traffic", style = MaterialTheme.typography.titleMedium)
+                if (!appTraffic.supported) {
+                    Text("Android does not expose per-app traffic counters on this device.")
+                } else {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("All uploaded data")
+                        Text(formatBytes(appTraffic.uploadedBytes))
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("All downloaded data")
+                        Text(formatBytes(appTraffic.downloadedBytes))
+                    }
+                    Text(
+                        "Includes realtime sockets, call signaling, API traffic, media and protocol overhead. Counters are measured by Android for Chaty's app UID.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
