@@ -436,6 +436,17 @@ jobs:
             t="screenshots/real-host-hold-$k-toggle-timing.txt"
             [ -f "$t" ] && { echo "TIMING-BEGIN $k"; cat "$t"; echo; echo "TIMING-END $k"; } || echo "TIMING-MISSING $k"
           done
+      - name: Stop emulator before post-actions
+        if: always()
+        run: |
+          # Run-132: the emulator-runner post "Terminate Emulator" step hung ~25min after
+          # OK(46 tests) until the 45-min job timeout cancelled a passing shard. Kill the
+          # emulator here - after all evidence capture and uploads - so the post-action
+          # has nothing to wait on. Evidence steps above still run first.
+          adb emu kill || true
+          for i in $(seq 1 15); do pgrep -f qemu-system >/dev/null || break; sleep 2; done
+          pkill -9 -f qemu-system || true
+          exit 0
 
   # Bounded infrastructure experiment (authorized 19:23): re-run ONLY the two
   # 175 lost shards (media, emoji-real) serially on one runner - one emulator
