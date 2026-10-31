@@ -113,9 +113,9 @@ object NativeP2pTransferProtocol {
     fun authenticateManifest(manifest: Manifest, secret: ByteArray): ByteArray {
         require(secret.size == KEY_BYTES)
         val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(secret, "HmacSHA256"))
+        mac.init(SecretKeySpec(deriveKey(secret, "chaty-manifest-v1"), "HmacSHA256"))
         mac.update(manifest.transferId.toByteArray(Charsets.UTF_8))
-        mac.update(0)
+        mac.update(0.toByte())
         mac.update(manifest.displayName.toByteArray(Charsets.UTF_8))
         mac.update(0)
         mac.update(manifest.mimeType.toByteArray(Charsets.UTF_8))
@@ -193,11 +193,24 @@ object NativeP2pTransferProtocol {
             .putLong(index).putInt(input.size.takeIf { mode == Cipher.ENCRYPT_MODE } ?: (input.size - 16))
             .array()
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(mode, SecretKeySpec(secret, "AES"), GCMParameterSpec(GCM_TAG_BITS, nonce))
+        cipher.init(mode, SecretKeySpec(deriveKey(secret, "chaty-chunk-aes-v1"), "AES"), GCMParameterSpec(GCM_TAG_BITS, nonce))
         cipher.updateAAD(aad)
         return try { cipher.doFinal(input) } catch (_: Exception) {
             throw SecurityException("Chunk authentication failed")
         }
+    }
+
+    /** HKDF-SHA256 key separation: manifest authentication and chunk encryption never reuse a raw key. */
+    private fun deriveKey(secret: ByteArray, label: String): ByteArray {
+        val salt = "chaty-transfer-v1".toByteArray(Charsets.UTF_8)
+        val extract = Mac.getInstance("HmacSHA256")
+        extract.init(SecretKeySpec(salt, "HmacSHA256"))
+        val prk = extract.doFinal(secret)
+        val expand = Mac.getInstance("HmacSHA256")
+        expand.init(SecretKeySpec(prk, "HmacSHA256"))
+        expand.update(label.toByteArray(Charsets.UTF_8))
+        expand.update(1.toByte())
+        return expand.doFinal().copyOf(KEY_BYTES)
     }
 
     private fun sha256(file: File): String {
