@@ -13,6 +13,8 @@ import com.example.chat.data.services.CallSessionState
 import com.example.chat.notifications.CallActionReceiver
 import com.example.chat.notifications.ChatyNotifications
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -207,8 +209,7 @@ class CallNotificationActionsProofTest {
             endBtn!!.click()
             awaitCondition(8000, "demo session cleared after hang-up (cycle $i)") { calls.currentSession == null }
             cycleLog.append("cycle").append(i).append(" duringRinging=").append(duringRinging)
-                .append(" tapAtMs=").append(tapAt).append(" clearedMs=").append(System.currentTimeMillis() - t0).append('
-')
+                .append(" tapAtMs=").append(tapAt).append(" clearedMs=").append(System.currentTimeMillis() - t0).append('\n')
             Thread.sleep(400)
         }
         awaitCondition(5000, "call notification removed after final hang-up") {
@@ -259,8 +260,7 @@ class CallNotificationActionsProofTest {
                 while (cleared < 8000 && service.currentSession != null) { Thread.sleep(150); cleared += 150 }
                 cycleLog.append("cycle").append(i).append(" immediate=").append(immediate)
                     .append(" launched=").append(launched).append(" endState=").append(service.currentSession?.state)
-                    .append(" localMedia=").append(media.hasLocalMedia).append(" ms=").append(System.currentTimeMillis() - t0).append('
-')
+                    .append(" localMedia=").append(media.hasLocalMedia).append(" ms=").append(System.currentTimeMillis() - t0).append('\n')
             }
             var drained = 0L
             while (drained < 8000 && media.hasLocalMedia) { Thread.sleep(200); drained += 200 }
