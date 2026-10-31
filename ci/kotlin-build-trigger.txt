@@ -1,1 +1,1 @@
-134 - runner step timeouts bounded on measured phases + restart cgroup oom_kill counters + lensframe timing/output discriminator + emoji meminfo attribution
+135 - early qemu identity + vmstat oom_kill + lens OPTION_CLOSEST diag + full meminfo dump + CALLEND-DIAG cascade + hang-up crash targeted repro
