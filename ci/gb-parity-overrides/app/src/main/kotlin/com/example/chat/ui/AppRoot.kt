@@ -103,6 +103,7 @@ fun AppRoot() {
         themeController.globalTheme, ServiceLocator.preferencesController,
     )
     ChatyTheme(config = resolvedTheme) {
+    com.example.chat.ui.icons.ProvideChatyIconTheme(ServiceLocator.preferencesController) {
     GlobalTypographyScale {
         com.example.chat.ui.core.system.ChatySystemBarsEffect(ServiceLocator.preferencesController, resolvedTheme.surfaceColor)
         com.example.chat.ui.core.system.ChatyPresenceEffect(
@@ -1610,6 +1611,7 @@ fun AppRoot() {
             content = { },
         )
         }
+    }
     }
     }
 }

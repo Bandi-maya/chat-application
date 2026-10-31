@@ -40,8 +40,9 @@ import androidx.compose.ui.graphics.StrokeJoin as CxJoin
 
 /** Active icon theme (Dart: prefs.universal.iconTheme resolved via ChatyIconThemeId.fromString). */
 val LocalChatyIconTheme = compositionLocalOf { ChatyIconThemeId.chatySigil }
+val LocalChatyIconVariants = compositionLocalOf<Map<String, String>> { emptyMap() }
 
-/** Observes preferences.universal.iconTheme and provides it to descendants. Place once near the app root. */
+/** Observes global and per-icon preferences and provides them to every ChatyIcon descendant. */
 @Composable
 fun ProvideChatyIconTheme(preferences: ChatyPreferencesController, content: @Composable () -> Unit) {
     var version by remember(preferences) { mutableIntStateOf(0) }
@@ -52,7 +53,12 @@ fun ProvideChatyIconTheme(preferences: ChatyPreferencesController, content: @Com
     }
     @Suppress("UNUSED_EXPRESSION") version
     val theme = ChatyIconThemeId.fromString(preferences.universal.iconTheme)
-    CompositionLocalProvider(LocalChatyIconTheme provides theme, content = content)
+    val variants = preferences.universal.iconVariants
+    CompositionLocalProvider(
+        LocalChatyIconTheme provides theme,
+        LocalChatyIconVariants provides variants,
+        content = content,
+    )
 }
 
 private fun Color.toCx() = CxColor(r.toFloat(), g.toFloat(), b.toFloat(), a.toFloat())
@@ -118,7 +124,9 @@ fun ChatyIcon(
     themeOverride: ChatyIconThemeId? = null,
     semanticLabel: String? = null,
 ) {
-    val theme = themeOverride ?: LocalChatyIconTheme.current
+    val theme = themeOverride
+        ?: LocalChatyIconVariants.current[icon.name]?.let(ChatyIconThemeId::fromString)
+        ?: LocalChatyIconTheme.current
     val resolved = color ?: LocalContentColor.current
     val px = with(LocalDensity.current) { size.toPx() }.toDouble()
     val sem = if (!semanticLabel.isNullOrEmpty()) Modifier.semantics { contentDescription = semanticLabel } else Modifier

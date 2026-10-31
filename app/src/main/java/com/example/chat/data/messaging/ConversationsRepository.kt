@@ -570,17 +570,27 @@ class ConversationsRepository(
 
         list[msgIndex] = msg.copy(reactions = updatedReactions)
         notifyChanged()
+        // Keep the optimistic reaction in the encrypted offline snapshot too.
+        snapshotScope?.launch {
+            persistMessageSnapshot(conversationId, messagesByChatId[conversationId]?.toList())
+        }
     }
 
-    /** Exact port of _toggleReactionAsync (demo mode does not exist on api). */
+    /** Syncs a reaction when the deployed backend exposes the RPC. If it does not,
+     *  the local optimistic reaction remains visible and is retained in the encrypted
+     *  account-scoped snapshot instead of being erased by an unconditional reload. */
     suspend fun toggleReactionAsync(conversationId: String, messageId: String, emoji: String) {
-        runCatching {
+        val synced = runCatching {
             rpc.rpc(
                 "toggle_message_reaction",
                 mapOf("p_message_id" to messageId, "p_emoji" to emoji),
             )
+        }.isSuccess
+        if (synced) {
+            loadMessages(conversationId)
+        } else {
+            persistMessageSnapshot(conversationId, messagesByChatId[conversationId]?.toList())
         }
-        loadMessages(conversationId)
         notifyChanged()
     }
 

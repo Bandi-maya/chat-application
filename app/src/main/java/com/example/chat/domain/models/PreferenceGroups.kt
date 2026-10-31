@@ -275,6 +275,8 @@ data class UniversalPreferences(
     val notificationIcon: String = "White",
     val fontStyle: String = "Default",
     val iconTheme: String = "Chaty Orbit",
+    /** Per-icon visual theme overrides keyed by stable ChatyIconId.name. */
+    val iconVariants: Map<String, String> = emptyMap(),
     val emojiStyle: String = "Chaty Motion",
     val loadFontEnabled: Boolean = false,
     val hidePhotosFromGallery: Boolean = false,
@@ -315,6 +317,7 @@ data class UniversalPreferences(
         "notificationIcon" to notificationIcon,
         "fontStyle" to fontStyle,
         "iconTheme" to iconTheme,
+        "iconVariants" to iconVariants,
         "emojiStyle" to emojiStyle,
         "loadFontEnabled" to loadFontEnabled,
         "hidePhotosFromGallery" to hidePhotosFromGallery,
@@ -346,6 +349,10 @@ data class UniversalPreferences(
             notificationIcon = map["notificationIcon"] as String? ?: "White",
             fontStyle = map["fontStyle"] as String? ?: "Default",
             iconTheme = map["iconTheme"] as String? ?: "Chaty Orbit",
+            iconVariants = (map["iconVariants"] as? Map<*, *>)
+                ?.mapNotNull { (key, value) ->
+                    if (key != null && value != null) key.toString() to value.toString() else null
+                }?.toMap() ?: emptyMap(),
             emojiStyle = map["emojiStyle"] as String? ?: "Chaty Motion",
             loadFontEnabled = map["loadFontEnabled"] as Boolean? ?: false,
             hidePhotosFromGallery = map["hidePhotosFromGallery"] as Boolean? ?: false,

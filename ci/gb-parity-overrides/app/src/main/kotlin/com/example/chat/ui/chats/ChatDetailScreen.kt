@@ -240,6 +240,7 @@ fun ChatDetailScreen(
     openGallery: () -> com.example.chat.ui.GalleryLease? = { null },
     closeGallery: (com.example.chat.ui.GalleryLease) -> Unit = {},
     onPickedImages: ((com.example.chat.ui.GalleryLease, List<android.net.Uri>) -> Unit)? = null,
+    onDirectSendImages: ((com.example.chat.ui.GalleryLease, List<android.net.Uri>) -> Unit)? = null,
     attachmentScopeEpoch: Int = 0,
     onCameraTap: () -> Unit = {},
     onComposerCameraTap: () -> Unit = onCameraTap,
@@ -1200,6 +1201,14 @@ fun ChatDetailScreen(
                         // Binding owns the accepted review flow. Never mint a fresh account here.
                         transferredGalleryLeases.add(lease)
                         review(lease, images)
+                        galleryLease = null
+                        attachmentSheetOpen = false
+                    }
+                } },
+                onDirectSendImages = onDirectSendImages?.let { send -> { images ->
+                    galleryLease?.takeIf { it.isValid }?.let { lease ->
+                        transferredGalleryLeases.add(lease)
+                        send(lease, images)
                         galleryLease = null
                         attachmentSheetOpen = false
                     }

@@ -74,14 +74,19 @@ class LocalSnapshotCacheService(context: Context) : SnapshotCacheStore {
                 val file = fileFor(userId, scope)
                 file.parentFile?.mkdirs()
                 val tmp = File("${file.path}.tmp")
-                val content = envelope.toString()
-                tmp.writeText(content)
+                val content = envelope.toString().toByteArray(Charsets.UTF_8)
                 try {
-                    if (file.exists()) file.delete()
-                    tmp.renameTo(file)
-                } catch (_: Exception) {
-                    // Fallback for filesystems that fail on atomic rename.
-                    file.writeText(content)
+                    // Write and fsync the replacement before swapping it into place.
+                    // Os.rename is an atomic same-directory replacement on Android;
+                    // unlike delete-then-rename it never destroys the last good snapshot
+                    // when the replacement fails.
+                    tmp.outputStream().use { stream ->
+                        stream.write(content)
+                        stream.flush()
+                        stream.fd.sync()
+                    }
+                    android.system.Os.rename(tmp.absolutePath, file.absolutePath)
+                } finally {
                     if (tmp.exists()) runCatching { tmp.delete() }
                 }
             }
