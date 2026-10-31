@@ -520,7 +520,7 @@ class P2pFileTransferService(
     }
 
     private fun sendCandidate(session: Session, candidate: IceCandidate) {
-        sendSignal(session.peerUserId, mapOf("signal_type" to "file_transfer_ice", "transfer_id" to session.id, "candidate" to candidate.sdp, "sdp_mid" to candidate.sdpMid, "sdp_mline" to candidate.sdpMLineIndex))
+        sendSignal(session.peerUserId, mapOf("signal_type" to "file_transfer_ice", "call_id" to session.id, "transfer_id" to session.id, "candidate" to candidate.sdp, "sdp_mid" to candidate.sdpMid, "sdp_mline" to candidate.sdpMLineIndex))
     }
 
     private fun fail(session: Session, reason: String) {
