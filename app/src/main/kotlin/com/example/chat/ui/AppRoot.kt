@@ -562,8 +562,11 @@ fun AppRoot() {
                 var pushedThemeStudio by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedAppIcon by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedSettingsSearch by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedNetworkUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
-                    if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
+                    if (dest == com.example.chat.ui.settings.SettingsDestination.NetworkUsage) {
+                        pushedNetworkUsage = true
+                    } else if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
                         route = AuthRoute.Security
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.SearchSettings) {
                         // Dart: showSearch(SettingsSearchDelegate(allSettings: _searchIndex())).
@@ -1156,6 +1159,12 @@ fun AppRoot() {
                             showToast = { msg -> settingsNotice = msg },
                         )
                     }
+                }
+                ChatyPushedPage(pushedNetworkUsage) {
+                    androidx.activity.compose.BackHandler { pushedNetworkUsage = false }
+                    com.example.chat.ui.settings.NetworkDataUsageScreen(
+                        onBack = { pushedNetworkUsage = false },
+                    )
                 }
                 ChatyPushedPage(pushedThemeStudio) {
                     // Dart main_navigation_shell Quick Actions "Theme Studio" -> ThemeStudioScreen(prefs, ThemeController).
