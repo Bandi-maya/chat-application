@@ -99,6 +99,8 @@ class WebRtcCallMediaController(
     var onTrafficEnded: (() -> Unit)? = null
     private val statsHandler = Handler(Looper.getMainLooper())
     private var statsStarted = false
+    private var trafficSessionPrepared = false
+    private var trafficSessionEnded = false
     private var lastSentBytes = 0L
     private var lastReceivedBytes = 0L
     private val statsPoll = object : Runnable {
@@ -190,6 +192,7 @@ class WebRtcCallMediaController(
             override fun onRenegotiationNeeded() {}
         }) ?: throw IllegalStateException("WebRTC did not produce a peer connection.")
         peerConnection = peer
+        trafficSessionPrepared = true
 
         openLocalMedia(isVideo, lowData, factory, peer)
     }
@@ -294,10 +297,12 @@ class WebRtcCallMediaController(
     }
 
     private fun stopTrafficStats() {
-        if (!statsStarted) return
         statsStarted = false
         statsHandler.removeCallbacks(statsPoll)
-        onTrafficEnded?.invoke()
+        if (trafficSessionPrepared && !trafficSessionEnded) {
+            trafficSessionEnded = true
+            onTrafficEnded?.invoke()
+        }
     }
 
     /** Applies a live uplink-aware profile while keeping the audio sender untouched. */
