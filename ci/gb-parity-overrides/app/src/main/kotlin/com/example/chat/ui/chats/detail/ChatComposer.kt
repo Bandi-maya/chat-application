@@ -61,7 +61,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -217,6 +220,11 @@ fun ChatEntryBar(
             ComposerActionButton("Send message", Icons.AutoMirrored.Rounded.Send, Color(theme.onAccentColor),
                 fillColor = colors.sendFill, emphasized = true, onTap = onSend)
         } else {
+            // MicGestureDiag (bounded, DEBUG-only): timestamps the recomposition
+            // that publishes the new mode label - with the run-127 toggle vs
+            // landing timestamps this discriminates "recomposition ran late"
+            // from "recomposed promptly, frame/a11y publish ran late".
+            if (com.example.chat.BuildConfig.DEBUG) android.util.Log.i("MicGestureDiag", "mic compose videoMode=" + videoMode + " t=" + System.currentTimeMillis())
             ComposerActionButton(
                 semanticsLabel = if (videoMode) "Video mode. Tap for microphone, hold to record video." else "Microphone mode. Tap for video, hold to record audio.",
                 icon = if (videoMode) Icons.Rounded.Videocam else Icons.Rounded.Mic,
@@ -680,7 +688,20 @@ private fun ComposerActionButton(
             }
             .background(fillColor ?: Color.Transparent, CircleShape)
             .clip(CircleShape)
-            .semantics { contentDescription = semanticsLabel }
+            .semantics {
+                contentDescription = semanticsLabel
+                // TalkBack/keyboard activation: the tap path is detectTapGestures,
+                // which publishes no click semantics (run-127 proof: the mic node
+                // was clickable=false with no ACTION_CLICK, so assistive tech
+                // could not activate it). Publish ONLY the tap action here;
+                // hold/record stays gesture-only, so a11y activation invokes the
+                // same mode-toggle/send callback as a tap and can never start a
+                // recording. Visuals and gesture handling are unchanged.
+                if (onTap != null) {
+                    this.role = Role.Button
+                    this.onClick(label = null) { onTap(); true }
+                }
+            }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectTapGestures(
