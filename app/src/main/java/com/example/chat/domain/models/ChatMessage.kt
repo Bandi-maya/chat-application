@@ -83,7 +83,7 @@ data class ChatMessage(
                         parsedType = messageTypeFromDatabase(t)
                         effectiveText = decoded.optString("text", "")
                         parsedAttachment = MessageAttachment(
-                            id = json["uid"]?.toString() ?: json["id"]?.toString() ?: "",
+                            id = decoded.optString("id", json["uid"]?.toString() ?: json["id"]?.toString() ?: ""),
                             type = t.ifEmpty { "image" },
                             name = decoded.optString("name", "attachment"),
                             size = decoded.optString("size", ""),
