@@ -234,6 +234,7 @@ class AddedStylesProofTest {
             // clickText's poll - the miss tree showed the settings root without
             // the row). Record WHERE the hit was seen for comparison with the
             // miss-time tree; search behavior and assertions unchanged.
+            capture("scrollhit-" + text.replace(Regex("[^A-Za-z0-9]+"), "-").take(40) + ".png")
             val (sig, sample) = windowSig()
             val node = try { device.findObject(By.text(text)) } catch (_: Exception) { null }
             val bounds = try { node?.visibleBounds?.toShortString() ?: "null" } catch (_: Exception) { "stale" }
@@ -279,6 +280,14 @@ class AddedStylesProofTest {
                 budget--; sweepDrags++
                 val before = freshRootTexts()
                 slowDrag(b, revealBelow = true)
+                // Per-drag movement evidence (run-131: one transient poll hit at
+                // list-top after ~90s of sweeping, mechanism unresolved). Log
+                // each drag's index, container, and whether the served tree
+                // moved; search behavior and assertions unchanged.
+                run {
+                    val (stepSig, stepSample) = windowSig()
+                    android.util.Log.w("AddedStyles", "SCROLLSTEP-DIAG drag=" + sweepDrags + " container=" + b.toShortString() + " sig=" + stepSig + " sample=[" + stepSample + "]")
+                }
                 if (awaitTreeCatchUp(before, text)) return true
                 if (freshHasText(text, 1500)) return true
                 val (sig, _) = windowSig()
