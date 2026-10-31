@@ -157,6 +157,7 @@ object ServiceLocator {
 
     val apiBackend: com.example.chat.data.api.ApiBackendService by lazy {
         com.example.chat.data.api.ApiBackendService(requireContext()).also { service ->
+            service.transferMonitor = transferMonitor
             service.onAttachmentsGone = { refs -> invalidateMediaFor(refs) }
             // Offline demo: fail-closed entry probe; a real GoTrue identity blocks demo mode.
             service.demoGoTruePresentHook = { sessionManager.hasAnySession() }
