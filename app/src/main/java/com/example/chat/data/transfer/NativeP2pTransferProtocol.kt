@@ -53,7 +53,7 @@ object NativeP2pTransferProtocol {
             get() = if (sizeBytes == 0L) 0L else (sizeBytes + chunkBytes - 1L) / chunkBytes
     }
 
-    data class EncryptedChunk(val index: Long, val ciphertextAndTag: ByteArray)
+    data class EncryptedChunk(val index: Long, val nonce: ByteArray, val ciphertextAndTag: ByteArray)
 
     /** A channel implementation can be backed by WebRTC DataChannel or a blind relay. */
     interface ChunkChannel {
@@ -187,7 +187,8 @@ object NativeP2pTransferProtocol {
 
     private fun encryptPlainChunk(manifest: Manifest, secret: ByteArray, index: Long, plain: ByteArray): EncryptedChunk {
         require(secret.size == KEY_BYTES && index in 0 until manifest.chunkCount)
-        return EncryptedChunk(index, crypt(Cipher.ENCRYPT_MODE, manifest, secret, index, plain))
+        val nonce = ByteArray(12).also(random::nextBytes)
+        return EncryptedChunk(index, nonce, crypt(Cipher.ENCRYPT_MODE, manifest, secret, index, nonce, plain))
     }
 
     /** Decrypt/authenticate one chunk and write it at its exact file offset. */
@@ -196,7 +197,8 @@ object NativeP2pTransferProtocol {
         require(chunk.index in 0 until manifest.chunkCount)
         val offset = Math.multiplyExact(chunk.index, manifest.chunkBytes.toLong())
         val expectedLength = minOf(manifest.chunkBytes.toLong(), manifest.sizeBytes - offset).toInt()
-        val plain = crypt(Cipher.DECRYPT_MODE, manifest, secret, chunk.index, chunk.ciphertextAndTag)
+        if (chunk.nonce.size != 12) throw SecurityException("Invalid chunk nonce")
+        val plain = crypt(Cipher.DECRYPT_MODE, manifest, secret, chunk.index, chunk.nonce, chunk.ciphertextAndTag)
         if (plain.size != expectedLength) throw SecurityException("Chunk length does not match manifest")
         destination.parentFile?.mkdirs()
         RandomAccessFile(destination, "rw").use { file ->
@@ -226,14 +228,15 @@ object NativeP2pTransferProtocol {
         return LongArray(count.toInt()) { it.toLong() }
     }
 
-    private fun crypt(mode: Int, manifest: Manifest, secret: ByteArray, index: Long, input: ByteArray): ByteArray {
-        val nonce = ByteBuffer.allocate(12).order(ByteOrder.BIG_ENDIAN)
-            .put(manifest.noncePrefix).putLong(index).array()
-        val aad = ByteBuffer.allocate(16 + 8 + 4).order(ByteOrder.BIG_ENDIAN)
+    private fun crypt(mode: Int, manifest: Manifest, secret: ByteArray, index: Long, nonce: ByteArray, input: ByteArray): ByteArray {
+        require(nonce.size == 12)
+        val aad = ByteBuffer.allocate(16 + 8 + 4 + NONCE_PREFIX_BYTES).order(ByteOrder.BIG_ENDIAN)
             .put(java.util.UUID.fromString(manifest.transferId).let {
                 ByteBuffer.allocate(16).putLong(it.mostSignificantBits).putLong(it.leastSignificantBits).array()
             })
-            .putLong(index).putInt(input.size.takeIf { mode == Cipher.ENCRYPT_MODE } ?: (input.size - 16))
+            .putLong(index)
+            .putInt(input.size.takeIf { mode == Cipher.ENCRYPT_MODE } ?: (input.size - 16))
+            .put(manifest.noncePrefix)
             .array()
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(mode, SecretKeySpec(deriveKey(secret, "chaty-chunk-aes-v1"), "AES"), GCMParameterSpec(GCM_TAG_BITS, nonce))
