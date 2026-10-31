@@ -468,7 +468,10 @@ class P2pFileTransferService(
                 publish(session, "Network backpressure — waiting")
                 break
             }
-            session.sentBytes = minOf(session.manifest.sizeBytes, session.sentBytes + minOf(session.manifest.chunkBytes.toLong(), session.manifest.sizeBytes - index * session.manifest.chunkBytes))
+            if (!session.sentChunkIndices[index.toInt()]) {
+                session.sentChunkIndices.set(index.toInt())
+                session.sentBytes = minOf(session.manifest.sizeBytes, session.sentBytes + minOf(session.manifest.chunkBytes.toLong(), session.manifest.sizeBytes - index * session.manifest.chunkBytes))
+            }
             session.monitorId?.let { transferMonitor.update(it, session.sentBytes, session.manifest.sizeBytes) }
             publish(session, "Sending")
         }
@@ -515,6 +518,7 @@ class P2pFileTransferService(
         publish(session, "Received and verified", target.absolutePath)
         session.channel?.close()
         session.peer?.close()
+        sessions.remove(session.id)
     }
 
     private fun completeSender(session: Session) {
@@ -524,6 +528,7 @@ class P2pFileTransferService(
         session.peer?.close()
         session.file?.let { runCatching { it.delete() } }
         runCatching { (session.sourceOwner ?: session.sourceChannel)?.close() }
+        sessions.remove(session.id)
     }
 
     fun disposeAll() {
