@@ -214,6 +214,12 @@ class CallForegroundService : Service() {
             .build()
     }
 
+    // Nested at class level, not inside the companion object: Kotlin does
+    // not resolve companion-nested classifiers through the outer class
+    // name (run 120 unit-test compile failure), so tests can reference
+    // CallForegroundService.StopDisposition.
+    enum class StopDisposition { CLEANUP, ACCEPT, IGNORE }
+
     companion object {
         const val CHANNEL_ID = "chaty_active_call"
         const val SERVICE_ID = 7401
@@ -318,8 +324,6 @@ class CallForegroundService : Service() {
 
         fun shouldDiscardPendingStart(stopOwner: String?, pendingOwner: String?): Boolean =
             stopOwner != null && stopOwner == pendingOwner
-
-        enum class StopDisposition { CLEANUP, ACCEPT, IGNORE }
 
         private fun stopOwnerFor(ownerToken: String?, callId: String?): String? = when {
             ownerToken != null && callId != null -> ownerToken + ":" + callId
