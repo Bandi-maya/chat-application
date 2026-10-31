@@ -100,15 +100,15 @@ jobs:
               if not source.is_file():
                   continue
               relative = source.relative_to(root)
-              if not relative.parts or relative.parts[0] != "app":
+              if not relative.parts or relative.parts[0] not in ("app", "ci"):
                   raise SystemExit(f"Unexpected override path: {relative}")
               target = Path(*relative.parts)
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 68:
-              raise SystemExit(f"Expected 68 override files, applied {applied}")
+          if applied != 70:
+              raise SystemExit(f"Expected 70 override files, applied {applied}")
           PYOVERRIDES
       - uses: actions/setup-java@v4
         with:
@@ -250,7 +250,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        shard: [core-ui, media, emoji-real, emoji-loop, maps, calls-camera]
+        shard: [core-ui, media, media-emoji-perf, emoji-real, emoji-loop, maps, calls-camera]
     env:
       CHATY_TEST_SHARD: ${{ matrix.shard }}
     steps:
@@ -313,15 +313,15 @@ jobs:
               if not source.is_file():
                   continue
               relative = source.relative_to(root)
-              if not relative.parts or relative.parts[0] != "app":
+              if not relative.parts or relative.parts[0] not in ("app", "ci"):
                   raise SystemExit(f"Unexpected override path: {relative}")
               target = Path(*relative.parts)
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 68:
-              raise SystemExit(f"Expected 68 override files, applied {applied}")
+          if applied != 70:
+              raise SystemExit(f"Expected 70 override files, applied {applied}")
           PYOVERRIDES
       - uses: actions/setup-java@v4
         with:
