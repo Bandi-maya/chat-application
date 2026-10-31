@@ -268,7 +268,8 @@ class P2pFileTransferService(
         if (!kind.startsWith("file_transfer_")) return
         val id = signal["transfer_id"]?.toString() ?: return
         if (signal["call_id"]?.toString() != id) return
-        if (id.length > 64 || senderIdInvalid(signal["sender_id"]?.toString() ?: signal["caller_id"]?.toString())) return
+        val canonicalId = runCatching { java.util.UUID.fromString(id).toString() }.getOrNull()
+        if (canonicalId != id || senderIdInvalid(signal["sender_id"]?.toString() ?: signal["caller_id"]?.toString())) return
         val sender = (signal["sender_id"] ?: signal["caller_id"])?.toString() ?: return
         if (sender.isBlank() || sender == currentUserId()) return
         when (kind) {
