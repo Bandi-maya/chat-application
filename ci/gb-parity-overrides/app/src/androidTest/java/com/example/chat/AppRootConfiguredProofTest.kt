@@ -416,11 +416,21 @@ class AppRootConfiguredProofTest {
                     Instant.now().toString(),
                 )
             }
-            val passiveRefreshOk = device.wait(Until.hasObject(By.text("Synthetic Task Beta")), 10000)
+            var passiveRefreshOk = false
+            val passiveDeadline = System.currentTimeMillis() + 10000
+            while (System.currentTimeMillis() < passiveDeadline) {
+                // Fresh hierarchy each poll: UiAutomator's cache can hold the pre-update title
+                // past the actual recomposition (121's capture showed Beta on screen while the
+                // cached a11y tree still reported Alpha), so mirror the incoming-event pattern.
+                if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.clearCache()
+                if (device.hasObject(By.text("Synthetic Task Beta"))) { passiveRefreshOk = true; break }
+                Thread.sleep(250)
+            }
             // DIAGNOSTIC ONLY (does not change the original verdict below): at passive-wait
             // expiry, record controller state and the open detail's a11y exposure BEFORE any
             // navigation; screenshot request/completion times come from SHOT-REQ/SHOT-DONE.
             runCatching {
+                if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.clearCache()
                 val ctlTitle = ServiceLocator.tasksController.tasks.firstOrNull { it.id == "synthetic-task-1" }?.title
                 val a11yBeta = device.hasObject(By.text("Synthetic Task Beta"))
                 val a11yAlpha = device.hasObject(By.text("Synthetic Task Alpha"))
