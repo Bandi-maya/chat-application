@@ -36,6 +36,8 @@ class AppTrafficMonitor(context: Context) {
     val state: StateFlow<AppTrafficSnapshot> = _state
     private var job: Job? = null
     private var lastPersistAt = 0L
+    private var lastTxSampled = prefs.getLong("last_tx", -1L)
+    private var lastRxSampled = prefs.getLong("last_rx", -1L)
 
     fun start(scope: CoroutineScope) {
         synchronized(lock) {
@@ -56,10 +58,10 @@ class AppTrafficMonitor(context: Context) {
             _state.value = _state.value.copy(supported = false)
             return
         }
-        val previousTx = prefs.getLong("last_tx", -1L)
-        val previousRx = prefs.getLong("last_rx", -1L)
-        val txDelta = if (previousTx >= 0L && tx >= previousTx) tx - previousTx else 0L
-        val rxDelta = if (previousRx >= 0L && rx >= previousRx) rx - previousRx else 0L
+        val txDelta = if (lastTxSampled >= 0L && tx >= lastTxSampled) tx - lastTxSampled else 0L
+        val rxDelta = if (lastRxSampled >= 0L && rx >= lastRxSampled) rx - lastRxSampled else 0L
+        lastTxSampled = tx
+        lastRxSampled = rx
         val current = _state.value
         val next = current.copy(
             uploadedBytes = current.uploadedBytes + txDelta,
@@ -68,7 +70,7 @@ class AppTrafficMonitor(context: Context) {
         )
         _state.value = next
         val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastPersistAt >= 5_000L || previousTx < 0L || previousRx < 0L) {
+        if (now - lastPersistAt >= 5_000L || lastPersistAt == 0L) {
             prefs.edit()
                 .putLong("last_tx", tx)
                 .putLong("last_rx", rx)
