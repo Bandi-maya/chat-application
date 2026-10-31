@@ -122,6 +122,11 @@ object ServiceLocator {
         com.example.chat.data.network.NetworkStatusMonitor(requireContext())
     }
 
+    /** Persistent byte-accurate upload/download totals and live transfer snapshots. */
+    val transferMonitor: com.example.chat.data.network.TransferMonitor by lazy {
+        com.example.chat.data.network.TransferMonitor(requireContext())
+    }
+
     /** Runs once, from the apiBackend lazy initializer, so there is exactly one collector. Reconnects the
      *  socket only on an offline -> online transition (validated internet), never disables anything while
      *  offline: a false 'validated' reading just skips the early reconnect and the backoff timer still runs. */
@@ -132,6 +137,14 @@ object ServiceLocator {
             networkMonitor.state.collect { status ->
                 if (status.online && !wasOnline) service.onNetworkRegained()
                 wasOnline = status.online
+                if (status.online && callSignaling.hasActiveSession) {
+                    runCatching {
+                        callSignaling.onNetworkStatusChanged(
+                            upstreamKbps = status.upstreamKbps,
+                            downstreamKbps = status.downstreamKbps,
+                        )
+                    }.onFailure { android.util.Log.w("ChatyNetwork", "Call adaptation skipped", it) }
+                }
             }
         }
     }
@@ -496,7 +509,30 @@ object ServiceLocator {
             signalSender = com.example.chat.data.services.CallSignalSender { targetUserId, data ->
                 apiBackend.sendCallSignal(targetUserId, data)
             },
-            mediaFactory = { com.example.chat.data.services.WebRtcCallMediaController(requireContext()) },
+            mediaFactory = {
+                val uploadId = transferMonitor.begin(
+                    com.example.chat.data.network.TransferDirection.upload,
+                    com.example.chat.data.network.TransferKind.call,
+                    null,
+                    "Live call",
+                )
+                val downloadId = transferMonitor.begin(
+                    com.example.chat.data.network.TransferDirection.download,
+                    com.example.chat.data.network.TransferKind.call,
+                    null,
+                    "Live call",
+                )
+                com.example.chat.data.services.WebRtcCallMediaController(requireContext()).also { media ->
+                    media.onTrafficBytes = { uploaded, downloaded ->
+                        transferMonitor.update(uploadId, uploaded)
+                        transferMonitor.update(downloadId, downloaded)
+                    }
+                    media.onTrafficEnded = {
+                        transferMonitor.finish(uploadId)
+                        transferMonitor.finish(downloadId)
+                    }
+                }
+            },
             // GAP (no invention): api branch persists terminal call records via
             // dataStore.addCallRecord; no custom-backend call-history endpoint is
             // verified, and CallHistoryService here is Postgrest-backed. Sink is a
@@ -594,7 +630,15 @@ object ServiceLocator {
                 com.example.chat.ui.media.ImageSendCompressor.compress(bytes, quality)
             },
             apiAuthenticated = { apiBackend.isAuthenticated },
-            apiUpload = { bytes, filename -> apiBackend.uploadMedia(filename, bytes, expectedScope = kotlin.coroutines.coroutineContext[com.example.chat.data.api.ApiScopeElement]?.scope) },
+            apiUpload = { bytes, filename, onProgress ->
+                apiBackend.uploadMedia(
+                    filename,
+                    bytes,
+                    expectedScope = kotlin.coroutines.coroutineContext[com.example.chat.data.api.ApiScopeElement]?.scope,
+                    onProgress = onProgress,
+                )
+            },
+            transferMonitor = transferMonitor,
         )
     }
 
@@ -740,7 +784,39 @@ object ServiceLocator {
             store = mediaCache,
             isOnline = { networkMonitor.state.value.online },
             lookup = { ref -> trustedAttachmentFor(ref) },
-            download = { url -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { downloader.open(url) } },
+            download = { url ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val transferId = transferMonitor.begin(
+                        com.example.chat.data.network.TransferDirection.download,
+                        com.example.chat.data.network.TransferKind.other,
+                        null,
+                        "Attachment",
+                    )
+                    try {
+                        val source = downloader.open(url) { sent, total ->
+                            transferMonitor.update(transferId, sent, total)
+                        }
+                        object : java.io.FilterInputStream(source) {
+                            private var reachedEof = false
+                            override fun read(): Int = super.read().also { if (it < 0) reachedEof = true }
+                            override fun read(b: ByteArray, off: Int, len: Int): Int =
+                                super.read(b, off, len).also { if (it < 0) reachedEof = true }
+                            override fun close() {
+                                try { super.close() } finally {
+                                    transferMonitor.finish(
+                                        transferId,
+                                        if (reachedEof) com.example.chat.data.network.TransferStatus.completed
+                                        else com.example.chat.data.network.TransferStatus.failed,
+                                    )
+                                }
+                            }
+                        }
+                    } catch (error: Throwable) {
+                        transferMonitor.finish(transferId, com.example.chat.data.network.TransferStatus.failed)
+                        throw error
+                    }
+                }
+            },
         )
     }
 
