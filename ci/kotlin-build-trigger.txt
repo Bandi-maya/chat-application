@@ -10,3 +10,4 @@ trigger-120: reviewed batch - FGS v2 caller-originated stop ownership + owner-sc
 trigger-121: compile fix - StopDisposition enum to class level (120 unit-test compile failure) + main-thread TestLifecycleOwner harness repair
 trigger-122: reviewed batch - recorder quality selector mirrors production (b4c1e40), fresh-a11y passive refresh poll in AppRoot proof, locked-case desc stop selector override + guard 68
 trigger-123: CI isolation batch - media-emoji-perf shard split + qemu host diagnostics (run-smoke override) + ci-override allowlist
+trigger-124: combined reviewed batch - LensSheet/ModeStrip/AddedStyles fresh-poll DIAG telemetry + LocalVideoScope/ComposerFrontVideo section-scoped teardown proofs + zoom cancellation fix (12 commits, guard 72)
