@@ -363,8 +363,28 @@ class AddedStylesProofTest {
 
     private fun clickText(text: String, timeoutMs: Long = 10000): UiObject2 {
         assertTrue("'$text' not reachable", scrollToText(text))
-        val obj = device.wait(Until.findObject(By.text(text)), timeoutMs)
-            ?: throw AssertionError("'$text' not found after scroll")
+        // Fresh-tree find: this emulator build can serve a stale accessibility
+        // cache for in-place lazy-list updates (AppRoot-proven shape:
+        // scrollToText's fresh machinery saw the node while a plain Until wait
+        // kept a pre-scroll snapshot). Poll with a cleared cache instead of one
+        // cached Until.findObject; on a real miss, log the fresh-cache state
+        // and keep the tree/pixels as evidence. Click target, timeout and the
+        // assertion message are unchanged.
+        val deadline = android.os.SystemClock.uptimeMillis() + timeoutMs
+        var obj: UiObject2? = null
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.clearCache()
+            obj = device.findObject(By.text(text))
+            if (obj != null) break
+            android.os.SystemClock.sleep(250)
+        }
+        if (obj == null) {
+            if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.clearCache()
+            android.util.Log.w("AddedStyles", "CLICKTEXT-DIAG miss text='" + text + "' freshHasAfterClear=" + device.hasObject(By.text(text)))
+            dumpTree("clicktext-miss")
+            capture("clicktext-miss")
+            throw AssertionError("'$text' not found after scroll")
+        }
         obj.click()
         return obj
     }
