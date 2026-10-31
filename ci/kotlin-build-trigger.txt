@@ -7,3 +7,4 @@ Gallery opens expanded with full-height viewport; voice note progress scrubs; da
 Firebase transport removed; authenticated WebSocket foreground service maintains message and incoming-call notifications without FCM.
 Foreground WebSocket service source, manifest and no-FCM app dependencies finalized; run Android compile and tests.
 Removed Google services plugin, FCM dependency and FCM service; verified remoteMessaging foreground service wiring for authenticated socket alerts.
+Adaptive weak-network transport, real upload/download byte progress, persistent data-usage totals, Network & Data Usage settings screen, and live WebRTC bitrate adaptation implemented; run Android compile, unit and instrumentation checks.
