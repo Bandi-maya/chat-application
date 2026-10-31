@@ -369,16 +369,23 @@ class CameraCombinedOutputProofTest {
                 // artwork is a thin ring, so EVERY translucent texel is an
                 // antialiased edge and the old flatness gate matched zero texels.
                 // Convention MEASURED on the actual device path, not assumed
-                // (main 14:39): run-128's decoded cc-video.png vs cc-overlay.png
-                // at the 84 translucent texels fits tinted*(1-a)+p*a (texture
-                // PREMULTIPLIED) with max error 0.7, while the straight-alpha
-                // hypothesis misses by mean 54/max 64 - GLUtils.texImage2D does
-                // NOT un-premultiply on this path, and Bitmap.getPixel returns
-                // premultiplied channels. No vertical flip (flip hypotheses err
-                // >73). Opaque-texel codec noise is <=1.
+                // (main 14:39): run-128's decoded cc-video.png vs this test's own
+                // cc-overlay.png readback fits obs = tinted*(1-a) + read*a at all
+                // 84 translucent texels with max error 0.7 (straight-alpha
+                // hypothesis misses by mean 54/max 64; either flip hypothesis
+                // >73; opaque-texel codec noise <=1). This is a measured identity
+                // between the shader's sampled value and the test's Bitmap
+                // readback channel - where premultiplication lives across
+                // storage/upload/sample/readback is NOT claimed and does not
+                // matter to this assertion.
+                // Double application derived from the shader itself with the
+                // SAME source sample s in both passes (mix(tinted, s, a)):
+                //   r1 = t*(1-a) + s*a
+                //   r2 = r1*(1-a) + s*a = t*(1-a)^2 + s*a*(2-a)
+                // The aggregate form t*(1-a2) + s*a2, a2 = 1-(1-a)^2, is valid
+                // ONLY because s is constant across passes (same overlay texel);
+                // it would not hold if the sample changed between steps.
                 //   single: tinted*(1-a) + p*a      double: tinted*(1-a2) + p*a2
-                //   a2 = 1-(1-a)^2  (two source-over applications of the same
-                //   texture sample: r2 = r1*(1-a) + p*a)
                 data class Chan(val ch: Char, val premult: Float, val tintedC: Float, val obsC: Float)
                 fun doublingSample(obs: (Int, Int) -> Int, perTexelAssert: Boolean): Pair<Int, Int> {
                     var checked = 0; var violations = 0
