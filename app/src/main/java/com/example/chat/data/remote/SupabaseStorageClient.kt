@@ -27,7 +27,25 @@ class SupabaseStorageClient(
         path: String,
         bytes: ByteArray,
         contentType: String,
+        onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
     ): Unit = withContext(Dispatchers.IO) {
+        val mediaType = contentType.toMediaType()
+        val rawBody = bytes.toRequestBody(mediaType)
+        val body = if (onProgress == null) rawBody else object : okhttp3.RequestBody() {
+            override fun contentType() = rawBody.contentType()
+            override fun contentLength() = rawBody.contentLength()
+            override fun writeTo(sink: okio.BufferedSink) {
+                var transferred = 0L
+                val forwarding = object : okio.ForwardingSink(sink) {
+                    override fun write(source: okio.Buffer, byteCount: Long) {
+                        super.write(source, byteCount)
+                        transferred += byteCount
+                        onProgress.invoke(transferred, rawBody.contentLength())
+                    }
+                }
+                rawBody.writeTo(okio.buffer(forwarding))
+            }
+        }
         val request = Request.Builder()
             .url("$supabaseUrl/storage/v1/object/$bucket/$path")
             .addHeader("apikey", publishableKey)
@@ -36,7 +54,7 @@ class SupabaseStorageClient(
             .apply {
                 accessToken()?.let { addHeader("Authorization", "Bearer $it") }
             }
-            .post(bytes.toRequestBody(contentType.toMediaType()))
+            .post(body)
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
