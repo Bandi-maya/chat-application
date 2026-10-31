@@ -117,11 +117,6 @@ object ServiceLocator {
 
     /** REST backend (ApiBackendService on the api branch): the service the
      *  auth screens actually call; its session takes facade precedence. */
-    /** The ApiBackendService under construction. initialize() runs the FCM sync hook synchronously when a session is
-     *  stored; fcmRegistrar must reach the service through this field, not through the apiBackend lazy (re-entering
-     *  it recursed until StackOverflowError at launch, CI run 40267033954 job 121395203962). */
-    @Volatile private var apiBackendUnderConstruction: com.example.chat.data.api.ApiBackendService? = null
-
     /** One monitor for the process (created lazily with the single apiBackend). */
     val networkMonitor: com.example.chat.data.network.NetworkStatusMonitor by lazy {
         com.example.chat.data.network.NetworkStatusMonitor(requireContext())
@@ -143,37 +138,12 @@ object ServiceLocator {
 
     val apiBackend: com.example.chat.data.api.ApiBackendService by lazy {
         com.example.chat.data.api.ApiBackendService(requireContext()).also { service ->
-            apiBackendUnderConstruction = service
-            // Dart locator wiring for _syncFcmToken / unregisterOnLogout:
-            // deferred lambdas so the registrar's lazy init cannot cycle
-            // back into this lazy block during construction.
             service.onAttachmentsGone = { refs -> invalidateMediaFor(refs) }
-            service.syncFcmTokenHook = { fcmRegistrar.syncTokenOnLogin() }
-            service.unregisterFcmHook = { fcmRegistrar.unregisterOnLogout() }
             // Offline demo: fail-closed entry probe; a real GoTrue identity blocks demo mode.
             service.demoGoTruePresentHook = { sessionManager.hasAnySession() }
             service.initialize()
             startNetworkRecovery(service)
         }
-    }
-
-    /** FCM token lifecycle (firebase_notification_service.dart port),
-     *  installed into FcmRegistrarHolder so the framework-created
-     *  ChatyFirebaseMessagingService reaches it. Runtime delivery stays
-     *  inert until a real google-services.json lands. */
-    val fcmRegistrar: com.example.chat.data.api.FcmTokenRegistrar by lazy {
-        com.example.chat.data.api.FcmTokenRegistrar(
-            apiDevices = (apiBackendUnderConstruction ?: apiBackend).deviceTokenClient,
-            log = { android.util.Log.d("FcmTokenRegistrar", it) },
-            runAsync = { block -> Thread(block, "fcm-register").start() },
-            // Dart FirebaseMessaging.getToken(); throws IllegalStateException while FirebaseApp is
-            // not initialised (no google-services.json), which the registrar logs.
-            tokenFetcher = { onToken, onError ->
-                com.google.firebase.messaging.FirebaseMessaging.getInstance().token
-                    .addOnSuccessListener { onToken(it) }
-                    .addOnFailureListener { onError(it) }
-            },
-        ).also { com.example.chat.notifications.FcmRegistrarHolder.registrar = it }
     }
 
     val themeController: com.example.chat.core.theme.ThemeController by lazy {
