@@ -43,6 +43,8 @@ import com.example.chat.domain.models.ConnectionHealth
 import com.example.chat.domain.models.ConnectionHealthState
 import com.example.chat.domain.models.NetworkTransportType
 import com.example.chat.domain.models.RealtimeSocketStatus
+import com.example.chat.data.network.NetworkStatusMonitor
+import com.example.chat.data.transfer.P2pFileTransferService
 
 /** Port of lib/ui/core/connection/connection_detail_sheet.dart: connection
  *  diagnostics dialog (transport, backend, realtime, latency, pending queue)
@@ -55,6 +57,8 @@ fun ConnectionDetailSheetContent(
     testing: Boolean,
     onRunTest: () -> Unit,
     onDismiss: () -> Unit,
+    networkStatus: NetworkStatusMonitor.Status? = null,
+    p2pTransferStates: List<P2pFileTransferService.TransferState> = emptyList(),
 ) {
     val statusColor = when (state.health) {
         ConnectionHealth.excellent -> connectionExcellent
@@ -165,6 +169,48 @@ fun ConnectionDetailSheetContent(
             labelColor = foregroundSecondary,
             valueColor = foreground,
         )
+        networkStatus?.let { link ->
+            MetricRow(
+                label = "Estimated downlink",
+                value = if (link.downstreamKbps > 0) "${link.downstreamKbps} kbps" else "Measuring…",
+                icon = Icons.Rounded.Speed,
+                labelColor = foregroundSecondary,
+                valueColor = foreground,
+            )
+            MetricRow(
+                label = "Estimated uplink",
+                value = if (link.upstreamKbps > 0) "${link.upstreamKbps} kbps" else "Measuring…",
+                icon = Icons.Rounded.Speed,
+                labelColor = foregroundSecondary,
+                valueColor = foreground,
+            )
+            MetricRow(
+                label = "Data connection",
+                value = if (link.metered) "Metered" else "Unmetered",
+                icon = if (link.metered) Icons.Rounded.SignalCellularAlt else Icons.Rounded.Wifi,
+                labelColor = foregroundSecondary,
+                valueColor = if (link.metered) connectionWeak else connectionExcellent,
+            )
+        }
+        MetricRow(
+            label = "Direct file transfers",
+            value = p2pTransferStates.count { it.status !in setOf("Sent", "Received and verified", "Failed", "Cancelled") }.toString(),
+            icon = Icons.Rounded.Sync,
+            labelColor = foregroundSecondary,
+            valueColor = foreground,
+        )
+        p2pTransferStates.takeLast(3).forEach { transfer ->
+            Column(Modifier.fillMaxWidth().padding(start = 28.dp, top = 3.dp, bottom = 3.dp)) {
+                Text(transfer.fileName, color = foreground, fontSize = 12.sp, fontWeight = FontWeight.W600)
+                Text(
+                    transfer.status + " · " + "%.1f".format(transfer.progress * 100) + "%",
+                    color = foregroundSecondary,
+                    fontSize = 11.sp,
+                )
+                if (transfer.error != null) Text(transfer.error, color = connectionPoor, fontSize = 11.sp)
+            }
+        }
+
         MetricRow(
             label = "Pending Outgoing Messages",
             value = "${state.queuedMessagesCount}",
