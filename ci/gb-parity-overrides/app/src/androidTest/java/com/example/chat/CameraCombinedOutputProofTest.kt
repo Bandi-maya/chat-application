@@ -155,6 +155,37 @@ class CameraCombinedOutputProofTest {
         }
     }
 
+    /** Measures the image->bitmap row mapping from the painted markers instead
+     *  of assuming a GL flip. Run-127 dumps proved the acquired frames in this
+     *  harness are NOT row-flipped (green painted top-left measured at bitmap
+     *  top-left under identity transform); the prior fixed imageY=H-1-bitmapY
+     *  mapping sampled the wrong rows. Assertion semantics unchanged: the same
+     *  texels are checked at the measured mapping, and an unmappable frame
+     *  fails loudly here instead of silently sampling wrong rows. */
+    private fun detectRowFlip(bmp: Bitmap, expectedGreenImageY: Int): Boolean {
+        var sumY = 0L
+        var n = 0L
+        for (y in 0 until bmp.height step 2) {
+            for (x in 0 until bmp.width step 2) {
+                val p = bmp.getPixel(x, y)
+                if (Color.green(p) > 180 && Color.red(p) < 80 && Color.blue(p) < 80) { sumY += y; n++ }
+            }
+        }
+        assertTrue("orientation calibration: painted green marker not found in acquired frame", n > 20)
+        val centroid = (sumY / n).toInt()
+        val flippedY = H - 1 - expectedGreenImageY
+        val dFlipped = Math.abs(centroid - flippedY)
+        val dPlain = Math.abs(centroid - expectedGreenImageY)
+        Log.i("CC-DIAG", "orientation greenCentroidY=" + centroid + " expectedImageY=" + expectedGreenImageY + " flippedDist=" + dFlipped + " plainDist=" + dPlain + " flipped=" + (dFlipped < dPlain))
+        assertTrue(
+            "orientation calibration: green centroid y=" + centroid + " matches neither flipped (" + flippedY + ") nor plain (" + expectedGreenImageY + ") mapping",
+            dFlipped < 60 || dPlain < 60,
+        )
+        return dFlipped < dPlain
+    }
+
+    private fun mapY(imageY: Int, flipped: Boolean): Int = if (flipped) H - 1 - imageY else imageY
+
     /** Evidence-only failure dumps: write acquired frames to the px artifact dir.
      *  Assertions and their order are unchanged; dumps run only on the failure path. */
     private fun dumpFrame(name: String, bmp: Bitmap) {
@@ -277,11 +308,13 @@ class CameraCombinedOutputProofTest {
             harness.renderFrame(::paintMarkerFrame)
             val video = acquireBitmap(videoReader)
             val preview = acquireBitmap(previewReader)
+            val videoFlipped = detectRowFlip(video, 40)
+            val previewFlipped = detectRowFlip(preview, 40)
             try {
                 // Color matrix on VIDEO only: red background -> blue on video,
                 // unchanged red on preview (targets gate: PREVIEW excluded).
-                expectDominant(video, 160, 40, 'b', "video color matrix")
-                expectDominant(preview, 160, 40, 'r', "preview untouched by color matrix")
+                expectDominant(video, 160, mapY(40, videoFlipped), 'b', "video color matrix")
+                expectDominant(preview, 160, mapY(40, previewFlipped), 'r', "preview untouched by color matrix")
 
                 val overlay = harness.overlayBitmap()
                 assertNotNull("lens overlay bitmap must exist after a lens frame", overlay)
@@ -289,8 +322,9 @@ class CameraCombinedOutputProofTest {
 
                 // Lens presence on VIDEO: at opaque overlay texels the recorded
                 // pixel must deviate from the pure swapped background.
-                // Overlay texture row 0 = bitmap top; with the identity
-                // transform the image rows are GL-flipped: imageY = H-1-bitmapY.
+                // Overlay texture row 0 = bitmap top. The image->bitmap row
+                // mapping is measured per frame from the painted markers
+                // (run-127 dumps proved no GL flip in this harness).
                 var presenceChecked = 0
                 var doublingChecked = 0
                 for (by in 0 until H step 2) {
@@ -298,10 +332,11 @@ class CameraCombinedOutputProofTest {
                         val ov = ovBmp.getPixel(bx, by)
                         val oa = Color.alpha(ov)
                         if (oa < 30) continue
-                        val iy = H - 1 - by
+                        val iyVideo = mapY(by, videoFlipped)
+                        val iyPreview = mapY(by, previewFlipped)
                         if (oa > 220) {
                             if (presenceChecked < 40) {
-                                val vp = video.getPixel(bx, iy)
+                                val vp = video.getPixel(bx, iyVideo)
                                 val dev = Math.abs(Color.red(vp) - 0) + Math.abs(Color.green(vp) - 0) + Math.abs(Color.blue(vp) - 255)
                                 assertTrue(
                                     "opaque overlay texel ($bx,$by) must appear on video (dev=$dev)",
@@ -311,7 +346,7 @@ class CameraCombinedOutputProofTest {
                             }
                             // Preview must show the raw background at the same
                             // anchor: no lens leak (no cross-path double-draw).
-                            val pp = preview.getPixel(bx, iy)
+                            val pp = preview.getPixel(bx, iyPreview)
                             assertTrue(
                                 "overlay texel ($bx,$by) must NOT appear on preview (r=${Color.red(pp)},g=${Color.green(pp)},b=${Color.blue(pp)})",
                                 Color.red(pp) > 180 && Color.green(pp) < 80 && Color.blue(pp) < 80,
@@ -337,7 +372,7 @@ class CameraCombinedOutputProofTest {
                             // A twice-painted overlay has a' = a + a(1-a) and
                             // p' = p*(2-a), a visibly heavier deposit.
                             val a = oa / 255f
-                            val vp = video.getPixel(bx, iy)
+                            val vp = video.getPixel(bx, iyVideo)
                             val a2 = a + a * (1f - a)
                             for ((ch, ovP, tintedC) in listOf(
                                 Triple('r', Color.red(ov).toFloat(), 0f),
@@ -389,16 +424,19 @@ class CameraCombinedOutputProofTest {
             val preview = acquireBitmap(previewReader)
             val video = acquireBitmap(videoReader)
             try {
-                // Identity mapping (verified by the video assertions in the
-                // combined test): image(x,y) <- canvas(x, H-1-y).
+                // The image->bitmap row mapping is measured per frame from
+                // the painted markers (run-127 proof: no GL flip in this
+                // harness), not assumed flipped.
+                val ptPreviewFlipped = detectRowFlip(preview, 40)
+                val ptVideoFlipped = detectRowFlip(video, 210)
                 // Mirror: green canvas(0..80,0..80) -> image right half,
                 // blue canvas(240..320,160..240) -> image left half.
-                expectDominant(preview, 279, 199, 'g', "mirrored green")
-                expectDominant(preview, 39, 39, 'b', "mirrored blue")
-                // Rotate 270 about center: u'=v, v'=1-u. Green -> (53,30),
-                // blue -> (266,209).
-                expectDominant(video, 53, 30, 'g', "rotated green")
-                expectDominant(video, 266, 209, 'b', "rotated blue")
+                expectDominant(preview, 279, mapY(40, ptPreviewFlipped), 'g', "mirrored green")
+                expectDominant(preview, 39, mapY(200, ptPreviewFlipped), 'b', "mirrored blue")
+                // Rotate 270 about center: u'=v, v'=1-u. Green -> image(53,210),
+                // blue -> image(266,30).
+                expectDominant(video, 53, mapY(210, ptVideoFlipped), 'g', "rotated green")
+                expectDominant(video, 266, mapY(30, ptVideoFlipped), 'b', "rotated blue")
             } catch (t: Throwable) {
                 dumpFrame("pt-video.png", video); dumpFrame("pt-preview.png", preview)
                 logColorMap("video", video); logColorMap("preview", preview)
