@@ -51,6 +51,16 @@ class AppTrafficMonitor(context: Context) {
         }
     }
 
+    fun resetTotals() = synchronized(lock) {
+        _state.value = AppTrafficSnapshot(supported = _state.value.supported)
+        prefs.edit()
+            .putLong("last_tx", lastTxSampled)
+            .putLong("last_rx", lastRxSampled)
+            .putLong("total_tx", 0L)
+            .putLong("total_rx", 0L)
+            .apply()
+    }
+
     private fun sample() = synchronized(lock) {
         val tx = TrafficStats.getUidTxBytes(uid)
         val rx = TrafficStats.getUidRxBytes(uid)
