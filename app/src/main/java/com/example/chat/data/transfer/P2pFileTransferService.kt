@@ -373,12 +373,13 @@ class P2pFileTransferService(
             }
             // Sender responds in ordered batches. Wait for a batch before requesting more.
             val before = ledger.receivedCount()
+            val expectedAfterBatch = before + indices.size
             var waitCount = 0
-            while (ledger.receivedCount() == before && !ledger.isComplete() && waitCount < 40) {
+            while (ledger.receivedCount() < expectedAfterBatch && !ledger.isComplete() && channel.state() == DataChannel.State.OPEN && waitCount < 40) {
                 kotlinx.coroutines.delay(250)
                 waitCount++
             }
-            if (ledger.receivedCount() == before) {
+            if (ledger.receivedCount() < expectedAfterBatch) {
                 publish(session, "Waiting for sender / network")
                 kotlinx.coroutines.delay(1_000)
             }
