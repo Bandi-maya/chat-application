@@ -273,6 +273,7 @@ class WebRtcCallMediaController(
         if (!statsStarted) return
         peer.getStats(object : org.webrtc.StatsObserver {
             override fun onComplete(reports: Array<org.webrtc.StatsReport>) {
+                if (!statsStarted) return
                 var sent = 0L
                 var received = 0L
                 reports.forEach { report ->
@@ -280,7 +281,7 @@ class WebRtcCallMediaController(
                     if (type == "ssrc" || type == "outbound-rtp" || type == "inbound-rtp") {
                         report.values.forEach { value ->
                             when (value.name) {
-                                "bytesSent" -> sent += value.value.toLongOrNull() ?: 0L
+                                "bytesSent" -> sent += value.value.toDoubleOrNull()?.toLong() ?: 0L
                                 "bytesReceived" -> received += value.value.toLongOrNull() ?: 0L
                             }
                         }
