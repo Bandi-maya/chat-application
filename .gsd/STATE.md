@@ -22,9 +22,9 @@ updated: 2026-10-31T23:00:00+05:30
 
 ## Next Steps
 
-1. Apply the minimal annotation correction in `BundleOngoingCallView.kt`.
-2. Run the Kotlin APK workflow and inspect its exact job logs.
-3. Continue only after compilation succeeds; then run unit tests, instrumentation compilation and runtime smoke.
+1. Inspect the Kotlin APK workflow triggered by `e8d335a3b4d1bf99971aad3f8007845388588b35`.
+2. Confirm `:app:compileDebugKotlin` passes; investigate any new compile errors from exact logs.
+3. If compilation passes, inspect unit tests, instrumentation compilation and runtime smoke.
 4. Update issue register, implementation progress and this state with exact commit/run evidence.
 
 ## Active Decisions
@@ -38,7 +38,8 @@ updated: 2026-10-31T23:00:00+05:30
 
 ## Blockers
 
-- [ ] Current Compose compilation failure: duplicate annotation and missing composable annotation in `BundleOngoingCallView.kt`. Minimal fix planned.
+- [x] Current Compose compilation failure source fix committed: removed duplicate `@Composable` before `AzureRingVerticalOngoingCall` and annotated `ControlIconButton`.
+- [ ] CI verification of the source fix is pending on the new trigger commit `e8d335a3b4d1bf99971aad3f8007845388588b35`.
 - [ ] Physical-device/live-backend verification requires user configuration and must not be simulated.
 
 ## Concerns
