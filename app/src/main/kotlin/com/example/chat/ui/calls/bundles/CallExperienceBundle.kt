@@ -3,7 +3,7 @@ package com.example.chat.ui.calls.bundles
 import androidx.compose.ui.graphics.Color
 
 /**
- * The Six selectable Call Experience Bundles for Chaty.
+ * The selectable Call Experience Bundles for Chaty.
  */
 enum class CallBundleId(
     val id: String,
@@ -41,6 +41,21 @@ enum class CallBundleId(
         id = "vivo_iqoo",
         displayName = "Vivo / iQOO Native Style",
         subtitle = "OriginOS & FuntouchOS-inspired incoming calls, outgoing calls & vibrant active controls",
+    ),
+    AZURE_RING_VERTICAL(
+        id = "azure_ring_vertical",
+        displayName = "Azure Ring Vertical",
+        subtitle = "Deep-blue incoming screen with a central pulse ring; drag the ring up to decline or down to answer (reference-clustered, brand unverified)",
+    ),
+    MONO_CHEVRON_DARK(
+        id = "mono_chevron_dark",
+        displayName = "Mono Chevron Dark",
+        subtitle = "Minimal dark incoming screen; drag the center puck down to answer or up to decline (reference-clustered, brand unverified)",
+    ),
+    NEXTCLOUD_TALK(
+        id = "nextcloud_talk",
+        displayName = "Nextcloud Talk Style",
+        subtitle = "Teal-header incoming & active call screens inspired by the Nextcloud Talk reference",
     );
 
     companion object {
@@ -166,6 +181,54 @@ object CallBundleRegistry {
         isGlassmorphic = true,
     )
 
+    val AzureRingVerticalTokens = CallBundleThemeTokens(
+        bundleId = CallBundleId.AZURE_RING_VERTICAL,
+        primaryAccent = Color(0xFF3D8BFD), // Azure pulse blue
+        acceptColor = Color(0xFF22C55E),   // Answer green
+        declineColor = Color(0xFFEF4444),  // Decline red
+        surfaceBackground = Color(0xFF0B1E3A), // Deep azure navy
+        cardBackground = Color(0xFF16305C),
+        primaryText = Color(0xFFF8FAFC),
+        secondaryText = Color(0xFF9FB4D8),
+        controlBarBackground = Color(0xD916305C),
+        pillCornerRadiusDp = 24,
+        cardCornerRadiusDp = 22,
+        iconButtonSizeDp = 58,
+        isGlassmorphic = false,
+    )
+
+    val MonoChevronDarkTokens = CallBundleThemeTokens(
+        bundleId = CallBundleId.MONO_CHEVRON_DARK,
+        primaryAccent = Color(0xFFEDEDED), // Near-white mono accent
+        acceptColor = Color(0xFF2FD35F),   // Chevron green
+        declineColor = Color(0xFFF04438),  // Chevron red
+        surfaceBackground = Color(0xFF0A0A0C), // Near black
+        cardBackground = Color(0xFF17181C),
+        primaryText = Color(0xFFFFFFFF),
+        secondaryText = Color(0xFF9CA0AA),
+        controlBarBackground = Color(0xF017181C),
+        pillCornerRadiusDp = 26,
+        cardCornerRadiusDp = 24,
+        iconButtonSizeDp = 60,
+        isGlassmorphic = false,
+    )
+
+    val NextcloudTalkTokens = CallBundleThemeTokens(
+        bundleId = CallBundleId.NEXTCLOUD_TALK,
+        primaryAccent = Color(0xFF0082C9), // Nextcloud brand teal-blue
+        acceptColor = Color(0xFF46BA61),   // Nextcloud accept green
+        declineColor = Color(0xFFE9322D),  // Nextcloud decline red
+        surfaceBackground = Color(0xFF1B2A34), // Dark slate body
+        cardBackground = Color(0xFF243643),
+        primaryText = Color(0xFFFFFFFF),
+        secondaryText = Color(0xFFA9BAC6),
+        controlBarBackground = Color(0xFF0082C9),
+        pillCornerRadiusDp = 18,
+        cardCornerRadiusDp = 16,
+        iconButtonSizeDp = 56,
+        isGlassmorphic = false,
+    )
+
     fun getTokens(bundleId: CallBundleId): CallBundleThemeTokens = when (bundleId) {
         CallBundleId.CHATY_DEFAULT -> ChatyDefaultTokens
         CallBundleId.APPLE_IOS -> AppleIosTokens
@@ -173,6 +236,10 @@ object CallBundleRegistry {
         CallBundleId.GOOGLE_PHONE_LATEST -> GoogleLatestTokens
         CallBundleId.GOOGLE_PHONE_CLASSIC -> GoogleClassicTokens
         CallBundleId.VIVO_IQOO -> VivoIqooTokens
+        CallBundleId.AZURE_RING_VERTICAL -> AzureRingVerticalTokens
+        CallBundleId.MONO_CHEVRON_DARK -> MonoChevronDarkTokens
+        CallBundleId.NEXTCLOUD_TALK -> NextcloudTalkTokens
     }
 }
+
 
