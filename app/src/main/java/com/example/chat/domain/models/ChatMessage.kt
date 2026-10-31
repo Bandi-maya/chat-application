@@ -73,6 +73,7 @@ data class ChatMessage(
             var parsedType = MessageType.text
             var parsedAttachment: MessageAttachment? = null
             var effectiveText = rawContent
+            val attachmentMetadata = linkedMapOf<String, Any?>()
 
             if (rawContent.startsWith("{") && rawContent.endsWith("}")) {
                 try {
@@ -88,6 +89,9 @@ data class ChatMessage(
                             size = decoded.optString("size", ""),
                             url = decoded.optString("url", "").ifEmpty { null },
                         )
+                        // Only encrypted invitation material is retained; plaintext link secrets never enter message JSON.
+                        listOf("p2p_invite_ciphertext", "p2p_invite_group", "p2p_invite_epoch", "p2p_transfer_version")
+                            .forEach { key -> if (decoded.has(key)) attachmentMetadata[key] = decoded.opt(key) }
                     }
                 } catch (_: Exception) {
                 }
@@ -125,7 +129,7 @@ data class ChatMessage(
                     json["is_delivered"] == true || json["is_delivered"]?.toString() == "true" -> DeliveryState.delivered
                     else -> DeliveryState.sent
                 },
-                metadata = if (senderName.isNotEmpty()) mapOf("sender_name" to senderName) else emptyMap(),
+                metadata = buildMap { if (senderName.isNotEmpty()) put("sender_name", senderName); putAll(attachmentMetadata) },
             )
         }
     }
