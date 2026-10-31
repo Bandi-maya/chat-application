@@ -112,6 +112,21 @@ jobs:
           if applied != 77:
               raise SystemExit(f"Expected 77 override files, applied {applied}")
           PYOVERRIDES
+      - name: Restore branch-owned adaptive network sources after candidate overlay
+        run: |
+          git checkout HEAD -- \
+            app/src/main/java/com/example/chat/data/network/NetworkStatusMonitor.kt \
+            app/src/main/java/com/example/chat/data/network/TransferMonitor.kt \
+            app/src/main/java/com/example/chat/data/api/ApiMediaUploadClient.kt \
+            app/src/main/java/com/example/chat/data/remote/SupabaseStorageClient.kt \
+            app/src/main/java/com/example/chat/data/media/BoundedMediaDownloader.kt \
+            app/src/main/java/com/example/chat/data/services/ChatMediaService.kt \
+            app/src/main/java/com/example/chat/data/services/CallSignalingService.kt \
+            app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt \
+            app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt \
+            app/src/main/kotlin/com/example/chat/ui/AppRoot.kt \
+            app/src/main/kotlin/com/example/chat/ui/settings/SettingsRootScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/settings/NetworkDataUsageScreen.kt
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
       - uses: actions/setup-java@v4
