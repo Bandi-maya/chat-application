@@ -27,7 +27,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -596,7 +599,13 @@ private fun DeclineAnswerPuckBar(
                 .size(64.dp)
                 .clip(CircleShape)
                 .background(Color.White)
-                .semantics { contentDescription = "Answer or decline puck" }
+                .semantics {
+                    contentDescription = "Answer or decline puck"
+                    customActions = listOf(
+                        CustomAccessibilityAction("Answer call") { onAccept(); true },
+                        CustomAccessibilityAction("Decline call") { onDecline(); true },
+                    )
+                }
                 .testTag("google_puck")
                 .draggable(
                     orientation = Orientation.Horizontal,
@@ -1122,6 +1131,8 @@ private fun NextcloudTalkIncomingCall(
                 onDragDown = {},
                 tapBelowPx = 14f,
                 onTap = onAccept,
+                upA11yLabel = "Accept call",
+                downA11yLabel = null,
                 modifier = Modifier.testTag("nextcloud_accept"),
             ) {
                 Box(
@@ -1176,7 +1187,11 @@ private fun DragOutOfCircleControl(
                 .size(72.dp)
                 .clip(CircleShape)
                 .background(Color.White)
-                .semantics { contentDescription = label }
+                .semantics {
+                    contentDescription = label
+                    // TalkBack/switch-access activation; touch input still requires the drag gesture.
+                    onClick(label = label) { onTrigger(); true }
+                }
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDrag = { change, dragAmount ->
@@ -1228,6 +1243,8 @@ private fun VerticalDragPuck(
     thresholdDp: Float = 80f,
     tapBelowPx: Float = 0f,
     onTap: (() -> Unit)? = null,
+    upA11yLabel: String? = "Decline call",
+    downA11yLabel: String? = "Answer call",
     puckContent: @Composable () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -1237,7 +1254,13 @@ private fun VerticalDragPuck(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .offset { IntOffset(0, dy.value.roundToInt()) }
-            .semantics { contentDescription = puckDescription }
+            .semantics {
+                contentDescription = puckDescription
+                customActions = listOfNotNull(
+                    upA11yLabel?.let { CustomAccessibilityAction(it) { onDragUp(); true } },
+                    downA11yLabel?.let { CustomAccessibilityAction(it) { onDragDown(); true } },
+                )
+            }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDrag = { change, dragAmount ->
