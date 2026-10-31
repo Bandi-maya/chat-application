@@ -257,8 +257,9 @@ class P2pFileTransferService(
             ))) throw IllegalStateException("Chaty signaling is offline; retry when connected")
             session.signalingReady = true
             flushLocalCandidates(session)
-            invite.toUri()
+            invite.toUri().also { invite.secret.fill(0) }
         } catch (error: Throwable) {
+            invite.secret.fill(0)
             fail(session, error.message ?: "Unable to start transfer")
             throw error
         }
