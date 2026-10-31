@@ -6,6 +6,20 @@ mkdir -p screenshots
 # qemu disappearance has host telemetry instead of inference from guest logs alone.
 while :; do p=$(pgrep -f qemu-system | head -1); if [ -n "$p" ]; then echo "{\"t\":$(date +%s),\"pid\":$p,\"rss_kb\":\"$(awk '/VmRSS/{print $2}' /proc/$p/status 2>/dev/null)\",\"memavail_kb\":\"$(awk '/MemAvailable/{print $2}' /proc/meminfo)\"}"; fi; sleep 5; done > screenshots/host-watch.jsonl &
 hostwatch_pid=$!
+# Early qemu identity (run-134 lesson): qemu was already dead at restart-check
+# entry when the exit happened, so a host-dmesg 'RenderThread[<tid>] segfault'
+# line can only be bound to the emulator if tid->process identity was captured
+# while qemu was alive, BEFORE the test window.
+QPID=$(pgrep -f qemu-system | head -1)
+{
+  echo "capture_wall=$(date -u +%FT%TZ) uptime=$(cat /proc/uptime)"
+  echo "qemu_pid=${QPID:-none}"
+  if [ -n "$QPID" ]; then
+    echo "qemu_starttime_ticks=$(awk '{print $22}' /proc/$QPID/stat 2>/dev/null)"
+    echo "qemu_cgroup=$(head -1 /proc/$QPID/cgroup 2>/dev/null)"
+    for t in /proc/$QPID/task/*; do echo "tid=$(basename "$t") comm=$(cat "$t/comm" 2>/dev/null)"; done
+  fi
+} > screenshots/qemu-identity.txt 2>&1
 # Evidence only: no camera opening or real account/hardware use. Bounds preserve failure artifacts.
 timeout 20 adb shell dumpsys media.camera > screenshots/camera-inventory-before.txt 2>&1 || true
 timeout 10 adb shell getprop ro.kernel.qemu > screenshots/emulator-identity.txt 2>&1 || true
