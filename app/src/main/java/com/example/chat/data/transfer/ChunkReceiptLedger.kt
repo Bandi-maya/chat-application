@@ -17,6 +17,7 @@ class ChunkReceiptLedger(
     private val chunkCount: Long,
 ) {
     private val atomic = AtomicFile(stateFile)
+    private val ledgerFile = stateFile
     private val lock = Any()
     private var received = load()
 
@@ -72,7 +73,7 @@ class ChunkReceiptLedger(
     }
 
     private fun stateFileExists(): Boolean = runCatching {
-        atomic.baseFile.exists() || atomic.baseFileBak.exists() || atomic.baseFileNew.exists()
+        ledgerFile.exists()
     }.getOrDefault(false)
 
     private fun persist() {
