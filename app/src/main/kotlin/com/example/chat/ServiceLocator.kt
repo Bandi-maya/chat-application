@@ -127,6 +127,11 @@ object ServiceLocator {
         com.example.chat.data.network.NetworkStatusMonitor(requireContext())
     }
 
+    /** Persistent byte-accurate upload/download totals and live transfer snapshots. */
+    val transferMonitor: com.example.chat.data.network.TransferMonitor by lazy {
+        com.example.chat.data.network.TransferMonitor(requireContext())
+    }
+
     /** Runs once, from the apiBackend lazy initializer, so there is exactly one collector. Reconnects the
      *  socket only on an offline -> online transition (validated internet), never disables anything while
      *  offline: a false 'validated' reading just skips the early reconnect and the backoff timer still runs. */
@@ -624,7 +629,15 @@ object ServiceLocator {
                 com.example.chat.ui.media.ImageSendCompressor.compress(bytes, quality)
             },
             apiAuthenticated = { apiBackend.isAuthenticated },
-            apiUpload = { bytes, filename -> apiBackend.uploadMedia(filename, bytes, expectedScope = kotlin.coroutines.coroutineContext[com.example.chat.data.api.ApiScopeElement]?.scope) },
+            apiUpload = { bytes, filename, onProgress ->
+                apiBackend.uploadMedia(
+                    filename,
+                    bytes,
+                    expectedScope = kotlin.coroutines.coroutineContext[com.example.chat.data.api.ApiScopeElement]?.scope,
+                    onProgress = onProgress,
+                )
+            },
+            transferMonitor = transferMonitor,
         )
     }
 
