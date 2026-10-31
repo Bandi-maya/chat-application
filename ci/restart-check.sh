@@ -19,7 +19,9 @@ adb devices -l | tr -d '\r' | sed 's/^/RESTART-ADB /'
 # ends early; grep the ring buffer for kill signatures explicitly.
 # (run-131: the earlier one-liner could not distinguish no-matches from
 # dmesg-unavailable because the pipeline exit status was sed's.)
-DMESG_OUT=$(dmesg 2>/dev/null)
+# GH runners gate dmesg behind root (kernel.dmesg_restrict=1): the plain read
+# returned empty, logged as dmesg-unavailable in runs 131-132. sudo -n is passwordless.
+DMESG_OUT=$(sudo -n dmesg 2>/dev/null)
 if [ -z "$DMESG_OUT" ]; then
   echo "RESTART-KERNEL dmesg-unavailable"
 else
