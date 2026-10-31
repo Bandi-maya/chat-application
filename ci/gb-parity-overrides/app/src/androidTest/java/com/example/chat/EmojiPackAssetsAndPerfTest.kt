@@ -88,9 +88,7 @@ class EmojiPackAssetsAndPerfTest {
         val out = sh("dumpsys meminfo ${ctx.packageName}")
         // Run-134: the row matcher missed API-34 GL/EGL headings ('?' rows), so
         // keep the complete dump per phase; the summary stays for quick reads.
-        meminfoFullDump.append("==== phase ").append(phase).append('
-').append(out).append('
-')
+        meminfoFullDump.append("==== phase ").append(phase).append('\n').append(out).append('\n')
         return listOf("Native Heap", "Graphics", "GL dev", "EGL mtrack", "GL mtrack", "Unknown").joinToString(" | ") { name ->
             out.lines().firstOrNull { it.trimStart().startsWith(name) }?.trim()?.replace(Regex("\\s+"), " ") ?: "$name ?"
         }
