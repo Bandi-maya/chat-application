@@ -1,1 +1,1 @@
-135 - early qemu identity + vmstat oom_kill + lens OPTION_CLOSEST diag + full meminfo dump + CALLEND-DIAG cascade + hang-up crash targeted repro
+135b - c5 anchor fix lands CALLEND-DIAG signaling cascade (full 135 set)
