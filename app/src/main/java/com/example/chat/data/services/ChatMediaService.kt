@@ -31,6 +31,8 @@ class ChatMediaService(
     private val imageShareLimit: () -> Int = { 30 },
     /** Optional image compression seam (quality percent -> bytes or null). */
     private val imageCompressor: suspend (bytes: ByteArray, quality: Int) -> ByteArray? = { _, _ -> null },
+    /** Network-aware cap: weak uplinks reduce image bytes before the resumable upload starts. */
+    private val adaptiveImageQuality: () -> Int = { 85 },
     /** Dart locator.isRegistered<ApiBackendService>() && api.isAuthenticated:
      *  facade precedence for the custom backend. */
     private val apiAuthenticated: () -> Boolean = { false },
@@ -69,7 +71,7 @@ class ChatMediaService(
         var effectiveMime = mimeType ?: fallbackMimeForType(type)
 
         if (type == "image" && effectiveMime != "image/gif") {
-            val quality = imageQuality.coerceIn(10, 100)
+            val quality = minOf(imageQuality.coerceIn(10, 100), adaptiveImageQuality().coerceIn(10, 100))
             if (quality < 100) {
                 try {
                     val compressed = imageCompressor(payload, quality)
