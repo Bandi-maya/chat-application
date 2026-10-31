@@ -50,6 +50,22 @@ class VoiceComposerGestureProofTest {
                     "voice-tap-toggle-pre-tap-$style2.xml"))
             }
             micNode.click()
+            // Evidence-only: timed pixel+a11y series discriminates render lag
+            // (pixels change late) from a11y reflection lag (pixels change early,
+            // desc lands late). Assertion and 12s window unchanged below.
+            val voiceT0 = SystemClock.uptimeMillis()
+            for (i in 0..7) {
+                try {
+                    Thread.sleep(if (i == 0) 250 else 500)
+                    val landed = device.hasObject(By.descStartsWith("Video mode."))
+                    ins.uiAutomation.takeScreenshot()?.let { b ->
+                        File(File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() },
+                            "voice-timing-$style2-" + i + ".png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }; b.recycle()
+                    }
+                    android.util.Log.i("VOICE-TIMING", "style=$style2 i=" + i + " t=" + (SystemClock.uptimeMillis() - voiceT0) + "ms a11yLanded=" + landed)
+                    if (landed) break
+                } catch (e: Exception) { android.util.Log.w("VOICE-TIMING", "capture i=" + i + " failed: " + e.message) }
+            }
             val switched = device.wait(Until.hasObject(By.descStartsWith("Video mode.")), 12000) // SwiftShader a11y reflection lag: 91 proved the toggle fires (diag) with the label landing past 5s
             // DIAGNOSTIC ONLY: post-tap state capture for offline review of the tap-toggle.
             runCatching {
