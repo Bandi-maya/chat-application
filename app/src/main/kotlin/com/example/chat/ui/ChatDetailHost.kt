@@ -773,7 +773,7 @@ fun ChatDetailHost(
             title = { Text("Receive " + (message.attachment?.name ?: "video") + "?") },
             text = {
                 Column {
-                    Text((message.attachment?.size ?: "Large file") + " · Direct encrypted transfer")
+                    Text((message.attachment?.size ?: "Large file") + " · Encrypted peer transfer")
                     Text("The file will be saved in Chaty’s Movies folder.", color = Color(theme.secondaryTextColor))
                 }
             },
