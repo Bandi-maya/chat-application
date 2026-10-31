@@ -9,6 +9,7 @@ import com.example.chat.data.network.TransferStatus
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.FileChannel
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +115,7 @@ class P2pFileTransferService(
         val manifest: NativeP2pTransferProtocol.Manifest,
         val secret: ByteArray,
         val direction: TransferDirection,
+        var sourceChannel: FileChannel? = null,
         var peer: PeerConnection? = null,
         var channel: DataChannel? = null,
         var ledger: ChunkReceiptLedger? = null,
@@ -183,6 +185,57 @@ class P2pFileTransferService(
                 "transfer_id" to invite.transferId,
                 "sdp" to offer.description,
                 "manifest" to mapOf("transfer_id" to wireManifest.transferId, "name" to wireManifest.displayName, "mime" to wireManifest.mimeType, "size" to wireManifest.sizeBytes, "chunk" to wireManifest.chunkBytes, "sha256" to wireManifest.sha256Hex, "nonce" to b64(wireManifest.noncePrefix), "expires" to wireManifest.expiresAtEpochSeconds),
+                "manifest_auth" to b64(auth),
+            ))) throw IllegalStateException("Chaty signaling is offline; retry when connected")
+            session.signalingReady = true
+            flushLocalCandidates(session)
+            invite.toUri()
+        } catch (error: Throwable) {
+            fail(session, error.message ?: "Unable to start transfer")
+            throw error
+        }
+    }
+
+    /** Zero-copy source path for ACTION_OPEN_DOCUMENT: the seekable provider descriptor stays open until send completes. */
+    suspend fun offerFile(
+        targetUserId: String,
+        source: FileChannel,
+        displayName: String,
+        sizeBytes: Long,
+        mimeType: String,
+        linkExpirySeconds: Long = 7L * 24L * 60L * 60L,
+    ): String = withContext(Dispatchers.IO) {
+        require(targetUserId.isNotBlank() && targetUserId != currentUserId()) { "Choose a valid recipient" }
+        val invite = NativeP2pTransferProtocol.createInvite()
+        val manifest = NativeP2pTransferProtocol.createManifest(
+            invite, source, displayName, sizeBytes, mimeType,
+            System.currentTimeMillis() / 1000L + linkExpirySeconds,
+        )
+        val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
+        val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes,
+            manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
+        val session = Session(invite.transferId, targetUserId, null, manifest, invite.secret,
+            TransferDirection.upload, sourceChannel = source)
+        sessions[invite.transferId] = session
+        val kind = if (mimeType.startsWith("video/")) TransferKind.video else TransferKind.document
+        session.monitorId = transferMonitor.begin(TransferDirection.upload, kind, manifest.sizeBytes, manifest.displayName)
+        publish(session, "Waiting for recipient")
+        try {
+            val peer = createPeer(session)
+            val channel = peer.createDataChannel("chaty-file-v1", DataChannel.Init().apply { ordered = true })
+                ?: throw IllegalStateException("Could not create transfer channel")
+            session.channel = channel
+            observeChannel(session, channel, isSender = true)
+            val offer = createDescription(peer, offer = true)
+            if (!sendSignal(targetUserId, mapOf(
+                "signal_type" to "file_transfer_offer", "call_id" to invite.transferId,
+                "transfer_id" to invite.transferId, "sdp" to offer.description,
+                "manifest" to mapOf(
+                    "transfer_id" to wireManifest.transferId, "name" to wireManifest.displayName,
+                    "mime" to wireManifest.mimeType, "size" to wireManifest.sizeBytes,
+                    "chunk" to wireManifest.chunkBytes, "sha256" to wireManifest.sha256Hex,
+                    "nonce" to b64(wireManifest.noncePrefix), "expires" to wireManifest.expiresAtEpochSeconds,
+                ),
                 "manifest_auth" to b64(auth),
             ))) throw IllegalStateException("Chaty signaling is offline; retry when connected")
             session.signalingReady = true
@@ -388,7 +441,9 @@ class P2pFileTransferService(
     }
 
     private suspend fun sendRequested(session: Session, array: JSONArray?) {
-        val file = session.file ?: return
+        val file = session.file
+        val sourceChannel = session.sourceChannel
+        if (file == null && sourceChannel == null) return
         val channel = session.channel ?: return
         if (channel.state() != DataChannel.State.OPEN) return
         val count = minOf(array?.length() ?: 0, 128)
@@ -400,7 +455,8 @@ class P2pFileTransferService(
             val index = array?.optLong(i, -1L) ?: -1L
             if (index !in 0 until session.manifest.chunkCount) continue
             val encrypted = withContext(Dispatchers.IO) {
-                NativeP2pTransferProtocol.encryptChunk(file, session.manifest, session.secret, index)
+                if (file != null) NativeP2pTransferProtocol.encryptChunk(file, session.manifest, session.secret, index)
+                else NativeP2pTransferProtocol.encryptChunk(sourceChannel!!, session.manifest, session.secret, index)
             }
             val packet = ByteBuffer.allocate(8 + encrypted.ciphertextAndTag.size).order(ByteOrder.BIG_ENDIAN)
             packet.putLong(index)
@@ -465,6 +521,7 @@ class P2pFileTransferService(
         session.channel?.close()
         session.peer?.close()
         session.file?.let { runCatching { it.delete() } }
+        runCatching { session.sourceChannel?.close() }
     }
 
     fun disposeAll() {
@@ -528,6 +585,7 @@ class P2pFileTransferService(
         publish(session, "Failed", error = reason)
         session.channel?.close()
         session.peer?.close()
+        runCatching { session.sourceChannel?.close() }
         sessions.remove(session.id)
     }
 
