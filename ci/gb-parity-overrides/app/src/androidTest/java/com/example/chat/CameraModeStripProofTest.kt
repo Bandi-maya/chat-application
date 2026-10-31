@@ -331,8 +331,17 @@ class CameraModeStripProofTest {
     // rises with time = lens applied after early frames were captured (timing
     // race); flat-low at every offset = recorded output never baked. The 900us
     // assertion itself is unchanged.
+    fun frameAtClosest(video:File,us:Long):Bitmap{
+     val mmr=android.media.MediaMetadataRetriever()
+     try{mmr.setDataSource(video.absolutePath);return mmr.getFrameAtTime(us,android.media.MediaMetadataRetriever.OPTION_CLOSEST) ?: error("no frame")}
+     finally{mmr.release()}
+    }
+    // Run-134: sync-mode sampling collapsed onto one keyframe (identical diffs at
+    // all three offsets), so it could not discriminate timing from output. The
+    // diag samples now extract the ACTUAL frame at each offset (OPTION_CLOSEST);
+    // the 900us assertion below keeps its original sync-mode extraction.
     for (us in listOf(300000L,900000L,1500000L)) {
-     val ta=frameAt(withLens,us);val tb=frameAt(bare,us)
+     val ta=frameAtClosest(withLens,us);val tb=frameAtClosest(bare,us)
      if(ta.width==tb.width && ta.height==tb.height){
       val tw=ta.width.toFloat();val th=ta.height.toFloat()
       android.util.Log.w("MODESTRIP-DIAG","lensframe us="+us+" centerDiff="+regionMeanDiff(ta,tb,tw*0.30f,th*0.20f,tw*0.70f,th*0.60f)+" cornerDiff="+regionMeanDiff(ta,tb,0f,0f,tw*0.15f,th*0.12f)+" size="+ta.width+"x"+ta.height)
