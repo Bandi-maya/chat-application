@@ -123,6 +123,7 @@ class P2pFileTransferService(
         val sentChunkIndices: java.util.BitSet = java.util.BitSet(),
         var sentBytes: Long = 0,
         var receivedBytes: Long = 0,
+        var receiverFinalized: Boolean = false,
         var remoteDescriptionSet: Boolean = false,
         var signalingReady: Boolean = false,
         val queuedCandidates: MutableList<IceCandidate> = mutableListOf(),
@@ -281,6 +282,7 @@ class P2pFileTransferService(
     fun cancel(transferId: String) {
         val session = sessions[transferId] ?: return
         sendSignal(session.peerUserId, mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
+        session.file?.let { runCatching { it.delete() } }
         fail(session, "Cancelled")
     }
 
@@ -400,7 +402,9 @@ class P2pFileTransferService(
                 NativeP2pTransferProtocol.encryptChunk(file, session.manifest, session.secret, index)
             }
             val packet = ByteBuffer.allocate(8 + encrypted.ciphertextAndTag.size).order(ByteOrder.BIG_ENDIAN)
-                .putLong(index).put(encrypted.ciphertextAndTag).flip() as ByteBuffer
+            packet.putLong(index)
+            packet.put(encrypted.ciphertextAndTag)
+            packet.flip()
             if (!channel.send(DataChannel.Buffer(packet, true))) {
                 publish(session, "Network backpressure — waiting")
                 break
@@ -428,13 +432,14 @@ class P2pFileTransferService(
             session.receivedBytes = minOf(session.receivedBytes, session.manifest.sizeBytes)
             session.monitorId?.let { transferMonitor.update(it, session.receivedBytes, session.manifest.sizeBytes) }
             publish(session, "Receiving")
-            if (session.ledger?.isComplete() == true) finalizeReceiver(session)
         } catch (error: Throwable) {
             fail(session, error.message ?: "File chunk failed verification")
         }
     }
 
     private suspend fun finalizeReceiver(session: Session) {
+        if (session.receiverFinalized) return
+        session.receiverFinalized = true
         val part = session.destination ?: return
         val target = session.finalDestination ?: return
         if (!NativeP2pTransferProtocol.verifyCompletedFile(part, session.manifest)) {
@@ -462,7 +467,10 @@ class P2pFileTransferService(
     }
 
     fun disposeAll() {
-        sessions.values.toList().forEach { fail(it, "Account signed out") }
+        sessions.values.toList().forEach { session ->
+            session.file?.let { runCatching { it.delete() } }
+            fail(session, "Account signed out")
+        }
         incoming.clear()
         incomingCandidates.clear()
         _pendingOffers.value = emptyList()
@@ -519,7 +527,6 @@ class P2pFileTransferService(
         publish(session, "Failed", error = reason)
         session.channel?.close()
         session.peer?.close()
-        session.file?.let { runCatching { it.delete() } }
         sessions.remove(session.id)
     }
 
