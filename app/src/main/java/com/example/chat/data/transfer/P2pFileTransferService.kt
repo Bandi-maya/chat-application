@@ -126,6 +126,7 @@ class P2pFileTransferService(
         val sentChunkIndices: java.util.BitSet = java.util.BitSet(),
         var sentBytes: Long = 0,
         var receivedBytes: Long = 0,
+        var chunksSinceSync: Int = 0,
         var receiverFinalized: Boolean = false,
         var restartAttempts: Int = 0,
         var restartInProgress: Boolean = false,
@@ -561,13 +562,22 @@ class P2pFileTransferService(
             val index = buffer.long
             if (index !in 0 until session.manifest.chunkCount) throw SecurityException("Invalid chunk index")
             val encrypted = ByteArray(buffer.remaining()).also(buffer::get)
-            NativeP2pTransferProtocol.writeChunk(
-                session.destination ?: throw IllegalStateException("Destination missing"),
-                session.manifest, session.secret,
-                NativeP2pTransferProtocol.EncryptedChunk(index, encrypted),
-            )
-            session.ledger?.markReceived(index)
-            session.receivedBytes = (session.ledger?.receivedCount() ?: 0L) * session.manifest.chunkBytes
+            val ledger = session.ledger ?: throw IllegalStateException("Resume ledger missing")
+            if (!ledger.hasReceived(index)) {
+                val part = session.destination ?: throw IllegalStateException("Destination missing")
+                NativeP2pTransferProtocol.writeChunk(
+                    part, session.manifest, session.secret,
+                    NativeP2pTransferProtocol.EncryptedChunk(index, encrypted),
+                )
+                session.chunksSinceSync++
+                val willComplete = ledger.receivedCount() + 1L >= session.manifest.chunkCount
+                if (session.chunksSinceSync >= 16 || willComplete) {
+                    withContext(Dispatchers.IO) { NativeP2pTransferProtocol.syncFile(part) }
+                    session.chunksSinceSync = 0
+                }
+                ledger.markReceived(index)
+            }
+            session.receivedBytes = ledger.receivedCount() * session.manifest.chunkBytes
             session.receivedBytes = minOf(session.receivedBytes, session.manifest.sizeBytes)
             session.monitorId?.let { transferMonitor.update(it, session.receivedBytes, session.manifest.sizeBytes) }
             publish(session, "Receiving")
