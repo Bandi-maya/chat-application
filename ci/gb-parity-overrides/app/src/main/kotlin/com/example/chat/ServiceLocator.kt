@@ -533,6 +533,17 @@ object ServiceLocator {
                         transferMonitor.update(uploadId, uploaded)
                         transferMonitor.update(downloadId, downloaded)
                     }
+                    media.onNetworkMetrics = { measuredUpKbps, lossPercent, rttMs ->
+                        appScope.launch {
+                            val link = networkMonitor.state.value
+                            callSignaling.onNetworkStatusChanged(
+                                upstreamKbps = if (measuredUpKbps > 0) measuredUpKbps else link.upstreamKbps,
+                                downstreamKbps = link.downstreamKbps,
+                                packetLossPercent = lossPercent,
+                                roundTripTimeMs = rttMs,
+                            )
+                        }
+                    }
                     media.onTrafficEnded = {
                         transferMonitor.finish(uploadId)
                         transferMonitor.finish(downloadId)
