@@ -14,6 +14,10 @@ RES=0
 QEMU_PID=$(pgrep -f qemu-system | head -1 || true)
 echo "RESTART-QEMU entry pid=${QEMU_PID:-none} state=$([ -n "$QEMU_PID" ] && echo alive || echo missing)"
 adb devices -l | tr -d '\r' | sed 's/^/RESTART-ADB /'
+# Kill-mechanism evidence (run-130: RESTART-QEMU proves the qemu PROCESS exits;
+# whether the kernel OOM-killed it is unresolved). host-dmesg-tail exists but
+# ends early; grep the ring buffer for kill signatures explicitly.
+dmesg 2>/dev/null | grep -iE 'oom|killed process|out of memory|segfault' | tail -5 | sed 's/^/RESTART-KERNEL /' || echo "RESTART-KERNEL dmesg unavailable-or-no-matches"
 adb shell am force-stop $PKG
 USER_JSON='{&quot;id&quot;:&quot;synthetic-user-1&quot;,&quot;username&quot;:&quot;testuser&quot;,&quot;displayName&quot;:&quot;Test User&quot;,&quot;avatarInitials&quot;:&quot;T&quot;,&quot;avatarColorHex&quot;:&quot;0xFF6366F1&quot;,&quot;about&quot;:&quot;Synthetic&quot;,&quot;email&quot;:&quot;&quot;,&quot;phone&quot;:&quot;&quot;,&quot;avatarUrl&quot;:null}'
 cat > /tmp/chaty_api_backend.xml <<XMLEOF
