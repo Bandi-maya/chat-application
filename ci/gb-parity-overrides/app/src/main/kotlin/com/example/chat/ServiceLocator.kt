@@ -588,6 +588,7 @@ object ServiceLocator {
             currentUserId = { apiBackend.currentUser?.id },
             sendSignal = { targetUserId, data -> apiBackend.sendCallSignal(targetUserId, data); true },
             transferMonitor = transferMonitor,
+            iceServers = { com.example.chat.data.transfer.P2pFileTransferService.parseIceServers(callSignaling.iceServersForTransfer()) },
         ).also { service ->
             apiBackend.addScopedCallSignalListener { expected, data ->
                 if (data["signal_type"]?.toString()?.startsWith("file_transfer_") == true) {
