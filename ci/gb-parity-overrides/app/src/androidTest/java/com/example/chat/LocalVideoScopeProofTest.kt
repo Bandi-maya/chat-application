@@ -66,9 +66,20 @@ class LocalVideoScopeProofTest {
                         File(output,"local-video-camera-inventory-after-invalidate.txt").writeText(inv)
                         assertTrue("auth invalidation releases the camera session (no active client)",released)
                     }else{
-                        device.pressBack();assertTrue(device.wait(Until.hasObject(By.text("Discard video")),3000));capture("exit-prompt")
+                        val t0=android.os.SystemClock.uptimeMillis()
+                        device.pressBack();assertTrue("first pressBack shows Discard video",device.wait(Until.hasObject(By.text("Discard video")),3000));capture("exit-prompt")
+                        val firstMs=android.os.SystemClock.uptimeMillis()-t0
                         device.findObject(By.text("Keep reviewing")).click();assertTrue(file.exists())
-                        device.pressBack();assertTrue(device.wait(Until.hasObject(By.text("Discard video")),3000))
+                        // Timing evidence (run-128: the second prompt never appeared
+                        // within 3s, single occurrence, bare AssertionError). Poll
+                        // with timestamps so a miss records the window state;
+                        // timeout and semantics unchanged.
+                        val t2=android.os.SystemClock.uptimeMillis()
+                        device.pressBack()
+                        var secondAt=0L;val pddl=t2+3000
+                        while(android.os.SystemClock.uptimeMillis()<pddl&&secondAt==0L){if(device.hasObject(By.text("Discard video")))secondAt=android.os.SystemClock.uptimeMillis()else Thread.sleep(100)}
+                        File(output,"local-video-exit-prompt-timing.txt").writeText("firstPromptMs="+firstMs+" secondPromptMs="+(if(secondAt>0)(secondAt-t2).toString() else "timeout>3000")+"\n")
+                        assertTrue("second pressBack re-shows Discard video (first="+firstMs+"ms second="+(if(secondAt>0)(secondAt-t2).toString()+"ms" else "timeout>3000")+")",secondAt>0)
                         device.findObject(By.text("Discard video")).click();assertTrue(device.wait(Until.hasObject(By.desc("Take photo")),10000));assertFalse(file.exists())
                     }
                 }
