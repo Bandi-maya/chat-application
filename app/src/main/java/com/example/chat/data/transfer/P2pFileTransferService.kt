@@ -685,6 +685,7 @@ class P2pFileTransferService(
                 "signal_type" to "file_transfer_restart_request",
                 "call_id" to session.id,
                 "transfer_id" to session.id,
+                "request_nonce" to java.util.UUID.randomUUID().toString(),
             ))
             publish(session, "Waiting for sender to reconnect")
         }
