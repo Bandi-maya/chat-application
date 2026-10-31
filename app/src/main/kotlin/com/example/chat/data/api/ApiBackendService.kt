@@ -1205,8 +1205,35 @@ class ApiBackendService(
 
     /** One HTTP attempt for a queued message; updates the chat and the outbox from the result. */
     private suspend fun sendOutboxEntry(entry: OutboxEntry): ApiChatClient.SendResult {
-        val result = withContext(Dispatchers.IO) {
-            chat.sendMessageResult(entry.conversationId, entry.content, clientId = entry.tempId)
+        val payloadBytes = entry.content.toByteArray(Charsets.UTF_8).size.toLong()
+        val ledger = transferMonitor
+        val transferId = ledger?.begin(
+            com.example.chat.data.network.TransferDirection.upload,
+            com.example.chat.data.network.TransferKind.message,
+            payloadBytes,
+            "Message",
+        )
+        val result = try {
+            withContext(Dispatchers.IO) {
+                chat.sendMessageResult(entry.conversationId, entry.content, clientId = entry.tempId)
+            }
+        } catch (error: Throwable) {
+            if (transferId != null) ledger?.finish(transferId, com.example.chat.data.network.TransferStatus.failed)
+            throw error
+        }
+        if (transferId != null) {
+            when (result) {
+                is ApiChatClient.SendResult.Ok -> {
+                    ledger?.update(transferId, payloadBytes, payloadBytes)
+                    ledger?.finish(transferId)
+                }
+                is ApiChatClient.SendResult.Rejected ->
+                    ledger?.finish(transferId, com.example.chat.data.network.TransferStatus.failed)
+                ApiChatClient.SendResult.Offline -> {
+                    ledger?.setStatus(transferId, com.example.chat.data.network.TransferStatus.paused)
+                    ledger?.finish(transferId, com.example.chat.data.network.TransferStatus.paused)
+                }
+            }
         }
         when (result) {
             is ApiChatClient.SendResult.Ok -> {
@@ -1330,6 +1357,9 @@ class ApiBackendService(
      *  ServiceLocator wires these hooks instead (same effect, no cycle). */
     var syncFcmTokenHook: (() -> Unit)? = null
     var unregisterFcmHook: (() -> Unit)? = null
+    /** Optional process-wide ledger for visible message-transfer progress and payload usage. */
+    @Volatile var transferMonitor: com.example.chat.data.network.TransferMonitor? = null
+
     /** Offline demo: returns true when any real GoTrue identity is live or
      *  persisted (wired by ServiceLocator). Demo entry FAILS CLOSED in that
      *  case; a real stored session is never cleared as demo prep. */
