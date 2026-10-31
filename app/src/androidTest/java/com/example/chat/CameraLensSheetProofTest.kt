@@ -63,14 +63,15 @@ class CameraLensSheetProofTest {
                 val targetDesc = initial.map { it.contentDescription }.first { !it.endsWith("in use") }
                 val targetName = targetDesc.removeSuffix(" lens thumbnail")
                 initial.first { it.contentDescription == targetDesc }.click()
+                val tappedInUse = freshHas(d, By.desc("$targetName lens thumbnail, in use"), 8000)
+                capture("carousel-selected")
                 assertTrue(
                     "tapped thumbnail becomes the in-use one",
-                    d.wait(Until.hasObject(By.desc("$targetName lens thumbnail, in use")), 8000),
+                    tappedInUse,
                 )
                 val inUseAfter = thumbnails().map { it.contentDescription }.filter { it.endsWith("in use") }
                 assertEquals("exactly one in-use thumbnail after tap", 1, inUseAfter.size)
                 assertEquals("$targetName lens thumbnail, in use", inUseAfter.single())
-                capture("carousel-selected")
                 // Browse button: sheet opens and reflects the SAME selection.
                 d.findObject(By.desc("Browse all lenses")).click()
                 assertTrue("browse sheet opens from its button", d.wait(Until.hasObject(By.descContains(" lens")), 8000) && sheetOpen())
@@ -111,14 +112,17 @@ class CameraLensSheetProofTest {
                 val target = first.map { it.contentDescription }.first { !it.endsWith("in use") }
                 val targetName = target.removeSuffix(" lens thumbnail")
                 first.first { it.contentDescription == target }.click()
+                val becameInUse = freshHas(d, By.desc("$targetName lens thumbnail, in use"), 8000)
+                if (!becameInUse) d.dumpWindowHierarchy(File(File(c.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "camera-lens-stay-fail.xml"))
                 assertTrue(
                     "tapped thumbnail becomes the in-use one",
-                    d.wait(Until.hasObject(By.desc("$targetName lens thumbnail, in use")), 8000),
+                    becameInUse,
                 )
                 // No late revert: after the centering animation tail and any watcher
                 // frame, the tapped lens must STILL be the only in-use one. This is
                 // the build-100 failure shape (selection snapped back mid-animation).
                 SystemClock.sleep(1500)
+                if (android.os.Build.VERSION.SDK_INT >= 33) ins.uiAutomation.clearCache()
                 val after = thumbnails().map { it.contentDescription }.filter { it.endsWith("in use") }
                 assertEquals("no revert after centering settles", listOf("$targetName lens thumbnail, in use"), after)
             }
@@ -149,15 +153,20 @@ class CameraLensSheetProofTest {
                 // the contract under test is that no LATER revert fires after settle.
                 val row = thumbnails().first().visibleBounds
                 d.swipe(row.centerX(), row.centerY(), row.centerX() - 240, row.centerY(), 24)
-                d.wait(Until.hasObject(By.descContains("lens thumbnail, in use")), 8000)
+                freshHas(d, By.descContains("lens thumbnail, in use"), 8000)
+                if (android.os.Build.VERSION.SDK_INT >= 33) ins.uiAutomation.clearCache()
                 val settled = thumbnails().map { it.contentDescription }.filter { it.endsWith("in use") }
                 assertEquals("exactly one in-use thumbnail after interruption settles", 1, settled.size)
                 // No late override: the settled selection must survive a full
                 // animation window unchanged.
                 val winner = settled.single()
+                val stillWinner = freshHas(d, By.desc(winner), 3000)
+                if (android.os.Build.VERSION.SDK_INT >= 33) ins.uiAutomation.clearCache()
+                val inUseCount = thumbnails().map { it.contentDescription }.count { it.endsWith("in use") } == 1
+                if (!(stillWinner && inUseCount)) d.dumpWindowHierarchy(File(File(c.getExternalFilesDir(null), "screenshots").apply { mkdirs() }, "camera-lens-drag-fail.xml"))
                 assertTrue(
                     "settled selection is not overridden by the cancelled centering",
-                    d.wait(Until.hasObject(By.desc(winner)), 3000) && thumbnails().map { it.contentDescription }.count { it.endsWith("in use") } == 1,
+                    stillWinner && inUseCount,
                 )
             }
         } finally {
@@ -194,6 +203,23 @@ class CameraLensSheetProofTest {
         } finally {
             d.unfreezeRotation()
         }
+    }
+
+    // Fresh-tree selector poll: this emulator build can serve a stale
+    // accessibility cache for in-place semantics updates (proven in
+    // AppRootProofTest: pixels showed the new tree while a plain Until wait
+    // kept matching the old one), so selection-desc waits must not trust a
+    // single cached snapshot. Wait semantics and timeouts are unchanged;
+    // only the tree source is refreshed each poll.
+    private fun freshHas(d: UiDevice, selector: BySelector, timeoutMs: Long): Boolean {
+        val ins = InstrumentationRegistry.getInstrumentation()
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < deadline) {
+            if (android.os.Build.VERSION.SDK_INT >= 33) ins.uiAutomation.clearCache()
+            if (d.hasObject(selector)) return true
+            SystemClock.sleep(250)
+        }
+        return false
     }
 
     private fun thumbnails() = InstrumentationRegistry.getInstrumentation().let { d ->
