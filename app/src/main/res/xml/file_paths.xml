@@ -4,4 +4,5 @@
 <paths>
     <cache-path name="shared_files" path="." />
     <files-path name="app_files" path="." />
+    <external-files-path name="p2p_received" path="Movies/" />
 </paths>
