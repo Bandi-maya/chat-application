@@ -48,7 +48,7 @@ class SupabaseStorageClient(
                     override fun write(source: okio.Buffer, byteCount: Long) {
                         super.write(source, byteCount)
                         transferred += byteCount
-                        onProgress.invoke(transferred, rawBody.contentLength())
+                        onProgress?.invoke(transferred, rawBody.contentLength())
                     }
                 }
                 rawBody.writeTo(okio.buffer(forwarding))
@@ -148,6 +148,7 @@ class SupabaseStorageClient(
                         }
                         409 -> {
                             offset = queryTusOffset(uploadUrl, bearer, origin)
+                            if (offset > bytes.size) throw IOException("Resume offset exceeds file length")
                             onProgress?.invoke(offset, bytes.size.toLong())
                         }
                         else -> throw IOException("Resumable upload chunk failed with HTTP ${response.code}")
@@ -157,6 +158,7 @@ class SupabaseStorageClient(
                 failures++
                 if (failures > MAX_TUS_RETRIES) throw error
                 offset = queryTusOffset(uploadUrl, bearer, origin)
+                if (offset > bytes.size) throw IOException("Resume offset exceeds file length")
                 onProgress?.invoke(offset, bytes.size.toLong())
                 try { Thread.sleep((250L shl (failures - 1)).coerceAtMost(2_000L)) } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
