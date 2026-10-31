@@ -780,7 +780,9 @@ fun ChatDetailHost(
             text = {
                 Column {
                     Text((message.attachment?.size ?: "Large file") + " · Encrypted peer transfer")
-                    Text("The file will be saved in Chaty’s Movies folder.", color = Color(theme.secondaryTextColor))
+                    Text("Estimated download: about " + (message.attachment?.size ?: "the full file size") + ". Retries may use additional data.", color = Color(theme.secondaryTextColor))
+                    Text("The file is saved in Chaty’s private storage and can be played inside the app.", color = Color(theme.secondaryTextColor))
+                    if (liveNetworkStatus.metered) Text("You are on a metered connection.", color = Color(theme.warningColor))
                 }
             },
             dismissButton = {
