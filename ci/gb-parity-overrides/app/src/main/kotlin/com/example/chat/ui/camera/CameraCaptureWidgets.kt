@@ -528,6 +528,26 @@ fun CameraCaptureBottomControls(
             if (ready && captureViewMode == CaptureViewMode.lenses && !effectsOpen) {
                 // Lens name + tracking health row.
                 Box(Modifier.fillMaxWidth()) {
+                // Gallery + flip live on the lens-name row in lenses mode (run-128
+                // evidence): on the shutter row their hit bounds covered the
+                // full-width carousel's thumbnails - Switch camera
+                // [901,2071][1038,2208] swallowed the Gold Crown thumbnail's center
+                // tap point, Puppy Ears sat fully beneath it, and a scrolled No Lens
+                // hit the same overlap under gallery. Same size/callbacks/labels,
+                // no carousel-lane overlap. Photo/video rows keep the verified
+                // reference layout untouched.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 10.dp)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onPickFromGallery)
+                        .semantics { contentDescription = "Pick image from gallery" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CameraGlyph(kind = "gallery", color = Color.White, size = 22.dp)
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -569,19 +589,39 @@ fun CameraCaptureBottomControls(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                // Lens explorer entry: browse grid beside the carousel (Snap-style).
-                Box(
+                // Lens explorer entry + camera flip at this row's end (Snap-style).
+                Row(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 10.dp)
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x33FFFFFF))
-                        .clickable(onClick = onBrowseLenses)
-                        .semantics { contentDescription = "Browse all lenses" },
-                    contentAlignment = Alignment.Center,
+                        .padding(end = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CameraGlyph(kind = "browse_grid", color = Color.White, size = 20.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .clickable(enabled = ready, onClick = onFlip)
+                            .semantics { contentDescription = "Switch camera" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CameraGlyph(
+                            kind = "flip",
+                            color = if (ready) Color.White else Color(0x4DFFFFFF),
+                            size = 22.dp,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x33FFFFFF))
+                            .clickable(onClick = onBrowseLenses)
+                            .semantics { contentDescription = "Browse all lenses" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CameraGlyph(kind = "browse_grid", color = Color.White, size = 20.dp)
+                    }
                 }
                 }
                 Spacer(Modifier.height((if (tight) 1 else 4).dp))
@@ -676,6 +716,7 @@ fun CameraCaptureBottomControls(
                         LensCarousel(manager = lensManager, deviceTier = deviceTier)
                     }
                 }
+                if (!lensesRow) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
@@ -687,7 +728,9 @@ fun CameraCaptureBottomControls(
                 ) {
                     CameraGlyph(kind = "gallery", color = Color.White, size = 27.dp)
                 }
+                }
                 CameraCaptureShutter(enabled = ready, capturing = capturing, videoActive = videoActive, recording = videoRecording, hollow = lensesRow, onClick = onShutter)
+                if (!lensesRow) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
@@ -702,6 +745,7 @@ fun CameraCaptureBottomControls(
                         color = if (ready) Color.White else Color(0x4DFFFFFF),
                         size = 27.dp,
                     )
+                }
                 }
             }
             }
