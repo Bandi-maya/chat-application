@@ -57,6 +57,14 @@ class LocalVideoScopeProofTest {
                         val ddl=android.os.SystemClock.uptimeMillis()+5000
                         while(android.os.SystemClock.uptimeMillis()<ddl && !tornDown){Thread.sleep(200);tornDown=scenario.state==androidx.lifecycle.Lifecycle.State.DESTROYED}
                         assertTrue("auth invalidation tears down the camera session (host contract dismissal)",tornDown)
+                        // Resource release, not only Activity state: the app's camera
+                        // client must leave CameraService's active list.
+                        var released=false
+                        var inv=""
+                        val rddl=android.os.SystemClock.uptimeMillis()+5000
+                        while(android.os.SystemClock.uptimeMillis()<rddl && !released){Thread.sleep(300);inv=device.executeShellCommand("dumpsys media.camera");released=!inv.contains("Client Package Name: "+context.packageName)}
+                        File(output,"local-video-camera-inventory-after-invalidate.txt").writeText(inv)
+                        assertTrue("auth invalidation releases the camera session (no active client)",released)
                     }else{
                         device.pressBack();assertTrue(device.wait(Until.hasObject(By.text("Discard video")),3000));capture("exit-prompt")
                         device.findObject(By.text("Keep reviewing")).click();assertTrue(file.exists())
