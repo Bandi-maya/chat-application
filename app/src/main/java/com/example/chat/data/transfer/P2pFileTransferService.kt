@@ -123,13 +123,16 @@ class P2pFileTransferService(
         var sentBytes: Long = 0,
         var receivedBytes: Long = 0,
         var remoteDescriptionSet: Boolean = false,
+        var signalingReady: Boolean = false,
         val queuedCandidates: MutableList<IceCandidate> = mutableListOf(),
+        val pendingLocalCandidates: MutableList<IceCandidate> = mutableListOf(),
     )
 
     private val appContext = context.applicationContext
     private val factory: PeerConnectionFactory
     private val sessions = ConcurrentHashMap<String, Session>()
     private val incoming = ConcurrentHashMap<String, Pair<PendingOffer, Map<String, Any?>>>()
+    private val incomingCandidates = ConcurrentHashMap<String, MutableList<IceCandidate>>()
     private val _pendingOffers = MutableStateFlow<List<PendingOffer>>(emptyList())
     val pendingOffers: StateFlow<List<PendingOffer>> = _pendingOffers.asStateFlow()
     private val _transfers = MutableStateFlow<List<TransferState>>(emptyList())
@@ -155,6 +158,7 @@ class P2pFileTransferService(
             invite, file, mimeType, System.currentTimeMillis() / 1000L + linkExpirySeconds,
         )
         val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
+        val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes, manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
         val session = Session(invite.transferId, targetUserId, file, manifest, invite.secret,
             TransferDirection.upload)
         sessions[invite.transferId] = session
@@ -175,9 +179,11 @@ class P2pFileTransferService(
                 "signal_type" to "file_transfer_offer",
                 "transfer_id" to invite.transferId,
                 "sdp" to offer.description,
-                "manifest" to manifest.toWire().json().toMap(),
+                "manifest" to wireManifest.json().toMap(),
                 "manifest_auth" to b64(auth),
             ))) throw IllegalStateException("Chaty signaling is offline; retry when connected")
+            session.signalingReady = true
+            flushLocalCandidates(session)
             invite.toUri()
         } catch (error: Throwable) {
             fail(session, error.message ?: "Unable to start transfer")
@@ -208,13 +214,15 @@ class P2pFileTransferService(
                 publish(session, "Connecting")
             }
             "file_transfer_ice" -> {
-                val session = sessions[id]?.takeIf { it.peerUserId == sender } ?: return
                 val candidate = signal["candidate"]?.toString().orEmpty()
                 if (candidate.isBlank()) return
                 val ice = IceCandidate(signal["sdp_mid"]?.toString(), (signal["sdp_mline"] as? Number)?.toInt() ?: 0, candidate)
-                val peer = session.peer
-                if (peer == null || !session.remoteDescriptionSet) session.queuedCandidates.add(ice)
-                else peer.addIceCandidate(ice)
+                val session = sessions[id]?.takeIf { it.peerUserId == sender }
+                if (session == null) {
+                    val queue = incomingCandidates.getOrPut(id) { java.util.Collections.synchronizedList(mutableListOf()) }
+                    if (queue.size < 256) queue.add(ice)
+                } else if (!session.remoteDescriptionSet) session.queuedCandidates.add(ice)
+                else session.peer?.addIceCandidate(ice)
             }
             "file_transfer_cancel" -> sessions[id]?.takeIf { it.peerUserId == sender }?.let { fail(it, "Sender cancelled this transfer") }
         }
@@ -238,6 +246,7 @@ class P2pFileTransferService(
         val partFile = File(appContext.filesDir, "p2p-receive/${invite.transferId}.part")
         session.destination = partFile
         session.ledger = ChunkReceiptLedger(File(appContext.filesDir, "p2p-ledger/${invite.transferId}.state"), manifest.chunkCount)
+        incomingCandidates.remove(invite.transferId)?.let { session.queuedCandidates.addAll(it) }
         session.monitorId = transferMonitor.begin(
             TransferDirection.download, TransferKind.video, manifest.sizeBytes, manifest.displayName,
         )
@@ -251,6 +260,8 @@ class P2pFileTransferService(
             if (!sendSignal(offer.senderId, mapOf(
                 "signal_type" to "file_transfer_answer", "transfer_id" to invite.transferId, "sdp" to answer.description,
             ))) throw IllegalStateException("Chaty signaling is offline")
+            session.signalingReady = true
+            flushLocalCandidates(session)
             incoming.remove(invite.transferId); refreshPending()
             publish(session, "Waiting for secure data channel")
             true
@@ -353,9 +364,10 @@ class P2pFileTransferService(
             }
             // Sender responds in ordered batches. Wait for a batch before requesting more.
             val before = ledger.receivedCount()
-            repeat(40) {
-                if (ledger.receivedCount() > before || ledger.isComplete()) return@repeat
+            var waitCount = 0
+            while (ledger.receivedCount() == before && !ledger.isComplete() && waitCount < 40) {
                 kotlinx.coroutines.delay(250)
+                waitCount++
             }
             if (ledger.receivedCount() == before) {
                 publish(session, "Waiting for sender / network")
@@ -423,12 +435,14 @@ class P2pFileTransferService(
             part.delete()
             return
         }
-        if (target.exists() && !target.delete()) throw IllegalStateException("Cannot replace destination file")
+        if (target.exists()) throw IllegalStateException("A file with this name already exists")
         target.parentFile?.mkdirs()
         if (!part.renameTo(target)) throw IllegalStateException("Cannot finalize received file")
         session.channel?.send(DataChannel.Buffer(ByteBuffer.wrap(JSONObject().put("kind", "complete").toString().toByteArray()), false))
         session.monitorId?.let { transferMonitor.finish(it) }
         publish(session, "Received and verified", target.absolutePath)
+        session.ledger?.flush()
+        session.channel?.send(DataChannel.Buffer(ByteBuffer.wrap(JSONObject().put("kind", "complete").toString().toByteArray()), false))
         session.channel?.close()
         session.peer?.close()
     }
@@ -476,6 +490,16 @@ class P2pFileTransferService(
         session.queuedCandidates.clear()
     }
 
+    private fun flushLocalCandidates(session: Session) {
+        val pending = session.pendingLocalCandidates.toList()
+        session.pendingLocalCandidates.clear()
+        pending.forEach { sendCandidate(session, it) }
+    }
+
+    private fun sendCandidate(session: Session, candidate: IceCandidate) {
+        sendSignal(session.peerUserId, mapOf("signal_type" to "file_transfer_ice", "transfer_id" to session.id, "candidate" to candidate.sdp, "sdp_mid" to candidate.sdpMid, "sdp_mline" to candidate.sdpMLineIndex))
+    }
+
     private fun fail(session: Session, reason: String) {
         session.monitorId?.let { transferMonitor.finish(it, TransferStatus.failed) }
         publish(session, "Failed", error = reason)
@@ -496,8 +520,6 @@ class P2pFileTransferService(
     private fun refreshPending() {
         _pendingOffers.value = incoming.values.map { it.first }.sortedByDescending { it.expiresAtEpochSeconds }
     }
-
-    private fun WireManifest.toWire() = this
 
     companion object {
         private const val MAX_BUFFERED_BYTES = 2L * 1024L * 1024L
