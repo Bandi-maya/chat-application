@@ -96,14 +96,19 @@ class P2pFileTransferService(
         companion object {
             fun parse(value: Any?): WireManifest {
                 val j = value as? Map<*, *> ?: throw SecurityException("Transfer manifest missing")
+                val id = j["transfer_id"]?.toString() ?: throw SecurityException("Transfer id missing")
+                val name = j["name"]?.toString() ?: "video"
+                val mime = j["mime"]?.toString() ?: "application/octet-stream"
+                val digest = j["sha256"]?.toString() ?: ""
+                val nonceText = j["nonce"]?.toString() ?: throw SecurityException("Transfer nonce missing")
+                if (id.length > 64 || name.length > 180 || mime.length > 120 || digest.length != 64 || nonceText.length > 64) {
+                    throw SecurityException("Transfer manifest fields exceed limits")
+                }
                 return WireManifest(
-                    j["transfer_id"]?.toString() ?: throw SecurityException("Transfer id missing"),
-                    j["name"]?.toString() ?: "video",
-                    j["mime"]?.toString() ?: "application/octet-stream",
+                    id, name, mime,
                     (j["size"] as? Number)?.toLong() ?: j["size"]?.toString()?.toLongOrNull() ?: 0L,
                     (j["chunk"] as? Number)?.toInt() ?: j["chunk"]?.toString()?.toIntOrNull() ?: 0,
-                    j["sha256"]?.toString() ?: "",
-                    unb64(j["nonce"]?.toString() ?: ""),
+                    digest, unb64(nonceText),
                     (j["expires"] as? Number)?.toLong() ?: j["expires"]?.toString()?.toLongOrNull() ?: 0L,
                 )
             }
@@ -285,10 +290,10 @@ class P2pFileTransferService(
                         manifest.sha256Hex != currentManifest.sha256Hex ||
                         !manifest.noncePrefix.contentEquals(currentManifest.noncePrefix)
                     ) return
+                    val authentication = signal["manifest_auth"]?.toString()?.takeIf { it.length <= 128 }
+                        ?: throw SecurityException("Transfer authentication missing")
                     NativeP2pTransferProtocol.verifyManifest(
-                        activeReceiver.manifest,
-                        unb64(signal["manifest_auth"]?.toString() ?: ""),
-                        activeReceiver.secret,
+                        activeReceiver.manifest, unb64(authentication), activeReceiver.secret,
                     )
                     activeReceiver.remoteDescriptionSet = false
                     setRemoteDescription(peer, SessionDescription.Type.OFFER, signal["sdp"]?.toString() ?: return)
@@ -309,6 +314,7 @@ class P2pFileTransferService(
             "file_transfer_answer" -> {
                 val session = sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.upload } ?: return
                 val sdp = signal["sdp"]?.toString().orEmpty()
+                if (sdp.length !in 1..256_000) return
                 if (sdp.isNotBlank()) {
                     setRemoteDescription(session.peer ?: return, SessionDescription.Type.ANSWER, sdp)
                     session.remoteDescriptionSet = true
@@ -319,7 +325,7 @@ class P2pFileTransferService(
             }
             "file_transfer_ice" -> {
                 val candidate = signal["candidate"]?.toString().orEmpty()
-                if (candidate.isBlank()) return
+                if (candidate.isBlank() || candidate.length > 4096) return
                 val ice = IceCandidate(signal["sdp_mid"]?.toString(), (signal["sdp_mline"] as? Number)?.toInt() ?: 0, candidate)
                 val session = sessions[id]?.takeIf { it.peerUserId == sender }
                 if (session == null) {
