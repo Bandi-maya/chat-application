@@ -248,7 +248,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
     mediaReview?.let { (items, deferred) ->
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { mediaReview = null; deferred.complete(null) },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = true),
         ) {
             com.example.chat.ui.chats.detail.MediaReviewScreen(
                 items,
