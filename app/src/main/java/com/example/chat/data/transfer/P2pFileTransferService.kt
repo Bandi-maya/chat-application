@@ -26,6 +26,9 @@ import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * Native direct WebRTC DataChannel transport for large Chaty files.
@@ -115,6 +118,7 @@ class P2pFileTransferService(
         var channel: DataChannel? = null,
         var ledger: ChunkReceiptLedger? = null,
         var destination: File? = null,
+        var finalDestination: File? = null,
         var monitorId: String? = null,
         var sentBytes: Long = 0,
         var receivedBytes: Long = 0,
@@ -230,8 +234,8 @@ class P2pFileTransferService(
             manifest, unb64(signal["manifest_auth"]?.toString() ?: ""), invite.secret,
         )
         val session = Session(invite.transferId, offer.senderId, null, manifest, invite.secret,
-            TransferDirection.download, destination = destination)
-        val partFile = File(destination.parentFile ?: appContext.filesDir, ".${invite.transferId}.part")
+            TransferDirection.download, destination = null, finalDestination = destination)
+        val partFile = File(appContext.filesDir, "p2p-receive/${invite.transferId}.part")
         session.destination = partFile
         session.ledger = ChunkReceiptLedger(File(appContext.filesDir, "p2p-ledger/${invite.transferId}.state"), manifest.chunkCount)
         session.monitorId = transferMonitor.begin(
@@ -269,7 +273,7 @@ class P2pFileTransferService(
             bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
             rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE
         }
-        return factory.createPeerConnection(config, object : PeerConnection.Observer {
+        val peer = factory.createPeerConnection(config, object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate?) {
                 if (candidate != null) sendSignal(session.peerUserId, mapOf(
                     "signal_type" to "file_transfer_ice", "transfer_id" to session.id,
@@ -303,8 +307,9 @@ class P2pFileTransferService(
             override fun onRemoveStream(stream: org.webrtc.MediaStream?) {}
             override fun onAddTrack(receiver: org.webrtc.RtpReceiver?, streams: Array<out org.webrtc.MediaStream>?) {}
             override fun onRenegotiationNeeded() {}
-        }) ?: throw IllegalStateException("Could not create WebRTC peer connection").also { }
-            .also { session.peer = it }
+        }) ?: throw IllegalStateException("Could not create WebRTC peer connection")
+        session.peer = peer
+        return peer
     }
 
     private fun observeChannel(session: Session, channel: DataChannel, isSender: Boolean) {
@@ -419,7 +424,9 @@ class P2pFileTransferService(
             return
         }
         if (target.exists() && !target.delete()) throw IllegalStateException("Cannot replace destination file")
+        target.parentFile?.mkdirs()
         if (!part.renameTo(target)) throw IllegalStateException("Cannot finalize received file")
+        session.channel?.send(DataChannel.Buffer(ByteBuffer.wrap(JSONObject().put("kind", "complete").toString().toByteArray()), false))
         session.monitorId?.let { transferMonitor.finish(it) }
         publish(session, "Received and verified", target.absolutePath)
         session.channel?.close()
@@ -433,32 +440,30 @@ class P2pFileTransferService(
         session.peer?.close()
     }
 
-    private fun createDescription(peer: PeerConnection, offer: Boolean): SessionDescription =
-        kotlinx.coroutines.runBlocking {
-            kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+    private suspend fun createDescription(peer: PeerConnection, offer: Boolean): SessionDescription =
+            suspendCancellableCoroutine { continuation ->
                 val observer = object : SdpObserver {
                     override fun onCreateSuccess(description: SessionDescription?) {
-                        if (description == null) continuation.resumeWith(Result.failure(IllegalStateException("SDP missing")))
+                        if (description == null) continuation.resumeWithException(IllegalStateException("SDP missing"))
                         else peer.setLocalDescription(object : SdpObserver {
-                            override fun onSetSuccess() { continuation.resumeWith(Result.success(description)) }
-                            override fun onSetFailure(error: String?) { continuation.resumeWith(Result.failure(IllegalStateException(error ?: "setLocalDescription failed"))) }
+                            override fun onSetSuccess() { continuation.resume(description) }
+                            override fun onSetFailure(error: String?) { continuation.resumeWithException(IllegalStateException(error ?: "setLocalDescription failed")) }
                             override fun onCreateSuccess(p0: SessionDescription?) {}
                             override fun onCreateFailure(error: String?) {}
                         }, description)
                     }
-                    override fun onCreateFailure(error: String?) { continuation.resumeWith(Result.failure(IllegalStateException(error ?: "SDP create failed"))) }
+                    override fun onCreateFailure(error: String?) { continuation.resumeWithException(IllegalStateException(error ?: "SDP create failed")) }
                     override fun onSetSuccess() {}
                     override fun onSetFailure(error: String?) {}
                 }
                 if (offer) peer.createOffer(observer, MediaConstraints()) else peer.createAnswer(observer, MediaConstraints())
             }
-        }
 
     private suspend fun setRemoteDescription(peer: PeerConnection, type: SessionDescription.Type, sdp: String) {
         kotlinx.coroutines.suspendCancellableCoroutine<Unit> { continuation ->
             peer.setRemoteDescription(object : SdpObserver {
-                override fun onSetSuccess() { continuation.resumeWith(Result.success(Unit)) }
-                override fun onSetFailure(error: String?) { continuation.resumeWith(Result.failure(IllegalStateException(error ?: "setRemoteDescription failed"))) }
+                override fun onSetSuccess() { continuation.resume(Unit) }
+                override fun onSetFailure(error: String?) { continuation.resumeWithException(IllegalStateException(error ?: "setRemoteDescription failed")) }
                 override fun onCreateSuccess(p0: SessionDescription?) {}
                 override fun onCreateFailure(error: String?) {}
             }, SessionDescription(type, sdp))
