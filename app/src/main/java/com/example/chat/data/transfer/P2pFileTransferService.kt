@@ -22,6 +22,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
+import org.webrtc.MediaConstraints
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.SdpObserver
@@ -120,6 +121,7 @@ class P2pFileTransferService(
         var destination: File? = null,
         var finalDestination: File? = null,
         var monitorId: String? = null,
+        val sentChunkIndices: java.util.BitSet = java.util.BitSet(),
         var sentBytes: Long = 0,
         var receivedBytes: Long = 0,
         var remoteDescriptionSet: Boolean = false,
@@ -179,7 +181,7 @@ class P2pFileTransferService(
                 "signal_type" to "file_transfer_offer",
                 "transfer_id" to invite.transferId,
                 "sdp" to offer.description,
-                "manifest" to wireManifest.json().toMap(),
+                "manifest" to mapOf("transfer_id" to wireManifest.transferId, "name" to wireManifest.displayName, "mime" to wireManifest.mimeType, "size" to wireManifest.sizeBytes, "chunk" to wireManifest.chunkBytes, "sha256" to wireManifest.sha256Hex, "nonce" to b64(wireManifest.noncePrefix), "expires" to wireManifest.expiresAtEpochSeconds),
                 "manifest_auth" to b64(auth),
             ))) throw IllegalStateException("Chaty signaling is offline; retry when connected")
             session.signalingReady = true
@@ -202,6 +204,8 @@ class P2pFileTransferService(
             "file_transfer_offer" -> {
                 val manifest = WireManifest.parse(signal["manifest"])
                 if (manifest.transferId != id || manifest.sizeBytes !in 1..NativeP2pTransferProtocol.MAX_FILE_BYTES) return
+                if (signal["sdp"]?.toString().orEmpty().length !in 1..256_000) return
+                if (manifest.displayName.length > 180 || manifest.mimeType.length > 120) return
                 val offer = PendingOffer(id, sender, manifest.displayName, manifest.sizeBytes, manifest.mimeType, manifest.expiresAtEpochSeconds)
                 incoming[id] = offer to signal
                 _pendingOffers.value = incoming.values.map { it.first }.sortedByDescending { it.expiresAtEpochSeconds }
@@ -441,11 +445,10 @@ class P2pFileTransferService(
         if (target.exists()) throw IllegalStateException("A file with this name already exists")
         target.parentFile?.mkdirs()
         if (!part.renameTo(target)) throw IllegalStateException("Cannot finalize received file")
+        session.ledger?.flush()
         session.channel?.send(DataChannel.Buffer(ByteBuffer.wrap(JSONObject().put("kind", "complete").toString().toByteArray()), false))
         session.monitorId?.let { transferMonitor.finish(it) }
         publish(session, "Received and verified", target.absolutePath)
-        session.ledger?.flush()
-        session.channel?.send(DataChannel.Buffer(ByteBuffer.wrap(JSONObject().put("kind", "complete").toString().toByteArray()), false))
         session.channel?.close()
         session.peer?.close()
     }
