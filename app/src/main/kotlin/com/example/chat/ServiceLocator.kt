@@ -680,7 +680,7 @@ object ServiceLocator {
                 com.example.chat.ui.media.ImageSendCompressor.compress(bytes, quality)
             },
             adaptiveImageQuality = {
-                when (val up = networkMonitor.state.value.upstreamKbps) {
+                when (networkMonitor.state.value.upstreamKbps) {
                     in 1..80 -> 45
                     in 81..250 -> 60
                     in 251..700 -> 78
