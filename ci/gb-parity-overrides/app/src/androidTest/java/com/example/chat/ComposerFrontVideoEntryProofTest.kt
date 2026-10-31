@@ -40,7 +40,10 @@ class ComposerFrontVideoEntryProofTest {
                 fun cameraTruth(): CamTruth {
                     val dump = d.executeShellCommand("dumpsys media.camera")
                     fun idFor(f: String) = Regex("internal/(\\d+)[^\\n]*static information: ==\\n\\s*Facing: " + f).find(dump)?.groupValues?.get(1)
-                    val active = Regex("Camera ID: (\\d+),[^)]*Client Package Name: " + Regex.escape(c.packageName)).findAll(dump).map { it.groupValues[1] }.toSet()
+                    // Only the CURRENT "Active Camera Clients" block; the dumpsys
+                    // events log below it is history and must not count.
+                    val activeSection = dump.substringAfter("Active Camera Clients:", "").substringBefore("\n]", "")
+                    val active = Regex("Camera ID: (\\d+),[^)]*Client Package Name: " + Regex.escape(c.packageName)).findAll(activeSection).map { it.groupValues[1] }.toSet()
                     return CamTruth(dump, idFor("Front"), idFor("Back"), active)
                 }
                 // The video session binds asynchronously; poll for the app's client.
@@ -50,8 +53,18 @@ class ComposerFrontVideoEntryProofTest {
                 File(out,"composer-front-video-camera-inventory-ready.txt").writeText(truth.dump)
                 val frontId = truth.frontId; val backId = truth.backId
                 assertTrue("camera HAL exposes facing ids for the bound-camera proof", frontId != null && backId != null)
-                assertTrue("Actual CameraX bound camera is front", frontId != null && truth.active.contains(frontId))
-                assertFalse("Never silently bind back", backId != null && truth.active.contains(backId))
+                // Observe the whole binding window, not one instant: the front
+                // client must persist and the back id must never appear.
+                var frontAlways = frontId != null && truth.active.contains(frontId)
+                var sawBack = backId != null && truth.active.contains(backId)
+                repeat(6) {
+                    Thread.sleep(400)
+                    val t = cameraTruth()
+                    if (frontId != null && !t.active.contains(frontId)) frontAlways = false
+                    if (backId != null && t.active.contains(backId)) sawBack = true
+                }
+                assertTrue("Actual CameraX bound camera is front", frontAlways)
+                assertFalse("Never silently bind back", sawBack)
                 assertFalse("Never auto-record",d.hasObject(By.desc("Stop recording")))
                 assertFalse("No unrecorded review",d.hasObject(By.text("Play recording")))
                 Thread.sleep(800)
