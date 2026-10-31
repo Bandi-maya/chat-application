@@ -3,6 +3,7 @@ package com.example.chat.data.transfer
 import android.util.Base64
 import java.io.File
 import java.io.RandomAccessFile
+import java.nio.channels.FileChannel
 import java.net.URI
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -110,6 +111,26 @@ object NativeP2pTransferProtocol {
         )
     }
 
+    /** File-descriptor-backed manifest path: hash a seekable picker descriptor without copying a 100 GB file. */
+    fun createManifest(
+        invite: Invite,
+        source: FileChannel,
+        displayName: String,
+        sizeBytes: Long,
+        mimeType: String,
+        expiresAtEpochSeconds: Long,
+        chunkBytes: Int = DEFAULT_CHUNK_BYTES,
+    ): Manifest {
+        require(sizeBytes in 1..MAX_FILE_BYTES) { "File must be between 1 byte and 100 GB" }
+        require(source.size() == sizeBytes) { "Selected file changed or is not seekable" }
+        require(chunkBytes in (64 * 1024)..(1024 * 1024))
+        require(expiresAtEpochSeconds > System.currentTimeMillis() / 1000L)
+        val safeName = displayName.replace(Regex("[\\\\/\\u0000-\\u001f]"), "_").take(180).ifBlank { "video" }
+        val prefix = ByteArray(NONCE_PREFIX_BYTES).also(random::nextBytes)
+        return Manifest(invite.transferId, safeName, mimeType.take(120).ifBlank { "application/octet-stream" },
+            sizeBytes, chunkBytes, sha256(source, sizeBytes), prefix, expiresAtEpochSeconds)
+    }
+
     /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */
     fun authenticateManifest(manifest: Manifest, secret: ByteArray): ByteArray {
         require(secret.size == KEY_BYTES)
@@ -139,16 +160,33 @@ object NativeP2pTransferProtocol {
 
     /** Read only the requested byte range; never loads the whole source file into memory. */
     fun encryptChunk(source: File, manifest: Manifest, secret: ByteArray, index: Long): EncryptedChunk {
-        require(secret.size == KEY_BYTES)
-        require(index in 0 until manifest.chunkCount)
-        if (!source.isFile || source.length() != manifest.sizeBytes) throw SecurityException("Source file changed during transfer")
+        require(source.isFile && source.length() == manifest.sizeBytes)
         val offset = Math.multiplyExact(index, manifest.chunkBytes.toLong())
         val length = minOf(manifest.chunkBytes.toLong(), manifest.sizeBytes - offset).toInt()
         val plain = ByteArray(length)
-        RandomAccessFile(source, "r").use { file ->
-            file.seek(offset)
-            file.readFully(plain)
+        RandomAccessFile(source, "r").use { file -> file.seek(offset); file.readFully(plain) }
+        return encryptPlainChunk(manifest, secret, index, plain)
+    }
+
+    /** Random-access picker descriptor path. The caller retains/owns the FileChannel. */
+    fun encryptChunk(source: FileChannel, manifest: Manifest, secret: ByteArray, index: Long): EncryptedChunk {
+        require(index in 0 until manifest.chunkCount)
+        if (!source.isOpen || source.size() != manifest.sizeBytes) throw SecurityException("Source file changed during transfer")
+        val offset = Math.multiplyExact(index, manifest.chunkBytes.toLong())
+        val length = minOf(manifest.chunkBytes.toLong(), manifest.sizeBytes - offset).toInt()
+        val plain = ByteArray(length)
+        val buffer = ByteBuffer.wrap(plain)
+        var position = offset
+        while (buffer.hasRemaining()) {
+            val read = source.read(buffer, position)
+            if (read <= 0) throw java.io.EOFException("Could not read selected file range")
+            position += read
         }
+        return encryptPlainChunk(manifest, secret, index, plain)
+    }
+
+    private fun encryptPlainChunk(manifest: Manifest, secret: ByteArray, index: Long, plain: ByteArray): EncryptedChunk {
+        require(secret.size == KEY_BYTES && index in 0 until manifest.chunkCount)
         return EncryptedChunk(index, crypt(Cipher.ENCRYPT_MODE, manifest, secret, index, plain))
     }
 
@@ -212,6 +250,21 @@ object NativeP2pTransferProtocol {
         expand.update(label.toByteArray(Charsets.UTF_8))
         expand.update(1.toByte())
         return expand.doFinal().copyOf(KEY_BYTES)
+    }
+
+    private fun sha256(channel: FileChannel, sizeBytes: Long): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteBuffer.allocate(1024 * 1024)
+        var position = 0L
+        while (position < sizeBytes) {
+            buffer.clear()
+            buffer.limit(minOf(buffer.capacity().toLong(), sizeBytes - position).toInt())
+            val read = channel.read(buffer, position)
+            if (read <= 0) throw java.io.EOFException("Could not hash selected file")
+            digest.update(buffer.array(), 0, read)
+            position += read
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun sha256(file: File): String {
