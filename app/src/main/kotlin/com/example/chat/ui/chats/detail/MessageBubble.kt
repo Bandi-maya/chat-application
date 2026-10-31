@@ -565,15 +565,25 @@ fun ChatMessageBubble(
                                 resolveUrl = voiceUrlResolver,
                                 onTap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() },
                             )
-                            "video" -> VideoAttachmentPreview(
-                                attachment = message.attachment!!,
-                                textColor = Color(textColor),
-                                accentColor = Color(theme.accentColor),
-                                remoteImage = remoteImage,
-                                message = message, binding = attachmentBinding,
-                                resolveUrl = voiceUrlResolver,
-                                onTap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() },
-                            )
+                            "video" -> {
+                                val attachment = message.attachment!!
+                                val tap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() }
+                                if (attachment.url?.startsWith("chaty://transfer/") == true &&
+                                    !message.metadata["p2p_invite_ciphertext"].toString().isNullOrBlank()
+                                ) {
+                                    P2pVideoInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
+                                } else {
+                                    VideoAttachmentPreview(
+                                        attachment = attachment,
+                                        textColor = Color(textColor),
+                                        accentColor = Color(theme.accentColor),
+                                        remoteImage = remoteImage,
+                                        message = message, binding = attachmentBinding,
+                                        resolveUrl = voiceUrlResolver,
+                                        onTap = tap,
+                                    )
+                                }
+                            }
                             "audio" -> VoiceNoteCard(
                                 attachment = message.attachment!!,
                                 textColor = Color(textColor),
@@ -1335,6 +1345,45 @@ private fun ContactCard(message: ChatMessage, textColor: Color, accentColor: Col
                 fontSize = 10.5.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun P2pVideoInviteCard(
+    attachment: MessageAttachment,
+    isMe: Boolean,
+    textColor: Color,
+    accentColor: Color,
+    onTap: () -> Unit,
+) {
+    Row(
+        Modifier
+            .widthIn(min = 220.dp, max = 290.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(accentColor.copy(alpha = 0.10f))
+            .border(1.dp, accentColor.copy(alpha = 0.28f), RoundedCornerShape(14.dp))
+            .clickable(onClick = onTap)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(accentColor.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.VideocamOff, contentDescription = null, tint = accentColor, modifier = Modifier.size(23.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(attachment.name, color = textColor, fontWeight = FontWeight.W700, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(attachment.size, color = textColor.copy(alpha = 0.68f), fontSize = 11.sp)
+            Text(
+                if (isMe) "Secure direct transfer · waiting" else "Secure direct transfer · tap to receive",
+                color = accentColor,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.W700,
+                maxLines = 2,
             )
         }
     }
