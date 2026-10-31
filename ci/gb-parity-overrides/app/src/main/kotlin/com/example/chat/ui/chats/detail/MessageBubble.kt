@@ -1163,13 +1163,26 @@ private fun VoiceNoteCard(
         Column(Modifier.weight(1f)) {
             androidx.compose.material3.LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(3.dp)),
+                modifier = Modifier.fillMaxWidth().height(12.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .pointerInput(total, prepared) {
+                        detectTapGestures { tap ->
+                            if (prepared && total > 0) {
+                                val fraction = (tap.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                val target = (total * fraction).toInt()
+                                runCatching { player.seekTo(target); positionMs = target }
+                            }
+                        }
+                    },
                 color = playingBarColor ?: MaterialTheme.colorScheme.primary,
                 trackColor = (playingBarColor ?: MaterialTheme.colorScheme.primary).copy(alpha = 0.24f),
             )
             Box(Modifier.height(5.dp))
             playbackError?.let { Text(it, color = textColor, fontSize = 10.sp) }
-            Text("${fmt(positionMs)} / ${fmt(total)}", color = textColor.copy(alpha = 0.75f), fontSize = 10.5.sp)
+            Text(
+                if (total > 0) "${fmt(positionMs)} / ${fmt(total)}" else "Tap play to load duration",
+                color = textColor.copy(alpha = 0.75f), fontSize = 10.5.sp,
+            )
         }
     }
 }
