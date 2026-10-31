@@ -123,20 +123,42 @@ class LockBadgeMotionProofTest {
     }
 
     private fun titleBounds(): Rect {
-        val title = device.wait(androidx.test.uiautomator.Until.findObject(By.text(LockBadgeProofActivity.TARGET_TITLE)), 5000)
-            ?: throw AssertionError("target title not visible")
-        return title.visibleBounds
+        // Fresh re-query on staleness: a scroll/recompose can invalidate the
+        // waited node before the bounds read (run-127 StaleObjectException in
+        // badgeRect). Bounded retries; wait target and result unchanged.
+        var attempt = 0
+        while (true) {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 33) inst.uiAutomation.clearCache()
+                val title = device.wait(androidx.test.uiautomator.Until.findObject(By.text(LockBadgeProofActivity.TARGET_TITLE)), 5000)
+                    ?: throw AssertionError("target title not visible")
+                return title.visibleBounds
+            } catch (e: androidx.test.uiautomator.StaleObjectException) {
+                if (++attempt >= 5) throw e
+                device.waitForIdle(500)
+            }
+        }
     }
 
     /** Badge rect: immediately left of the target row's title text (14dp badge + 4dp spacer). */
     private fun badgeRect(): Rect {
         // Wait, not a bare find: after a scroll-back the a11y tree can lag the pixels.
-        val title = device.wait(androidx.test.uiautomator.Until.findObject(By.text(LockBadgeProofActivity.TARGET_TITLE)), 5000)
-            ?: throw AssertionError("target title not visible")
-        val b = title.visibleBounds
-        val d = inst.targetContext.resources.displayMetrics.density
-        val w = (18 * d).toInt() // 14dp badge + 4dp spacer
-        return Rect(b.left - w, b.top, b.left, b.bottom)
+        // Fresh re-query on staleness (run-127 StaleObjectException at this read).
+        var attempt = 0
+        while (true) {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 33) inst.uiAutomation.clearCache()
+                val title = device.wait(androidx.test.uiautomator.Until.findObject(By.text(LockBadgeProofActivity.TARGET_TITLE)), 5000)
+                    ?: throw AssertionError("target title not visible")
+                val b = title.visibleBounds
+                val d = inst.targetContext.resources.displayMetrics.density
+                val w = (18 * d).toInt() // 14dp badge + 4dp spacer
+                return Rect(b.left - w, b.top, b.left, b.bottom)
+            } catch (e: androidx.test.uiautomator.StaleObjectException) {
+                if (++attempt >= 5) throw e
+                device.waitForIdle(500)
+            }
+        }
     }
 
     private fun dist(a: Int, b: Int) = Math.abs(((a shr 16) and 255) - ((b shr 16) and 255)) +
