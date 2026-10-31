@@ -28,6 +28,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -81,6 +82,8 @@ fun ChatDetailHost(
 ) {
     val api = ServiceLocator.apiBackend
     val p2pTransfers = ServiceLocator.p2pFileTransfers
+    val liveNetworkStatus by ServiceLocator.networkMonitor.state.collectAsState()
+    val liveP2pTransfers by p2pTransfers.transfers.collectAsState()
     val prefs = ServiceLocator.preferencesController
     val repo = ServiceLocator.conversationsRepository
     val rt = ServiceLocator.richRealtime
@@ -394,6 +397,8 @@ fun ChatDetailHost(
             }
         },
         connectionState = ServiceLocator.connectionHealth.state,
+        networkStatus = liveNetworkStatus,
+        p2pTransferStates = liveP2pTransfers,
         onProbeConnection = { try { ServiceLocator.connectionHealth.probeConnection() } catch (_: Exception) {} },
         onDraftChanged = { text -> scope.launch { try { repo.setDraft(conversation.id, text) } catch (_: Exception) {} } },
         onTypingChanged = { typing ->
