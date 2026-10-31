@@ -164,7 +164,7 @@ class P2pFileTransferService(
         )
         val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
         val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes, manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
-        val session = Session(invite.transferId, targetUserId, file, manifest, invite.secret,
+        val session = Session(invite.transferId, targetUserId, file, manifest, invite.secret.copyOf(),
             TransferDirection.upload)
         sessions[invite.transferId] = session
         val monitorId = transferMonitor.begin(
@@ -190,8 +190,9 @@ class P2pFileTransferService(
             ))) throw IllegalStateException("Chaty signaling is offline; retry when connected")
             session.signalingReady = true
             flushLocalCandidates(session)
-            invite.toUri()
+            invite.toUri().also { invite.secret.fill(0) }
         } catch (error: Throwable) {
+            invite.secret.fill(0)
             fail(session, error.message ?: "Unable to start transfer")
             throw error
         }
@@ -216,7 +217,7 @@ class P2pFileTransferService(
         val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
         val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes,
             manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
-        val session = Session(invite.transferId, targetUserId, null, manifest, invite.secret,
+        val session = Session(invite.transferId, targetUserId, null, manifest, invite.secret.copyOf(),
             TransferDirection.upload, sourceChannel = source, sourceOwner = sourceOwner)
         sessions[invite.transferId] = session
         val kind = if (mimeType.startsWith("video/")) TransferKind.video else TransferKind.document
@@ -319,10 +320,11 @@ class P2pFileTransferService(
         NativeP2pTransferProtocol.verifyManifest(
             manifest, unb64(signal["manifest_auth"]?.toString() ?: ""), invite.secret,
         )
-        val session = Session(invite.transferId, offer.senderId, null, manifest, invite.secret,
+        val session = Session(invite.transferId, offer.senderId, null, manifest, invite.secret.copyOf(),
             TransferDirection.download, destination = null, finalDestination = destination)
         val partFile = File(destination.parentFile ?: appContext.filesDir, ".${invite.transferId}.part")
         session.destination = partFile
+        invite.secret.fill(0)
         session.ledger = ChunkReceiptLedger(File(appContext.filesDir, "p2p-ledger/${invite.transferId}.state"), manifest.chunkCount)
         incomingCandidates.remove(invite.transferId)?.let { session.queuedCandidates.addAll(it) }
         session.monitorId = transferMonitor.begin(
