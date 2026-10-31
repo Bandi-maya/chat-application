@@ -371,9 +371,9 @@ class P2pFileTransferService(
         val wire = WireManifest.parse(signal["manifest"])
         val manifest = wire.protocol()
         try {
-            NativeP2pTransferProtocol.verifyManifest(
-                manifest, unb64(signal["manifest_auth"]?.toString() ?: ""), invite.secret,
-            )
+            val authentication = signal["manifest_auth"]?.toString()?.takeIf { it.length <= 128 }
+                ?: throw SecurityException("Transfer authentication missing")
+            NativeP2pTransferProtocol.verifyManifest(manifest, unb64(authentication), invite.secret)
         } catch (error: Throwable) {
             invite.secret.fill(0)
             throw error
