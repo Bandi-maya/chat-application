@@ -299,6 +299,10 @@ class CallSignalingService(
     }
 
     /** Dart initialize(): one-time guard shared by concurrent callers. */
+    /** Reuse the same authenticated TURN/STUN credential provider for file DataChannels. */
+    suspend fun iceServersForTransfer(): List<Map<String, Any?>> =
+        runCatching { iceServersProvider() }.getOrElse { defaultIceServers() }
+
     fun initialize() {
         if (initialized) return
         if (initializeJob != null) return
