@@ -337,19 +337,31 @@ class P2pFileTransferService(
             pending = incoming[invite.transferId]
             waitSteps++
         }
-        val (offer, signal) = pending ?: throw IllegalStateException("The sender is not online yet. Keep Chaty open and try again when the offer arrives.")
+        val (offer, signal) = pending ?: run {
+            invite.secret.fill(0)
+            throw IllegalStateException("The sender is not online yet. Keep Chaty open and try again when the offer arrives.")
+        }
         if (offer.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L) {
+            invite.secret.fill(0)
             incoming.remove(invite.transferId); refreshPending()
             throw SecurityException("This transfer link has expired")
         }
         val wire = WireManifest.parse(signal["manifest"])
         val manifest = wire.protocol()
-        NativeP2pTransferProtocol.verifyManifest(
-            manifest, unb64(signal["manifest_auth"]?.toString() ?: ""), invite.secret,
-        )
+        try {
+            NativeP2pTransferProtocol.verifyManifest(
+                manifest, unb64(signal["manifest_auth"]?.toString() ?: ""), invite.secret,
+            )
+        } catch (error: Throwable) {
+            invite.secret.fill(0)
+            throw error
+        }
         destination.parentFile?.mkdirs()
         val availableBytes = android.os.StatFs((destination.parentFile ?: appContext.filesDir).absolutePath).availableBytes
-        if (availableBytes < manifest.sizeBytes) throw IllegalStateException("Not enough free storage to receive this file.")
+        if (availableBytes < manifest.sizeBytes) {
+            invite.secret.fill(0)
+            throw IllegalStateException("Not enough free storage to receive this file.")
+        }
         val session = Session(invite.transferId, offer.senderId, null, manifest, invite.secret.copyOf(),
             TransferDirection.download, destination = null, finalDestination = destination)
         val partFile = File(destination.parentFile ?: appContext.filesDir, ".${invite.transferId}.part")
