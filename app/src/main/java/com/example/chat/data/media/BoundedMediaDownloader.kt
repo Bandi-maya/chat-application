@@ -17,7 +17,7 @@ class BoundedMediaDownloader(
     private val client: OkHttpClient = OkHttpClient(),
     private val maxBytes: Long,
 ) {
-    fun open(url: String): InputStream {
+    fun open(url: String, onProgress: ((transferred: Long, total: Long?) -> Unit)? = null): InputStream {
         val parsed = url.toHttpUrlOrNull()
         // https only, no redirects (a redirect could send the request to an untrusted host); no auth header is added.
         if (parsed == null || !parsed.isHttps) throw IOException("unsupported url")
@@ -28,17 +28,27 @@ class BoundedMediaDownloader(
             val body = response.body ?: throw IOException("empty body")
             val len = body.contentLength()
             if (len > maxBytes) throw IOException("too large")
-            return Limited(body.byteStream(), maxBytes) { response.close() }
+            return Limited(body.byteStream(), maxBytes, len.takeIf { it >= 0 }, onProgress) { response.close() }
         } catch (e: Throwable) {
             response.close(); throw e
         }
     }
 
-    private class Limited(src: InputStream, private val max: Long, private val onClose: () -> Unit) : FilterInputStream(src) {
+    private class Limited(
+        src: InputStream,
+        private val max: Long,
+        private val total: Long?,
+        private val onProgress: ((Long, Long?) -> Unit)?,
+        private val onClose: () -> Unit,
+    ) : FilterInputStream(src) {
         private var count = 0L
         override fun read(): Int = super.read().also { if (it >= 0) bump(1) }
         override fun read(b: ByteArray, off: Int, len: Int): Int = super.read(b, off, len).also { if (it > 0) bump(it) }
-        private fun bump(n: Int) { count += n; if (count > max) throw IOException("too large") }
+        private fun bump(n: Int) {
+            count += n
+            if (count > max) throw IOException("too large")
+            onProgress?.invoke(count, total)
+        }
         override fun close() { try { super.close() } finally { onClose() } }
     }
 }
