@@ -126,7 +126,7 @@ fun LensCarousel(
         try {
             listState.animateScrollToItem(index)
         } finally {
-            if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "centerOn end gen=" + generation + " current=" + centeringGeneration + " cleared=" + (centeringGeneration == generation))
+            if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "centerOn end gen=" + generation + " current=" + centeringGeneration + " cleared=" + (centeringGeneration == generation) + " landed=" + listState.firstVisibleItemIndex + "+" + listState.firstVisibleItemScrollOffset)
             if (centeringGeneration == generation) programmaticTarget = null
         }
     }
@@ -160,7 +160,7 @@ fun LensCarousel(
             if (programmaticTarget != null) return@collectLatest
             val nearest = (offsetPx / slotPx).roundToInt().coerceIn(0, catalog.size - 1)
             if (nearest == currentIndex || catalog.isEmpty()) return@collectLatest
-            if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "watcher select nearest=" + nearest + " offsetPx=" + offsetPx + " prevIndex=" + currentIndex)
+            if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "watcher select nearest=" + nearest + " offsetPx=" + offsetPx + " prevIndex=" + currentIndex + " slotPx=" + slotPx + " firstVisible=" + listState.firstVisibleItemIndex + "+" + listState.firstVisibleItemScrollOffset)
             currentIndex = nearest
             val now = System.currentTimeMillis()
             if (now >= hapticRearmAtMs) {
