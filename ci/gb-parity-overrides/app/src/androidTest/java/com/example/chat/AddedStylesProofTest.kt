@@ -259,7 +259,7 @@ class AddedStylesProofTest {
                 budget--; toTopDrags++
                 val before = freshRootTexts()
                 slowDrag(b, revealBelow = false)
-                if (awaitTreeCatchUp(before, text)) return true
+                awaitTreeCatchUp(before, text) // wait-only (run-132 root cause: tree advancement is NOT a hit - SCROLLHIT bounds=null proved an advancement-only true aborted the sweep one drag in); the found decision stays with freshHasText
                 // Bounded event wait (not an arbitrary sleep): rows enter the a11y tree
                 // only after the scroll settles (~1s at evidence-capture cadence, capture
                 // 40823906408 sweep trees/pixels). Returns early on match; assertion unchanged.
@@ -288,7 +288,7 @@ class AddedStylesProofTest {
                     val (stepSig, stepSample) = windowSig()
                     android.util.Log.w("AddedStyles", "SCROLLSTEP-DIAG drag=" + sweepDrags + " container=" + b.toShortString() + " sig=" + stepSig + " sample=[" + stepSample + "]")
                 }
-                if (awaitTreeCatchUp(before, text)) return true
+                awaitTreeCatchUp(before, text) // wait-only (run-132 root cause: tree advancement is NOT a hit - SCROLLHIT bounds=null proved an advancement-only true aborted the sweep one drag in); the found decision stays with freshHasText
                 if (freshHasText(text, 1500)) return true
                 val (sig, _) = windowSig()
                 if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
