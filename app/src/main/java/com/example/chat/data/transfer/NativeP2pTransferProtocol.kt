@@ -202,8 +202,12 @@ object NativeP2pTransferProtocol {
         RandomAccessFile(destination, "rw").use { file ->
             file.seek(offset)
             file.write(plain)
-            file.fd.sync()
         }
+    }
+
+    /** Flush a batch of chunk writes before the receipt ledger durably checkpoints them. */
+    fun syncFile(destination: File) {
+        RandomAccessFile(destination, "rw").use { it.fd.sync() }
     }
 
     /** Call only after every chunk has been received; rejects missing/truncated/corrupt files. */
