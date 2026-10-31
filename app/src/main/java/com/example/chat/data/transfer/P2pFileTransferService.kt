@@ -244,7 +244,7 @@ class P2pFileTransferService(
             session.channel = channel
             observeChannel(session, channel, isSender = true)
             val offer = createDescription(peer, offer = true)
-            if (!sendSignal(targetUserId, mapOf(
+            if (!sendSignalScoped(session, mapOf(
                 "signal_type" to "file_transfer_offer", "call_id" to invite.transferId,
                 "transfer_id" to invite.transferId, "sdp" to offer.description,
                 "manifest" to mapOf(
@@ -404,7 +404,7 @@ class P2pFileTransferService(
             session.remoteDescriptionSet = true
             flushCandidates(session)
             val answer = createDescription(peer, offer = false)
-            if (!sendSignal(offer.senderId, mapOf(
+            if (!sendSignalScoped(session, mapOf(
                 "signal_type" to "file_transfer_answer", "call_id" to invite.transferId, "transfer_id" to invite.transferId, "sdp" to answer.description,
             ))) throw IllegalStateException("Chaty signaling is offline")
             session.signalingReady = true
@@ -434,11 +434,10 @@ class P2pFileTransferService(
         }
         val peer = factory.createPeerConnection(config, object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate?) {
-                if (candidate != null) sendSignal(session.peerUserId, mapOf(
-                    "signal_type" to "file_transfer_ice", "call_id" to session.id, "transfer_id" to session.id,
-                    "candidate" to candidate.sdp, "sdp_mid" to candidate.sdpMid,
-                    "sdp_mline" to candidate.sdpMLineIndex,
-                ))
+                if (candidate != null) {
+                    if (session.signalingReady) sendCandidate(session, candidate)
+                    else if (session.pendingLocalCandidates.size < 256) session.pendingLocalCandidates.add(candidate)
+                }
             }
             override fun onDataChannel(channel: DataChannel?) {
                 if (channel != null && session.direction == TransferDirection.download) {
