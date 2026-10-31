@@ -187,6 +187,21 @@ class AddedStylesProofTest {
         return out
     }
 
+    /** Fresh-tree text poll: clearCache (SDK>=33) before each find so a stale
+     *  cache hit cannot short-circuit the sweep (run-124 proof: scrollToText
+     *  returned true from a pre-recreate cache hit while the real viewport sat
+     *  two rows above the target; freshHasAfterClear=false at miss). */
+    private fun freshHasText(text: String, timeoutMs: Long): Boolean {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        do {
+            if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.clearCache()
+            if (device.hasObject(By.text(text))) return true
+            SystemClock.sleep(200)
+        } while (SystemClock.uptimeMillis() < deadline)
+        if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.clearCache()
+        return device.hasObject(By.text(text))
+    }
+
     /** Wait (bounded) for the served a11y tree to ADVANCE past the pre-drag
      *  snapshot, observing the fresh root directly; returns immediately when the
      *  target text becomes accessible. True when advancement or target seen. */
@@ -213,7 +228,7 @@ class AddedStylesProofTest {
      * two consecutive drags leave the visible text set unchanged (end reached).
      */
     private fun scrollToText(text: String, maxDrags: Int = 44): Boolean {
-        if (device.wait(Until.hasObject(By.text(text)), 4000)) return true
+        if (freshHasText(text, 4000)) return true
         val (initialSig, initialSample) = windowSig()
         var budget = maxDrags
         var toTopDrags = 0
@@ -232,13 +247,13 @@ class AddedStylesProofTest {
                 // Bounded event wait (not an arbitrary sleep): rows enter the a11y tree
                 // only after the scroll settles (~1s at evidence-capture cadence, capture
                 // 40823906408 sweep trees/pixels). Returns early on match; assertion unchanged.
-                if (device.wait(Until.hasObject(By.text(text)), 1500)) return true
+                if (freshHasText(text, 1500)) return true
                 val (sig, _) = windowSig()
                 if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
             }
             if (budget <= 0) break
         }
-        if (device.wait(Until.hasObject(By.text(text)), 1500)) return true
+        if (freshHasText(text, 1500)) return true
 
         // Phase B: sweep downward from the top, composing every row.
         for (s in scrollables()) {
@@ -250,14 +265,14 @@ class AddedStylesProofTest {
                 val before = freshRootTexts()
                 slowDrag(b, revealBelow = true)
                 if (awaitTreeCatchUp(before, text)) return true
-                if (device.wait(Until.hasObject(By.text(text)), 1500)) return true
+                if (freshHasText(text, 1500)) return true
                 val (sig, _) = windowSig()
                 if (sig == lastSig) { still++; if (still >= 2) break } else { still = 0; lastSig = sig }
             }
             if (budget <= 0) break
         }
 
-        var found = device.wait(Until.hasObject(By.text(text)), 1500)
+        var found = freshHasText(text, 1500)
         if (!found) {
             // Settle probe: give the tree a long quiet window, then read the
             // fresh root once more. If the row is STILL absent while rendered,
