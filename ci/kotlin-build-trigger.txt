@@ -8,3 +8,4 @@ trigger-118: FGS stop-courier race fix (ACTION_STOP courier in CallForegroundSer
 trigger-119: reviewed batch - calls shard isolation rename, video duplicate-bind fix, album tap evidence probes, grid-Microsoft.txt collection, FGS owner-scoped stop authority
 trigger-120: reviewed batch - FGS v2 caller-originated stop ownership + owner-scope regression coverage + 119 compile fix
 trigger-121: compile fix - StopDisposition enum to class level (120 unit-test compile failure) + main-thread TestLifecycleOwner harness repair
+trigger-122: reviewed batch - recorder quality selector mirrors production (b4c1e40), fresh-a11y passive refresh poll in AppRoot proof, locked-case desc stop selector override + guard 68
