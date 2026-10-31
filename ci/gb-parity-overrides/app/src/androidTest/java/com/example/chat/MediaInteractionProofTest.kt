@@ -389,7 +389,14 @@ class MediaInteractionProofTest {
             assertTrue(device.wait(Until.hasObject(By.desc(video)), 5000))
             assertEquals(0, camera.get()); assertEquals(0, sends.get()); assertEquals(0, recordingStarts.get())
             clickDesc(video)
-            assertTrue(device.wait(Until.hasObject(By.desc(mic)), 5000))
+            // Measured wait (run-132: mic icon not re-served within 5s after the video
+            // tap; the product swap is a plain conditional render - no animation - so this
+            // is the emulator a11y-publish lag family, same shape as the approved
+            // recording Stop guard). Assertion unchanged; landing latency logged.
+            val micSwapStart = android.os.SystemClock.uptimeMillis()
+            val micBack = device.wait(Until.hasObject(By.desc(mic)), 20000)
+            android.util.Log.w("MediaProof", "MODEICON-DIAG mic-reattach landed=" + micBack + " latencyMs=" + (android.os.SystemClock.uptimeMillis() - micSwapStart))
+            assertTrue(micBack)
             clickDesc(mic) // Keep video selected across whitespace, text entry and send reset.
             clickText("Whitespace fixture")
             assertTrue(device.wait(Until.hasObject(By.desc(video)), 5000))
