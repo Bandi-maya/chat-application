@@ -117,6 +117,7 @@ jobs:
           git checkout HEAD -- \
             app/src/main/java/com/example/chat/data/network/NetworkStatusMonitor.kt \
             app/src/main/java/com/example/chat/data/network/TransferMonitor.kt \
+            app/src/main/java/com/example/chat/data/network/AppTrafficMonitor.kt \
             app/src/main/java/com/example/chat/data/api/ApiMediaUploadClient.kt \
             app/src/main/java/com/example/chat/data/remote/SupabaseStorageClient.kt \
             app/src/main/java/com/example/chat/data/media/BoundedMediaDownloader.kt \
