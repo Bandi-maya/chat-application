@@ -273,6 +273,92 @@ class CallContactPickerProofTest {
             Thread.sleep(500)
         }
     }
+
+    /**
+     * Production-path bundle routing proof (user 2026-10-31: apply must take effect on
+     * the actual call). Drives the REAL settings UI: app shell -> Settings -> Calls ->
+     * Selected Call Bundle -> picker row tap (the production picker applies on row tap
+     * via SettingsSubHost -> CallPresentationPreferencesStore.setCallExperienceBundle,
+     * the app's own store instance, so GlobalCallHost reacts). Then a demo INCOMING
+     * session through ServiceLocator.callSignaling forces the REAL GlobalCallHost to
+     * render the persisted family's incoming view. Restores the original bundle after.
+     * Coverage note: demo session via the app's own host, not a connected peer call.
+     */
+    @Test
+    fun pickerSelectionAppliesAndRoutesLiveDemoIncomingCall() {
+        ins.uiAutomation.grantRuntimePermission(ins.targetContext.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
+        val appCtx = ins.targetContext
+        val scope = kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+        )
+        val store = CallPresentationPreferencesStore(AndroidCallPresentationPrefsStorage(appCtx), scope)
+        store.initialize()
+        var deadline = System.currentTimeMillis() + 8000
+        while (!store.isInitialized) {
+            if (System.currentTimeMillis() > deadline) fail("store did not initialize")
+            Thread.sleep(50)
+        }
+        val original = store.value.callExperienceBundleId
+        try {
+            val launch = appCtx.packageManager.getLaunchIntentForPackage(appCtx.packageName)!!
+            appCtx.startActivity(launch)
+            assertTrue("app shell visible", dev.wait(Until.hasObject(By.text("Chats")), 20000))
+
+            var settingsEntry = dev.wait(Until.findObject(By.text("Settings")), 8000)
+            if (settingsEntry == null) settingsEntry = dev.wait(Until.findObject(By.desc("Settings")), 4000)
+            assertNotNull("Settings entry not found", settingsEntry)
+            settingsEntry.click()
+            dev.waitForIdle(3000)
+
+            var callsRow = dev.wait(Until.findObject(By.text("Calls")), 8000)
+            if (callsRow == null) {
+                dev.swipe(540, 1600, 540, 700, 40)
+                callsRow = dev.wait(Until.findObject(By.text("Calls")), 5000)
+            }
+            assertNotNull("Calls settings row not found", callsRow)
+            callsRow.click()
+            dev.waitForIdle(3000)
+
+            val tile = dev.wait(Until.findObject(By.text("Selected Call Bundle")), 8000)
+            assertNotNull("Selected Call Bundle tile missing", tile)
+            tile.click()
+            dev.waitForIdle(3000)
+
+            val row = dev.wait(Until.findObject(By.text("Mono Chevron Dark")), 8000)
+            assertNotNull("Mono Chevron Dark option missing from picker", row)
+            row.click()
+            dev.waitForIdle(3000)
+            shot("bundle-picker-applied-mono-chevron")
+
+            deadline = System.currentTimeMillis() + 8000
+            while (store.value.callExperienceBundleId != "mono_chevron_dark") {
+                if (System.currentTimeMillis() > deadline) fail("picker Apply did not persist mono_chevron_dark")
+                Thread.sleep(100)
+            }
+
+            dev.pressBack(); dev.waitForIdle(2000)
+            dev.pressBack(); dev.waitForIdle(2000)
+            dev.pressBack(); dev.waitForIdle(2000)
+
+            val calls = com.example.chat.ServiceLocator.callSignaling
+            calls.startDemoCall("synthetic-bundle-peer", "Bundle Route Caller", null, null, isVideo = false, isOutgoing = false)
+            assertTrue(
+                "GlobalCallHost must render the persisted Mono Chevron incoming view",
+                dev.wait(Until.hasObject(By.desc("Mono chevron answer or decline puck")), 12000),
+            )
+            shot("bundle-live-demo-mono-chevron")
+
+            swipeFrom("Mono chevron answer or decline puck", 0, -430)
+            deadline = System.currentTimeMillis() + 8000
+            while (calls.currentSession != null) {
+                if (System.currentTimeMillis() > deadline) fail("demo session not cleared after decline gesture")
+                Thread.sleep(100)
+            }
+        } finally {
+            store.setCallExperienceBundle(original)
+            Thread.sleep(500)
+        }
+    }
 }
 }
 
