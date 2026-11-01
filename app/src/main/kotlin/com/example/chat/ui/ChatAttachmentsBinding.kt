@@ -115,6 +115,14 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                 throw error
             }
         }
+        if (staged.length() <= 0L) {
+            staged.delete()
+            throw IllegalStateException("The selected file is empty.")
+        }
+        if (staged.length() > max) {
+            staged.delete()
+            throw IllegalStateException("This $type exceeds the ${max / (1024 * 1024)} MB storage limit.")
+        }
         return PickedFile(name = name, path = staged.absolutePath, mimeType = cr.getType(uri))
     }
 
@@ -132,7 +140,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                             id = java.util.UUID.randomUUID().toString(),
                             type = type,
                             name = file.name,
-                            size = ServiceLocator.chatMedia.run { formatBytes(stagedFile.length()) },
+                            size = com.example.chat.data.services.ChatMediaService.formatBytes(stagedFile.length()),
                             url = uploaded["url"]?.toString() ?: throw IllegalStateException("Upload response did not contain a media URL."),
                             durationSeconds = durationSeconds,
                         )
