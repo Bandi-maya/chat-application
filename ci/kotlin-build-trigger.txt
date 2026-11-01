@@ -100,3 +100,5 @@ Notification UX/security follow-up: distinct Notification settings title, flat t
 Navigation integration follow-up: notification inbox settings action returns through saved Home host and opens Notification settings; pending destination clears on sign-out. Verify full Kotlin build and tests: 2026-11-01
 
 Security recovery regression: missing enabled PIN/pattern/password now requires Android device-credential proof and fails closed when unavailable; unit tests updated: 2026-11-01
+
+Candidate-overlay compatibility: restore branch-owned ChatsHomeHost, NotificationSettingsPage and GbDesignSystem so notifications callback, separate settings title, flat previews and chevron refinements are present in the verified APK: 2026-11-01
