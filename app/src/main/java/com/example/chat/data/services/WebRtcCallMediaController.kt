@@ -316,7 +316,7 @@ class WebRtcCallMediaController(
         }
     }
 
-    /** Applies a live uplink-aware profile while keeping the audio sender untouched. */
+    /** Applies live video and Opus bitrate profiles; audio remains present at every quality tier. */
     override suspend fun applyNetworkProfile(profile: CallNetworkProfile) {
         val capturer = videoCapturer
         if (capturer != null) {
