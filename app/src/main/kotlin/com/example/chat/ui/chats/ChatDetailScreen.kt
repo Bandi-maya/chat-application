@@ -99,6 +99,7 @@ import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.ConnectionHealthState
+import com.example.chat.data.network.AppTrafficSnapshot
 import com.example.chat.data.network.NetworkStatusMonitor
 import com.example.chat.data.network.TransferItem
 import com.example.chat.data.transfer.P2pFileTransferService
@@ -192,6 +193,7 @@ fun ChatDetailScreen(
     networkStatus: NetworkStatusMonitor.Status? = null,
     p2pTransferStates: List<P2pFileTransferService.TransferState> = emptyList(),
     liveTransfers: List<TransferItem> = emptyList(),
+    appTraffic: AppTrafficSnapshot? = null,
     onRetryP2pTransfer: (String) -> Unit = {},
     onDraftChanged: (String) -> Unit = {},
     onTypingChanged: (Boolean) -> Unit = {},
@@ -1209,6 +1211,7 @@ fun ChatDetailScreen(
                     networkStatus = networkStatus,
                     p2pTransferStates = p2pTransferStates,
                     liveTransfers = liveTransfers,
+                    appTraffic = appTraffic,
                     onRetryP2pTransfer = onRetryP2pTransfer,
                 )
             }
