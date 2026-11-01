@@ -123,6 +123,8 @@ jobs:
             app/src/main/java/com/example/chat/data/media/BoundedMediaDownloader.kt \
             app/src/main/java/com/example/chat/data/services/ChatMediaService.kt \
             app/src/main/java/com/example/chat/data/services/CallSignalingService.kt \
+            app/src/main/java/com/example/chat/data/services/SessionLifecycleService.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/home/ConversationRow.kt \
             app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt \
             app/src/main/java/com/example/chat/data/transfer/NativeP2pTransferProtocol.kt \
             app/src/main/java/com/example/chat/data/transfer/ChunkReceiptLedger.kt \
