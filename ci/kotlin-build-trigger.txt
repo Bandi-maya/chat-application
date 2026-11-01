@@ -18,3 +18,4 @@ P2P retry controls, private-file cleanup, image/document cards, and crypto tests
 P2P final retry-state and digest-bound resume hardening verification: 2026-11-01
 Receiver re-offer recovery, sender ICE reset, and final P2P UI integration verification: 2026-11-01
 Slow-link 16-chunk DataChannel windows and reconnect-aware receive loop build verification: 2026-11-01
+P2P storage checkpoint directory and slow-link resume safety checks: 2026-11-01
