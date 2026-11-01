@@ -399,8 +399,10 @@ class P2pFileTransferService(
                     val queue = incomingCandidates.getOrPut(id) {
                         java.util.Collections.synchronizedList(mutableListOf())
                     }
-                    if (queue.size < 256 && queue.none { it.first == sender && it.second.sdp == ice.sdp }) {
-                        queue.add(sender to ice)
+                    synchronized(queue) {
+                        if (queue.size < 256 && queue.none { it.first == sender && it.second.sdp == ice.sdp }) {
+                            queue.add(sender to ice)
+                        }
                     }
                 } else if (!session.remoteDescriptionSet) session.queuedCandidates.add(ice)
                 else session.peer?.addIceCandidate(ice)

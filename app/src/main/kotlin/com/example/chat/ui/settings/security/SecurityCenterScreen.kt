@@ -162,9 +162,19 @@ fun SecurityCenterScreen(
     Box(Modifier.fillMaxSize()) {
         ChatySettingsPage(
             title = "Security & App Lock",
-            subtitle = "Encryption Status, Authentication & Chaty Lock",
+            subtitle = "Local Authentication & Message Security",
             onBack = onBack,
         ) {
+            ChatySettingsSection(
+                title = "Messaging security status",
+                description = "Standard one-to-one and group messages in this Kotlin release use the custom REST chat service over HTTPS. Their content is not end-to-end encrypted, and the service can read it. Standard cloud attachments are also server-readable. The RFC 9420 MLS engine is present but is not connected to the active REST login and message routes. Large peer transfers use AES-GCM encrypted chunks and require the MLS-protected invitation path; setup failures stop the transfer.",
+            ) {
+                Text(
+                    "HTTPS protects traffic in transit between Chaty and the service. It does not prevent the service from accessing standard message content. App Lock protects access to this device only; it does not encrypt server-side chat data.",
+                    color = colors.foregroundSecondary,
+                    fontSize = 12.sp,
+                )
+            }
             ChatySettingsSection(
                 title = "Chaty App Lock",
                 description = "Require a local credential or operating-system authentication before Chaty can be used.",

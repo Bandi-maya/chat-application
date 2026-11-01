@@ -75,6 +75,13 @@ class AndroidLockBiometrics(private val context: Context) : LockBiometrics {
         weakSuccess = status(BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS,
     )
 
+    override suspend fun isDeviceCredentialSupported(): Boolean =
+        LockBiometricPolicy.deviceCredentialAvailable(
+            sdkInt = Build.VERSION.SDK_INT,
+            isDeviceSecure = isDeviceSecure(),
+            canAuthenticateCredentialSuccess = status(DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS,
+        )
+
     override suspend fun authenticateBiometricOnly(reason: String): Boolean = authenticate(reason, biometricOnly = true)
 
     override suspend fun authenticateWithDeviceCredential(reason: String): Boolean =

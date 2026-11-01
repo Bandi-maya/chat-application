@@ -161,6 +161,7 @@ class ProtectedResourceGateParityTest {
                 override suspend fun canCheckBiometrics() = true
                 override suspend fun availableBiometrics() = listOf("fingerprint")
                 override suspend fun isDeviceSupported() = true
+                override suspend fun isDeviceCredentialSupported() = true
                 override suspend fun authenticateBiometricOnly(reason: String) = true
                 override suspend fun authenticateWithDeviceCredential(reason: String) = true
             },
