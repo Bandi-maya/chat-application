@@ -153,14 +153,16 @@ class LocalLockService(
 
     suspend fun verifySecretPhrase(rawQuery: String): Boolean {
         val normalized = normalizeSecretPhrase(rawQuery)
-        if (normalized.isEmpty()) return false
+        if (normalized.isEmpty() || getRemainingCooldownSeconds() > 0) return false
         return try {
             val encodedHash = secureStorage.read(SECRET_PHRASE_HASH_KEY)
             val encodedSalt = secureStorage.read(SECRET_PHRASE_SALT_KEY)
             if (encodedHash == null || encodedSalt == null) return false
             val salt = b64dec.decode(encodedSalt)
             val expected = b64dec.decode(encodedHash)
-            MessageDigest.isEqual(expected, pbkdf2(normalized, salt))
+            val matches = MessageDigest.isEqual(expected, pbkdf2(normalized, salt))
+            if (matches) resetFailedAttempts() else recordFailedAttempt()
+            matches
         } catch (_: Exception) {
             false
         }
