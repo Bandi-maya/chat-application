@@ -235,6 +235,7 @@ class P2pFileTransferService(
             flushLocalCandidates(session)
             invite.toUri().also { invite.secret.fill(0) }
         } catch (error: Throwable) {
+            clearSenderResume(invite.transferId)
             invite.secret.fill(0)
             fail(session, error.message ?: "Unable to start transfer")
             throw error
@@ -299,6 +300,7 @@ class P2pFileTransferService(
             flushLocalCandidates(session)
             invite.toUri().also { invite.secret.fill(0) }
         } catch (error: Throwable) {
+            clearSenderResume(invite.transferId)
             invite.secret.fill(0)
             fail(session, error.message ?: "Unable to start transfer")
             throw error
@@ -398,7 +400,10 @@ class P2pFileTransferService(
                 }
             }
             "file_transfer_cancel" -> {
-                sessions[id]?.takeIf { it.peerUserId == sender }?.let { fail(it, "Sender cancelled this transfer") }
+                sessions[id]?.takeIf { it.peerUserId == sender }?.let {
+                    if (it.direction == TransferDirection.upload) clearSenderResume(id)
+                    fail(it, "Sender cancelled this transfer")
+                }
                 val pending = incoming[id]?.first
                 if (pending?.senderId == sender) {
                     incoming.remove(id)
@@ -544,7 +549,11 @@ class P2pFileTransferService(
         return true
     }
     fun cancel(transferId: String) {
-        val session = sessions[transferId] ?: return
+        val session = sessions[transferId]
+        if (session == null) {
+            clearSenderResume(transferId)
+            return
+        }
         if (session.direction == TransferDirection.upload) clearSenderResume(transferId)
         sendSignalScoped(session, mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
         fail(session, "Cancelled")
@@ -1106,7 +1115,12 @@ class P2pFileTransferService(
                     TransferDirection.upload, kind, manifest.sizeBytes, manifest.displayName,
                 )
                 publish(session, "Reconnecting sender")
-                startRestoredSenderOffer(session)
+                try {
+                    startRestoredSenderOffer(session)
+                } catch (error: Throwable) {
+                    fail(session, error.message ?: "Could not restore sender transfer")
+                    throw error
+                }
                 return true
             } finally {
                 secret.fill(0)
