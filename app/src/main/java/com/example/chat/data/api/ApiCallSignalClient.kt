@@ -27,8 +27,9 @@ class ApiCallSignalClient(
     private fun valid(scope: CallSignalScope): Boolean = currentScope() === scope
     private fun base(scope: CallSignalScope): String? = runCatching {
         val uri = URI(scope.baseUrl)
+        val loopback = uri.host in setOf("localhost", "127.0.0.1", "10.0.2.2", "::1")
         // Never send credentials through unencrypted or user-info/fragment URLs.
-        if (uri.scheme != "https" || uri.host.isNullOrBlank() || uri.userInfo != null || uri.query != null || uri.fragment != null) null
+        if (uri.host.isNullOrBlank() || (uri.scheme != "https" && !(loopback && uri.scheme == "http")) || uri.userInfo != null || uri.query != null || uri.fragment != null) null
         else scope.baseUrl.trimEnd('/')
     }.getOrNull()
     private fun request(scope: CallSignalScope, method: String, path: String, body: String?): Pair<Int, String>? {
