@@ -111,7 +111,7 @@ fun SecurityCenterScreen(
     }
     LaunchedEffect(Unit) { loadCapabilities() }
 
-    fun toast(message: String) {
+    fun showToast(message: String) {
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
             snackbar.showSnackbar(message)
@@ -135,7 +135,7 @@ fun SecurityCenterScreen(
                 val d = CompletableDeferred<Boolean>(); modal = Modal.Setup(storageKey, pinLength, d); return d.await().also { modal = null }
             }
             override suspend fun reloadCapabilities() = loadCapabilities()
-            override fun toast(message: String) = toast(message)
+            override fun toast(message: String) = showToast(message)
             override fun isActive() = active
             override fun applySecurity(lockMethod: String?, appLockEnabled: Boolean?, logTitle: String) {
                 val latest = preferences.security
