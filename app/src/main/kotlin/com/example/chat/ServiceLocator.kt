@@ -85,7 +85,7 @@ object ServiceLocator {
 
     val authClient: SupabaseAuthClient by lazy { SupabaseAuthClient() }
 
-    private val sessionStorage: SessionStore by lazy { SessionStore(requireContext()) }
+    private val sessionStorage: com.example.chat.data.auth.SessionStorage by lazy { EncryptedGoTrueSessionStorage(requireContext()) }
 
     val sessionManager: AuthSessionManager by lazy {
         AuthSessionManager(auth = authClient, storage = sessionStorage)
