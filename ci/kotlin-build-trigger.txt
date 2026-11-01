@@ -44,3 +44,4 @@ Verify Android 10-15 screen-share foreground-service handshake, call service pre
 Screen-share foreground-service API gate and media library transient-file/stale-scan regression tests added; verify Kotlin build and test suites.
 P2P safety: file-backed chunk encryption now rejects negative and out-of-manifest indices before allocating or reading; regression tests added for both invalid boundaries.
 Build recovery: encrypted API refresh-token migration, encrypted GoTrue partial migration, SessionStorage wiring, non-secret API preferences, FCM-free no-provider behavior, and current voice/lock debug fixture API alignment. Verify debug APK compilation and regression tests.
+Screen-share revocation now clears the call's isSharingScreen state and releases the mediaProjection foreground-service type; run build and API-level tests.
