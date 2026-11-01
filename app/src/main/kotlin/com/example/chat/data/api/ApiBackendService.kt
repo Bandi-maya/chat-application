@@ -158,6 +158,67 @@ class ApiBackendService(
     private val callSignalListeners =
         java.util.concurrent.CopyOnWriteArrayList<(Map<String, Any?>) -> Unit>()
 
+    /**
+     * Loads short-lived ICE credentials from the Chaty custom API.
+     * The authenticated user identity is taken from the current account scope;
+     * credentials are never requested from Supabase and are never cached.
+     */
+    suspend fun loadIceServers(): List<Map<String, Any?>> = withContext(Dispatchers.IO) {
+        val expected = authSnapshot()
+        val bearer = expected.token?.takeIf { it.isNotBlank() }
+            ?: throw SecurityException("Sign in to load WebRTC ICE credentials.")
+        val base = expected.baseUrl.trimEnd('/')
+        val uri = runCatching { java.net.URI(base) }.getOrElse {
+            throw IllegalStateException("Custom API URL is invalid.")
+        }
+        val loopback = uri.host in setOf("localhost", "127.0.0.1", "10.0.2.2", "::1")
+        if (uri.host.isNullOrBlank() || (uri.scheme != "https" && !(loopback && uri.scheme == "http")) ||
+            uri.userInfo != null || uri.query != null || uri.fragment != null
+        ) throw SecurityException("ICE credentials require a secure custom API URL.")
+
+        val headers = mapOf(
+            "Authorization" to "Bearer $bearer",
+            "x-tenant-id" to expected.tenantId,
+            "Accept" to "application/json",
+        )
+        val transport = OkHttpApiTransport()
+        val primary = transport.execute("GET", "$base/chat/call/ice-servers", headers, null)
+        val response = if (primary.first == 404) {
+            transport.execute("GET", "$base/api/v1/chat/call/ice-servers", headers, null)
+        } else primary
+        if (authSnapshot() !== expected) throw kotlinx.coroutines.CancellationException("Account changed while loading ICE credentials.")
+        if (response.first == 401 || response.first == 403) throw SecurityException("Custom API rejected ICE credential authorization.")
+        if (response.first !in 200..299) throw IllegalStateException("Custom ICE endpoint failed (${response.first}).")
+
+        val json = org.json.JSONObject(response.second)
+        val raw = json.optJSONArray("ice_servers")
+            ?: throw IllegalStateException("Custom ICE endpoint returned no ice_servers array.")
+        if (raw.length() > 16) throw SecurityException("Custom ICE endpoint returned too many ICE servers.")
+        val servers = ArrayList<Map<String, Any?>>(raw.length())
+        for (index in 0 until raw.length()) {
+            val item = raw.optJSONObject(index) ?: continue
+            val rawUrls = item.opt("urls")
+            val urls = when (rawUrls) {
+                is String -> listOf(rawUrls)
+                is org.json.JSONArray -> (0 until rawUrls.length()).mapNotNull { i ->
+                    rawUrls.optString(i).takeIf { it.isNotBlank() }
+                }
+                else -> emptyList()
+            }.onEach { url ->
+                if (!url.startsWith("stun:", true) && !url.startsWith("stuns:", true) &&
+                    !url.startsWith("turn:", true) && !url.startsWith("turns:", true)
+                ) throw SecurityException("Custom ICE endpoint returned an unsupported ICE URL.")
+            }
+            if (urls.isEmpty()) continue
+            val entry = linkedMapOf<String, Any?>("urls" to if (rawUrls is String) urls.first() else urls)
+            item.optString("username").takeIf { it.isNotBlank() }?.let { entry["username"] = it }
+            item.optString("credential").takeIf { it.isNotBlank() }?.let { entry["credential"] = it }
+            servers += entry
+        }
+        if (servers.isEmpty()) throw IllegalStateException("Custom ICE endpoint returned no usable ICE servers.")
+        servers
+    }
+
     fun addCallSignalListener(listener: (Map<String, Any?>) -> Unit) = callSignalListeners.add(listener)
     /** Dart ApiBackendService.sendCallSignal: fire-and-forget call signaling
      *  over the custom-backend WebSocket (payload type call_signal). */
