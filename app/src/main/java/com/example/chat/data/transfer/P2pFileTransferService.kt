@@ -442,6 +442,13 @@ class P2pFileTransferService(
         val ledgerDirectory = File(appContext.filesDir, "p2p-ledger").apply { mkdirs() }
         session.ledger = ChunkReceiptLedger(File(ledgerDirectory, resumeKey + ".state"), manifest.chunkCount)
         if (!partFile.isFile) session.ledger?.clear()
+        // The part file and AtomicFile receipt bitmap survive process death. Restore
+        // the visible byte count immediately instead of showing 0% until the first
+        // newly received chunk arrives after the sender re-offers.
+        session.receivedBytes = minOf(
+            session.ledger?.receivedCount()?.times(manifest.chunkBytes.toLong()) ?: 0L,
+            manifest.sizeBytes,
+        )
         incomingCandidates.remove(invite.transferId)?.let { session.queuedCandidates.addAll(it) }
         val transferKind = when {
             manifest.mimeType.startsWith("video/") -> TransferKind.video
