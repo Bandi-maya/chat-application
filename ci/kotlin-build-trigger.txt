@@ -90,3 +90,5 @@ Kotlin quality pass: dedicated notifications inbox and settings separation; thre
 Realtime account-scoped frame guard and release call-log cleanup verification: 2026-11-01
 
 Security follow-up: fail-closed current-lock verification when stored credential is missing; call-specific incoming PendingIntents and lock-screen caller redaction; component preview context fix; verify notifications and GoTrue session changes: 2026-11-01
+
+Final CI repair: restore branch-owned lock badge proof activity after candidate overlay; add Compose motion fixture imports and verify current session, notification and security regression changes: 2026-11-01
