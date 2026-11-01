@@ -71,6 +71,9 @@ class WebRtcCallMediaController(
     private var videoCapturer: VideoCapturer? = null
     private var screenCapturer: ScreenCapturerAndroid? = null
     private var screenStream: MediaStream? = null
+    private var screenSurfaceTextureHelper: SurfaceTextureHelper? = null
+    private var screenVideoSource: VideoSource? = null
+    private var screenVideoTrack: VideoTrack? = null
     private var localAudioTrack: AudioTrack? = null
     private var localVideoTrack: VideoTrack? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
@@ -434,48 +437,85 @@ class WebRtcCallMediaController(
         val peer = peerConnection ?: return false
         val factory = peerConnectionFactory ?: return false
         val permission = screenCapturePermission ?: return false
-
-        val capturer = ScreenCapturerAndroid(
-            permission,
-            object : MediaProjection.Callback() {
-                override fun onStop() {
-                    // User revoked projection; restore camera track.
-                }
-            },
-        )
-        val helper = SurfaceTextureHelper.create("chaty_screen", eglContext)
-        val source = factory.createVideoSource(true)
-        capturer.initialize(helper, appContext, source.capturerObserver)
-        capturer.startCapture(1280, 720, 30)
-        val track = factory.createVideoTrack("chaty_screen", source)
-        track.setEnabled(true)
-
+        // Resolve the sender before allocating projection resources. The old
+        // ordering leaked a live capturer when a video sender was unavailable.
         val videoSender = peer.senders.firstOrNull { it.track()?.kind() == "video" }
             ?: return false
-        videoSender.setTrack(track, false)
 
-        screenCapturer = capturer
-        screenStream = factory.createLocalMediaStream("chaty_screen_stream")
-        screenStream?.addTrack(track)
-        return true
+        var capturer: ScreenCapturerAndroid? = null
+        var helper: SurfaceTextureHelper? = null
+        var source: VideoSource? = null
+        var track: VideoTrack? = null
+        var stream: MediaStream? = null
+        return try {
+            capturer = ScreenCapturerAndroid(
+                permission,
+                object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        // Android/user revoked projection: restore the camera
+                        // and release all projection-owned resources.
+                        Handler(Looper.getMainLooper()).post { stopScreenShareInternal() }
+                    }
+                },
+            )
+            helper = SurfaceTextureHelper.create("chaty_screen", eglContext)
+            source = factory.createVideoSource(true)
+            capturer.initialize(helper, appContext, source.capturerObserver)
+            capturer.startCapture(1280, 720, 30)
+            track = factory.createVideoTrack("chaty_screen", source)
+            track.setEnabled(true)
+            stream = factory.createLocalMediaStream("chaty_screen_stream")
+            stream.addTrack(track)
+            if (!videoSender.setTrack(track, false)) {
+                throw IllegalStateException("Unable to attach screen capture track.")
+            }
+
+            screenCapturer = capturer
+            screenSurfaceTextureHelper = helper
+            screenVideoSource = source
+            screenVideoTrack = track
+            screenStream = stream
+            screenCapturePermission = null // MediaProjection consent is single-use.
+            true
+        } catch (_: Exception) {
+            try { capturer?.stopCapture() } catch (_: Exception) {}
+            try { capturer?.dispose() } catch (_: Exception) {}
+            try { stream?.dispose() } catch (_: Exception) {}
+            try { track?.dispose() } catch (_: Exception) {}
+            try { source?.dispose() } catch (_: Exception) {}
+            try { helper?.dispose() } catch (_: Exception) {}
+            screenCapturePermission = null
+            false
+        }
     }
 
     override suspend fun stopScreenShare() {
+        stopScreenShareInternal()
+    }
+
+    private fun stopScreenShareInternal() {
         val capturer = screenCapturer
         screenCapturer = null
         try {
             capturer?.stopCapture()
         } catch (_: Exception) {
         }
-        capturer?.dispose()
+        try { capturer?.dispose() } catch (_: Exception) {}
+
         val cameraTrack = localVideoTrack
         val videoSender = peerConnection?.senders?.firstOrNull { it.track()?.kind() == "video" }
         if (videoSender != null && cameraTrack != null) {
             videoSender.setTrack(cameraTrack, false)
         }
-        val stream = screenStream
+        screenStream?.dispose()
         screenStream = null
-        stream?.dispose()
+        screenVideoTrack?.dispose()
+        screenVideoTrack = null
+        screenVideoSource?.dispose()
+        screenVideoSource = null
+        screenSurfaceTextureHelper?.dispose()
+        screenSurfaceTextureHelper = null
+        screenCapturePermission = null
     }
 
     /** Attach a SurfaceViewRenderer created by the Compose UI. */
@@ -514,6 +554,15 @@ class WebRtcCallMediaController(
         } catch (_: Exception) {
         }
         screen?.dispose()
+        screenStream?.dispose()
+        screenStream = null
+        screenVideoTrack?.dispose()
+        screenVideoTrack = null
+        screenVideoSource?.dispose()
+        screenVideoSource = null
+        screenSurfaceTextureHelper?.dispose()
+        screenSurfaceTextureHelper = null
+        screenCapturePermission = null
         try {
             videoCapturer?.stopCapture()
         } catch (_: Exception) {
