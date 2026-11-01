@@ -401,10 +401,11 @@ class P2pFileTransferService(
         }
         val session = Session(invite.transferId, offer.senderId, currentUserId() ?: throw SecurityException("Sign in before receiving a file."), null, manifest, invite.secret.copyOf(),
             TransferDirection.download, destination = null, finalDestination = destination)
-        val partFile = File(destination.parentFile ?: appContext.filesDir, ".${invite.transferId}.part")
+        val resumeKey = invite.transferId + "-" + manifest.sha256Hex.take(16)
+        val partFile = File(destination.parentFile ?: appContext.filesDir, "." + resumeKey + ".part")
         session.destination = partFile
         invite.secret.fill(0)
-        session.ledger = ChunkReceiptLedger(File(appContext.filesDir, "p2p-ledger/${invite.transferId}.state"), manifest.chunkCount)
+        session.ledger = ChunkReceiptLedger(File(appContext.filesDir, "p2p-ledger/" + resumeKey + ".state"), manifest.chunkCount)
         incomingCandidates.remove(invite.transferId)?.let { session.queuedCandidates.addAll(it) }
         val transferKind = when {
             manifest.mimeType.startsWith("video/") -> TransferKind.video
