@@ -143,6 +143,7 @@ object ChatyNotifications {
         val open = Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN_CHAT
             putExtra(EXTRA_ROOM_ID, roomId)
+            data = android.net.Uri.Builder().scheme("chaty").authority("open-chat").appendPath(roomId).build()
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         val notification = NotificationCompat.Builder(context, CHANNEL_MESSAGES)
@@ -186,16 +187,26 @@ object ChatyNotifications {
             putExtra(EXTRA_IS_VIDEO, isVideo)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
-        val fullScreen = PendingIntent.getActivity(context, 1, activityIntent(ACTION_INCOMING_CALL), flags())
-        val answer = PendingIntent.getActivity(context, 2, activityIntent(ACTION_ANSWER_CALL), flags())
+        fun requestCode(action: String): Int = 31 * callId.hashCode() + action.hashCode()
+        val fullScreenIntent = activityIntent(ACTION_INCOMING_CALL).apply {
+            data = android.net.Uri.Builder().scheme("chaty").authority("incoming-call")
+                .appendPath(callId).appendPath("full-screen").build()
+        }
+        val answerIntent = activityIntent(ACTION_ANSWER_CALL).apply {
+            data = android.net.Uri.Builder().scheme("chaty").authority("incoming-call")
+                .appendPath(callId).appendPath("answer").build()
+        }
+        val fullScreen = PendingIntent.getActivity(context, requestCode(ACTION_INCOMING_CALL), fullScreenIntent, flags())
+        val answer = PendingIntent.getActivity(context, requestCode(ACTION_ANSWER_CALL), answerIntent, flags())
+        val declineIntent = Intent(context, CallActionReceiver::class.java).apply {
+            action = ACTION_DECLINE_CALL
+            data = android.net.Uri.Builder().scheme("chaty").authority("incoming-call")
+                .appendPath(callId).appendPath("decline").build()
+            putExtra(EXTRA_CALL_ID, callId)
+            putExtra(EXTRA_CALLER_ID, callerId)
+        }
         val decline = PendingIntent.getBroadcast(
-            context, 3,
-            Intent(context, CallActionReceiver::class.java).apply {
-                action = ACTION_DECLINE_CALL
-                putExtra(EXTRA_CALL_ID, callId)
-                putExtra(EXTRA_CALLER_ID, callerId)
-            },
-            flags(),
+            context, requestCode(ACTION_DECLINE_CALL), declineIntent, flags(),
         )
         val caller = Person.Builder().setName(callerName.ifBlank { "Unknown" }).setImportant(true).build()
         val notification = NotificationCompat.Builder(context, CHANNEL_CALLS)
@@ -205,7 +216,15 @@ object ChatyNotifications {
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, decline, answer).setIsVideo(isVideo))
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(
+                NotificationCompat.Builder(context, CHANNEL_CALLS)
+                    .setSmallIcon(android.R.drawable.sym_call_incoming)
+                    .setContentTitle("Incoming Chaty call")
+                    .setContentText("Unlock to view caller")
+                    .setCategory(NotificationCompat.CATEGORY_CALL)
+                    .build(),
+            )
             .setOngoing(true)
             .setAutoCancel(false)
             .setTimeoutAfter(45_000)
