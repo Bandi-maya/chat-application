@@ -33,6 +33,7 @@ fun ChatsHomeHost(
     onOpenSecurity: () -> Unit,
     onOpenLockedChats: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenNotifications: () -> Unit = {},
     onOpenNewChat: (groupMode: Boolean, broadcastMode: Boolean) -> Unit = { _, _ -> },
     onOpenGlobalSearch: () -> Unit = {},
     onOpenMessageManagement: () -> Unit = {},
@@ -115,6 +116,7 @@ fun ChatsHomeHost(
         verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },
         nav = ChatsHomeNav(
             onOpenSettings = onOpenSettings,
+            onOpenNotifications = onOpenNotifications,
             onOpenSecuritySettings = onOpenSecurity,
             onOpenLockedVault = onOpenLockedChats,
             onOpenNewChat = onOpenNewChat,
