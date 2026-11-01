@@ -841,7 +841,7 @@ fun ChatDetailHost(
                     } else {
                         scope.launch {
                             try {
-                                p2pTransfers.acceptInvite(link, destination)
+                                p2pTransfers.acceptInvite(link, destination, message.senderId)
                                 toast("Receiving " + (message.attachment?.name ?: "file") + "…")
                             } catch (e: Exception) { toast(e.message ?: "Could not receive this file.") }
                             p2pReceiveMessage = null
