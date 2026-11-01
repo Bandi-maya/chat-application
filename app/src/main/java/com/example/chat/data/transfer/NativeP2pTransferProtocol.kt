@@ -100,9 +100,9 @@ object NativeP2pTransferProtocol {
             .ifBlank { "video" }
         val prefix = ByteArray(NONCE_PREFIX_BYTES).also(random::nextBytes)
         return Manifest(
-            transferId = invite.transferId,
+            transferId = requireCanonicalTransferId(invite.transferId),
             displayName = safeName,
-            mimeType = mimeType.take(120).ifBlank { "application/octet-stream" },
+            mimeType = normalizeMimeType(mimeType),
             sizeBytes = size,
             chunkBytes = chunkBytes,
             sha256Hex = sha256(source),
@@ -122,19 +122,37 @@ object NativeP2pTransferProtocol {
         chunkBytes: Int = DEFAULT_CHUNK_BYTES,
     ): Manifest {
         require(sizeBytes in 1..MAX_FILE_BYTES) { "File must be between 1 byte and 100 GB" }
-        require(source.size() == sizeBytes) { "Selected file changed or is not seekable" }
+        require(source.isOpen && source.size() == sizeBytes) { "Selected file changed or is not seekable" }
         require(chunkBytes in (16 * 1024)..(64 * 1024))
         require(expiresAtEpochSeconds > System.currentTimeMillis() / 1000L)
         val safeName = displayName.replace(Regex("[\\\\/\\u0000-\\u001f]"), "_").take(180).ifBlank { "video" }
         val prefix = ByteArray(NONCE_PREFIX_BYTES).also(random::nextBytes)
-        return Manifest(invite.transferId, safeName, mimeType.take(120).ifBlank { "application/octet-stream" },
-            sizeBytes, chunkBytes, sha256(source, sizeBytes), prefix, expiresAtEpochSeconds)
+        return Manifest(
+            requireCanonicalTransferId(invite.transferId),
+            safeName,
+            normalizeMimeType(mimeType),
+            sizeBytes,
+            chunkBytes,
+            sha256(source, sizeBytes),
+            prefix,
+            expiresAtEpochSeconds,
+        )
+    }
+
+    private fun requireCanonicalTransferId(value: String): String {
+        val canonical = runCatching { java.util.UUID.fromString(value).toString() }.getOrNull()
+        if (canonical == null || canonical != value) throw SecurityException("Invalid transfer id")
+        return canonical
     }
 
     private fun normalizeMimeType(value: String): String {
         val normalized = value.trim().lowercase().take(120)
-        return normalized.takeIf {
-            it.matches(Regex("^[a-z0-9][a-z0-9!#    /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */^_.+-]{0,63}/[a-z0-9][a-z0-9!#    /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */^_.+-]{0,63}$"))
+        val token = "[a-z0-9][a-z0-9.+_-]{0,63}"
+        return normalized.takeIf { it.matches(Regex("^$token/$token$")) }
+            ?: "application/octet-stream"
+    }
+
+    /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */^_.+-]{0,63}/[a-z0-9][a-z0-9!#    /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */^_.+-]{0,63}$"))
         } ?: "application/octet-stream"
     }
 
