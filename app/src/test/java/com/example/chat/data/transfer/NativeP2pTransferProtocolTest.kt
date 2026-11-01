@@ -51,6 +51,26 @@ class NativeP2pTransferProtocolTest {
     }
 
     @Test
+    fun normalizesUntrustedMimeTypesAndKeepsValidTypes() {
+        val root = Files.createTempDirectory("chaty-p2p-mime").toFile()
+        try {
+            val source = File(root, "payload.bin").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val invite = NativeP2pTransferProtocol.createInvite()
+            val valid = NativeP2pTransferProtocol.createManifest(
+                invite, source, "video/mp4", System.currentTimeMillis() / 1000L + 600,
+            )
+            assertEquals("video/mp4", valid.mimeType)
+            val untrusted = NativeP2pTransferProtocol.createManifest(
+                invite, source, "text/plain; charset=utf-8", System.currentTimeMillis() / 1000L + 600,
+            )
+            assertEquals("application/octet-stream", untrusted.mimeType)
+            invite.secret.fill(0)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun encryptsAndVerifiesChunkedFileEndToEnd() {
         val root = Files.createTempDirectory("chaty-p2p").toFile()
         try {

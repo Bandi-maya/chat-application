@@ -113,7 +113,7 @@ object ProtectedResourceGate {
         when (method) {
             "PIN", "Pattern", "Password" -> service.hasCredential(method)
             "Biometric" -> service.canUseBiometrics()
-            "Device Credential" -> true
+            "Device Credential" -> service.canUseDeviceCredential()
             else -> false
         }
 

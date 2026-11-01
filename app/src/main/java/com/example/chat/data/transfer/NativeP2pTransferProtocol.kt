@@ -146,14 +146,10 @@ object NativeP2pTransferProtocol {
     }
 
     private fun normalizeMimeType(value: String): String {
-        val normalized = value.trim().lowercase().take(120)
         val token = "[a-z0-9][a-z0-9.+_-]{0,63}"
-        return normalized.takeIf { it.matches(Regex("^$token/$token$")) }
+        val normalized = value.trim().lowercase()
+        return normalized.take(120).takeIf { it.matches(Regex("^$token/$token$")) }
             ?: "application/octet-stream"
-    }
-
-    /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */^_.+-]{0,63}/[a-z0-9][a-z0-9!#    /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */^_.+-]{0,63}$"))
-        } ?: "application/octet-stream"
     }
 
     /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */

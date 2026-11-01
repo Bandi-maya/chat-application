@@ -273,9 +273,15 @@ class LocalLockService(
         false
     }
 
+    suspend fun canUseDeviceCredential(): Boolean = try {
+        biometrics?.isDeviceSupported() == true
+    } catch (_: Exception) {
+        false
+    }
+
     suspend fun authenticateDeviceCredential(reason: String = "Use your device lock to unlock Chaty"): Boolean = try {
         val b = biometrics
-        if (b == null || !b.isDeviceSupported()) false else b.authenticateWithDeviceCredential(reason)
+        if (!canUseDeviceCredential() || b == null) false else b.authenticateWithDeviceCredential(reason)
     } catch (_: Exception) {
         false
     }
