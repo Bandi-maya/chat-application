@@ -75,7 +75,7 @@ class ApiMediaUploadClient(
         val bearer = token() ?: throw UploadException("Not authenticated")
         val base = restApiBaseUrl().trimEnd('/')
         val fileTransport = transport as? FileProgressTransport
-            ?: return uploadMedia(file.name, file.readBytes(), onProgress)
+            ?: throw UploadException("Streaming upload is unavailable; refusing to load the full file into memory.")
         val response = try {
             val primary = fileTransport.uploadFileWithProgress(
                 "$base/chat/upload", "Bearer $bearer", tenantId(), file.name, file, onProgress,
