@@ -231,6 +231,7 @@ fun SettingsSubHost(
         SettingsDestination.StorageMedia -> {
             var cacheLimitMb by remember { mutableStateOf(com.example.chat.data.local.MediaCacheSettings.limitMb(context)) }
             StorageMediaScreen(
+                preferences = prefs,
                 onBack = onBack,
                 onClearCache = {
                     ServiceLocator.mediaCache.clearCurrentAccount()

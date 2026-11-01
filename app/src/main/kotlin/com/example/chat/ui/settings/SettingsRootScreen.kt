@@ -196,11 +196,11 @@ fun SettingsRootScreen(
     var dialog by remember { mutableStateOf("") }          // "", "about", "policy"
     var pickTarget by remember { mutableStateOf("") }      // "", "avatar", "banner"
     val override = preferences.home.myNameOverride.trim()
-    val effectiveOverride = if (override.isNotEmpty() && override != "Alex Rivera" && override != "Bandi Maya") override else ""
+    val effectiveOverride = override
     val rawName = user.displayName.trim()
     val displayName = when {
         effectiveOverride.isNotEmpty() -> effectiveOverride
-        rawName.isNotEmpty() && rawName != "Bandi Maya" && rawName != "Chaty User" -> rawName
+        rawName.isNotEmpty() -> rawName
         user.username.isNotEmpty() -> user.username
         else -> "User"
     }
@@ -242,7 +242,7 @@ fun SettingsRootScreen(
                 IconButton(onClick = { onNavigate(SettingsDestination.QrCode) }) { Icon(Icons.Rounded.QrCode2, "QR code", Modifier.size(25.dp), tint = colors.foreground) }
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                Column(Modifier.padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     val bannerHeight = ((LocalConfiguration.current.screenWidthDp - 32) * 9f / 16f).dp
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
                         Box(
@@ -290,7 +290,7 @@ fun SettingsRootScreen(
                             else fallback()
                         }
                     }
-                    Spacer(Modifier.height(50.dp))
+                    Spacer(Modifier.height(48.dp))
                     Row(
                         Modifier.clip(RoundedCornerShape(12.dp)).clickable { onNavigate(SettingsDestination.EditProfile) }.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -312,10 +312,10 @@ fun SettingsRootScreen(
                     Modifier.fillMaxWidth()
                         .background(colors.surfaceSecondary, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                         .border(1.dp, colors.borderSubtle, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .padding(top = 12.dp, bottom = 36.dp),
+                        .padding(top = 12.dp, bottom = 40.dp),
                 ) {
                     rootGroups.forEach { group ->
-                        Column(Modifier.fillMaxWidth().padding(start = 12.dp, top = 6.dp, end = 12.dp, bottom = 6.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp)) {
                             Text(group.title, Modifier.padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 8.dp), color = colors.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             Column(
                                 Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(24.dp))
@@ -410,9 +410,9 @@ fun SettingsRootScreen(
             },
             text = {
                 Column {
-                    Text("Chaty Messenger Pro", color = colors.foreground, fontWeight = FontWeight.Bold)
+                    Text("Chaty", color = colors.foreground, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
-                    Text("Version 2.4.0 (Build 2026.10)", color = colors.foregroundSecondary, fontSize = 12.sp)
+                    Text("Version ${context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"} · Build ${if (android.os.Build.VERSION.SDK_INT >= 28) context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode else context.packageManager.getPackageInfo(context.packageName, 0).versionCode.toLong()}", color = colors.foregroundSecondary, fontSize = 12.sp)
                     Spacer(Modifier.height(12.dp))
                     Text(
                         "A modern, privacy-first messaging platform with advanced personalization, rich customization, and offline security.",
@@ -434,7 +434,7 @@ fun SettingsRootScreen(
 private fun RootItemTile(icon: ImageVector, tint: Color, title: String, subtitle: String, onTap: () -> Unit) {
     val colors = LocalAppColors.current
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onTap).padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onTap).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(24.dp), tint = tint) }
