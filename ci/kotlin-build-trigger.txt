@@ -96,3 +96,5 @@ Final CI repair: restore branch-owned lock badge proof activity after candidate 
 Kotlin fixture restoration and notification feed integration: restore debug lock-badge fixture after candidate overlay; message/call events populate the local activity feed; verify current security-flow fail-closed behavior: 2026-11-01
 
 Notification UX/security follow-up: distinct Notification settings title, flat toast preview sections and muted chevrons; sign-out clears per-account notification feed, shade and pending actions; verify Kotlin build and instrumentation: 2026-11-01
+
+Navigation integration follow-up: notification inbox settings action returns through saved Home host and opens Notification settings; pending destination clears on sign-out. Verify full Kotlin build and tests: 2026-11-01
