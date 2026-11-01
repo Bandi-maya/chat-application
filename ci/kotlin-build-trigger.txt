@@ -15,3 +15,4 @@ P2P crypto hardening: canonical transfer IDs, HKDF key separation, and bounded c
 Native P2P integration: WebRTC DataChannel offers/answers/trickle ICE through existing call signaling, authenticated TURN/STUN configuration, MLS-encrypted invitation secret in chat video cards, 100 GB seekable descriptor streaming, AES-GCM chunk verification, resumable receiver bitmap, in-app playback, connection sheet metrics, and bounded ICE restarts. Build and test integration.
 P2P direct transfer, image/document attachment integration, and 48 KiB SCTP-safe chunks build verification: 2026-11-01
 P2P retry controls, private-file cleanup, image/document cards, and crypto tests build verification: 2026-11-01
+P2P final retry-state and digest-bound resume hardening verification: 2026-11-01
