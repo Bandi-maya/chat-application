@@ -198,23 +198,23 @@ fun ConnectionDetailSheetContent(
                 valueColor = if (link.metered) connectionWeak else connectionExcellent,
             )
         }
-        MetricRow(
         appTraffic?.let { usage ->
             MetricRow(
                 label = "Chaty data uploaded",
                 value = if (usage.supported) com.example.chat.data.services.ChatMediaService.formatBytes(usage.uploadedBytes) else "Unavailable",
-                icon = Icons.Rounded.Upload,
+                icon = Icons.Rounded.Speed,
                 labelColor = foregroundSecondary,
                 valueColor = foreground,
             )
             MetricRow(
                 label = "Chaty data downloaded",
                 value = if (usage.supported) com.example.chat.data.services.ChatMediaService.formatBytes(usage.downloadedBytes) else "Unavailable",
-                icon = Icons.Rounded.Download,
+                icon = Icons.Rounded.Speed,
                 labelColor = foregroundSecondary,
                 valueColor = foreground,
             )
         }
+        MetricRow(
             label = "Peer file transfers",
             value = p2pTransferStates.count { it.status !in setOf("Sent", "Received and verified", "Failed", "Cancelled") }.toString(),
             icon = Icons.Rounded.Sync,
