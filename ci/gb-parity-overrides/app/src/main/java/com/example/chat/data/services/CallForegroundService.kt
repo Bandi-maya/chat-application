@@ -93,7 +93,7 @@ class CallForegroundService : Service() {
             if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG ACTION_STOP courier startId=$startId")
             try {
                 ensureChannel()
-                val stopNotification = buildNotification("Chaty call", "")
+                val stopNotification = buildNotification("Chaty call", "", "")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     startForeground(SERVICE_ID, stopNotification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
                 } else {
@@ -127,13 +127,14 @@ class CallForegroundService : Service() {
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Chaty call"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) == true
+        val sessionId = intent?.getStringExtra(EXTRA_SESSION_ID).orEmpty()
         // Foreground FIRST: on API 31+ the system kills the service with
         // ForegroundServiceDidNotStartInTimeException if startForeground is not
         // reached within a few seconds of startForegroundService(). Lock
         // acquisition (wifi/wake) can block, so it must happen after the service
         // is foreground, never before it.
         ensureChannel()
-        val notification = buildNotification(title, text)
+        val notification = buildNotification(title, text, sessionId)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val types = if (isVideo) {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
@@ -180,7 +181,7 @@ class CallForegroundService : Service() {
         }
     }
 
-    private fun buildNotification(title: String, text: String): Notification {
+    private fun buildNotification(title: String, text: String, sessionId: String): Notification {
         // Tapping returns to the in-app call UI: MainActivity routes ACTION_SHOW_CALL
         // to the call presentation controller, only while a session is actually live.
         val showCall = android.app.PendingIntent.getActivity(
@@ -195,9 +196,10 @@ class CallForegroundService : Service() {
         // backgrounded call had no system-level hangup. CallStyle gives a standard
         // system-rendered hang-up button (no custom styling is promised).
         val hangUp = android.app.PendingIntent.getBroadcast(
-            this, SERVICE_ID + 1,
+            this, if (sessionId.isBlank()) SERVICE_ID + 1 else sessionId.hashCode(),
             Intent(this, com.example.chat.notifications.CallActionReceiver::class.java).apply {
                 action = com.example.chat.notifications.ChatyNotifications.ACTION_END_CALL
+                if (sessionId.isNotBlank()) putExtra(com.example.chat.notifications.ChatyNotifications.EXTRA_CALL_ID, sessionId)
             },
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
         )
