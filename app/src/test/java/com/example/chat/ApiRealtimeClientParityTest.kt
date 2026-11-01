@@ -162,6 +162,19 @@ class ApiRealtimeClientParityTest {
     // ── URL resolution (backend_config.dart getWebSocketUrl) ─────────────
 
     @Test
+    fun urlRejectsUnsafeUserIdsBeforeBuildingAnyPath() {
+        listOf("../admin", "user/other", "user?token=x", "user#fragment", "%2fadmin").forEach { invalid ->
+            var rejected = false
+            try {
+                ApiRealtimeClient.resolveWebSocketUrl(invalid, null, "", "https://chat.example.com")
+            } catch (_: IllegalArgumentException) {
+                rejected = true
+            }
+            assertTrue("unsafe WebSocket user ID should be rejected: $invalid", rejected)
+        }
+    }
+
+    @Test
     fun urlDefaultsToWsSchemeOnRestBase() {
         assertEquals(
             "ws://10.0.2.2:8000/chat/ws/u1",

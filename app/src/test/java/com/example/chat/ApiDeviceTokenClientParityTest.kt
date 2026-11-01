@@ -49,6 +49,16 @@ class ApiDeviceTokenClientParityTest {
     }
 
     @Test
+    fun registerEncodesUntrustedTokenAsJsonAndRejectsControlCharacters() {
+        val t = FakeTransport()
+        client(t).registerDeviceToken("fcm-abc\\\"\\r\\n\\\"inject", "android")
+        assertTrue("invalid FCM token must not reach transport", t.calls.isEmpty())
+
+        client(t).registerDeviceToken("fcm:abc-123_xyz.token", "android")
+        assertTrue(t.calls.single().contains("\"fcm_token\":\"fcm:abc-123_xyz.token\""))
+    }
+
+    @Test
     fun registerSwallowsTransportFailure() {
         val t = object : ApiDeviceTokenClient.Transport {
             override fun send(method: String, url: String, headers: Map<String, String>, body: String?): Int {
@@ -65,6 +75,15 @@ class ApiDeviceTokenClientParityTest {
         assertEquals(2, t.calls.size)
         assertTrue(t.calls[0].startsWith("DELETE https://api.example.com/me/devices/fcm-abc "))
         assertTrue(t.calls[1].startsWith("DELETE https://api.example.com/app-users/me/devices/fcm-abc "))
+    }
+
+    @Test
+    fun unregisterRejectsPathSeparatorsAndQueryInjection() {
+        val t = FakeTransport()
+        client(t).unregisterDeviceToken("../admin")
+        client(t).unregisterDeviceToken("fcm-token?next=/admin")
+        client(t).unregisterDeviceToken("fcm-token#fragment")
+        assertTrue(t.calls.isEmpty())
     }
 
     @Test

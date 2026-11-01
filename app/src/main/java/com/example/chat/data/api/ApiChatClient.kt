@@ -39,15 +39,7 @@ class ApiChatClient(
      * fragments. Current server IDs are UUIDs/opaque ASCII keys; rejecting
      * separators and URL control characters prevents endpoint path injection.
      */
-    private fun safePathSegment(value: String): String? =
-        value.takeIf { candidate ->
-            candidate.length in 1..128 &&
-                candidate != "." && candidate != ".." &&
-                candidate.all { ch ->
-                    ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9' ||
-                        ch == '-' || ch == '_' || ch == '.' || ch == '~'
-                }
-        }
+    private fun safePathSegment(value: String): String? = ApiPathSegments.safe(value)
 
     private fun authHeaders(json: Boolean = false): Map<String, String> {
         val headers = mutableMapOf<String, String>()

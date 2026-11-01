@@ -79,6 +79,7 @@ class ApiTasksClient(
     /** updateTaskStatus: PUT /tasks/<id> {status}. Dart maps the enum to the
      *  server string ('todo' for inbox) and only replaces local state on 200. */
     fun updateTaskStatus(taskId: String, status: TaskStatus): ChatTask? {
+        val taskPath = ApiPathSegments.safe(taskId) ?: return null
         val statusStr = when (status) {
             TaskStatus.inbox -> "todo"
             TaskStatus.assigned -> "assigned"
@@ -90,7 +91,7 @@ class ApiTasksClient(
         return try {
             val payload = JSONObject().put("status", statusStr).toString()
             val response = transport.execute(
-                "PUT", "${base()}/tasks/$taskId", authHeaders(json = true), payload,
+                "PUT", "${base()}/tasks/$taskPath", authHeaders(json = true), payload,
             )
             if (response.first != 200) return null
             ChatTask.fromApi(ApiChatClient.deepMap(JSONObject(response.second).getJSONObject("data")))
@@ -109,6 +110,7 @@ class ApiTasksClient(
         priority: String,
         dueAtIso: String,
     ): ChatTask? {
+        val taskPath = ApiPathSegments.safe(taskId) ?: return null
         return try {
             val payload = JSONObject()
                 .put("title", title)
@@ -118,7 +120,7 @@ class ApiTasksClient(
                 .put("assigned_to_ids", JSONArray(assigneeIds))
                 .toString()
             val response = transport.execute(
-                "PUT", "${base()}/tasks/$taskId", authHeaders(json = true), payload,
+                "PUT", "${base()}/tasks/$taskPath", authHeaders(json = true), payload,
             )
             if (response.first != 200) return null
             ChatTask.fromApi(ApiChatClient.deepMap(JSONObject(response.second).getJSONObject("data")))
@@ -129,8 +131,9 @@ class ApiTasksClient(
 
     /** deleteTask: DELETE /tasks/<id>; Dart only removes local state on 200. */
     fun deleteTask(taskId: String): Boolean {
+        val taskPath = ApiPathSegments.safe(taskId) ?: return false
         return try {
-            val response = transport.execute("DELETE", "${base()}/tasks/$taskId", authHeaders(), null)
+            val response = transport.execute("DELETE", "${base()}/tasks/$taskPath", authHeaders(), null)
             response.first == 200
         } catch (_: Exception) {
             false

@@ -25,16 +25,26 @@ class ApiDeviceTokenClient(
     }
 
     /** Port of ApiBackendService.registerDeviceToken. */
+    private fun safeFcmToken(value: String): String? =
+        value.takeIf { it.length in 1..4096 && it.all { ch ->
+            ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9' ||
+                ch == ':' || ch == '-' || ch == '_' || ch == '.'
+        } }
+
     fun registerDeviceToken(fcmToken: String, deviceType: String = "android") {
         val bearer = token()
-        if (bearer == null || fcmToken.isEmpty()) return
+        val safeToken = safeFcmToken(fcmToken) ?: return
+        val safeDeviceType = deviceType.takeIf { it in setOf("android", "ios", "web") } ?: return
         val base = restApiBaseUrl().trimEnd('/')
         val headers = mapOf(
             "Authorization" to "Bearer $bearer",
             "Content-Type" to "application/json",
             "x-tenant-id" to tenantId(),
         )
-        val body = """{"fcm_token":"$fcmToken","device_type":"$deviceType"}"""
+        val body = org.json.JSONObject()
+            .put("fcm_token", safeToken)
+            .put("device_type", safeDeviceType)
+            .toString()
         try {
             val status = transport.send("POST", "$base/me/devices", headers, body)
             if (status == 404) {
@@ -49,16 +59,17 @@ class ApiDeviceTokenClient(
     /** Port of ApiBackendService.unregisterDeviceToken. */
     fun unregisterDeviceToken(fcmToken: String) {
         val bearer = token()
-        if (bearer == null || fcmToken.isEmpty()) return
+        val safeToken = safeFcmToken(fcmToken) ?: return
+        if (bearer.isNullOrBlank()) return
         val base = restApiBaseUrl().trimEnd('/')
         val headers = mapOf(
             "Authorization" to "Bearer $bearer",
             "x-tenant-id" to tenantId(),
         )
         try {
-            val status = transport.send("DELETE", "$base/me/devices/$fcmToken", headers, null)
+            val status = transport.send("DELETE", "$base/me/devices/$safeToken", headers, null)
             if (status == 404) {
-                transport.send("DELETE", "$base/app-users/me/devices/$fcmToken", headers, null)
+                transport.send("DELETE", "$base/app-users/me/devices/$safeToken", headers, null)
             }
             log("[ApiDeviceTokenClient] FCM token unregistered from backend")
         } catch (e: Exception) {
