@@ -30,11 +30,18 @@ class EncryptedGoTrueSessionStorage(private val context: Context) : SessionStora
             .putString(REFRESH, session.refreshToken)
             .putLong(EXPIRY, expiry)
             .putString(USER, userId)
+            .remove(CLEARED)
             .commit()) { "Could not save encrypted sign-in session." }
     }
 
     override suspend fun load(): SessionStore.StoredSession? = withContext(Dispatchers.IO) {
         val p = encrypted
+        // A durable sign-out tombstone must win over any stale plaintext
+        // DataStore copy left behind by a crash or failed legacy cleanup.
+        if (p.getBoolean(CLEARED, false)) {
+            context.sessionDataStore.edit { it.clear() }
+            return@withContext null
+        }
         val access = p.getString(ACCESS, null)
         val refresh = p.getString(REFRESH, null)
         val expiry = p.getLong(EXPIRY, 0L)
@@ -61,7 +68,10 @@ class EncryptedGoTrueSessionStorage(private val context: Context) : SessionStora
 
     override suspend fun clear() {
         withContext(Dispatchers.IO) {
-            check(encrypted.edit().remove(ACCESS).remove(REFRESH).remove(EXPIRY).remove(USER).commit()) {
+            // Commit the tombstone first. If legacy DataStore cleanup is
+            // interrupted, the next load must not migrate the signed-out user.
+            check(encrypted.edit().remove(ACCESS).remove(REFRESH).remove(EXPIRY).remove(USER)
+                .putBoolean(CLEARED, true).commit()) {
                 "Could not clear encrypted sign-in session."
             }
             context.sessionDataStore.edit { it.clear() }
@@ -73,5 +83,6 @@ class EncryptedGoTrueSessionStorage(private val context: Context) : SessionStora
         const val REFRESH = "gotrue_refresh_token"
         const val EXPIRY = "gotrue_expires_at_epoch_ms"
         const val USER = "gotrue_user_id"
+        const val CLEARED = "gotrue_session_cleared"
     }
 }
