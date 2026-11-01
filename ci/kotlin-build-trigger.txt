@@ -25,3 +25,4 @@ P2P descriptor chunk compatibility and transient key-zeroing security hardening 
 CI for P2P signaling adapter and process-restart resume fixes plus branch-owned ServiceLocator restore: 2026-11-01
 Authenticated TURN Edge Function wired to Kotlin call and P2P ICE; compile verification: 2026-11-01
 Connection diagnostics now include measured app UID upload/download totals: 2026-11-01
+Custom ICE endpoint, adaptive low-signal P2P windows, native video invitation cards, audio-only call bitrate adaptation, and streamed custom-backend voice uploads: 2026-11-01
