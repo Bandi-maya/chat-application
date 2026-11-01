@@ -192,6 +192,7 @@ fun ChatDetailScreen(
     networkStatus: NetworkStatusMonitor.Status? = null,
     p2pTransferStates: List<P2pFileTransferService.TransferState> = emptyList(),
     liveTransfers: List<TransferItem> = emptyList(),
+    onRetryP2pTransfer: (String) -> Unit = {},
     onDraftChanged: (String) -> Unit = {},
     onTypingChanged: (Boolean) -> Unit = {},
     quickReplies: List<QuickReplyTemplate> = emptyList(),
@@ -1208,6 +1209,7 @@ fun ChatDetailScreen(
                     networkStatus = networkStatus,
                     p2pTransferStates = p2pTransferStates,
                     liveTransfers = liveTransfers,
+                    onRetryP2pTransfer = onRetryP2pTransfer,
                 )
             }
         }
