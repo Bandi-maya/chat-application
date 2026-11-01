@@ -43,6 +43,7 @@ import com.example.chat.domain.models.ConnectionHealth
 import com.example.chat.domain.models.ConnectionHealthState
 import com.example.chat.domain.models.NetworkTransportType
 import com.example.chat.domain.models.RealtimeSocketStatus
+import com.example.chat.data.network.AppTrafficSnapshot
 import com.example.chat.data.network.NetworkStatusMonitor
 import com.example.chat.data.network.TransferItem
 import com.example.chat.data.network.TransferStatus
@@ -62,6 +63,7 @@ fun ConnectionDetailSheetContent(
     networkStatus: NetworkStatusMonitor.Status? = null,
     p2pTransferStates: List<P2pFileTransferService.TransferState> = emptyList(),
     liveTransfers: List<TransferItem> = emptyList(),
+    appTraffic: AppTrafficSnapshot? = null,
     onRetryP2pTransfer: (String) -> Unit = {},
 ) {
     val statusColor = when (state.health) {
@@ -197,6 +199,22 @@ fun ConnectionDetailSheetContent(
             )
         }
         MetricRow(
+        appTraffic?.let { usage ->
+            MetricRow(
+                label = "Chaty data uploaded",
+                value = if (usage.supported) com.example.chat.data.services.ChatMediaService.formatBytes(usage.uploadedBytes) else "Unavailable",
+                icon = Icons.Rounded.Upload,
+                labelColor = foregroundSecondary,
+                valueColor = foreground,
+            )
+            MetricRow(
+                label = "Chaty data downloaded",
+                value = if (usage.supported) com.example.chat.data.services.ChatMediaService.formatBytes(usage.downloadedBytes) else "Unavailable",
+                icon = Icons.Rounded.Download,
+                labelColor = foregroundSecondary,
+                valueColor = foreground,
+            )
+        }
             label = "Peer file transfers",
             value = p2pTransferStates.count { it.status !in setOf("Sent", "Received and verified", "Failed", "Cancelled") }.toString(),
             icon = Icons.Rounded.Sync,
