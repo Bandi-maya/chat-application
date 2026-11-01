@@ -86,9 +86,15 @@ class SupabaseTurnCredentialsClient(
             val rawUrls = item.opt("urls")
             val urls: Any = when (rawUrls) {
                 is String -> rawUrls.also { validateIceUrl(it) }
-                is JSONArray -> rawUrls.let { array ->
-                    val list = (0 until array.length()).mapNotNull { i ->
-                        array.optString(i).takeIf { it.isNotBlank() }?.also(::validateIceUrl)
+                is JSONArray -> {
+                    val array = rawUrls
+                    val list = ArrayList<String>(array.length())
+                    for (urlIndex in 0 until array.length()) {
+                        val url = array.optString(urlIndex)
+                        if (url.isNotBlank()) {
+                            validateIceUrl(url)
+                            list += url
+                        }
                     }
                     if (list.isEmpty()) continue
                     list
