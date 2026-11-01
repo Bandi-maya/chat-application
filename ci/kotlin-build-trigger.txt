@@ -76,3 +76,5 @@ Known-good CI workflow with corrected com.logybyte package import matching: 2026
 Settings preview and Dynamic Island documentation hardening: 2026-11-01
 
 Settings notification bridge comment verification: 2026-11-01
+
+Dynamic Island fail-closed notification capture policy: 2026-11-01
