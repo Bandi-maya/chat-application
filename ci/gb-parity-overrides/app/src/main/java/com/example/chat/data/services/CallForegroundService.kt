@@ -199,7 +199,10 @@ class CallForegroundService : Service() {
             this, if (sessionId.isBlank()) SERVICE_ID + 1 else sessionId.hashCode(),
             Intent(this, com.example.chat.notifications.CallActionReceiver::class.java).apply {
                 action = com.example.chat.notifications.ChatyNotifications.ACTION_END_CALL
-                if (sessionId.isNotBlank()) putExtra(com.example.chat.notifications.ChatyNotifications.EXTRA_CALL_ID, sessionId)
+                if (sessionId.isNotBlank()) {
+                    data = android.net.Uri.Builder().scheme("chaty-call").authority("hangup").appendPath(sessionId).build()
+                    putExtra(com.example.chat.notifications.ChatyNotifications.EXTRA_CALL_ID, sessionId)
+                }
             },
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
         )
