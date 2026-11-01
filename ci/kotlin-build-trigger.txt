@@ -84,3 +84,5 @@ Kotlin-only settings contract validation, accurate release/security copy, and cu
 Navigation/security/call hardening: fix SecurityFlowHost toast callback recursion and revalidate Android microphone/camera grants after runtime permission prompt; run Kotlin build and regression suites: 2026-11-01
 
 Upload response parsing and robust Compose fixture import patch: 2026-11-01
+
+Kotlin quality pass: dedicated notifications inbox and settings separation; thread-safe event feed; GoTrue sign-out tombstone regression; stale call permission callback rejection; call-ID-bound notification hang-up; audit scorecard reconciliation: 2026-11-01
