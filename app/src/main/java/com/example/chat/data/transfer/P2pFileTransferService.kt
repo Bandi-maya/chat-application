@@ -460,7 +460,6 @@ class P2pFileTransferService(
     fun cancel(transferId: String) {
         val session = sessions[transferId] ?: return
         sendSignalScoped(session, mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
-        session.file?.let { runCatching { it.delete() } }
         fail(session, "Cancelled")
     }
 
@@ -688,7 +687,6 @@ class P2pFileTransferService(
         publish(session, "Sent")
         session.channel?.close()
         session.peer?.close()
-        session.file?.let { runCatching { it.delete() } }
         runCatching { (session.sourceOwner ?: session.sourceChannel)?.close() }
         session.secret.fill(0)
         sessions.remove(session.id)
@@ -696,7 +694,9 @@ class P2pFileTransferService(
 
     fun disposeAll() {
         sessions.values.toList().forEach { session ->
-            session.file?.let { runCatching { it.delete() } }
+            // Never delete a user-selected source file; discard only private partial receive data on account change.
+            session.destination?.let { runCatching { it.delete() } }
+            session.ledger?.let { runCatching { it.clear() } }
             fail(session, "Account signed out")
         }
         incoming.clear()
