@@ -40,10 +40,18 @@ object CallPermissionGate {
             val ask = requester
                 ?: throw IllegalStateException("Microphone/camera permission is required for calls.")
             val result = ask(need)
-            val denied = need.filterNot { result[it] == true }
-            if (denied.isNotEmpty()) {
-                val what = if (Manifest.permission.RECORD_AUDIO in denied) "Microphone" else "Camera"
+            val deniedByResult = need.filterNot { result[it] == true }
+            if (deniedByResult.isNotEmpty()) {
+                val what = if (Manifest.permission.RECORD_AUDIO in deniedByResult) "Microphone" else "Camera"
                 throw IllegalStateException("$what permission was denied.")
+            }
+            // Re-read Android's permission state after the dialog. Activity results can be
+            // stale if the activity/request is interrupted or a permission is revoked while
+            // the flow is suspended; never start WebRTC media on the callback map alone.
+            val stillMissing = missing({ granted(context, it) }, isVideo)
+            if (stillMissing.isNotEmpty()) {
+                val what = if (Manifest.permission.RECORD_AUDIO in stillMissing) "Microphone" else "Camera"
+                throw IllegalStateException("$what permission is not available.")
             }
         }
         if (Build.VERSION.SDK_INT >= 33 && !granted(context, Manifest.permission.POST_NOTIFICATIONS)) {
