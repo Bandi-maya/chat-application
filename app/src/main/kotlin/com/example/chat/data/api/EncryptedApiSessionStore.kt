@@ -53,7 +53,7 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
         check(secure.edit().putString(TOKEN, token).putString(USER, userJson).remove(REFRESH).commit()) {
             "Unable to persist encrypted API session."
         }
-        legacy.edit().remove(TOKEN).remove(USER).commit()
+        legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()
         Unit
     }
 
