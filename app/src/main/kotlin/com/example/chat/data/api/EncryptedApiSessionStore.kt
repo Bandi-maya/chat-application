@@ -20,11 +20,19 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
 
     @Synchronized
     private fun migrate() {
-        if (!secure.getString(TOKEN, null).isNullOrBlank()) return
-        val token = legacy.getString(TOKEN, null) ?: return
-        val user = legacy.getString(USER, null) ?: return
-        check(secure.edit().putString(TOKEN, token).putString(USER, user).commit())
-        check(legacy.edit().remove(TOKEN).remove(USER).commit())
+        val encryptedToken = secure.getString(TOKEN, null)
+        val encryptedUser = secure.getString(USER, null)
+        if (!encryptedToken.isNullOrBlank() && !encryptedUser.isNullOrBlank()) return
+        val oldToken = legacy.getString(TOKEN, null)
+        val oldUser = legacy.getString(USER, null)
+        val token = encryptedToken ?: oldToken ?: return
+        val user = encryptedUser ?: oldUser ?: return
+        check(secure.edit().putString(TOKEN, token).putString(USER, user).commit()) {
+            "Unable to migrate API session into encrypted storage."
+        }
+        check(legacy.edit().remove(TOKEN).remove(USER).commit()) {
+            "Unable to remove migrated plaintext API session."
+        }
     }
 
     override fun loadToken(): String? = synchronized(this) {
@@ -37,14 +45,18 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
         secure.getString(USER, null)
     }
 
-    override fun save(token: String, userJson: String) = synchronized(this) {
-        check(secure.edit().putString(TOKEN, token).putString(USER, userJson).commit())
+    override fun save(token: String, userJson: String): Unit = synchronized(this) {
+        check(secure.edit().putString(TOKEN, token).putString(USER, userJson).commit()) {
+            "Unable to persist encrypted API session."
+        }
         legacy.edit().remove(TOKEN).remove(USER).commit()
+        Unit
     }
 
-    override fun clear() = synchronized(this) {
+    override fun clear(): Unit = synchronized(this) {
         secure.edit().remove(TOKEN).remove(USER).commit()
         legacy.edit().remove(TOKEN).remove(USER).commit()
+        Unit
     }
 
     private companion object {
