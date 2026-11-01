@@ -27,6 +27,7 @@ class ChatyNotificationService(
     private val notifyChanged: () -> Unit = {},
 ) {
     private val _notifications = mutableListOf<ChatyEventNotification>()
+    private val notificationsLock = Any()
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
 
     /** Dart ChangeNotifier.addListener/removeListener. */
@@ -35,10 +36,10 @@ class ChatyNotificationService(
     private fun fireListeners() { notifyChanged(); for (l in listeners) l() }
 
     val notifications: List<ChatyEventNotification>
-        get() = _notifications.toList()
+        get() = synchronized(notificationsLock) { _notifications.toList() }
 
     val latest: ChatyEventNotification?
-        get() = _notifications.firstOrNull()
+        get() = synchronized(notificationsLock) { _notifications.firstOrNull() }
 
     fun triggerEventNotification(
         title: String,
@@ -51,7 +52,7 @@ class ChatyNotificationService(
         avatarColorHex: String? = null,
     ) {
         val notification = ChatyEventNotification(
-            id = "notif_${System.nanoTime()}",
+            id = "notif_${java.util.UUID.randomUUID()}",
             title = title,
             body = body,
             icon = icon,
@@ -62,16 +63,22 @@ class ChatyNotificationService(
             avatarInitials = avatarInitials,
             avatarColorHex = avatarColorHex,
         )
-        _notifications.add(0, notification)
-        while (_notifications.size > 100) {
-            _notifications.removeAt(_notifications.size - 1)
+        synchronized(notificationsLock) {
+            _notifications.add(0, notification)
+            while (_notifications.size > 100) {
+                _notifications.removeAt(_notifications.size - 1)
+            }
         }
         fireListeners()
     }
 
     fun clearAll() {
-        if (_notifications.isEmpty()) return
-        _notifications.clear()
-        fireListeners()
+        val changed = synchronized(notificationsLock) {
+            if (_notifications.isEmpty()) false else {
+                _notifications.clear()
+                true
+            }
+        }
+        if (changed) fireListeners()
     }
 }
