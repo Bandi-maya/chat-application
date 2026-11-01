@@ -76,10 +76,9 @@ private sealed interface Modal {
 }
 
 /**
- * Port of SecurityCenterScreen (lib/features/settings/security/security_center_screen.dart).
- * Flow decisions live in [SecurityFlowRunner] (JVM-tested). UNCOMPILED (Compose).
- * [onOpenLockedChats] replaces LockedChatsScreen.open (screen owned by another worker).
- * The safety-number dialog is defined in Dart but not referenced from build(); it is kept for parity.
+ * Native Kotlin/Compose security settings screen.
+ * Flow decisions live in [SecurityFlowRunner] and are covered by JVM tests.
+ * [onOpenLockedChats] is supplied by the navigation host.
  */
 @Composable
 fun SecurityCenterScreen(
