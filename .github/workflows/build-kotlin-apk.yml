@@ -161,7 +161,7 @@ jobs:
               source = voice.read_text()
               for name in ('pause', 'resume'):
                   source = re.sub(
-                      rf'(?m)^\s*override\s+(?:suspend\s+)?fun\s+{name}\s*\([^)]*\)\s*\{{\s*\}}\s*\n?',
+                      rf'(?ms)^\s*override\s+(?:suspend\s+)?fun\s+{name}\s*\([^)]*\)\s*(?:\{{[^{{}}]*\}}|=\s*[^\n]+)\s*\n?',
                       '',
                       source,
                   )
