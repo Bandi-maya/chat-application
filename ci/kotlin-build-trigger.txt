@@ -80,3 +80,5 @@ Settings notification bridge comment verification: 2026-11-01
 Dynamic Island fail-closed notification capture policy: 2026-11-01
 
 Kotlin-only settings contract validation, accurate release/security copy, and current branch verification: 2026-11-01
+
+Navigation/security/call hardening: fix SecurityFlowHost toast callback recursion and revalidate Android microphone/camera grants after runtime permission prompt; run Kotlin build and regression suites: 2026-11-01
