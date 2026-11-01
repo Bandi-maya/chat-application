@@ -415,6 +415,7 @@ class P2pFileTransferService(
             "file_transfer_cancel" -> {
                 sessions[id]?.takeIf { it.peerUserId == sender }?.let {
                     if (it.direction == TransferDirection.upload) clearSenderResume(id)
+                    else discardPartialReceive(it)
                     fail(it, "Sender cancelled this transfer")
                 }
                 val pending = incoming[id]?.first
@@ -570,11 +571,25 @@ class P2pFileTransferService(
         val session = sessions[transferId]
         if (session == null) {
             clearSenderResume(transferId)
+            incoming.remove(transferId)
+            incomingCandidates.remove(transferId)
+            refreshPending()
             return
         }
-        if (session.direction == TransferDirection.upload) clearSenderResume(transferId)
+        if (session.direction == TransferDirection.upload) {
+            clearSenderResume(transferId)
+        } else {
+            discardPartialReceive(session)
+        }
         sendSignalScoped(session, mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
         fail(session, "Cancelled")
+    }
+
+    /** Removes only the private partial file, never the user's selected final destination. */
+    private fun discardPartialReceive(session: Session) {
+        if (session.direction != TransferDirection.download) return
+        session.destination?.let { runCatching { it.delete() } }
+        session.ledger?.let { runCatching { it.clear() } }
     }
 
     private suspend fun createPeer(session: Session): PeerConnection {
@@ -654,7 +669,18 @@ class P2pFileTransferService(
                     if (!isSender) scope.launch { receiveChunk(session, bytes) }
                     return
                 }
-                val text = runCatching { Charsets.UTF_8.decode(buffer.data).toString() }.getOrDefault("")
+                val controlSize = buffer.data.remaining()
+                if (controlSize !in 1..MAX_CONTROL_FRAME_BYTES) {
+                    scope.launch { fail(session, "Invalid transfer control frame") }
+                    return
+                }
+                val controlBytes = ByteArray(controlSize)
+                buffer.data.get(controlBytes)
+                val text = try {
+                    Charsets.UTF_8.decode(ByteBuffer.wrap(controlBytes)).toString()
+                } finally {
+                    controlBytes.fill(0)
+                }
                 val message = runCatching { JSONObject(text) }.getOrNull() ?: return
                 when (message.optString("kind")) {
                     "request" -> if (isSender) scope.launch { sendRequested(session, message.optJSONArray("indices")) }
@@ -1221,6 +1247,7 @@ class P2pFileTransferService(
 
     companion object {
         private const val MAX_BUFFERED_BYTES = 2L * 1024L * 1024L
+        private const val MAX_CONTROL_FRAME_BYTES = 16 * 1024
         private const val MAX_PENDING_OFFERS = 20
         private const val MAX_REQUEST_CHUNKS = 16
         private const val SLOW_LINK_BATCH_WAIT_ITERATIONS = 4_800

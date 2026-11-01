@@ -71,12 +71,12 @@ object NativeP2pTransferProtocol {
 
     fun parseInvite(uriText: String): Invite {
         val uri = runCatching { URI(uriText) }.getOrElse { throw SecurityException("Invalid transfer link") }
-        if (uri.scheme != "chaty" || uri.host != "transfer" || uri.query != null) {
+        if (uri.scheme != "chaty" || uri.host != "transfer" || uri.port != -1 || uri.rawUserInfo != null || uri.query != null) {
             throw SecurityException("Unsupported transfer link")
         }
         val id = uri.path.removePrefix("/")
         val canonicalId = runCatching { java.util.UUID.fromString(id).toString() }.getOrElse { throw SecurityException("Invalid transfer id") }
-        if (!canonicalId.equals(id, ignoreCase = true)) throw SecurityException("Invalid transfer id")
+        if (canonicalId != id) throw SecurityException("Invalid transfer id")
         val secret = decode(uri.rawFragment ?: throw SecurityException("Transfer link is incomplete"))
         if (secret.size != KEY_BYTES) throw SecurityException("Invalid transfer secret")
         return Invite(id, secret)
@@ -131,6 +131,13 @@ object NativeP2pTransferProtocol {
             sizeBytes, chunkBytes, sha256(source, sizeBytes), prefix, expiresAtEpochSeconds)
     }
 
+    private fun normalizeMimeType(value: String): String {
+        val normalized = value.trim().lowercase().take(120)
+        return normalized.takeIf {
+            it.matches(Regex("^[a-z0-9][a-z0-9!#    /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */^_.+-]{0,63}/[a-z0-9][a-z0-9!#    /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */^_.+-]{0,63}$"))
+        } ?: "application/octet-stream"
+    }
+
     /** HMAC binds the file metadata, size, chunk geometry, expiry and whole-file digest. */
     fun authenticateManifest(manifest: Manifest, secret: ByteArray): ByteArray {
         require(secret.size == KEY_BYTES)
@@ -159,7 +166,13 @@ object NativeP2pTransferProtocol {
         if (manifest.noncePrefix.size != NONCE_PREFIX_BYTES) throw SecurityException("Invalid transfer nonce")
         if (!manifest.sha256Hex.matches(Regex("[0-9a-f]{64}"))) throw SecurityException("Invalid file digest")
         val expected = authenticateManifest(manifest, secret)
-        if (!MessageDigest.isEqual(expected, authentication)) throw SecurityException("Transfer link authentication failed")
+        try {
+            if (!MessageDigest.isEqual(expected, authentication)) {
+                throw SecurityException("Transfer link authentication failed")
+            }
+        } finally {
+            expected.fill(0)
+        }
     }
 
     /** Read only the requested byte range; never loads the whole source file into memory. */
@@ -195,7 +208,11 @@ object NativeP2pTransferProtocol {
     private fun encryptPlainChunk(manifest: Manifest, secret: ByteArray, index: Long, plain: ByteArray): EncryptedChunk {
         require(secret.size == KEY_BYTES && index in 0 until manifest.chunkCount)
         val nonce = ByteArray(12).also(random::nextBytes)
-        return EncryptedChunk(index, nonce, crypt(Cipher.ENCRYPT_MODE, manifest, secret, index, nonce, plain))
+        return try {
+            EncryptedChunk(index, nonce, crypt(Cipher.ENCRYPT_MODE, manifest, secret, index, nonce, plain))
+        } finally {
+            plain.fill(0)
+        }
     }
 
     /** Decrypt/authenticate one chunk and write it at its exact file offset. */
@@ -206,11 +223,15 @@ object NativeP2pTransferProtocol {
         val expectedLength = minOf(manifest.chunkBytes.toLong(), manifest.sizeBytes - offset).toInt()
         if (chunk.nonce.size != 12) throw SecurityException("Invalid chunk nonce")
         val plain = crypt(Cipher.DECRYPT_MODE, manifest, secret, chunk.index, chunk.nonce, chunk.ciphertextAndTag)
-        if (plain.size != expectedLength) throw SecurityException("Chunk length does not match manifest")
-        destination.parentFile?.mkdirs()
-        RandomAccessFile(destination, "rw").use { file ->
-            file.seek(offset)
-            file.write(plain)
+        try {
+            if (plain.size != expectedLength) throw SecurityException("Chunk length does not match manifest")
+            destination.parentFile?.mkdirs()
+            RandomAccessFile(destination, "rw").use { file ->
+                file.seek(offset)
+                file.write(plain)
+            }
+        } finally {
+            plain.fill(0)
         }
     }
 
