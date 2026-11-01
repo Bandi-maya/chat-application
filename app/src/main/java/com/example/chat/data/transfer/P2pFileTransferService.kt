@@ -169,7 +169,7 @@ class P2pFileTransferService(
     private val factory: PeerConnectionFactory
     private val sessions = ConcurrentHashMap<String, Session>()
     private val incoming = ConcurrentHashMap<String, Pair<PendingOffer, Map<String, Any?>>>()
-    private val incomingCandidates = ConcurrentHashMap<String, MutableList<IceCandidate>>()
+    private val incomingCandidates = ConcurrentHashMap<String, MutableList<Pair<String, IceCandidate>>>()
     private val _pendingOffers = MutableStateFlow<List<PendingOffer>>(emptyList())
     val pendingOffers: StateFlow<List<PendingOffer>> = _pendingOffers.asStateFlow()
     private val _transfers = MutableStateFlow<List<TransferState>>(emptyList())
@@ -394,8 +394,14 @@ class P2pFileTransferService(
                 val session = sessions[id]?.takeIf { it.peerUserId == sender }
                 if (session == null) {
                     if (!incomingCandidates.containsKey(id) && incomingCandidates.size >= MAX_PENDING_OFFERS) return
-                    val queue = incomingCandidates.getOrPut(id) { java.util.Collections.synchronizedList(mutableListOf()) }
-                    if (queue.size < 256) queue.add(ice)
+                    // ICE is untrusted until tied to the sender whose authenticated
+                    // offer is accepted. Keep sender identity with every queued item.
+                    val queue = incomingCandidates.getOrPut(id) {
+                        java.util.Collections.synchronizedList(mutableListOf())
+                    }
+                    if (queue.size < 256 && queue.none { it.first == sender && it.second.sdp == ice.sdp }) {
+                        queue.add(sender to ice)
+                    }
                 } else if (!session.remoteDescriptionSet) session.queuedCandidates.add(ice)
                 else session.peer?.addIceCandidate(ice)
             }
@@ -502,7 +508,10 @@ class P2pFileTransferService(
             session.ledger?.receivedCount()?.times(manifest.chunkBytes.toLong()) ?: 0L,
             manifest.sizeBytes,
         )
-        incomingCandidates.remove(invite.transferId)?.let { session.queuedCandidates.addAll(it) }
+        incomingCandidates.remove(invite.transferId)?.let { candidates ->
+            candidates.filter { (candidateSender, _) -> candidateSender == offer.senderId }
+                .forEach { (_, candidate) -> session.queuedCandidates.add(candidate) }
+        }
         val transferKind = when {
             manifest.mimeType.startsWith("video/") -> TransferKind.video
             manifest.mimeType.startsWith("image/") -> TransferKind.image

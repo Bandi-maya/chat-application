@@ -154,7 +154,18 @@ class ProtectedResourceGateParityTest {
         assertFalse(ProtectedResourceGate.isMethodConfigured(lockService, "PIN"))
         lockService.setCredential("PIN", "1234", 4)
         assertTrue(ProtectedResourceGate.isMethodConfigured(lockService, "PIN"))
-        assertTrue(ProtectedResourceGate.isMethodConfigured(lockService, "Device Credential"))
+        assertFalse(ProtectedResourceGate.isMethodConfigured(lockService, "Device Credential"))
+        val supportedDevice = LocalLockService(
+            MemoryStore(),
+            biometrics = object : com.example.chat.data.services.LockBiometrics {
+                override suspend fun canCheckBiometrics() = true
+                override suspend fun availableBiometrics() = listOf("fingerprint")
+                override suspend fun isDeviceSupported() = true
+                override suspend fun authenticateBiometricOnly(reason: String) = true
+                override suspend fun authenticateWithDeviceCredential(reason: String) = true
+            },
+        )
+        assertTrue(ProtectedResourceGate.isMethodConfigured(supportedDevice, "Device Credential"))
         assertFalse(ProtectedResourceGate.isMethodConfigured(lockService, "Unknown"))
     }
 
