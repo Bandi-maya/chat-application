@@ -92,9 +92,10 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 
 /**
- * Android bridge for Dart's MethodChannel('chaty/dynamic_island'). The native side is NOT ported by this
- * screen: the integration owner must implement it (or pass null, which reproduces Dart's
- * MissingPluginException path). Every method may throw [DynamicIslandException] (= PlatformException).
+ * Contract for the Android Dynamic Island bridge. The production implementation
+ * lives in ui.island.AndroidDynamicIslandBridge and reads actual OS overlay and
+ * notification-listener permissions; it does not infer permission from service
+ * declaration. Platform failures are surfaced as [DynamicIslandException].
  */
 class DynamicIslandException(message: String?) : Exception(message)
 
