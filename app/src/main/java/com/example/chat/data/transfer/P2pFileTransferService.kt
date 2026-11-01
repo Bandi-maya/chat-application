@@ -510,6 +510,7 @@ class P2pFileTransferService(
                     PeerConnection.PeerConnectionState.CONNECTED -> {
                         session.restartAttempts = 0
                         publish(session, "Secure channel connected")
+                        if (session.direction == TransferDirection.download) scope.launch { requestMissing(session) }
                     }
                     PeerConnection.PeerConnectionState.DISCONNECTED -> {
                         publish(session, "Connection interrupted — retrying")
@@ -575,7 +576,7 @@ class P2pFileTransferService(
     private suspend fun requestMissing(session: Session) = session.requestMutex.withLock {
         val channel = session.channel ?: return@withLock
         val ledger = session.ledger ?: return@withLock
-        while (channel.state() == DataChannel.State.OPEN && !ledger.isComplete()) {
+        while (channel.state() == DataChannel.State.OPEN && session.peer?.connectionState() == PeerConnection.PeerConnectionState.CONNECTED && !ledger.isComplete()) {
             // Small windows keep DataChannel buffering bounded on 1G/2G links; do not resend a slow batch after 10 seconds.
             val indices = ledger.missingIndices(MAX_REQUEST_CHUNKS)
             if (indices.isEmpty()) break
@@ -588,7 +589,7 @@ class P2pFileTransferService(
             val before = ledger.receivedCount()
             val expectedAfterBatch = before + indices.size
             var waitCount = 0
-            while (ledger.receivedCount() < expectedAfterBatch && !ledger.isComplete() && channel.state() == DataChannel.State.OPEN && waitCount < SLOW_LINK_BATCH_WAIT_ITERATIONS) {
+            while (ledger.receivedCount() < expectedAfterBatch && !ledger.isComplete() && channel.state() == DataChannel.State.OPEN && session.peer?.connectionState() == PeerConnection.PeerConnectionState.CONNECTED && waitCount < SLOW_LINK_BATCH_WAIT_ITERATIONS) {
                 kotlinx.coroutines.delay(250)
                 waitCount++
             }
