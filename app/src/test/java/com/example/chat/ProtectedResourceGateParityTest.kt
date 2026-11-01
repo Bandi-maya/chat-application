@@ -106,6 +106,26 @@ class ProtectedResourceGateParityTest {
     }
 
     @Test
+    fun setupSuccessWithoutPersistedCredentialStillDeniesProtectedChat() = runBlocking {
+        var lockPromptCalled = false
+        val ok = ProtectedResourceGate.authorizeConversation(
+            conversationId = "c_setup",
+            isProtected = true,
+            autoLockTimeout = "1m",
+            lockMethod = "PIN",
+            lockService = lockService,
+            setupPrompt = ProtectedResourceGate.SetupPrompt { _, _ -> true },
+            lockPrompt = ProtectedResourceGate.LockPrompt { _, _ ->
+                lockPromptCalled = true
+                true
+            },
+        )
+        assertFalse(ok)
+        assertFalse(lockPromptCalled)
+        assertFalse(ProtectedResourceGate.hasRecentAppUnlock)
+    }
+
+    @Test
     fun generalActionSkipsCheckWhenNoCredentialEverExisted() = runBlocking {
         val ok = ProtectedResourceGate.authorizeGeneralAction(
             lockMethod = "PIN",
