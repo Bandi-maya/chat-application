@@ -133,6 +133,9 @@ fun AppRoot() {
         var planOrgName by remember { mutableStateOf("") }
         var planIsNew by remember { mutableStateOf(false) }
         var selectedInitialMessageId by remember { mutableStateOf<String?>(null) }
+        var pendingSettingsDestination by androidx.compose.runtime.saveable.rememberSaveable {
+            mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null)
+        }
         val lockRequired by ServiceLocator.appLock.lockRequired.collectAsState()
         androidx.compose.runtime.LaunchedEffect(
             route,
@@ -594,6 +597,12 @@ fun AppRoot() {
                     } else {
                         settingsNotice = dest.name
                     }
+                }
+                androidx.compose.runtime.LaunchedEffect(pendingSettingsDestination) {
+                    val pending = pendingSettingsDestination ?: return@LaunchedEffect
+                    settingsSub = pending
+                    pushedSettings = true
+                    pendingSettingsDestination = null
                 }
                 val shellHome = ServiceLocator.preferencesController.home
                 val shellPrefsCtl = ServiceLocator.preferencesController
@@ -1341,7 +1350,10 @@ fun AppRoot() {
             AuthRoute.Notifications -> com.example.chat.ui.notifications.NotificationsInboxScreen(
                 service = ServiceLocator.notifications,
                 onBack = { navigation.goBack() },
-                onOpenSettings = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Notifications) },
+                onOpenSettings = {
+                    pendingSettingsDestination = com.example.chat.ui.settings.SettingsDestination.Notifications
+                    navigation.goBack()
+                },
             )
             AuthRoute.Security -> com.example.chat.ui.settings.security.SecurityCenterScreen(
                 preferences = ServiceLocator.preferencesController,
