@@ -43,3 +43,24 @@ Actual Next5 security review confirms plaintext token stores, absent migrating t
 
 ## Runtime outcome update,01:54 IST
 Next4 runtime job failed during Android test compilation, BEFORE app installation/instrumentation: AttachmentFileCacheTest.kt:295 unresolved EditSession/outputFile reference. No app started, no runtime XML or app visual passes. This is a test-source compile failure, not an observed app crash. Native and main application build and1006 JVM unit passes remain valid. Source: https://github.com/Bandi-maya/chat-application/actions/runs/40389044496/job/121812020284 . A missing EditSession import is the test compile cause; outputFile is a cascade error. No production defect is shown by this compile failure. Next5 launch was recorded at01:49; no completed outcome is recorded in this review.
+
+
+## Current Kotlin branch reconciliation — 2026-11-01
+
+This section supersedes stale status statements in the 27 Oct baseline above where current source differs. Historical observations are retained for traceability; they must not be presented as current confirmed findings without rechecking the named source.
+
+| Finding | Current source status | Remaining evidence |
+|---|---|---|
+| Plaintext custom API session persistence | Remediated in current branch source by `EncryptedApiSessionStore` with Keystore-backed EncryptedSharedPreferences, pair validation, refresh-token handling and a durable clear tombstone. | Crash/restart and migration tests on device; verify all active auth entrypoints use this store. |
+| Plaintext GoTrue session persistence | Encrypted storage and legacy migration are wired; this review added a durable sign-out tombstone so stale legacy DataStore values cannot restore a signed-out session. | New Android regression test must pass; test process-kill/crash boundaries and encrypted-store key invalidation. |
+| Secret phrase cooldown | Current `LocalLockService.verifySecretPhrase` checks remaining cooldown, records failed attempts, resets on success and uses constant-time comparison. | Validate storage tamper/restore behavior and real biometric/device credential flows. |
+| Call permission callback trust | Remediated: current Android permission state is re-read after the activity callback; stale positive callback test added. | Android instrumentation and API-level permission revocation tests. |
+| Ongoing-call notification hang-up | Current app source and candidate overlay now carry the call ID; receiver checks the active session ID before ending it. | Verify exact candidate build and real call termination; no stale-notification cross-session action. |
+| Notifications icon opens Settings | Remediated for Chats and Groups: header icon opens dedicated local activity feed; Notification Settings remains a separate settings destination. | UI automation/pixel/accessibility validation. Feed is not a persistent server archive. |
+| Security snackbar recursion | Remediated: flow host callback delegates to a separate screen snackbar method. | Exercise all security flows in UI automation. |
+| Standard chat E2EE | Still open: active REST message route is not MLS-encrypted. | Requires an agreed backend/device-key/group-epoch contract and full migration; do not advertise universal E2EE. |
+| Standard cloud attachment E2EE | Still open: standard upload path remains server-readable. | Requires a client-side streaming encryption and key-wrapping design compatible with current backend storage. |
+| Call history sink | Still open/feature-gated until a supported call-log API contract exists. | Backend contract and persistence tests. |
+| Full-app QA | Still open. | Exact-head build, emulator/device matrix, screenshot/accessibility review and independent security testing. |
+
+See `docs/audit/KOTLIN_QUALITY_SCORECARD.md` for the evidence-based area ratings and acceptance gate. The 5/5 rating is not granted to any area lacking its required runtime evidence.
