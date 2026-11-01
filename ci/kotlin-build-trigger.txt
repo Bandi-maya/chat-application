@@ -37,3 +37,4 @@ Harden encrypted API session migration and verify streaming attachment path: 202
 Add regression coverage for secret-phrase cooldown; verify latest encrypted-session and streaming media changes: 2026-11-01
 Use a single legacy DataStore delegate for safe GoTrue token migration; verify latest auth storage and media changes: 2026-11-01
 Security and media hardening: Keystore auth sessions, no full-file RAM upload fallback, protected-chat credential revalidation, off-main-thread media indexing, and WebRTC screen-share cleanup. Build and test Kotlin branch: 2026-11-01
+CI source-overlay correction: restore branch-owned encrypted session, lock-gate, attachment, media-indexing, WebRTC, and regression-test files before compilation.
