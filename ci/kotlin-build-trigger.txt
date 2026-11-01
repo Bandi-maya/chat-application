@@ -86,3 +86,5 @@ Navigation/security/call hardening: fix SecurityFlowHost toast callback recursio
 Upload response parsing and robust Compose fixture import patch: 2026-11-01
 
 Kotlin quality pass: dedicated notifications inbox and settings separation; thread-safe event feed; GoTrue sign-out tombstone regression; stale call permission callback rejection; call-ID-bound notification hang-up; audit scorecard reconciliation: 2026-11-01
+
+Realtime account-scoped frame guard and release call-log cleanup verification: 2026-11-01
