@@ -217,6 +217,7 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/media/MediaLibraryService.kt \
             app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/media/PdfWorkspaceScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceHost.kt \
             app/src/test/java/com/example/chat/LocalLockServiceFullTest.kt \
             app/src/test/java/com/example/chat/ProtectedResourceGateParityTest.kt \
             app/src/test/java/com/example/chat/ui/media/MediaLibraryServiceHardeningTest.kt
