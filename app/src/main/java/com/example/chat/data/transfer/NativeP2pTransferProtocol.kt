@@ -28,7 +28,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 object NativeP2pTransferProtocol {
     const val MAX_FILE_BYTES: Long = 100L * 1024L * 1024L * 1024L
-    const val DEFAULT_CHUNK_BYTES: Int = 256 * 1024
+    const val DEFAULT_CHUNK_BYTES: Int = 48 * 1024
     private const val KEY_BYTES = 32
     private const val NONCE_PREFIX_BYTES = 4
     private const val GCM_TAG_BITS = 128
@@ -92,7 +92,7 @@ object NativeP2pTransferProtocol {
         require(source.isFile && source.canRead()) { "Source file is not readable" }
         val size = source.length()
         require(size in 1..MAX_FILE_BYTES) { "File must be between 1 byte and 100 GB" }
-        require(chunkBytes in (64 * 1024)..(1024 * 1024)) { "Unsupported chunk size" }
+        require(chunkBytes in (16 * 1024)..(64 * 1024)) { "Unsupported chunk size" }
         require(expiresAtEpochSeconds > System.currentTimeMillis() / 1000L) { "Transfer expiry must be in the future" }
         val safeName = source.name
             .replace(Regex("[\\\\/\\u0000-\\u001f]"), "_")
@@ -151,7 +151,7 @@ object NativeP2pTransferProtocol {
     fun verifyManifest(manifest: Manifest, authentication: ByteArray, secret: ByteArray, nowEpochSeconds: Long = System.currentTimeMillis() / 1000L) {
         if (manifest.expiresAtEpochSeconds <= nowEpochSeconds) throw SecurityException("This transfer link has expired")
         if (manifest.sizeBytes !in 1..MAX_FILE_BYTES) throw SecurityException("Invalid file size")
-        if (manifest.chunkBytes !in (64 * 1024)..(1024 * 1024)) throw SecurityException("Invalid chunk size")
+        if (manifest.chunkBytes !in (16 * 1024)..(64 * 1024)) throw SecurityException("Invalid chunk size")
         if (manifest.noncePrefix.size != NONCE_PREFIX_BYTES) throw SecurityException("Invalid transfer nonce")
         if (!manifest.sha256Hex.matches(Regex("[0-9a-f]{64}"))) throw SecurityException("Invalid file digest")
         val expected = authenticateManifest(manifest, secret)
