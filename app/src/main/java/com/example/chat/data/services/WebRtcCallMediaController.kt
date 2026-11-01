@@ -448,7 +448,7 @@ class WebRtcCallMediaController(
         var track: VideoTrack? = null
         var stream: MediaStream? = null
         return try {
-            capturer = ScreenCapturerAndroid(
+            val createdCapturer = ScreenCapturerAndroid(
                 permission,
                 object : MediaProjection.Callback() {
                     override fun onStop() {
@@ -458,23 +458,28 @@ class WebRtcCallMediaController(
                     }
                 },
             )
-            helper = SurfaceTextureHelper.create("chaty_screen", eglContext)
-            source = factory.createVideoSource(true)
-            capturer.initialize(helper, appContext, source.capturerObserver)
-            capturer.startCapture(1280, 720, 30)
-            track = factory.createVideoTrack("chaty_screen", source)
-            track.setEnabled(true)
-            stream = factory.createLocalMediaStream("chaty_screen_stream")
-            stream.addTrack(track)
-            if (!videoSender.setTrack(track, false)) {
+            capturer = createdCapturer
+            val createdHelper = SurfaceTextureHelper.create("chaty_screen", eglContext)
+            helper = createdHelper
+            val createdSource = factory.createVideoSource(true)
+            source = createdSource
+            createdCapturer.initialize(createdHelper, appContext, createdSource.capturerObserver)
+            createdCapturer.startCapture(1280, 720, 30)
+            val createdTrack = factory.createVideoTrack("chaty_screen", createdSource)
+            track = createdTrack
+            createdTrack.setEnabled(true)
+            val createdStream = factory.createLocalMediaStream("chaty_screen_stream")
+            stream = createdStream
+            createdStream.addTrack(createdTrack)
+            if (!videoSender.setTrack(createdTrack, false)) {
                 throw IllegalStateException("Unable to attach screen capture track.")
             }
 
-            screenCapturer = capturer
-            screenSurfaceTextureHelper = helper
-            screenVideoSource = source
-            screenVideoTrack = track
-            screenStream = stream
+            screenCapturer = createdCapturer
+            screenSurfaceTextureHelper = createdHelper
+            screenVideoSource = createdSource
+            screenVideoTrack = createdTrack
+            screenStream = createdStream
             screenCapturePermission = null // MediaProjection consent is single-use.
             true
         } catch (_: Exception) {
