@@ -403,8 +403,18 @@ class P2pFileTransferService(
             incoming.remove(invite.transferId); refreshPending()
             throw SecurityException("This transfer link has expired")
         }
-        val wire = WireManifest.parse(signal["manifest"])
-        val manifest = wire.protocol()
+        val wire = try {
+            WireManifest.parse(signal["manifest"])
+        } catch (error: Throwable) {
+            invite.secret.fill(0)
+            throw error
+        }
+        val manifest = try {
+            wire.protocol()
+        } catch (error: Throwable) {
+            invite.secret.fill(0)
+            throw error
+        }
         try {
             val authentication = signal["manifest_auth"]?.toString()?.takeIf { it.length <= 128 }
                 ?: throw SecurityException("Transfer authentication missing")
@@ -419,7 +429,11 @@ class P2pFileTransferService(
             invite.secret.fill(0)
             throw IllegalStateException("Not enough free storage to receive this file.")
         }
-        val session = Session(invite.transferId, offer.senderId, currentUserId() ?: throw SecurityException("Sign in before receiving a file."), null, manifest, invite.secret.copyOf(),
+        val localUserId = currentUserId() ?: run {
+            invite.secret.fill(0)
+            throw SecurityException("Sign in before receiving a file.")
+        }
+        val session = Session(invite.transferId, offer.senderId, localUserId, null, manifest, invite.secret.copyOf(),
             TransferDirection.download, destination = null, finalDestination = destination)
         val resumeKey = invite.transferId + "-" + manifest.sha256Hex.take(16)
         val partFile = File(destination.parentFile ?: appContext.filesDir, "." + resumeKey + ".part")
