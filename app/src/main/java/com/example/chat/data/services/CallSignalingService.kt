@@ -925,16 +925,21 @@ class CallSignalingService(
         roundTripTimeMs: Long = 0L,
     ) {
         val session = currentSession ?: return
-        if (!session.isActive || !session.isVideo || session.isDemo) return
+        // Adapt audio-only calls too. On voice calls the media controller updates
+        // only the Opus sender; video tracks simply do not exist.
+        if (!session.isActive || session.isDemo) return
+        val effectiveBandwidth = listOf(upstreamKbps, downstreamKbps)
+            .filter { it > 0 }
+            .minOrNull() ?: upstreamKbps
         val profile = when {
-            packetLossPercent >= 12.0 || roundTripTimeMs >= 1_500L || upstreamKbps in 1..69 ->
+            packetLossPercent >= 12.0 || roundTripTimeMs >= 1_500L || effectiveBandwidth in 1..69 ->
                 CallNetworkProfile.ultraWeak
-            packetLossPercent >= 6.0 || roundTripTimeMs >= 900L || upstreamKbps in 70..179 ->
+            packetLossPercent >= 6.0 || roundTripTimeMs >= 900L || effectiveBandwidth in 70..179 ->
                 CallNetworkProfile.weak
-            packetLossPercent >= 3.0 || roundTripTimeMs >= 550L || upstreamKbps in 180..449 ->
+            packetLossPercent >= 3.0 || roundTripTimeMs >= 550L || effectiveBandwidth in 180..449 ->
                 CallNetworkProfile.balanced
-            upstreamKbps in 450..899 -> CallNetworkProfile.strong
-            upstreamKbps >= 900 -> CallNetworkProfile.high
+            effectiveBandwidth in 450..899 -> CallNetworkProfile.strong
+            effectiveBandwidth >= 900 -> CallNetworkProfile.high
             else -> CallNetworkProfile.weak
         }.let { selected ->
             if (lowDataUsageEnabled() && selected.ordinal > CallNetworkProfile.balanced.ordinal) {
