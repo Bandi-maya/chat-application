@@ -473,6 +473,9 @@ class ApiRealtimeClient(
             restApiBaseUrl: String,
         ): String {
             val cleanUserId = userId.trim()
+            require(ApiPathSegments.safe(cleanUserId) != null) {
+                "WebSocket user ID contains invalid path characters."
+            }
             if (!customWebSocketUrl.isNullOrEmpty() && !customWebSocketUrl.contains("/ws/school")) {
                 val ws = customWebSocketUrl.trim()
                 if (ws.contains("{userId}") || ws.contains("\$userId")) {
