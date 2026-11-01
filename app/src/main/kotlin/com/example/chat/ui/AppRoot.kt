@@ -56,7 +56,7 @@ import androidx.compose.material.icons.rounded.Animation
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch, Notifications }
 
 private class AuthNavigationState {
     private var current by mutableStateOf(AuthRoute.Splash)
@@ -652,6 +652,7 @@ fun AppRoot() {
                                 onNewCall = { showCallPicker = true },
                                 onScanQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
                                 onOpenSettings = { pushedSettings = true },
+                    onOpenNotifications = { route = AuthRoute.Notifications },
                                 onOpenThemeStudio = { pushedThemeStudio = true },
                                 onOpenMessageScheduler = { pushedScheduled = true },
                                 onOpenAutoReplyRules = { pushedAutoReply = true },
@@ -1328,6 +1329,11 @@ fun AppRoot() {
                 }
             }
             } // Preserve Home's saved navigation state while a page is pushed.
+            AuthRoute.Notifications -> com.example.chat.ui.notifications.NotificationsInboxScreen(
+                service = ServiceLocator.notifications,
+                onBack = { navigation.goBack() },
+                onOpenSettings = { settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Notifications) },
+            )
             AuthRoute.Security -> com.example.chat.ui.settings.security.SecurityCenterScreen(
                 preferences = ServiceLocator.preferencesController,
                 lockService = ServiceLocator.localLockService,
