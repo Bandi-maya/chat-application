@@ -24,6 +24,16 @@ interface SecureKeyValueStore {
     suspend fun read(key: String): String?
     suspend fun write(key: String, value: String)
     suspend fun delete(key: String)
+
+    /** Atomic on Android implementations; compatibility default for test/platform adapters. */
+    suspend fun writeAll(values: Map<String, String>) {
+        values.forEach { (key, value) -> write(key, value) }
+    }
+
+    /** Atomic on Android implementations; compatibility default for test/platform adapters. */
+    suspend fun deleteAll(keys: Set<String>) {
+        keys.forEach { key -> delete(key) }
+    }
 }
 
 /**

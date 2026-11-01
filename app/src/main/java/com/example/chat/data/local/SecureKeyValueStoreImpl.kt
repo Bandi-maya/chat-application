@@ -7,16 +7,16 @@ import com.example.chat.data.e2ee.SecureKeyValueStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** EncryptedSharedPreferences-backed secure store (Android counterpart of
- *  flutter_secure_storage). Keys/values are AES-256-GCM/S2V encrypted with a
- *  Keystore-held master key, matching the Flutter app's security boundary:
- *  MLS db key, device id and signer material live only here. */
+/**
+ * Keystore-backed secret store. Every mutation waits for a durable encrypted
+ * preference commit and throws when Android reports that the write failed.
+ */
 class SecureKeyValueStoreImpl(context: Context) : SecureKeyValueStore {
 
     private val prefs = EncryptedSharedPreferences.create(
-        context,
+        context.applicationContext,
         "chaty_secure_store",
-        MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+        MasterKey.Builder(context.applicationContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
@@ -26,15 +26,27 @@ class SecureKeyValueStoreImpl(context: Context) : SecureKeyValueStore {
     }
 
     override suspend fun write(key: String, value: String): Unit = withContext(Dispatchers.IO) {
-        prefs.edit().putString(key, value).apply()
+        check(prefs.edit().putString(key, value).commit()) { "Unable to persist encrypted secure value." }
+    }
+
+    override suspend fun writeAll(values: Map<String, String>): Unit = withContext(Dispatchers.IO) {
+        val editor = prefs.edit()
+        values.forEach { (key, value) -> editor.putString(key, value) }
+        check(editor.commit()) { "Unable to persist encrypted secure values." }
     }
 
     override suspend fun delete(key: String): Unit = withContext(Dispatchers.IO) {
-        prefs.edit().remove(key).apply()
+        check(prefs.edit().remove(key).commit()) { "Unable to delete encrypted secure value." }
+    }
+
+    override suspend fun deleteAll(keys: Set<String>): Unit = withContext(Dispatchers.IO) {
+        val editor = prefs.edit()
+        keys.forEach(editor::remove)
+        check(editor.commit()) { "Unable to delete encrypted secure values." }
     }
 
     /** FlutterSecureStorage().deleteAll(): erase every secret in the store. */
     suspend fun deleteAll(): Unit = withContext(Dispatchers.IO) {
-        prefs.edit().clear().apply()
+        check(prefs.edit().clear().commit()) { "Unable to clear encrypted secure storage." }
     }
 }

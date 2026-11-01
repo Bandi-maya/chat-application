@@ -518,11 +518,53 @@ object SettingsRegistry {
     fun clustersForCategory(category: SettingsCategory): List<SettingsCluster> =
         clusters.filter { it.category == category }
 
-    /** ONE SETTING = ONE CANONICAL LOCATION. Throws on duplicate ids (source message omitted the id interpolation). */
-    fun validateInvariants(): Boolean {
+    /**
+     * Validates the complete catalog contract before the settings search/indexer
+     * consumes it. [validRoutes] can be supplied by the navigation host to
+     * verify that every declared destination is actually registered.
+     */
+    fun validateInvariants(validRoutes: Set<String>? = null): Boolean {
+        val clusterIds = HashSet<String>()
+        for (cluster in clusters) {
+            require(cluster.id.matches(Regex("^[a-z][a-z0-9_]*$"))) { "Invalid settings cluster ID: ${cluster.id}" }
+            require(clusterIds.add(cluster.id)) { "Duplicate settings cluster ID: ${cluster.id}" }
+            require(cluster.title.isNotBlank() && cluster.description.isNotBlank()) {
+                "Settings cluster ${cluster.id} must have a title and description."
+            }
+            require(cluster.settings.all { it.category == cluster.category }) {
+                "Settings cluster ${cluster.id} contains an item from another category."
+            }
+        }
+
         val ids = HashSet<String>()
-        for (s in allSettings) {
-            if (!ids.add(s.id)) throw AssertionError("Duplicate setting ID found: ")
+        for (setting in allSettings) {
+            require(setting.id.matches(Regex("^[a-z][a-z0-9_]*$"))) { "Invalid setting ID: ${setting.id}" }
+            require(ids.add(setting.id)) { "Duplicate setting ID: ${setting.id}" }
+            require(setting.title.isNotBlank() && setting.description.isNotBlank()) {
+                "Setting ${setting.id} must have a title and description."
+            }
+            require(setting.canonicalRoute.startsWith("/settings/") &&
+                !setting.canonicalRoute.contains("..") && !setting.canonicalRoute.contains("//")
+            ) { "Setting ${setting.id} has an invalid canonical route: ${setting.canonicalRoute}" }
+            validRoutes?.let { routes ->
+                require(setting.canonicalRoute in routes) {
+                    "Setting ${setting.id} points to an unregistered route: ${setting.canonicalRoute}"
+                }
+            }
+            when (setting.controlType) {
+                SettingControlType.toggle -> require(setting.defaultValue is Boolean) {
+                    "Toggle ${setting.id} must define a Boolean default value."
+                }
+                SettingControlType.singleChoice -> require(setting.defaultValue is String) {
+                    "Single-choice setting ${setting.id} must define a String default value."
+                }
+                SettingControlType.slider -> require(setting.defaultValue is Number) {
+                    "Slider ${setting.id} must define a numeric default value."
+                }
+                SettingControlType.previewSelector,
+                SettingControlType.action,
+                SettingControlType.navigationLink -> Unit
+            }
         }
         return true
     }
