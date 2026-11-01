@@ -220,7 +220,7 @@ class ApiBackendService(
         )
     }
 
-    private val realtimeListener = object : ApiRealtimeClient.Listener {
+    private val realtimeListener: ApiRealtimeClient.Listener = object : ApiRealtimeClient.Listener {
         override fun onNewMessage(message: ChatMessage) {
             var unknownRoom = false
             var isNewToList = false
