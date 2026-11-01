@@ -58,7 +58,7 @@ class ApiDeviceTokenClient(
 
     /** Port of ApiBackendService.unregisterDeviceToken. */
     fun unregisterDeviceToken(fcmToken: String) {
-        val bearer = token()
+        val bearer = token()?.takeIf { it.isNotBlank() } ?: return
         val safeToken = safeFcmToken(fcmToken) ?: return
         if (bearer.isNullOrBlank()) return
         val base = restApiBaseUrl().trimEnd('/')
