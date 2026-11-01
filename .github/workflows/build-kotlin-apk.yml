@@ -143,6 +143,9 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionDetailSheet.kt \
             app/src/main/res/xml/file_paths.xml \
             app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt \
+            app/src/main/java/com/example/chat/data/api/ApiRealtimeClient.kt \
+            app/src/main/java/com/example/chat/data/messaging/ConversationsRepository.kt \
+            app/src/main/kotlin/com/example/chat/ui/ChatVoiceBinding.kt \
             app/src/main/kotlin/com/example/chat/ServiceLocator.kt \
             app/src/main/kotlin/com/example/chat/ui/AppRoot.kt \
             app/src/main/java/com/example/chat/domain/models/ChatMessage.kt \
