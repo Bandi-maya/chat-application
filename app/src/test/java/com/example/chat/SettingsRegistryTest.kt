@@ -11,7 +11,7 @@ class SettingsRegistryTest {
     @Test
     fun registryContainsUniqueValidatedSettingContracts() {
         assertTrue(SettingsRegistry.validateInvariants())
-        assertEquals(42, SettingsRegistry.allSettings.size)
+        assertEquals(41, SettingsRegistry.allSettings.size)
         assertEquals(20, SettingsRegistry.clusters.size)
         assertEquals("account_display_name", SettingsRegistry.allSettings.first().id)
         assertEquals(13, SettingsCategory.values().size)
