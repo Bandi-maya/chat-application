@@ -71,6 +71,12 @@ class CallForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Direct proof/test starts and lifecycle-owned starts both carry an
+        // owner-qualified token. Keep the owner prefix so a stale test or
+        // coordinator stop cannot stop a service owned by another caller.
+        intent?.getStringExtra(EXTRA_OWNER)?.substringBefore(':')?.takeIf { it.isNotBlank() }?.let { owner ->
+            synchronized(ownerLock) { activeOwnerToken = owner }
+        }
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Chaty call"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) == true
@@ -183,6 +189,7 @@ class CallForegroundService : Service() {
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
         const val EXTRA_SCREEN_PROJECTION = "chaty.call.screen_projection"
         const val EXTRA_CALL_ID = "chaty.call.call_id"
+        const val EXTRA_OWNER = "chaty.call.owner"
 
         private fun activeCallId(context: Context): String? =
             runCatching { com.example.chat.ServiceLocator.callSignaling.currentSession?.callId }.getOrNull()
