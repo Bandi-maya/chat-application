@@ -147,7 +147,7 @@ Apply these contracts to every interactive component, not only screens:
 - Custom-backend attachment uploads now stage from URI to disk and use streaming file upload; the uploader refuses a full-file RAM fallback. The ordinary chat attachment cap remains unchanged.
 - Protected-chat setup now re-reads the persisted credential before granting access; secret-phrase attempts use the lockout cooldown.
 - Media-library indexing now runs on Dispatchers.IO, skips hidden/transient partial uploads, propagates cancellation and prevents stale scan results replacing newer snapshots.
-- Screen-share startup now waits for the active call foreground service to acknowledge the Android mediaProjection service type before constructing ScreenCapturerAndroid. The manifest declares the mediaProjection foreground-service permission/type. API-level device tests, user-revocation lifecycle proof and release build evidence remain outstanding.
+- Screen-share startup now waits for the active call foreground service to acknowledge the Android mediaProjection service type before constructing ScreenCapturerAndroid. The manifest declares the mediaProjection foreground-service permission/type. Projection stop/revocation now resets call screen-share state so the service can drop the mediaProjection type. API-level device tests and release build evidence remain outstanding.
 - MLS attachment exporter material exists, but attachment bytes are not yet encrypted end-to-end on every upload/download path. Do not describe media attachments as E2EE until encrypted storage, recipient-side decryption, tamper rejection and membership/epoch tests all pass.
 - CI candidate overlay restore list was expanded for branch-owned hardening sources so the build job compiles the intended versions.
 
