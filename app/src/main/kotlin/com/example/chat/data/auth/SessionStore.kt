@@ -7,7 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 
-private val Context.sessionDataStore by preferencesDataStore(name = "chaty_session")
+internal val Context.sessionDataStore by preferencesDataStore(name = "chaty_session")
 
 /**
  * Persists the GoTrue session, mirroring supabase_flutter's local session
