@@ -424,11 +424,6 @@ object ServiceLocator {
             onPendingEnqueued = { appScope.launch { outgoingQueue.processQueue() } },
             snapshotCache = snapshotCache,
             snapshotScope = appScope,
-            scopeSnapshot = { apiBackend.authSnapshot() },
-            withScope = { expected, action ->
-                (expected as? com.example.chat.data.api.ApiAccountScope)
-                    ?.let { apiBackend.withAuthScope(it, action) } ?: false
-            },
             onAttachmentsGone = { refs -> invalidateMediaFor(refs) },
             // Dart backend_service _shouldSendReadReceipts: ghost mode, readReceipts and blue-ticks-after-reply.
             shouldSendReadReceipts = { conversationId ->
