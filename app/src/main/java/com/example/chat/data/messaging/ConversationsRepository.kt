@@ -53,6 +53,9 @@ class ConversationsRepository(
     private val snapshotCache: SnapshotCacheStore? = null,
     /** Scope for the Dart-unawaited snapshot writes. */
     private val snapshotScope: kotlinx.coroutines.CoroutineScope? = null,
+    /** Account-scope capture/guard: stale responses from a previous login cannot mutate this repository. */
+    private val scopeSnapshot: () -> Any? = { null },
+    private val withScope: (Any?, () -> Unit) -> Boolean = { _, action -> action(); true },
     /** Called with the attachments of messages that were deleted/removed so local media copies can be invalidated.
      *  Default no-op; must not throw (guarded) and must not block for long. */
     private val onAttachmentsGone: (List<com.example.chat.data.local.AttachmentRef>) -> Unit = {},
@@ -73,6 +76,7 @@ class ConversationsRepository(
 
     @Suppress("UNCHECKED_CAST")
     suspend fun loadConversations(loadMembers: Boolean = true) {
+        val expectedScope = scopeSnapshot()
         val raw = rpc.rpc("get_my_conversations", emptyMap())
         val rows = raw as? List<*> ?: emptyList<Any?>()
         val next = LinkedHashMap<String, Conversation>()
@@ -105,12 +109,15 @@ class ConversationsRepository(
             next[id] = conversation
         }
 
-        conversationsById.clear()
-        conversationsById.putAll(next)
-        messagesByChatId.keys.retainAll(next.keys)
-        // Dart: unawaited(_persistConversationSnapshot()) - failures logged,
-        // never fatal.
-        snapshotScope?.launch { persistConversationSnapshot() }
+        val applied = withScope(expectedScope) {
+            conversationsById.clear()
+            conversationsById.putAll(next)
+            messagesByChatId.keys.retainAll(next.keys)
+            // Dart: unawaited(_persistConversationSnapshot()) - failures logged,
+            // never fatal.
+            snapshotScope?.launch { persistConversationSnapshot() }
+        }
+        if (!applied) return
 
         if (loadMembers) {
             coroutineScope {
@@ -144,6 +151,7 @@ class ConversationsRepository(
 
     @Suppress("UNCHECKED_CAST")
     suspend fun loadMessages(conversationId: String) {
+        val expectedScope = scopeSnapshot()
         val raw = rpc.rpc(
             "get_conversation_messages",
             mapOf(
@@ -175,21 +183,25 @@ class ConversationsRepository(
             }
         }
         messages.sortBy { it.createdAt }
-        val heldBefore = messagesByChatId[conversationId]?.toList()
-        messagesByChatId[conversationId] = messages
-        notifyGone(com.example.chat.data.media.AttachmentRefs.refsGone(conversationId, heldBefore, messages))
+        var heldBefore: List<ChatMessage>? = null
+        val applied = withScope(expectedScope) {
+            heldBefore = messagesByChatId[conversationId]?.toList()
+            messagesByChatId[conversationId] = messages
+            notifyGone(com.example.chat.data.media.AttachmentRefs.refsGone(conversationId, heldBefore, messages))
 
-        val conversation = conversationsById[conversationId]
-        if (conversation != null && messages.isNotEmpty()) {
-            val latest = messages.last()
-            conversationsById[conversationId] = conversation.copy(
-                lastMessageText = latest.text,
-                lastMessageTime = latest.createdAt,
-                lastMessageSenderId = latest.senderId,
-            )
+            val conversation = conversationsById[conversationId]
+            if (conversation != null && messages.isNotEmpty()) {
+                val latest = messages.last()
+                conversationsById[conversationId] = conversation.copy(
+                    lastMessageText = latest.text,
+                    lastMessageTime = latest.createdAt,
+                    lastMessageSenderId = latest.senderId,
+                )
+            }
+            // Dart: unawaited(_persistMessageSnapshot(conversationId, ..)).
+            snapshotScope?.launch { persistMessageSnapshot(conversationId, messagesByChatId[conversationId]) }
         }
-        // Dart: unawaited(_persistMessageSnapshot(conversationId, ..)).
-        snapshotScope?.launch { persistMessageSnapshot(conversationId, messagesByChatId[conversationId]) }
+        if (!applied) return
     }
 
     /** Exact port of _persistConversationSnapshot. */
