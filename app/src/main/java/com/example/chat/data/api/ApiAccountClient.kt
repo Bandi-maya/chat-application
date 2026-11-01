@@ -34,6 +34,7 @@ class ApiAccountClient(
         allowUserRegistration: Boolean,
     ): Boolean {
         val clean = organizationIdOrTenantId.trim()
+        val safeId = safeOrganizationSegment(clean) ?: return false
         val headers = mutableMapOf(
             "Content-Type" to "application/json",
             "x-tenant-id" to tenantId(),
@@ -41,10 +42,23 @@ class ApiAccountClient(
         token()?.let { headers["Authorization"] = "Bearer $it" }
         val body = JSONObject().put("allow_user_registration", allowUserRegistration).toString()
         val response = transport.execute(
-            "PATCH", "${baseUrl()}/organization/$clean/registration", headers, body,
+            "PATCH", "${baseUrl()}/organization/$safeId/registration", headers, body,
         )
         return response.first == 200
     }
+
+    private fun safeOrganizationSegment(value: String): String? =
+        value.takeIf { candidate ->
+            candidate.length in 1..64 && candidate != "." && candidate != ".." &&
+                candidate.first().isLetterOrDigit() &&
+                candidate.all { it.isLetterOrDigit() || it == '-' || it == '_' || it == '.' }
+        }
+
+    private fun safeMultipartFilename(value: String): String =
+        value.replace(Regex("[\\\\/\\r\\n\\u0000-\\u001f\\\"\\\\]"), "_")
+            .trim()
+            .take(120)
+            .ifBlank { "upload.bin" }
 
     /** Dart uploadProfilePhoto: multipart POST of field `file`; 404 retries
      *  against /api/v1; 200 returns (data.avatarUrl ?: data.url ?: ''); the
@@ -56,7 +70,7 @@ class ApiAccountClient(
             "x-tenant-id" to tenantId(),
             "Content-Type" to "multipart/form-data; boundary=$BOUNDARY",
         )
-        val body = buildMultipartBody(filename, bytes)
+        val body = buildMultipartBody(safeMultipartFilename(filename), bytes)
 
         val response: Pair<Int, String> = try {
             val primary = binaryTransport.execute(

@@ -235,9 +235,15 @@ class ApiAuthClient(
     fun checkOrganization(workspace: String): Map<String, Any?> {
         val clean = workspace.trim()
         if (clean.isEmpty()) throw Exception("Organization ID cannot be empty")
+        val safeWorkspace = clean.takeIf { value ->
+            value.length <= 64 && value != "." && value != ".." &&
+                value.first().isLetterOrDigit() &&
+                value.all { it.isLetterOrDigit() || it == '-' || it == '_' || it == '.' }
+        } ?: throw IllegalArgumentException("Organization ID contains invalid characters.")
+        val encodedWorkspace = java.net.URLEncoder.encode(safeWorkspace, "UTF-8")
 
-        val primary = "${baseUrl()}/organization/check/$clean"
-        val fallback = "${baseUrl()}/tenants/config?tenant_id=$clean"
+        val primary = "${baseUrl()}/organization/$encodedWorkspace"
+        val fallback = "${baseUrl()}/tenants/config?tenant_id=$encodedWorkspace"
         var response: Pair<Int, String>? = null
         try {
             response = transport.execute("GET", primary, emptyMap(), null)

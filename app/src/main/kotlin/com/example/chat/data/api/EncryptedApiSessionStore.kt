@@ -3,8 +3,14 @@ package com.example.chat.data.api
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import org.json.JSONObject
 
-/** Keystore-backed persistence for custom API session credentials. */
+/**
+ * Keystore-backed persistence for the custom API session. Session identity
+ * is treated as an indivisible token/user pair: credentials from encrypted
+ * and legacy stores are never mixed. A durable clear marker prevents a failed
+ * legacy deletion from resurrecting a signed-out user on next launch.
+ */
 class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
     private val app = context.applicationContext
     private val secure by lazy {
@@ -20,19 +26,42 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
 
     @Synchronized
     private fun migrate() {
+        if (secure.getBoolean(CLEARED, false)) {
+            // The marker is committed before legacy deletion; old credentials
+            // cannot be restored even if the following cleanup fails.
+            legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()
+            return
+        }
+
         val encryptedToken = secure.getString(TOKEN, null)
         val encryptedUser = secure.getString(USER, null)
-        val encryptedRefresh = secure.getString(REFRESH, null)
+        val hasEncryptedPair = !encryptedToken.isNullOrBlank() && !encryptedUser.isNullOrBlank()
+        if (hasEncryptedPair) {
+            legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()
+            return
+        }
+
+        // Never pair an encrypted token with a legacy user, or vice versa.
+        // Migrate only a complete legacy pair after the encrypted pair is
+        // absent. Malformed identity JSON is discarded instead of restored.
         val oldToken = legacy.getString(TOKEN, null)
         val oldUser = legacy.getString(USER, null)
-        val oldRefresh = legacy.getString(REFRESH, null)
+        if (oldToken.isNullOrBlank() || oldUser.isNullOrBlank()) return
+        val userIsValid = runCatching {
+            apiUserFromJson(oldUser).id.isNotBlank()
+        }.getOrDefault(false)
+        if (!userIsValid) {
+            check(legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()) {
+                "Unable to remove an invalid legacy API session."
+            }
+            return
+        }
 
-        val token = encryptedToken ?: oldToken
-        val user = encryptedUser ?: oldUser
-        if (token.isNullOrBlank() || user.isNullOrBlank()) return
-
-        val editor = secure.edit().putString(TOKEN, token).putString(USER, user)
-        (encryptedRefresh ?: oldRefresh)?.let { editor.putString(REFRESH, it) }
+        val editor = secure.edit()
+            .putString(TOKEN, oldToken)
+            .putString(USER, oldUser)
+            .remove(CLEARED)
+        legacy.getString(REFRESH, null)?.let { editor.putString(REFRESH, it) }
         check(editor.commit()) { "Unable to migrate API session into encrypted storage." }
         check(legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()) {
             "Unable to remove migrated plaintext API session."
@@ -41,28 +70,42 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
 
     override fun loadToken(): String? = synchronized(this) {
         migrate()
-        secure.getString(TOKEN, null)
+        if (secure.getBoolean(CLEARED, false)) null else secure.getString(TOKEN, null)
     }
 
     override fun loadUserJson(): String? = synchronized(this) {
         migrate()
-        secure.getString(USER, null)
+        if (secure.getBoolean(CLEARED, false)) null else secure.getString(USER, null)
     }
 
     override fun save(token: String, userJson: String): Unit = synchronized(this) {
-        check(secure.edit().putString(TOKEN, token).putString(USER, userJson).remove(REFRESH).commit()) {
-            "Unable to persist encrypted API session."
+        require(token.isNotBlank()) { "API access token must not be blank." }
+        val user = runCatching { apiUserFromJson(userJson) }.getOrElse {
+            throw IllegalArgumentException("API session user payload is invalid.", it)
         }
+        require(user.id.isNotBlank()) { "API session user ID must not be blank." }
+        check(
+            secure.edit()
+                .putString(TOKEN, token)
+                .putString(USER, userJson)
+                .remove(REFRESH)
+                .remove(CLEARED)
+                .commit(),
+        ) { "Unable to persist encrypted API session." }
+        // Encrypted pair is authoritative if legacy cleanup fails.
         legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()
         Unit
     }
 
     override fun loadRefreshToken(): String? = synchronized(this) {
         migrate()
-        secure.getString(REFRESH, null)
+        if (secure.getBoolean(CLEARED, false)) null else secure.getString(REFRESH, null)
     }
 
     override fun saveRefreshToken(token: String?): Unit = synchronized(this) {
+        if (secure.getBoolean(CLEARED, false) && !token.isNullOrBlank()) {
+            throw IllegalStateException("Cannot persist a refresh token without an active API session.")
+        }
         val editor = secure.edit()
         if (token.isNullOrBlank()) editor.remove(REFRESH) else editor.putString(REFRESH, token)
         check(editor.commit()) { "Unable to persist encrypted API refresh token." }
@@ -71,8 +114,19 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
     }
 
     override fun clear(): Unit = synchronized(this) {
-        secure.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()
-        legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()
+        // Commit the tombstone with credential removal first. If deleting the
+        // old plaintext copy fails, migrate() will still refuse to restore it.
+        check(
+            secure.edit()
+                .remove(TOKEN)
+                .remove(USER)
+                .remove(REFRESH)
+                .putBoolean(CLEARED, true)
+                .commit(),
+        ) { "Unable to clear encrypted API session." }
+        check(legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()) {
+            "API session is disabled but stale legacy credentials could not be removed."
+        }
         Unit
     }
 
@@ -80,5 +134,6 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
         const val TOKEN = "api_hub_token"
         const val USER = "api_hub_user"
         const val REFRESH = "api_hub_refresh_token"
+        const val CLEARED = "api_hub_session_cleared"
     }
 }
