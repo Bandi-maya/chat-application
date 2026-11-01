@@ -214,7 +214,7 @@ fun PdfWorkspaceScreen(
                                 letterSpacing = 1.1.sp, fontWeight = FontWeight.W800, color = Color.Gray,
                             ),
                         )
-                        IconButton(onClick = { library.refreshLibrary() }) {
+                        IconButton(onClick = { scope.launch { library.refreshLibrary() } }) {
                             Icon(Icons.Rounded.Refresh, contentDescription = "Refresh", modifier = Modifier.size(18.dp))
                         }
                     }
