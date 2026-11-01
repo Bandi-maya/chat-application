@@ -44,19 +44,19 @@ class EncryptedGoTrueSessionStorage(private val context: Context) : SessionStora
         }
 
         val old = context.sessionDataStore.data.first()
-        val oldAccess = old[stringPreferencesKey("access_token")]
-        val oldRefresh = old[stringPreferencesKey("refresh_token")]
-        val oldExpiry = old[longPreferencesKey("expires_at_epoch_ms")]
-        val oldUser = old[stringPreferencesKey("user_id")]
-        if (oldAccess.isNullOrBlank() || oldRefresh.isNullOrBlank() || oldExpiry == null || oldUser.isNullOrBlank()) {
+        val access = p.getString(ACCESS, null) ?: old[stringPreferencesKey("access_token")]
+        val refresh = p.getString(REFRESH, null) ?: old[stringPreferencesKey("refresh_token")]
+        val expiry = p.getLong(EXPIRY, 0L).takeIf { it > 0L } ?: old[longPreferencesKey("expires_at_epoch_ms")]
+        val user = p.getString(USER, null) ?: old[stringPreferencesKey("user_id")]
+        if (access.isNullOrBlank() || refresh.isNullOrBlank() || expiry == null || user.isNullOrBlank()) {
             return@withContext null
         }
-        check(p.edit().putString(ACCESS, oldAccess).putString(REFRESH, oldRefresh)
-            .putLong(EXPIRY, oldExpiry).putString(USER, oldUser).commit()) {
+        check(p.edit().putString(ACCESS, access).putString(REFRESH, refresh)
+            .putLong(EXPIRY, expiry).putString(USER, user).commit()) {
             "Could not migrate sign-in session to encrypted storage."
         }
         context.sessionDataStore.edit { it.clear() }
-        SessionStore.StoredSession(oldAccess, oldRefresh, oldExpiry, oldUser)
+        SessionStore.StoredSession(access, refresh, expiry, user)
     }
 
     override suspend fun clear() {
