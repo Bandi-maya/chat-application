@@ -301,7 +301,16 @@ class CallSignalingService(
     /** Dart initialize(): one-time guard shared by concurrent callers. */
     /** Reuse the same authenticated TURN/STUN credential provider for file DataChannels. */
     suspend fun iceServersForTransfer(): List<Map<String, Any?>> =
-        runCatching { iceServersProvider() }.getOrElse { defaultIceServers() }
+        try {
+            iceServersProvider()
+        } catch (error: Exception) {
+            android.util.Log.w(
+                "ChatyICE",
+                "TURN credentials unavailable; falling back to STUN-only connectivity",
+                error,
+            )
+            defaultIceServers()
+        }
 
     fun initialize() {
         if (initialized) return
