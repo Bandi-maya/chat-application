@@ -133,7 +133,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                 override suspend fun upload(type: String, file: PickedFile, durationSeconds: Int): MessageAttachment {
                     // Camera captures arrive as a file path (no picker bytes): read them here,
                     // matching Dart ChatMediaService.uploadFile(sourcePath:).
-                    val stagedFile = file.path?.let(::java.io.File)
+                    val stagedFile = file.path?.let { java.io.File(it) }
                     if (api.isAuthenticated && stagedFile != null) {
                         try {
                             val uploaded = api.uploadMedia(stagedFile) { _, _ -> }
