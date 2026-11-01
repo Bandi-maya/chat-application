@@ -231,6 +231,7 @@ class CallForegroundService : Service() {
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
         private const val ACTION_STOP = "chaty.call.STOP"
         const val EXTRA_SESSION_ID = "chaty.call.session_id"
+        const val EXTRA_CALL_ID = EXTRA_SESSION_ID
         const val EXTRA_OWNER = "chaty.call.owner"
         private const val EXTRA_STOP_OWNER = "chaty.call.stop_owner"
 
