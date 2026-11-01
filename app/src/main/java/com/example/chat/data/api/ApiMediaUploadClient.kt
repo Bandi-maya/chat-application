@@ -2,6 +2,7 @@ package com.example.chat.data.api
 
 import java.io.File
 import org.json.JSONObject
+import okio.buffer
 
 /** Media upload plane of the api branch's ApiBackendService.uploadMedia
  *  (lib/data/services/api_backend_service.dart:1569-1606): POST a single
@@ -154,7 +155,8 @@ class ApiMediaUploadClient(
                             onProgress(transferred, total)
                         }
                     }
-                    multipart.writeTo(okio.buffer(forwarding))
+                    multipart.writeTo(forwarding.buffer())
+                    forwarding.flush()
                 }
             }
             val request = okhttp3.Request.Builder()
