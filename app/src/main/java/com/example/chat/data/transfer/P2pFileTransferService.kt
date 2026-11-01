@@ -1,7 +1,11 @@
 package com.example.chat.data.transfer
 
 import android.content.Context
+import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.util.Base64
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.example.chat.data.network.TransferDirection
 import com.example.chat.data.network.TransferKind
 import com.example.chat.data.network.TransferMonitor
@@ -128,6 +132,7 @@ class P2pFileTransferService(
         val direction: TransferDirection,
         var sourceChannel: FileChannel? = null,
         var sourceOwner: java.io.Closeable? = null,
+        var sourceUri: String? = null,
         var peer: PeerConnection? = null,
         var channel: DataChannel? = null,
         var ledger: ChunkReceiptLedger? = null,
@@ -151,6 +156,16 @@ class P2pFileTransferService(
     )
 
     private val appContext = context.applicationContext
+    private val resumePrefs by lazy {
+        EncryptedSharedPreferences.create(
+            appContext,
+            "chaty_p2p_sender_resume",
+            MasterKey.Builder(appContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
+    }
+    private val restoringUploads = ConcurrentHashMap.newKeySet<String>()
     private val factory: PeerConnectionFactory
     private val sessions = ConcurrentHashMap<String, Session>()
     private val incoming = ConcurrentHashMap<String, Pair<PendingOffer, Map<String, Any?>>>()
@@ -165,6 +180,7 @@ class P2pFileTransferService(
             PeerConnectionFactory.InitializationOptions.builder(appContext).setEnableInternalTracer(false).createInitializationOptions(),
         )
         factory = PeerConnectionFactory.builder().createPeerConnectionFactory()
+        scope.launch(Dispatchers.IO) { restorePersistedUploadSnapshots() }
     }
 
     /** Creates the P2P offer and returns a link whose fragment is secret material. */
@@ -183,8 +199,11 @@ class P2pFileTransferService(
         )
         val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
         val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes, manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
-        val session = Session(invite.transferId, targetUserId, localUserId, file, manifest, invite.secret.copyOf(),
-            TransferDirection.upload)
+        val session = Session(
+            invite.transferId, targetUserId, localUserId, file, manifest, invite.secret.copyOf(),
+            TransferDirection.upload, sourceUri = file.toURI().toString(),
+        )
+        persistSenderResume(session)
         sessions[invite.transferId] = session
         val monitorId = transferMonitor.begin(
             TransferDirection.upload, when {
@@ -231,6 +250,7 @@ class P2pFileTransferService(
         mimeType: String,
         sourceOwner: java.io.Closeable? = null,
         linkExpirySeconds: Long = 7L * 24L * 60L * 60L,
+        sourceUri: String? = null,
     ): String = withContext(Dispatchers.IO) {
         val localUserId = currentUserId() ?: throw SecurityException("Sign in before sending a file.")
         require(targetUserId.isNotBlank() && targetUserId != localUserId) { "Choose a valid recipient" }
@@ -243,8 +263,11 @@ class P2pFileTransferService(
         val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
         val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes,
             manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
-        val session = Session(invite.transferId, targetUserId, localUserId, null, manifest, invite.secret.copyOf(),
-            TransferDirection.upload, sourceChannel = source, sourceOwner = sourceOwner)
+        val session = Session(
+            invite.transferId, targetUserId, localUserId, null, manifest, invite.secret.copyOf(),
+            TransferDirection.upload, sourceChannel = source, sourceOwner = sourceOwner, sourceUri = sourceUri,
+        )
+        persistSenderResume(session)
         sessions[invite.transferId] = session
         val kind = when {
             mimeType.startsWith("video/") -> TransferKind.video
@@ -362,10 +385,16 @@ class P2pFileTransferService(
                 else session.peer?.addIceCandidate(ice)
             }
             "file_transfer_restart_request" -> {
-                sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.upload }?.let {
-                    it.restartAttempts = 0
-                    it.restartInProgress = false
-                    restartIce(it)
+                val active = sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.upload }
+                if (active != null) {
+                    active.restartAttempts = 0
+                    active.restartInProgress = false
+                    restartIce(active)
+                } else {
+                    // The sender process may have died. Re-open the persisted,
+                    // app-granted source URI and re-offer the same manifest so
+                    // the recipient's durable chunk ledger can continue.
+                    restoreSenderSession(id, sender)
                 }
             }
             "file_transfer_cancel" -> {
@@ -485,14 +514,21 @@ class P2pFileTransferService(
         }
     }
 
-    /** User-requested retry after a long outage; keeps the chunk ledger and source descriptor. */
+    /** User-requested retry after an outage; sender descriptors can be restored after process death. */
     fun retryTransfer(transferId: String): Boolean {
-        val session = sessions[transferId] ?: return false
+        val session = sessions[transferId]
+        if (session == null) {
+            val record = runCatching { loadSenderResumeRecord(transferId) }.getOrNull() ?: return false
+            if (currentUserId() != record.optString("local_user_id")) return false
+            scope.launch { restoreSenderSession(transferId, record.optString("peer_user_id")) }
+            return true
+        }
         if (currentUserId() != session.localUserId) return false
         session.restartAttempts = 0
         session.restartInProgress = false
         if (session.direction == TransferDirection.upload) {
-            restartIce(session)
+            if (session.peer == null) scope.launch { startRestoredSenderOffer(session) }
+            else restartIce(session)
         } else {
             session.remoteDescriptionSet = false
             session.signalingReady = false
@@ -509,6 +545,7 @@ class P2pFileTransferService(
     }
     fun cancel(transferId: String) {
         val session = sessions[transferId] ?: return
+        if (session.direction == TransferDirection.upload) clearSenderResume(transferId)
         sendSignalScoped(session, mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
         fail(session, "Cancelled")
     }
@@ -735,6 +772,7 @@ class P2pFileTransferService(
     }
 
     private fun completeSender(session: Session) {
+        clearSenderResume(session.id)
         session.monitorId?.let { transferMonitor.finish(it) }
         publish(session, "Sent")
         session.channel?.close()
@@ -753,6 +791,7 @@ class P2pFileTransferService(
         }
         incoming.clear()
         incomingCandidates.clear()
+        scope.launch(Dispatchers.IO) { runCatching { resumePrefs.edit().clear().commit() } }
         _pendingOffers.value = emptyList()
     }
 
@@ -921,6 +960,209 @@ class P2pFileTransferService(
             bytes, session.direction, status, error, path,
         )
         _transfers.value = (_transfers.value.filterNot { it.transferId == session.id } + item).takeLast(40)
+    }
+
+    private fun senderResumeKey(transferId: String) = "sender_" + transferId
+
+    /** Secrets and the persisted source URI are stored only in Keystore-backed preferences. */
+    private fun persistSenderResume(session: Session) {
+        val sourceUri = session.sourceUri ?: return
+        if (session.direction != TransferDirection.upload) return
+        val manifest = session.manifest
+        val record = JSONObject()
+            .put("transfer_id", session.id)
+            .put("local_user_id", session.localUserId)
+            .put("peer_user_id", session.peerUserId)
+            .put("source_uri", sourceUri)
+            .put("display_name", manifest.displayName)
+            .put("mime_type", manifest.mimeType)
+            .put("size_bytes", manifest.sizeBytes)
+            .put("chunk_bytes", manifest.chunkBytes)
+            .put("sha256", manifest.sha256Hex)
+            .put("nonce_prefix", b64(manifest.noncePrefix))
+            .put("expires_at", manifest.expiresAtEpochSeconds)
+            .put("secret", b64(session.secret))
+        check(resumePrefs.edit().putString(senderResumeKey(session.id), record.toString()).commit()) {
+            "Unable to save encrypted transfer resume state."
+        }
+    }
+
+    private fun loadSenderResumeRecord(transferId: String): JSONObject? {
+        val canonical = runCatching { java.util.UUID.fromString(transferId).toString() }.getOrNull()
+        if (canonical != transferId) return null
+        val raw = resumePrefs.getString(senderResumeKey(transferId), null) ?: return null
+        val record = runCatching { JSONObject(raw) }.getOrNull() ?: run {
+            clearSenderResume(transferId)
+            return null
+        }
+        if (record.optString("transfer_id") != transferId ||
+            record.optString("source_uri").isBlank() ||
+            record.optString("secret").length !in 40..64
+        ) {
+            clearSenderResume(transferId)
+            return null
+        }
+        return record
+    }
+
+    private fun clearSenderResume(transferId: String) {
+        runCatching { resumePrefs.edit().remove(senderResumeKey(transferId)).commit() }
+    }
+
+    private fun restorePersistedUploadSnapshots() {
+        val activeUser = currentUserId() ?: return
+        val snapshots = runCatching {
+            resumePrefs.all.entries.mapNotNull { (_, value) ->
+                if (value !is String) return@mapNotNull null
+                val record = runCatching { JSONObject(value) }.getOrNull() ?: return@mapNotNull null
+                if (record.optString("local_user_id") != activeUser) return@mapNotNull null
+                val id = record.optString("transfer_id")
+                val size = record.optLong("size_bytes", 0L)
+                if (id.isBlank() || size <= 0L) return@mapNotNull null
+                TransferState(
+                    transferId = id,
+                    peerUserId = record.optString("peer_user_id"),
+                    fileName = record.optString("display_name", "Large file"),
+                    totalBytes = size,
+                    transferredBytes = 0L,
+                    direction = TransferDirection.upload,
+                    status = "Paused — source ready to resume",
+                    error = "Retry direct transfer to reconnect using the saved file permission.",
+                )
+            }
+        }.getOrDefault(emptyList())
+        if (snapshots.isNotEmpty()) {
+            _transfers.value = (_transfers.value.filterNot { old -> snapshots.any { it.transferId == old.transferId } } + snapshots).takeLast(40)
+        }
+    }
+
+    private suspend fun restoreSenderSession(transferId: String, expectedPeerId: String?): Boolean {
+        if (sessions.containsKey(transferId)) return true
+        if (!restoringUploads.add(transferId)) return false
+        try {
+            val record = withContext(Dispatchers.IO) { loadSenderResumeRecord(transferId) } ?: return false
+            val localId = record.optString("local_user_id")
+            val peerId = record.optString("peer_user_id")
+            if (currentUserId() != localId || peerId.isBlank() ||
+                (!expectedPeerId.isNullOrBlank() && peerId != expectedPeerId)
+            ) throw SecurityException("Saved transfer belongs to a different account or recipient.")
+
+            val secret = unb64(record.getString("secret"))
+            if (secret.size != 32) {
+                secret.fill(0)
+                throw SecurityException("Saved transfer secret is invalid.")
+            }
+            try {
+                val manifest = NativeP2pTransferProtocol.Manifest(
+                    transferId = transferId,
+                    displayName = record.getString("display_name"),
+                    mimeType = record.getString("mime_type"),
+                    sizeBytes = record.getLong("size_bytes"),
+                    chunkBytes = record.getInt("chunk_bytes"),
+                    sha256Hex = record.getString("sha256"),
+                    noncePrefix = unb64(record.getString("nonce_prefix")),
+                    expiresAtEpochSeconds = record.getLong("expires_at"),
+                )
+                NativeP2pTransferProtocol.verifyManifest(
+                    manifest,
+                    NativeP2pTransferProtocol.authenticateManifest(manifest, secret),
+                    secret,
+                )
+                val sourceUriText = record.getString("source_uri")
+                val (channel, owner) = withContext(Dispatchers.IO) { openPersistedSource(sourceUriText) }
+                val invite = NativeP2pTransferProtocol.Invite(transferId, secret)
+                val verified = try {
+                    withContext(Dispatchers.IO) {
+                        NativeP2pTransferProtocol.createManifest(
+                            invite, channel, manifest.displayName, manifest.sizeBytes, manifest.mimeType,
+                            manifest.expiresAtEpochSeconds, manifest.chunkBytes,
+                        )
+                    }
+                } catch (error: Throwable) {
+                    runCatching { owner.close() }
+                    throw error
+                }
+                if (verified.sha256Hex != manifest.sha256Hex) {
+                    runCatching { owner.close() }
+                    throw SecurityException("The saved source file has changed; select the original file again.")
+                }
+                val session = Session(
+                    transferId, peerId, localId, null, manifest, secret.copyOf(),
+                    TransferDirection.upload, sourceChannel = channel, sourceOwner = owner, sourceUri = sourceUriText,
+                )
+                val previous = sessions.putIfAbsent(transferId, session)
+                if (previous != null) {
+                    runCatching { owner.close() }
+                    session.secret.fill(0)
+                    return true
+                }
+                val kind = when {
+                    manifest.mimeType.startsWith("video/") -> TransferKind.video
+                    manifest.mimeType.startsWith("image/") -> TransferKind.image
+                    manifest.mimeType.startsWith("audio/") -> TransferKind.audio
+                    else -> TransferKind.document
+                }
+                session.monitorId = transferMonitor.begin(
+                    TransferDirection.upload, kind, manifest.sizeBytes, manifest.displayName,
+                )
+                publish(session, "Reconnecting sender")
+                startRestoredSenderOffer(session)
+                return true
+            } finally {
+                secret.fill(0)
+            }
+        } catch (error: Throwable) {
+            android.util.Log.w("ChatyP2P", "Unable to restore sender transfer $transferId", error)
+            return false
+        } finally {
+            restoringUploads.remove(transferId)
+        }
+    }
+
+    private fun openPersistedSource(sourceUriText: String): Pair<FileChannel, java.io.Closeable> {
+        val uri = Uri.parse(sourceUriText)
+        return when (uri.scheme) {
+            "content" -> {
+                val descriptor = appContext.contentResolver.openFileDescriptor(uri, "r")
+                    ?: throw SecurityException("Saved file permission is no longer available; select the file again.")
+                val owner = ParcelFileDescriptor.AutoCloseInputStream(descriptor)
+                owner.channel to owner
+            }
+            "file" -> {
+                val file = File(uri.path ?: throw SecurityException("Saved source path is invalid."))
+                if (!file.isFile || !file.canRead()) throw SecurityException("Saved source file is no longer readable.")
+                val owner = file.inputStream()
+                owner.channel to owner
+            }
+            else -> throw SecurityException("Saved transfer source is not a supported file URI.")
+        }
+    }
+
+    private suspend fun startRestoredSenderOffer(session: Session) {
+        val peer = createPeer(session)
+        val channel = peer.createDataChannel("chaty-file-v1", DataChannel.Init().apply { ordered = true })
+            ?: throw IllegalStateException("Could not recreate transfer channel")
+        session.channel = channel
+        observeChannel(session, channel, isSender = true)
+        val offer = createDescription(peer, offer = true)
+        val manifest = session.manifest
+        val payload = mapOf(
+            "signal_type" to "file_transfer_offer",
+            "call_id" to session.id,
+            "transfer_id" to session.id,
+            "sdp" to offer.description,
+            "manifest" to mapOf(
+                "transfer_id" to manifest.transferId, "name" to manifest.displayName,
+                "mime" to manifest.mimeType, "size" to manifest.sizeBytes,
+                "chunk" to manifest.chunkBytes, "sha256" to manifest.sha256Hex,
+                "nonce" to b64(manifest.noncePrefix), "expires" to manifest.expiresAtEpochSeconds,
+            ),
+            "manifest_auth" to b64(NativeP2pTransferProtocol.authenticateManifest(manifest, session.secret)),
+        )
+        if (!sendSignalScoped(session, payload)) throw IllegalStateException("Chaty signaling is offline; retry when connected")
+        session.signalingReady = true
+        flushLocalCandidates(session)
+        publish(session, "Waiting for recipient — resuming")
     }
 
     private fun senderIdInvalid(value: String?): Boolean = value.isNullOrBlank() || value.length > 256
