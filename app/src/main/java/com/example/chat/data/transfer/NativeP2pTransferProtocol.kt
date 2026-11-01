@@ -123,7 +123,7 @@ object NativeP2pTransferProtocol {
     ): Manifest {
         require(sizeBytes in 1..MAX_FILE_BYTES) { "File must be between 1 byte and 100 GB" }
         require(source.size() == sizeBytes) { "Selected file changed or is not seekable" }
-        require(chunkBytes in (64 * 1024)..(1024 * 1024))
+        require(chunkBytes in (16 * 1024)..(64 * 1024))
         require(expiresAtEpochSeconds > System.currentTimeMillis() / 1000L)
         val safeName = displayName.replace(Regex("[\\\\/\\u0000-\\u001f]"), "_").take(180).ifBlank { "video" }
         val prefix = ByteArray(NONCE_PREFIX_BYTES).also(random::nextBytes)
