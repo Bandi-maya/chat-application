@@ -22,15 +22,19 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
     private fun migrate() {
         val encryptedToken = secure.getString(TOKEN, null)
         val encryptedUser = secure.getString(USER, null)
-        if (!encryptedToken.isNullOrBlank() && !encryptedUser.isNullOrBlank()) return
+        val encryptedRefresh = secure.getString(REFRESH, null)
         val oldToken = legacy.getString(TOKEN, null)
         val oldUser = legacy.getString(USER, null)
-        val token = encryptedToken ?: oldToken ?: return
-        val user = encryptedUser ?: oldUser ?: return
-        check(secure.edit().putString(TOKEN, token).putString(USER, user).commit()) {
-            "Unable to migrate API session into encrypted storage."
-        }
-        check(legacy.edit().remove(TOKEN).remove(USER).commit()) {
+        val oldRefresh = legacy.getString(REFRESH, null)
+
+        val token = encryptedToken ?: oldToken
+        val user = encryptedUser ?: oldUser
+        if (token.isNullOrBlank() || user.isNullOrBlank()) return
+
+        val editor = secure.edit().putString(TOKEN, token).putString(USER, user)
+        (encryptedRefresh ?: oldRefresh)?.let { editor.putString(REFRESH, it) }
+        check(editor.commit()) { "Unable to migrate API session into encrypted storage." }
+        check(legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()) {
             "Unable to remove migrated plaintext API session."
         }
     }
@@ -53,14 +57,28 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
         Unit
     }
 
+    override fun loadRefreshToken(): String? = synchronized(this) {
+        migrate()
+        secure.getString(REFRESH, null)
+    }
+
+    override fun saveRefreshToken(token: String?): Unit = synchronized(this) {
+        val editor = secure.edit()
+        if (token.isNullOrBlank()) editor.remove(REFRESH) else editor.putString(REFRESH, token)
+        check(editor.commit()) { "Unable to persist encrypted API refresh token." }
+        legacy.edit().remove(REFRESH).commit()
+        Unit
+    }
+
     override fun clear(): Unit = synchronized(this) {
-        secure.edit().remove(TOKEN).remove(USER).commit()
-        legacy.edit().remove(TOKEN).remove(USER).commit()
+        secure.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()
+        legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()
         Unit
     }
 
     private companion object {
         const val TOKEN = "api_hub_token"
         const val USER = "api_hub_user"
+        const val REFRESH = "api_hub_refresh_token"
     }
 }
