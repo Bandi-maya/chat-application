@@ -164,6 +164,12 @@ jobs:
             app/src/main/kotlin/com/example/chat/data/api/EncryptedApiSessionStore.kt \
             app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt \
             app/src/main/kotlin/com/example/chat/data/auth/SessionStore.kt \
+            app/src/main/kotlin/com/example/chat/data/auth/AuthRepository.kt \
+            app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt \
+            app/src/main/java/com/example/chat/data/api/ApiSessionStore.kt \
+            app/src/main/kotlin/com/example/chat/data/api/EncryptedApiSessionStore.kt \
+            app/src/main/java/com/example/chat/data/services/AacPcmVoiceRecorder.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/VoiceSessionController.kt \
             app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt \
             app/src/main/kotlin/com/example/chat/ui/media/MediaLibraryService.kt \
             app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceScreen.kt \
