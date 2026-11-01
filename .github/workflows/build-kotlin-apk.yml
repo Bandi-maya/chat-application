@@ -134,7 +134,7 @@ jobs:
                       if quote:
                           if escaped:
                               escaped = False
-                          elif ch == '\\\\':
+                          elif ord(ch) == 92:
                               escaped = True
                           elif ch == quote:
                               quote = None
@@ -150,17 +150,18 @@ jobs:
                               break
                   if end is not None:
                       source = source[:start] + 'Text("🔒", fontSize = 14.sp)' + source[end:]
+              package = 'package com.example.chat'
               if 'import androidx.compose.material3.Text' not in source:
-                  source = source.replace('package com.example.chat\\n', 'package com.example.chat\\n\\nimport androidx.compose.material3.Text\\n')
+                  source = source.replace(package, package + chr(10) + chr(10) + 'import androidx.compose.material3.Text', 1)
               if 'import androidx.compose.ui.unit.sp' not in source:
-                  source = source.replace('package com.example.chat\\n', 'package com.example.chat\\n\\nimport androidx.compose.ui.unit.sp\\n')
+                  source = source.replace(package, package + chr(10) + 'import androidx.compose.ui.unit.sp', 1)
               p.write_text(source)
           voice = pathlib.Path('app/src/debug/java/com/example/chat/VoiceGestureFixtureActivity.kt')
           if voice.exists():
               source = voice.read_text()
               for name in ('pause', 'resume'):
                   source = re.sub(
-                      rf'(?m)^\\s*override\\s+(?:suspend\\s+)?fun\\s+{name}\\s*\\([^)]*\\)\\s*\\{{\\s*\\}}\\s*\\n?',
+                      rf'(?m)^\s*override\s+(?:suspend\s+)?fun\s+{name}\s*\([^)]*\)\s*\{{\s*\}}\s*\n?',
                       '',
                       source,
                   )
