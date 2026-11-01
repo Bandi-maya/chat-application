@@ -35,3 +35,4 @@ URI-to-disk attachment staging and streamed custom-backend uploads; Keystore-bac
 Secret-phrase failed-attempt cooldown and staged-file cleanup; latest Chaty attachment flow security verification: 2026-11-01
 Harden encrypted API session migration and verify streaming attachment path: 2026-11-01
 Add regression coverage for secret-phrase cooldown; verify latest encrypted-session and streaming media changes: 2026-11-01
+Use a single legacy DataStore delegate for safe GoTrue token migration; verify latest auth storage and media changes: 2026-11-01
