@@ -162,6 +162,7 @@ class CallForegroundService : Service() {
         if (callId.isNotBlank()) {
             val hangUp = Intent(this, com.example.chat.notifications.CallActionReceiver::class.java).apply {
                 action = com.example.chat.notifications.ChatyNotifications.ACTION_END_CALL
+                data = android.net.Uri.Builder().scheme("chaty-call").authority("hangup").appendPath(callId).build()
                 putExtra(EXTRA_CALL_ID, callId)
             }
             val hangUpPendingIntent = android.app.PendingIntent.getBroadcast(
