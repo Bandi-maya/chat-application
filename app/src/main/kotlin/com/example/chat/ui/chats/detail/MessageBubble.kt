@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.core.theme.argbWithAlpha
+import com.example.chat.data.transfer.P2pFileTransferService
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.TaskPriority
@@ -177,6 +178,7 @@ fun ChatMessageBubble(
     onMediaTap: (() -> Unit)? = null,
     onMediaTapWithBounds: ((Rect) -> Unit)? = null,
     attachmentBinding: AttachmentConsumerBinding? = null,
+    p2pTransferState: P2pFileTransferService.TransferState? = null,
     onVoicePlay: ((MessageAttachment) -> Unit)? = null,
     onViewOnceOpen: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
@@ -561,7 +563,7 @@ fun ChatMessageBubble(
                             "image" -> {
                                 val attachment = message.attachment!!
                                 val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
-                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
+                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
                                 else ImageAttachmentPreview(attachment = attachment, remoteImage = remoteImage, message = message, binding = attachmentBinding, resolveUrl = voiceUrlResolver, onTap = tap)
                             }
                             "video" -> {
@@ -570,7 +572,7 @@ fun ChatMessageBubble(
                                 if (attachment.url?.startsWith("chaty://transfer/") == true &&
                                     message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true
                                 ) {
-                                    P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
+                                    P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
                                 } else {
                                     VideoAttachmentPreview(
                                         attachment = attachment,
@@ -597,7 +599,7 @@ fun ChatMessageBubble(
                             "document" -> {
                                 val attachment = message.attachment!!
                                 val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
-                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
+                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
                                 else DocumentPreview(attachment = attachment, textColor = Color(textColor), accentColor = Color(theme.accentColor), onTap = tap)
                             }
                         }
@@ -1356,7 +1358,19 @@ private fun P2pFileInviteCard(
     textColor: Color,
     accentColor: Color,
     onTap: () -> Unit,
+    transferState: P2pFileTransferService.TransferState? = null,
 ) {
+    val transferLabel = when (transferState?.status) {
+        "Sending" -> "Sending · ${(transferState.progress * 100).toInt()}%"
+        "Receiving" -> "Receiving · ${(transferState.progress * 100).toInt()}%"
+        "Waiting for recipient" -> "Waiting for recipient"
+        "Secure channel connected" -> "Secure connection · starting"
+        "Received and verified" -> "Received · ready to play"
+        "Sent" -> "Sent securely"
+        "Failed" -> "Transfer failed · see connection details"
+        "Cancelled" -> "Transfer cancelled"
+        else -> transferLabel
+    }
     if (attachment.type == "video") {
         // Keep the invitation looking like a native video message, not a pasted URL.
         // The real media bytes stay peer-to-peer and are never embedded in chat metadata.
@@ -1403,7 +1417,7 @@ private fun P2pFileInviteCard(
                     Text(attachment.size, color = Color.White.copy(alpha = 0.68f), fontSize = 11.sp)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (isMe) "Waiting for recipient" else "Tap to receive video",
+                        transferLabel,
                         color = accentColor,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.W700,
@@ -1436,7 +1450,7 @@ private fun P2pFileInviteCard(
             Text(attachment.name, color = textColor, fontWeight = FontWeight.W700, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(attachment.size, color = textColor.copy(alpha = 0.68f), fontSize = 11.sp)
             Text(
-                if (isMe) "Encrypted peer transfer · waiting" else "Encrypted peer transfer · receive",
+                transferLabel,
                 color = accentColor,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.W700,
