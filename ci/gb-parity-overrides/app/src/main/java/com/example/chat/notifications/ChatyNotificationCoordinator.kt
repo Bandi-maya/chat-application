@@ -236,11 +236,11 @@ class ChatyNotificationCoordinator(
                 val id = e.callId ?: return
                 val cur = calls.currentSession?.takeIf { it.callId == id } ?: return
                 val next = if (cur.audioRoute == AudioRouteType.speaker) AudioRouteType.earpiece else AudioRouteType.speaker
-                calls.setAudioRoute(account, id, next) // service rejects stale account/call itself
+                calls.setAudioRoute(next) // service rejects stale account/call itself
             }
             ChatyNotificationPolicy.ACTION_DECLINE -> {
                 val id = e.callId ?: return
-                calls.declineCall(account, id)
+                calls.declineCall()
                 if (lastIncomingCallId == id) lastIncomingCallId = null
                 lane.cancelCallFor(account, id)
             }
