@@ -52,6 +52,20 @@ class LocalLockServiceFullTest {
         try { l.setSecretPhrase("  "); fail() } catch (_: IllegalArgumentException) {}
     }
 
+    @Test fun secretPhraseUsesSameFailedAttemptCooldownAsOtherCredentials() = runBlocking {
+        val l = svc(MemStore())
+        l.setSecretPhrase("private phrase")
+        repeat(4) { assertFalse(l.verifySecretPhrase("wrong phrase")) }
+        assertEquals(0, l.getRemainingCooldownSeconds())
+        assertFalse(l.verifySecretPhrase("wrong phrase")) // fifth failure starts 30-second cooldown
+        assertEquals(30, l.getRemainingCooldownSeconds())
+        assertFalse(l.verifySecretPhrase("private phrase")) // correct phrase cannot bypass active cooldown
+        clock += 31_000
+        assertTrue(l.verifySecretPhrase("private phrase"))
+        assertEquals(0, l.getFailedAttempts())
+        assertEquals(0, l.getRemainingCooldownSeconds())
+    }
+
     @Test fun biometricsSeam() = runBlocking {
         assertFalse(svc(MemStore()).canUseBiometrics())
         assertFalse(svc(MemStore()).authenticateDeviceCredential())
