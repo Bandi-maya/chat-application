@@ -24,3 +24,4 @@ Final CI workflow syntax and Kotlin compile compatibility fixes: 2026-11-01
 P2P descriptor chunk compatibility and transient key-zeroing security hardening verification: 2026-11-01
 CI for P2P signaling adapter and process-restart resume fixes plus branch-owned ServiceLocator restore: 2026-11-01
 Authenticated TURN Edge Function wired to Kotlin call and P2P ICE; compile verification: 2026-11-01
+Connection diagnostics now include measured app UID upload/download totals: 2026-11-01
