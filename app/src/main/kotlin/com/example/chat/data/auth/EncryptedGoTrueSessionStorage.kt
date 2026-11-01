@@ -44,19 +44,19 @@ class EncryptedGoTrueSessionStorage(private val context: Context) : SessionStora
         }
 
         val old = context.sessionDataStore.data.first()
-        val access = p.getString(ACCESS, null) ?: old[stringPreferencesKey("access_token")]
-        val refresh = p.getString(REFRESH, null) ?: old[stringPreferencesKey("refresh_token")]
-        val expiry = p.getLong(EXPIRY, 0L).takeIf { it > 0L } ?: old[longPreferencesKey("expires_at_epoch_ms")]
-        val user = p.getString(USER, null) ?: old[stringPreferencesKey("user_id")]
-        if (access.isNullOrBlank() || refresh.isNullOrBlank() || expiry == null || user.isNullOrBlank()) {
+        val legacyAccess = old[stringPreferencesKey("access_token")]
+        val legacyRefresh = old[stringPreferencesKey("refresh_token")]
+        val legacyExpiry = old[longPreferencesKey("expires_at_epoch_ms")]
+        val legacyUser = old[stringPreferencesKey("user_id")]
+        if (legacyAccess.isNullOrBlank() || legacyRefresh.isNullOrBlank() || legacyExpiry == null || legacyUser.isNullOrBlank()) {
             return@withContext null
         }
-        check(p.edit().putString(ACCESS, access).putString(REFRESH, refresh)
-            .putLong(EXPIRY, expiry).putString(USER, user).commit()) {
+        check(p.edit().putString(ACCESS, legacyAccess).putString(REFRESH, legacyRefresh)
+            .putLong(EXPIRY, legacyExpiry).putString(USER, legacyUser).commit()) {
             "Could not migrate sign-in session to encrypted storage."
         }
         context.sessionDataStore.edit { it.clear() }
-        SessionStore.StoredSession(access, refresh, expiry, user)
+        SessionStore.StoredSession(legacyAccess, legacyRefresh, legacyExpiry, legacyUser)
     }
 
     override suspend fun clear() {

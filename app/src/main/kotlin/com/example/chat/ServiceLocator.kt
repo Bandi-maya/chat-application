@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.chat.core.crypto.uniffi.UniffiMlsEngine
 import com.example.chat.data.auth.AuthRepository
 import com.example.chat.data.auth.AuthSessionManager
+import com.example.chat.data.auth.EncryptedGoTrueSessionStorage
 import com.example.chat.data.auth.SessionStore
 import com.example.chat.data.auth.SupabaseAuthClient
 import com.example.chat.data.e2ee.MlsE2eeService

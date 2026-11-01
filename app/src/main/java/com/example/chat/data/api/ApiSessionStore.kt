@@ -98,6 +98,17 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
         updated
     }
 
+    /**
+     * Drops the active in-memory identity without touching persisted credentials.
+     * Used only when rejecting an ephemeral/demo session that must not revoke or
+     * erase a separate real account's stored session.
+     */
+    fun clearInMemoryOnly() = synchronized(scopeLock) {
+        if (state.token == null && state.user == null) return@synchronized
+        state = ApiAuthSnapshot(null, null, state.generation + 1)
+        onTransition()
+    }
+
     fun signOut() = synchronized(scopeLock) {
         state = ApiAuthSnapshot(null, null, state.generation + 1)
         onTransition()
