@@ -415,7 +415,7 @@ fun SettingsRootScreen(
                     Text("Version ${context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"} · Build ${if (android.os.Build.VERSION.SDK_INT >= 28) context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode else context.packageManager.getPackageInfo(context.packageName, 0).versionCode.toLong()}", color = colors.foregroundSecondary, fontSize = 12.sp)
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "A modern, privacy-first messaging platform with advanced personalization, rich customization, and offline security.",
+                        "Messaging, calling, and personalization in one place. Review the security status and permissions available in this build before relying on a protection feature.",
                         color = colors.foregroundSecondary, fontSize = 13.sp, lineHeight = 16.9.sp,
                     )
                 }
