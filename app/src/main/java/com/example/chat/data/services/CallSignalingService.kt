@@ -180,8 +180,8 @@ class CallSignalingService(
     private val mediaFactory: () -> CallMediaController,
     /** Dart dataStore.addCallRecord sink for terminal call records. */
     private val callRecordSink: (CallRecord) -> Unit = {},
-    /** TURN/ICE server provider (Dart _loadIceServers Supabase edge function).
-     *  Default falls back to the same Google STUN list the Dart ships. */
+    /** Short-lived ICE server credentials supplied by Chaty's authenticated custom API.
+     *  Default falls back to Google STUN only when the custom endpoint is unavailable. */
     private val iceServersProvider: suspend () -> List<Map<String, Any?>> = { defaultIceServers() },
     private val lowDataUsageEnabled: () -> Boolean = { false },
     private val now: () -> Instant = { Instant.now() },
