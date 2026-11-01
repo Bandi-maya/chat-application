@@ -41,3 +41,4 @@ CI source-overlay correction: restore branch-owned encrypted session, lock-gate,
 Media indexing cancellation regression fix: cancellation propagates cleanly and the latest branch sources are restored after CI overlay.
 Android screen-share foreground hardening: consent is obtained first, mediaProjection FGS type is enabled and acknowledged before WebRTC creates the projection; failed upgrade preserves an existing call. Verify API 29-35 build/tests.
 Verify Android 10-15 screen-share foreground-service handshake, call service preservation, and source-overlay restore with latest Kotlin security changes.
+Screen-share foreground-service API gate and media library transient-file/stale-scan regression tests added; verify Kotlin build and test suites.
