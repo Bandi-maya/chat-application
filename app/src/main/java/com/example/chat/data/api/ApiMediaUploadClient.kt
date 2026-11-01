@@ -69,21 +69,32 @@ class ApiMediaUploadClient(
     fun uploadMedia(file: File): Map<String, Any> = uploadMedia(file) { _, _ -> }
 
     fun uploadMedia(file: File, onProgress: (transferred: Long, total: Long) -> Unit): Map<String, Any> {
+        val bearer = token() ?: throw UploadException("Not authenticated")
+        return uploadFile(file, bearer, restApiBaseUrl(), tenantId(), onProgress)
+    }
+
+    private fun uploadFile(
+        file: File,
+        bearer: String,
+        baseUrl: String,
+        requestTenantId: String,
+        onProgress: (transferred: Long, total: Long) -> Unit,
+    ): Map<String, Any> {
         if (!file.isFile || !file.canRead() || file.length() <= 0L) {
             throw UploadException("Selected media file is unavailable or empty.")
         }
-        val bearer = token() ?: throw UploadException("Not authenticated")
-        val base = restApiBaseUrl().trimEnd('/')
+        if (bearer.isBlank()) throw UploadException("Not authenticated")
+        val base = baseUrl.trimEnd('/')
         val fileTransport = transport as? FileProgressTransport
             ?: throw UploadException("Streaming upload is unavailable; refusing to load the full file into memory.")
         val safeFilename = safeMultipartFilename(file.name)
         val response = try {
             val primary = fileTransport.uploadFileWithProgress(
-                "$base/chat/upload", "Bearer $bearer", tenantId(), safeFilename, file, onProgress,
+                "$base/chat/upload", "Bearer $bearer", requestTenantId, safeFilename, file, onProgress,
             )
             if (primary.statusCode == 404) {
                 fileTransport.uploadFileWithProgress(
-                    "$base/api/v1/chat/upload", "Bearer $bearer", tenantId(), safeFilename, file, onProgress,
+                    "$base/api/v1/chat/upload", "Bearer $bearer", requestTenantId, safeFilename, file, onProgress,
                 )
             } else primary
         } catch (error: UploadException) {
@@ -99,7 +110,7 @@ class ApiMediaUploadClient(
             if (ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9' || ch == '.' || ch == '_' || ch == '-') ch else '_'
         }.joinToString("").trim('.', '_').take(120).ifBlank { "upload.bin" }
 
-    /** Account-scoped file upload. The account must remain identical through completion. */
+    /** Account-scoped file upload uses the captured account credentials, never live getters. */
     fun uploadMedia(
         expectedScope: ApiAccountScope,
         isScopeCurrent: () -> Boolean,
@@ -107,61 +118,55 @@ class ApiMediaUploadClient(
         onProgress: (transferred: Long, total: Long) -> Unit,
     ): Map<String, Any> {
         if (!isScopeCurrent()) throw UploadException("Account changed before upload started.")
-        val result = uploadMedia(file, onProgress)
+        val bearer = expectedScope.token?.takeIf { it.isNotBlank() }
+            ?: throw UploadException("Not authenticated")
+        val result = uploadFile(file, bearer, expectedScope.baseUrl, expectedScope.tenantId, onProgress)
         if (!isScopeCurrent()) throw UploadException("Account changed while upload was in progress.")
         return result
     }
 
-    /** Byte-array form for callers that already hold the payload
-     *  (ChatMediaService's post-compression bytes; the wire body is the
-     *  same multipart part either way). */
+    /** Byte-array form for callers that already hold the payload. */
     fun uploadMedia(
         filename: String,
         bytes: ByteArray,
         onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
     ): Map<String, Any> {
         val bearer = token() ?: throw UploadException("Not authenticated")
-        val base = restApiBaseUrl().trimEnd('/')
-        val safeFilename = safeMultipartFilename(filename)
+        return uploadBytes(filename, bytes, bearer, restApiBaseUrl(), tenantId(), onProgress)
+    }
 
+    private fun uploadBytes(
+        filename: String,
+        bytes: ByteArray,
+        bearer: String,
+        baseUrl: String,
+        requestTenantId: String,
+        onProgress: ((transferred: Long, total: Long) -> Unit)?,
+    ): Map<String, Any> {
+        if (bearer.isBlank()) throw UploadException("Not authenticated")
+        if (bytes.isEmpty()) throw UploadException("Selected media file is unavailable or empty.")
+        val base = baseUrl.trimEnd('/')
+        val safeFilename = safeMultipartFilename(filename)
         val response: Response = try {
             fun send(url: String): Response =
                 if (onProgress != null && transport is ProgressTransport) {
-                    transport.uploadWithProgress(url, "Bearer $bearer", tenantId(), safeFilename, bytes, onProgress)
+                    transport.uploadWithProgress(url, "Bearer $bearer", requestTenantId, safeFilename, bytes, onProgress)
                 } else {
-                    transport.upload(url, "Bearer $bearer", tenantId(), safeFilename, bytes)
+                    transport.upload(url, "Bearer $bearer", requestTenantId, safeFilename, bytes)
                 }
             val primary = send("$base/chat/upload")
             if (primary.statusCode == 404) send("$base/api/v1/chat/upload") else primary
-        } catch (e: UploadException) {
-            throw e
-        } catch (e: Exception) {
-            throw UploadException("Failed to connect to upload server: $e")
+        } catch (error: UploadException) {
+            throw error
+        } catch (error: Exception) {
+            throw UploadException("Failed to connect to upload server: $error")
         }
-
         return decodeResponse(response)
     }
 
-    private fun decodeResponse(response: Response): Map<String, Any> {
-        if (response.statusCode == 200 || response.statusCode == 201) {
-            val body = JSONObject(response.body)
-            val data = if (body.has("data")) body.get("data") else body
-            val obj = data as? JSONObject ?: body
-            return obj.keys().asSequence().associateWith { obj.get(it) }
-        }
-        var detail = "Failed to upload media (${response.statusCode})"
-        try {
-            val body = JSONObject(response.body)
-            detail = body.optString("detail").ifEmpty { body.optString("message").ifEmpty { detail } }
-        } catch (_: Exception) { }
-        throw UploadException(detail)
-    }
-
-
     /**
-     * Account-scoped upload seam. The scope is checked before the request and
-     * again after it completes so a late response cannot be attached to a new
-     * signed-in account. Progress remains a count of bytes actually written.
+     * Account-scoped byte upload uses the captured account credentials and
+     * refuses to return an attachment reference if the account changed.
      */
     fun uploadMedia(
         expectedScope: ApiAccountScope,
@@ -171,7 +176,9 @@ class ApiMediaUploadClient(
         onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
     ): Map<String, Any> {
         if (!isScopeCurrent()) throw UploadException("Account changed before upload started.")
-        val result = uploadMedia(filename, bytes, onProgress)
+        val bearer = expectedScope.token?.takeIf { it.isNotBlank() }
+            ?: throw UploadException("Not authenticated")
+        val result = uploadBytes(filename, bytes, bearer, expectedScope.baseUrl, expectedScope.tenantId, onProgress)
         if (!isScopeCurrent()) throw UploadException("Account changed while upload was in progress.")
         return result
     }

@@ -65,6 +65,55 @@ class ApiMediaUploadClientParityTest {
     }
 
     @Test
+    fun scopedUploadUsesCapturedCredentialsAndRouteEvenIfLiveAccountDiffers() {
+        var capturedAuthorization = ""
+        var capturedTenant = ""
+        var capturedUrl = ""
+        var stillCurrent = true
+        val t = object : ApiMediaUploadClient.FileProgressTransport {
+            override fun upload(
+                url: String,
+                authorization: String,
+                tenantId: String,
+                filename: String,
+                fileBytes: ByteArray,
+            ) = error("File streaming must use uploadFileWithProgress")
+
+            override fun uploadFileWithProgress(
+                url: String,
+                authorization: String,
+                tenantId: String,
+                filename: String,
+                file: File,
+                onProgress: (Long, Long) -> Unit,
+            ): ApiMediaUploadClient.Response {
+                capturedAuthorization = authorization
+                capturedTenant = tenantId
+                capturedUrl = url
+                onProgress(file.length(), file.length())
+                stillCurrent = false // simulate a logout/account switch during upload
+                return ApiMediaUploadClient.Response(200, """{"data":{"url":"https://cdn/file"}}""")
+            }
+        }
+        val scope = com.example.chat.data.api.ApiAccountScope(
+            userId = "user-old",
+            token = "token-old",
+            tenantId = "tenant-old",
+            baseUrl = "https://api-old.example",
+            webSocketTemplate = "",
+            generation = 1L,
+        )
+        val error = assertThrows(ApiMediaUploadClient.UploadException::class.java) {
+            ApiMediaUploadClient({ "https://api-new.example" }, { "tenant-new" }, { "token-new" }, t)
+                .uploadMedia(scope, { stillCurrent }, tempFile()) { _, _ -> }
+        }
+        assertEquals("Account changed while upload was in progress.", error.message)
+        assertEquals("Bearer token-old", capturedAuthorization)
+        assertEquals("tenant-old", capturedTenant)
+        assertEquals("https://api-old.example/chat/upload", capturedUrl)
+    }
+
+    @Test
     fun nonSuccessSurfacesServerDetail() {
         val t = FakeTransport(ApiMediaUploadClient.Response(413, """{"detail":"too large"}"""))
         val e = assertThrows(ApiMediaUploadClient.UploadException::class.java) {

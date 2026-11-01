@@ -461,8 +461,17 @@ class P2pFileTransferService(
         }
         if (offer.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L) {
             invite.secret.fill(0)
-            incoming.remove(invite.transferId); refreshPending()
+            incoming.remove(invite.transferId)
+            incomingCandidates.remove(invite.transferId)
+            refreshPending()
             throw SecurityException("This transfer link has expired")
+        }
+        if (!senderUserId.isNullOrBlank() && senderUserId != offer.senderId) {
+            invite.secret.fill(0)
+            incoming.remove(invite.transferId)
+            incomingCandidates.remove(invite.transferId)
+            refreshPending()
+            throw SecurityException("Transfer sender does not match the chat message sender.")
         }
         val wire = try {
             WireManifest.parse(signal["manifest"])
@@ -484,8 +493,12 @@ class P2pFileTransferService(
             invite.secret.fill(0)
             throw error
         }
-        destination.parentFile?.mkdirs()
-        val availableBytes = android.os.StatFs((destination.parentFile ?: appContext.filesDir).absolutePath).availableBytes
+        if (manifest.transferId != invite.transferId) {
+            invite.secret.fill(0)
+            throw SecurityException("Transfer manifest does not match the invitation.")
+        }
+        val safeDestination = validatePrivateReceiveDestination(appContext.filesDir, destination)
+        val availableBytes = android.os.StatFs(safeDestination.parentFile!!.absolutePath).availableBytes
         if (availableBytes < manifest.sizeBytes) {
             invite.secret.fill(0)
             throw IllegalStateException("Not enough free storage to receive this file.")
@@ -495,13 +508,37 @@ class P2pFileTransferService(
             throw SecurityException("Sign in before receiving a file.")
         }
         val session = Session(invite.transferId, offer.senderId, localUserId, null, manifest, invite.secret.copyOf(),
-            TransferDirection.download, destination = null, finalDestination = destination)
+            TransferDirection.download, destination = null, finalDestination = safeDestination)
         val resumeKey = invite.transferId + "-" + manifest.sha256Hex.take(16)
-        val partFile = File(destination.parentFile ?: appContext.filesDir, "." + resumeKey + ".part")
+        val partFile = File(safeDestination.parentFile!!, "." + resumeKey + ".part")
+        if (partFile.canonicalFile.parentFile != safeDestination.parentFile ||
+            (partFile.exists() && partFile.canonicalFile != partFile.absoluteFile)
+        ) {
+            invite.secret.fill(0)
+            throw SecurityException("Partial receive file path is not safe.")
+        }
         session.destination = partFile
         invite.secret.fill(0)
-        val ledgerDirectory = File(appContext.filesDir, "p2p-ledger").apply { mkdirs() }
-        session.ledger = ChunkReceiptLedger(File(ledgerDirectory, resumeKey + ".state"), manifest.chunkCount)
+        val ledgerDirectory = File(appContext.filesDir.canonicalFile, "p2p-ledger")
+        if (!ledgerDirectory.exists() && !ledgerDirectory.mkdirs()) {
+            invite.secret.fill(0)
+            throw IllegalStateException("Unable to create private transfer ledger.")
+        }
+        val safeLedgerDirectory = ledgerDirectory.canonicalFile
+        if (!safeLedgerDirectory.isDirectory || safeLedgerDirectory.name != "p2p-ledger" ||
+            safeLedgerDirectory.parentFile != appContext.filesDir.canonicalFile
+        ) {
+            invite.secret.fill(0)
+            throw SecurityException("Private transfer ledger path is not trusted.")
+        }
+        val ledgerFile = File(safeLedgerDirectory, resumeKey + ".state")
+        if (ledgerFile.canonicalFile.parentFile != safeLedgerDirectory ||
+            (ledgerFile.exists() && ledgerFile.canonicalFile != ledgerFile.absoluteFile)
+        ) {
+            invite.secret.fill(0)
+            throw SecurityException("Transfer ledger file path is not safe.")
+        }
+        session.ledger = ChunkReceiptLedger(ledgerFile, manifest.chunkCount)
         if (!partFile.isFile) session.ledger?.clear()
         // The part file and AtomicFile receipt bitmap survive process death. Restore
         // the visible byte count immediately instead of showing 0% until the first
