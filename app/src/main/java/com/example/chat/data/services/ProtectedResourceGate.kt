@@ -70,6 +70,10 @@ object ProtectedResourceGate {
         if (!isMethodConfigured(lockService, lockMethod)) {
             val pinLength = lockService.getPinLength()
             if (!setupPrompt.show(lockMethod, pinLength)) return false
+            // A successful setup UI result is not proof that a credential was
+            // persisted. Re-read the authoritative lock store before granting
+            // access, so a dismissed/failed save cannot fall through to unlock.
+            if (!isMethodConfigured(lockService, lockMethod)) return false
         }
         if (!lockPrompt.show(title, reason)) return false
         unlockedConversations[conversationId] = nowMillis
