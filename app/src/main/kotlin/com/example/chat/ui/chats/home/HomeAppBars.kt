@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.MarkChatRead
 import androidx.compose.material.icons.outlined.MarkChatUnread
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PersonAddAlt1
 import androidx.compose.material.icons.outlined.PushPin as OutlinedPushPin
 import androidx.compose.material.icons.outlined.Reply
@@ -104,6 +105,7 @@ data class HomeIdentity(
 data class ChatsHomeNav(
     val onOpenProfile: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
+    val onOpenNotifications: () -> Unit = {},
     val onOpenSecuritySettings: () -> Unit = {},
     val onOpenGlobalSearch: () -> Unit = {},
     val onOpenQr: () -> Unit = {},
@@ -265,6 +267,14 @@ fun StandardHomeAppBar(
             IconButton(onClick = nav.onOpenProfile) {
                 Icon(Icons.Outlined.PersonAddAlt1, contentDescription = "Account settings", tint = Color(theme.primaryTextColor))
             }
+        }
+        // Notifications is a separate destination from Settings.
+        IconButton(onClick = nav.onOpenNotifications) {
+            Icon(
+                Icons.Outlined.Notifications,
+                contentDescription = "Open notifications",
+                tint = Color(theme.primaryTextColor),
+            )
         }
         // Small profile avatar -> Settings (real photo when uploaded, via
         // the shared ChatyAsyncImage wrapper).
