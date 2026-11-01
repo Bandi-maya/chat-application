@@ -390,6 +390,9 @@ fun ChatDetailHost(
         connectionState = ServiceLocator.connectionHealth.state,
         networkStatus = liveNetworkStatus,
         p2pTransferStates = liveP2pTransfers,
+        onRetryP2pTransfer = { transferId ->
+            if (!p2pTransfers.retryTransfer(transferId)) toast("Could not queue a secure retry. Check your connection and try again.")
+        },
         liveTransfers = liveTransferItems,
         onProbeConnection = { try { ServiceLocator.connectionHealth.probeConnection() } catch (_: Exception) {} },
         onDraftChanged = { text -> scope.launch { try { repo.setDraft(conversation.id, text) } catch (_: Exception) {} } },
