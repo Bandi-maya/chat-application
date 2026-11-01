@@ -436,6 +436,27 @@ class P2pFileTransferService(
         }
     }
 
+    /** User-requested retry after a long outage; keeps the chunk ledger and source descriptor. */
+    fun retryTransfer(transferId: String): Boolean {
+        val session = sessions[transferId] ?: return false
+        if (currentUserId() != session.localUserId) return false
+        session.restartAttempts = 0
+        session.restartInProgress = false
+        if (session.direction == TransferDirection.upload) {
+            restartIce(session)
+        } else {
+            session.remoteDescriptionSet = false
+            val queued = sendSignalScoped(session, mapOf(
+                "signal_type" to "file_transfer_restart_request",
+                "call_id" to session.id,
+                "transfer_id" to session.id,
+                "request_nonce" to java.util.UUID.randomUUID().toString(),
+            ))
+            publish(session, "Requesting secure reconnect")
+            if (!queued) return false
+        }
+        return true
+    }
     fun cancel(transferId: String) {
         val session = sessions[transferId] ?: return
         sendSignalScoped(session, mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
@@ -568,8 +589,14 @@ class P2pFileTransferService(
         val count = minOf(array?.length() ?: 0, 128)
         for (i in 0 until count) {
             if (channel.state() != DataChannel.State.OPEN) break
-            while (channel.bufferedAmount() > MAX_BUFFERED_BYTES && channel.state() == DataChannel.State.OPEN) {
+            var backpressureWaits = 0
+            while (channel.bufferedAmount() > MAX_BUFFERED_BYTES && channel.state() == DataChannel.State.OPEN && backpressureWaits < 250) {
                 kotlinx.coroutines.delay(40)
+                backpressureWaits++
+            }
+            if (backpressureWaits >= 250 || channel.state() != DataChannel.State.OPEN) {
+                publish(session, "Paused by network backpressure")
+                break
             }
             val index = array?.optLong(i, -1L) ?: -1L
             if (index !in 0 until session.manifest.chunkCount) continue
