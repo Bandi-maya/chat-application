@@ -316,6 +316,40 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
+      - name: Send APK to Telegram
+        if: success()
+        run: |
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+          TELEGRAM_CHAT="${{ secrets.TELEGRAM_CHANNEL_ID }}"
+          if [ -z "$TELEGRAM_CHAT" ]; then
+            TELEGRAM_CHAT="${{ secrets.TELEGRAM_CHAT_ID }}"
+          fi
+          if [ -f "$APK_PATH" ] && [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && [ -n "$TELEGRAM_CHAT" ]; then
+            APP_NAME="Chaty Kotlin App"
+            VERSION="1.0.0"
+            COMMIT_SHA="${GITHUB_SHA::7}"
+            BRANCH="${GITHUB_REF#refs/heads/}"
+
+            CAPTION=$(cat <<EOF
+          📦 $APP_NAME
+          🏷️ Version: $VERSION
+          ⚙️ Build: $GITHUB_RUN_NUMBER
+          🌿 Branch: $BRANCH
+          🔗 Commit: $COMMIT_SHA
+          ✅ Status: Built Successfully
+          🕒 Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          EOF
+            )
+
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+              -F chat_id="$TELEGRAM_CHAT" \
+              -F document=@"$APK_PATH" \
+              -F caption="$CAPTION"
+            echo "APK successfully sent to Telegram."
+          else
+            echo "TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID/TELEGRAM_CHAT_ID secrets not configured or APK missing; skipping Telegram dispatch."
+          fi
+
       - name: Compile instrumentation tests before emulator setup
         run: gradle :app:compileDebugAndroidTestKotlin --no-daemon
 

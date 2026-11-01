@@ -471,7 +471,7 @@ class CallSignalingService(
                 }
             }
 
-            "hangup", "end" -> {
+            "hangup", "end", "cancel" -> {
                 val session = currentSession
                 if (session?.callId == callId) {
                     var oldPeer: CallMediaController? = null
