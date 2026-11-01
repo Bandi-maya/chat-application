@@ -72,6 +72,30 @@ class NativeP2pTransferProtocolTest {
     }
 
     @Test
+    fun rejectsOutOfRangeFileChunkIndicesBeforeReading() {
+        val root = Files.createTempDirectory("chaty-p2p-index").toFile()
+        try {
+            val source = File(root, "source.bin").apply { writeBytes(ByteArray(70_000) { it.toByte() }) }
+            val invite = NativeP2pTransferProtocol.createInvite()
+            val manifest = NativeP2pTransferProtocol.createManifest(
+                invite, source, "application/octet-stream", System.currentTimeMillis() / 1000L + 600,
+            )
+            for (invalidIndex in listOf(-1L, manifest.chunkCount)) {
+                var rejected = false
+                try {
+                    NativeP2pTransferProtocol.encryptChunk(source, manifest, invite.secret, invalidIndex)
+                } catch (_: IllegalArgumentException) {
+                    rejected = true
+                }
+                assertTrue("out-of-range chunk index $invalidIndex must be rejected", rejected)
+            }
+            invite.secret.fill(0)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun readsPickerFileChannelByRandomAccessRange() {
         val root = Files.createTempDirectory("chaty-p2p-channel").toFile()
         try {
