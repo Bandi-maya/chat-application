@@ -52,3 +52,5 @@ Screen-share startup handshake now coalesces concurrent requests, times out safe
 P2P journal failure path now zeroes the in-memory transfer secret and closes the picker descriptor before aborting; verify with latest foreground-service and transfer recovery changes.
 
 A-Z hardening implementation verification: 2026-11-01
+
+A-Z hardening follow-up verification: 2026-11-01
