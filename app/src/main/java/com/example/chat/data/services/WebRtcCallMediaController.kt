@@ -437,6 +437,9 @@ class WebRtcCallMediaController(
         val peer = peerConnection ?: return false
         val factory = peerConnectionFactory ?: return false
         val permission = screenCapturePermission ?: return false
+        // Android 10+ requires an active mediaProjection foreground-service
+        // type before ScreenCapturerAndroid creates the MediaProjection.
+        if (!CallForegroundService.ensureScreenProjectionForeground(appContext)) return false
         // Resolve the sender before allocating projection resources. The old
         // ordering leaked a live capturer when a video sender was unavailable.
         val videoSender = peer.senders.firstOrNull { it.track()?.kind() == "video" }
