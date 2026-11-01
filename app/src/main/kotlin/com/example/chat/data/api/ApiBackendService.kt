@@ -1430,7 +1430,18 @@ class ApiBackendService(
     /** Dart ApiBackendService.uploadMedia (api_backend_service.dart:1569):
      *  multipart POST /chat/upload with the /api/v1 404 fallback. */
     suspend fun uploadMedia(file: java.io.File): Map<String, Any> =
-        withContext(Dispatchers.IO) { mediaUpload.uploadMedia(file) }
+        uploadMedia(file) { _, _ -> }
+
+    /** Stream a file through the custom backend without reading it into a ByteArray. */
+    suspend fun uploadMedia(
+        file: java.io.File,
+        onProgress: (transferred: Long, total: Long) -> Unit,
+    ): Map<String, Any> {
+        val expected = authSnapshot()
+        return withContext(Dispatchers.IO) {
+            mediaUpload.uploadMedia(expected, { authSnapshot() === expected }, file, onProgress)
+        }
+    }
 
     /** Byte-array form used by ChatMediaService's post-compression payload;
      *  Dart uploads the (possibly compressed) File, whose filename is the
