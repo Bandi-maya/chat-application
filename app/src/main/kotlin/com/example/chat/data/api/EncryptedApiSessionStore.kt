@@ -50,7 +50,7 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
     }
 
     override fun save(token: String, userJson: String): Unit = synchronized(this) {
-        check(secure.edit().putString(TOKEN, token).putString(USER, userJson).commit()) {
+        check(secure.edit().putString(TOKEN, token).putString(USER, userJson).remove(REFRESH).commit()) {
             "Unable to persist encrypted API session."
         }
         legacy.edit().remove(TOKEN).remove(USER).commit()
