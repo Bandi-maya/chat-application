@@ -135,19 +135,23 @@ object NativeP2pTransferProtocol {
     fun authenticateManifest(manifest: Manifest, secret: ByteArray): ByteArray {
         require(secret.size == KEY_BYTES)
         val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(deriveKey(secret, "chaty-manifest-v1"), "HmacSHA256"))
-        mac.update(manifest.transferId.toByteArray(Charsets.UTF_8))
-        mac.update(0.toByte())
-        mac.update(manifest.displayName.toByteArray(Charsets.UTF_8))
-        mac.update(0.toByte())
-        mac.update(manifest.mimeType.toByteArray(Charsets.UTF_8))
-        mac.update(ByteBuffer.allocate(8 + 4 + 8).order(ByteOrder.BIG_ENDIAN)
-            .putLong(manifest.sizeBytes).putInt(manifest.chunkBytes).putLong(manifest.expiresAtEpochSeconds).array())
-        mac.update(manifest.sha256Hex.toByteArray(Charsets.US_ASCII))
-        mac.update(manifest.noncePrefix)
-        return mac.doFinal()
+        val macKey = deriveKey(secret, "chaty-manifest-v1")
+        return try {
+            mac.init(SecretKeySpec(macKey, "HmacSHA256"))
+            mac.update(manifest.transferId.toByteArray(Charsets.UTF_8))
+            mac.update(0.toByte())
+            mac.update(manifest.displayName.toByteArray(Charsets.UTF_8))
+            mac.update(0.toByte())
+            mac.update(manifest.mimeType.toByteArray(Charsets.UTF_8))
+            mac.update(ByteBuffer.allocate(8 + 4 + 8).order(ByteOrder.BIG_ENDIAN)
+                .putLong(manifest.sizeBytes).putInt(manifest.chunkBytes).putLong(manifest.expiresAtEpochSeconds).array())
+            mac.update(manifest.sha256Hex.toByteArray(Charsets.US_ASCII))
+            mac.update(manifest.noncePrefix)
+            mac.doFinal()
+        } finally {
+            macKey.fill(0)
+        }
     }
-
     fun verifyManifest(manifest: Manifest, authentication: ByteArray, secret: ByteArray, nowEpochSeconds: Long = System.currentTimeMillis() / 1000L) {
         if (manifest.expiresAtEpochSeconds <= nowEpochSeconds) throw SecurityException("This transfer link has expired")
         if (manifest.sizeBytes !in 1..MAX_FILE_BYTES) throw SecurityException("Invalid file size")
@@ -239,10 +243,15 @@ object NativeP2pTransferProtocol {
             .put(manifest.noncePrefix)
             .array()
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(mode, SecretKeySpec(deriveKey(secret, "chaty-chunk-aes-v1"), "AES"), GCMParameterSpec(GCM_TAG_BITS, nonce))
-        cipher.updateAAD(aad)
-        return try { cipher.doFinal(input) } catch (_: Exception) {
+        val aesKey = deriveKey(secret, "chaty-chunk-aes-v1")
+        return try {
+            cipher.init(mode, SecretKeySpec(aesKey, "AES"), GCMParameterSpec(GCM_TAG_BITS, nonce))
+            cipher.updateAAD(aad)
+            cipher.doFinal(input)
+        } catch (_: Exception) {
             throw SecurityException("Chunk authentication failed")
+        } finally {
+            aesKey.fill(0)
         }
     }
 
@@ -252,11 +261,15 @@ object NativeP2pTransferProtocol {
         val extract = Mac.getInstance("HmacSHA256")
         extract.init(SecretKeySpec(salt, "HmacSHA256"))
         val prk = extract.doFinal(secret)
-        val expand = Mac.getInstance("HmacSHA256")
-        expand.init(SecretKeySpec(prk, "HmacSHA256"))
-        expand.update(label.toByteArray(Charsets.UTF_8))
-        expand.update(1.toByte())
-        return expand.doFinal().copyOf(KEY_BYTES)
+        return try {
+            val expand = Mac.getInstance("HmacSHA256")
+            expand.init(SecretKeySpec(prk, "HmacSHA256"))
+            expand.update(label.toByteArray(Charsets.UTF_8))
+            expand.update(1.toByte())
+            expand.doFinal().copyOf(KEY_BYTES)
+        } finally {
+            prk.fill(0)
+        }
     }
 
     private fun sha256(channel: FileChannel, sizeBytes: Long): String {
