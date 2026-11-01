@@ -162,6 +162,8 @@ class CallForegroundService : Service() {
         const val EXTRA_SCREEN_PROJECTION = "chaty.call.screen_projection"
 
         private val projectionReadyLock = Any()
+        private val ownerLock = Any()
+        @Volatile private var activeOwnerToken: String? = null
         @Volatile private var projectionForegroundReady: CompletableDeferred<Boolean>? = null
 
         /**
@@ -183,7 +185,7 @@ class CallForegroundService : Service() {
                 putExtra(EXTRA_IS_VIDEO, true)
                 putExtra(EXTRA_SCREEN_PROJECTION, true)
             }
-            try {
+            return try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(intent)
                 } else {
@@ -227,7 +229,23 @@ class CallForegroundService : Service() {
             }
         }
 
+        /** Owner-aware entry point used by CallLifecycleCoordinator. */
+        fun sync(context: Context, session: ChatyCallSession?, ownerToken: String) {
+            synchronized(ownerLock) { activeOwnerToken = ownerToken }
+            sync(context, session)
+        }
+
+        /** A stale coordinator may stop only the service instance it owns. */
+        fun stop(context: Context, ownerToken: String, nextOwnerToken: String?) {
+            synchronized(ownerLock) {
+                if (activeOwnerToken != ownerToken) return
+                activeOwnerToken = nextOwnerToken
+            }
+            stop(context)
+        }
+
         fun stop(context: Context) {
+            synchronized(ownerLock) { activeOwnerToken = null }
             try {
                 context.stopService(Intent(context, CallForegroundService::class.java))
             } catch (_: Exception) {
