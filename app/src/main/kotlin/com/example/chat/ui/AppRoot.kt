@@ -770,6 +770,7 @@ fun AppRoot() {
                                     onOpenSecurity = { route = AuthRoute.Security },
                                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
                                     onOpenSettings = { pushedSettings = true },
+                                    onOpenNotifications = { route = AuthRoute.Notifications },
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
