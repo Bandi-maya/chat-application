@@ -137,7 +137,8 @@ class ApiRealtimeClient(
         if (socket != null && (socketToken != token() || socketUrl != webSocketUrl() || socketScope !== connectionScopeIdentity())) cleanupLocked()
         if (connecting || socket != null) return@post
         if (token() == null) return@post
-        val url = webSocketUrl()?.takeIf { it.isNotBlank() } ?: return@post
+        val configuredUrl = webSocketUrl()?.takeIf { it.isNotBlank() } ?: return@post
+        val url = runCatching { validateWebSocketUrl(configuredUrl) }.getOrNull() ?: return@post
         reconnectCancel?.cancel()
         reconnectCancel = null
         connecting = true
@@ -466,6 +467,32 @@ class ApiRealtimeClient(
          *  A value containing '/ws/school' is ignored at each level.
          *  '{userId}' / '$userId' placeholders are substituted; otherwise the
          *  standard '/chat/ws/<userId>' path is appended. */
+        private fun validateWebSocketUrl(value: String): String {
+            val uri = runCatching { java.net.URI(value.trim()) }.getOrElse {
+                throw IllegalArgumentException("WebSocket URL is invalid.", it)
+            }
+            val scheme = uri.scheme?.lowercase()
+            val host = uri.host?.lowercase().orEmpty().removePrefix("[").removeSuffix("]")
+            val loopback = host == "localhost" || host == "127.0.0.1" ||
+                host.startsWith("127.") || host == "10.0.2.2" || host == "::1"
+            val tokenSuppliedByConfig = uri.rawQuery
+                ?.split('&')
+                ?.any { it.substringBefore('=').equals("token", ignoreCase = true) } == true
+            require(uri.host.isNullOrBlank().not() && uri.rawUserInfo == null && uri.rawFragment == null) {
+                "WebSocket URL must have a host and cannot contain credentials or a fragment."
+            }
+            require(scheme == "wss" || (scheme == "ws" && loopback)) {
+                "WebSocket connections must use WSS except for loopback development hosts."
+            }
+            require(!tokenSuppliedByConfig) {
+                "WebSocket URL must not contain a configured token parameter."
+            }
+            return uri.toASCIIString()
+        }
+
+        /** Exact port of ApiBackendConfig.getWebSocketUrl. User IDs are always
+         *  validated as a single path segment. Remote connections must use
+         *  WSS because the bearer token is attached to the upgrade request. */
         fun resolveWebSocketUrl(
             userId: String,
             customWebSocketUrl: String?,
@@ -476,29 +503,28 @@ class ApiRealtimeClient(
             require(ApiPathSegments.safe(cleanUserId) != null) {
                 "WebSocket user ID contains invalid path characters."
             }
-            if (!customWebSocketUrl.isNullOrEmpty() && !customWebSocketUrl.contains("/ws/school")) {
-                val ws = customWebSocketUrl.trim()
-                if (ws.contains("{userId}") || ws.contains("\$userId")) {
-                    return ws
-                        .replace("{userId}", cleanUserId)
-                        .replace("\$userId", cleanUserId)
+            val candidate = when {
+                !customWebSocketUrl.isNullOrEmpty() && !customWebSocketUrl.contains("/ws/school") -> {
+                    val ws = customWebSocketUrl.trim()
+                    if (ws.contains("{userId}") || ws.contains("\\$userId")) {
+                        ws.replace("{userId}", cleanUserId).replace("\\$userId", cleanUserId)
+                    } else "${ws.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
                 }
-                return "${ws.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
-            }
-            if (envWebSocketUrl.isNotEmpty() && !envWebSocketUrl.contains("/ws/school")) {
-                if (envWebSocketUrl.contains("{userId}") || envWebSocketUrl.contains("\$userId")) {
-                    return envWebSocketUrl
-                        .replace("{userId}", cleanUserId)
-                        .replace("\$userId", cleanUserId)
+                envWebSocketUrl.isNotEmpty() && !envWebSocketUrl.contains("/ws/school") -> {
+                    if (envWebSocketUrl.contains("{userId}") || envWebSocketUrl.contains("\\$userId")) {
+                        envWebSocketUrl.replace("{userId}", cleanUserId).replace("\\$userId", cleanUserId)
+                    } else "${envWebSocketUrl.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
                 }
-                return "${envWebSocketUrl.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
+                else -> {
+                    val base = restApiBaseUrl
+                        .replaceFirst("https://", "wss://")
+                        .replaceFirst("http://", "ws://")
+                        .replace(Regex("/api/v[0-9]+/?$"), "")
+                        .replace(Regex("/+$"), "")
+                    "$base/chat/ws/$cleanUserId"
+                }
             }
-            val base = restApiBaseUrl
-                .replaceFirst("https://", "wss://")
-                .replaceFirst("http://", "ws://")
-                .replace(Regex("/api/v[0-9]+/?$"), "")
-                .replace(Regex("/+$"), "")
-            return "$base/chat/ws/$cleanUserId"
+            return validateWebSocketUrl(candidate)
         }
     }
 
