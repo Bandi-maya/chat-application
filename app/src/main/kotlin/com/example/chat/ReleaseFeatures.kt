@@ -3,10 +3,9 @@ package com.example.chat
 /**
  * Features that are hidden in this release.
  *
- * The app talks to backend_python over REST + WebSocket. The features below were built
- * against the old Supabase backend and backend_python has no endpoints for them yet,
- * so the buttons/settings did nothing (or failed silently). They are hidden, not deleted:
- * flip a flag to `true` once the matching backend support ships (next release).
+ * Kotlin release gates for capabilities whose required backend contracts are not
+ * currently available. Keep these disabled until the complete server and client
+ * paths are deployed and covered by integration tests.
  */
 object ReleaseFeatures {
     /** Status / stories ("Updates" tab, camera centre action). Needs a status API. */
