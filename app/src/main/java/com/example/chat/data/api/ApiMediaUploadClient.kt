@@ -2,6 +2,8 @@ package com.example.chat.data.api
 
 import java.io.File
 import org.json.JSONObject
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.asRequestBody
 import okio.buffer
 
 /** Media upload plane of the api branch's ApiBackendService.uploadMedia
@@ -47,14 +49,62 @@ class ApiMediaUploadClient(
         ): Response
     }
 
+    /** File-backed multipart path: never materializes a voice note/video in RAM. */
+    interface FileProgressTransport : Transport {
+        fun uploadFileWithProgress(
+            url: String,
+            authorization: String,
+            tenantId: String,
+            filename: String,
+            file: File,
+            onProgress: (transferred: Long, total: Long) -> Unit,
+        ): Response
+    }
+
     data class Response(val statusCode: Int, val body: String)
 
     class UploadException(message: String) : Exception(message)
 
-    /** Exact port of ApiBackendService.uploadMedia. Returns the server's
-     *  data map (url, path, size, mime keys as the backend supplies them). */
-    fun uploadMedia(file: File): Map<String, Any> =
-        uploadMedia(file.name, file.readBytes())
+    /** Exact port of ApiBackendService.uploadMedia using a streaming file body. */
+    fun uploadMedia(file: File): Map<String, Any> = uploadMedia(file) { _, _ -> }
+
+    fun uploadMedia(file: File, onProgress: (transferred: Long, total: Long) -> Unit): Map<String, Any> {
+        if (!file.isFile || !file.canRead() || file.length() <= 0L) {
+            throw UploadException("Selected media file is unavailable or empty.")
+        }
+        val bearer = token() ?: throw UploadException("Not authenticated")
+        val base = restApiBaseUrl().trimEnd('/')
+        val fileTransport = transport as? FileProgressTransport
+            ?: return uploadMedia(file.name, file.readBytes(), onProgress)
+        val response = try {
+            val primary = fileTransport.uploadFileWithProgress(
+                "$base/chat/upload", "Bearer $bearer", tenantId(), file.name, file, onProgress,
+            )
+            if (primary.statusCode == 404) {
+                fileTransport.uploadFileWithProgress(
+                    "$base/api/v1/chat/upload", "Bearer $bearer", tenantId(), file.name, file, onProgress,
+                )
+            } else primary
+        } catch (error: UploadException) {
+            throw error
+        } catch (error: Exception) {
+            throw UploadException("Failed to stream media to custom backend: $error")
+        }
+        return decodeResponse(response)
+    }
+
+    /** Account-scoped file upload. The account must remain identical through completion. */
+    fun uploadMedia(
+        expectedScope: ApiAccountScope,
+        isScopeCurrent: () -> Boolean,
+        file: File,
+        onProgress: (transferred: Long, total: Long) -> Unit,
+    ): Map<String, Any> {
+        if (!isScopeCurrent()) throw UploadException("Account changed before upload started.")
+        val result = uploadMedia(file, onProgress)
+        if (!isScopeCurrent()) throw UploadException("Account changed while upload was in progress.")
+        return result
+    }
 
     /** Byte-array form for callers that already hold the payload
      *  (ChatMediaService's post-compression bytes; the wire body is the
@@ -82,19 +132,21 @@ class ApiMediaUploadClient(
             throw UploadException("Failed to connect to upload server: $e")
         }
 
-        if (response.statusCode == 200) {
+        return decodeResponse(response)
+    }
+
+    private fun decodeResponse(response: Response): Map<String, Any> {
+        if (response.statusCode == 200 || response.statusCode == 201) {
             val body = JSONObject(response.body)
             val data = if (body.has("data")) body.get("data") else body
             val obj = data as? JSONObject ?: body
             return obj.keys().asSequence().associateWith { obj.get(it) }
         }
-
         var detail = "Failed to upload media (${response.statusCode})"
         try {
             val body = JSONObject(response.body)
             detail = body.optString("detail").ifEmpty { body.optString("message").ifEmpty { detail } }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) { }
         throw UploadException(detail)
     }
 
@@ -119,7 +171,7 @@ class ApiMediaUploadClient(
 
     /** Device transport over OkHttp, mirroring http.MultipartRequest: one
      *  'file' part, Bearer + x-tenant-id headers, no extra fields. */
-    class OkHttpTransport : ProgressTransport {
+    class OkHttpTransport : ProgressTransport, FileProgressTransport {
         private val client = okhttp3.OkHttpClient()
 
         override fun upload(
@@ -129,6 +181,48 @@ class ApiMediaUploadClient(
             filename: String,
             fileBytes: ByteArray,
         ): Response = uploadWithProgress(url, authorization, tenantId, filename, fileBytes) { _, _ -> }
+
+        override fun uploadFileWithProgress(
+            url: String,
+            authorization: String,
+            tenantId: String,
+            filename: String,
+            file: File,
+            onProgress: (Long, Long) -> Unit,
+        ): Response {
+            val fileBody = file.asRequestBody("application/octet-stream".toMediaType())
+            val multipart = okhttp3.MultipartBody.Builder()
+                .setType(okhttp3.MultipartBody.FORM)
+                .addFormDataPart("file", filename, fileBody)
+                .build()
+            val total = multipart.contentLength()
+            val body = object : okhttp3.RequestBody() {
+                override fun contentType() = multipart.contentType()
+                override fun contentLength() = total
+                override fun writeTo(sink: okio.BufferedSink) {
+                    var transferred = 0L
+                    val forwarding = object : okio.ForwardingSink(sink) {
+                        override fun write(source: okio.Buffer, byteCount: Long) {
+                            super.write(source, byteCount)
+                            transferred += byteCount
+                            onProgress(transferred, total)
+                        }
+                    }
+                    val buffered = forwarding.buffer()
+                    multipart.writeTo(buffered)
+                    buffered.flush()
+                }
+            }
+            val request = okhttp3.Request.Builder()
+                .url(url)
+                .header("Authorization", authorization)
+                .header("x-tenant-id", tenantId)
+                .post(body)
+                .build()
+            client.newCall(request).execute().use { resp ->
+                return Response(resp.code, resp.body?.string() ?: "")
+            }
+        }
 
         override fun uploadWithProgress(
             url: String,
