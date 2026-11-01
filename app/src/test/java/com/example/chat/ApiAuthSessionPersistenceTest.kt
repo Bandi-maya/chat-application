@@ -40,10 +40,11 @@ class ApiAuthSessionPersistenceTest {
     fun adoptionPersistsBeforePublishingIdentity() {
         val store = MemoryStore()
         val session = ApiAuthSession(store)
-        session.adopt(ApiAuthResult("token-1", user()))
+        session.adopt(ApiAuthResult("token-1", user(), refreshToken = "refresh-1"))
         assertEquals("token-1", store.token)
         assertEquals("u1", com.example.chat.data.api.apiUserFromJson(store.user!!).id)
         assertEquals("token-1", session.token)
+        assertEquals("refresh-1", store.refresh)
     }
 
     @Test
@@ -59,6 +60,21 @@ class ApiAuthSessionPersistenceTest {
         assertEquals(true, failed)
         assertNull(session.token)
         assertNull(session.currentUser)
+    }
+
+    @Test
+    fun profileEditsPreserveRefreshToken() {
+        val store = MemoryStore()
+        val session = ApiAuthSession(store)
+        session.adopt(ApiAuthResult("token-1", user(), refreshToken = "refresh-1"))
+        session.updateProfileFields(
+            displayName = "Updated User",
+            about = null,
+            username = null,
+            avatarUrl = null,
+        )
+        assertEquals("refresh-1", store.refresh)
+        assertEquals("Updated User", com.example.chat.data.api.apiUserFromJson(store.user!!).displayName)
     }
 
     @Test

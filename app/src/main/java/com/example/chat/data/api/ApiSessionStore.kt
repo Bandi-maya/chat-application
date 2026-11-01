@@ -61,7 +61,9 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
     fun restore() = synchronized(scopeLock) {
         val savedToken = store.loadToken()
         val savedUser = store.loadUserJson()
-        var user = if (savedToken != null && savedUser != null) runCatching { apiUserFromJson(savedUser) }.getOrNull() else null
+        var user = if (!savedToken.isNullOrBlank() && !savedUser.isNullOrBlank()) {
+            runCatching { apiUserFromJson(savedUser) }.getOrNull()
+        } else null
         if (user != null && user.id.trim().isEmpty()) {
             try {
                 val jwt = ApiAuthClient({ "" }, { "" }, ApiHttpTransport { _, _, _, _ -> 0 to "" }).decodeJwt(savedToken!!)
@@ -69,14 +71,24 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
                 if (uid.isNotEmpty()) user = user.copy(id = uid)
             } catch (_: Exception) { }
         }
+        if ((!savedToken.isNullOrBlank() || !savedUser.isNullOrBlank()) &&
+            (user == null || user.id.isBlank() || savedToken.isNullOrBlank())
+        ) {
+            // A partial/corrupt identity pair must not remain eligible for a
+            // future restore or block safe re-authentication indefinitely.
+            store.clear()
+            user = null
+        }
         state = ApiAuthSnapshot(user, savedToken.takeIf { user != null }, state.generation + 1)
         onTransition()
     }
 
     fun adopt(result: ApiAuthResult) = synchronized(scopeLock) {
+        // Commit the complete token/user/refresh-token tuple before publishing
+        // the new identity to listeners or request owners.
+        store.saveSession(result.token, apiUserToJson(result.user), result.refreshToken)
         state = ApiAuthSnapshot(result.user, result.token, state.generation + 1)
         onTransition()
-        store.save(result.token, apiUserToJson(result.user))
     }
 
     /** Dart updateProfile local side effect: apply provided fields, derive
@@ -98,8 +110,14 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
             avatarUrl = avatarUrl?.trim() ?: current.avatarUrl,
             avatarInitials = initials,
         )
+        val currentToken = token
+        if (!currentToken.isNullOrBlank()) {
+            // Profile updates must keep the current refresh token; otherwise
+            // the next access-token expiry unexpectedly signs the user out.
+            val refreshToken = store.loadRefreshToken()
+            store.saveSession(currentToken, apiUserToJson(updated), refreshToken)
+        }
         state = state.copy(user = updated)
-        token?.let { store.save(it, apiUserToJson(updated)) }
         updated
     }
 

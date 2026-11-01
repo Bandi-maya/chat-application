@@ -78,20 +78,21 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
         if (secure.getBoolean(CLEARED, false)) null else secure.getString(USER, null)
     }
 
-    override fun save(token: String, userJson: String): Unit = synchronized(this) {
+    override fun save(token: String, userJson: String): Unit =
+        saveSession(token, userJson, refreshToken = null)
+
+    override fun saveSession(token: String, userJson: String, refreshToken: String?): Unit = synchronized(this) {
         require(token.isNotBlank()) { "API access token must not be blank." }
         val user = runCatching { apiUserFromJson(userJson) }.getOrElse {
             throw IllegalArgumentException("API session user payload is invalid.", it)
         }
         require(user.id.isNotBlank()) { "API session user ID must not be blank." }
-        check(
-            secure.edit()
-                .putString(TOKEN, token)
-                .putString(USER, userJson)
-                .remove(REFRESH)
-                .remove(CLEARED)
-                .commit(),
-        ) { "Unable to persist encrypted API session." }
+        val editor = secure.edit()
+            .putString(TOKEN, token)
+            .putString(USER, userJson)
+            .remove(CLEARED)
+        if (refreshToken.isNullOrBlank()) editor.remove(REFRESH) else editor.putString(REFRESH, refreshToken)
+        check(editor.commit()) { "Unable to persist encrypted API session." }
         // Encrypted pair is authoritative if legacy cleanup fails.
         legacy.edit().remove(TOKEN).remove(USER).remove(REFRESH).commit()
         Unit

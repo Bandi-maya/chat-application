@@ -95,10 +95,9 @@ class ApiMediaUploadClient(
     }
 
     private fun safeMultipartFilename(value: String): String =
-        value.replace(Regex("[\\\\/\\r\\n\\u0000-\\u001f\\\"\\\\]"), "_")
-            .trim()
-            .take(120)
-            .ifBlank { "upload.bin" }
+        value.map { ch ->
+            if (ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9' || ch == '.' || ch == '_' || ch == '-') ch else '_'
+        }.joinToString("").trim('.', '_').take(120).ifBlank { "upload.bin" }
 
     /** Account-scoped file upload. The account must remain identical through completion. */
     fun uploadMedia(
