@@ -12,6 +12,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import okio.buffer
 
 /**
  * Supabase Storage REST client covering exactly what the api branch uses on
@@ -51,7 +52,8 @@ class SupabaseStorageClient(
                         onProgress?.invoke(transferred, rawBody.contentLength())
                     }
                 }
-                rawBody.writeTo(okio.buffer(forwarding))
+                rawBody.writeTo(forwarding.buffer())
+                forwarding.flush()
             }
         }
         val request = Request.Builder()
