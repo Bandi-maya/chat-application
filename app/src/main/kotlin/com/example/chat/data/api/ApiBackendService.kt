@@ -35,6 +35,8 @@ class ApiBackendService(
     val config = ApiBackendConfig(context, authScopeLock, ::notifyAuthScopeTransition)
 
     private val sessionStore: ApiSessionStore = EncryptedApiSessionStore(context.applicationContext)
+    // Non-secret account-local preferences and outbox only; credentials live in sessionStore.
+    private val prefs = context.applicationContext.getSharedPreferences("chaty_api_backend", Context.MODE_PRIVATE)
 
     private val auth = ApiAuthClient(
         baseUrl = { config.restApiBaseUrl },
@@ -687,8 +689,8 @@ class ApiBackendService(
         // block demo entry (never overwritten). A STRICTLY-demo persisted
         // pair is the one exception: re-entering the demo replaces it.
         run {
-            val storedToken = try { prefs.getString("api_hub_token", null) } catch (_: Exception) { null }
-            val storedUser = try { prefs.getString("api_hub_user", null) } catch (_: Exception) { null }
+            val storedToken = runCatching { sessionStore.loadToken() }.getOrNull()
+            val storedUser = runCatching { sessionStore.loadUserJson() }.getOrNull()
             val anyRaw = storedToken != null || storedUser != null ||
                 session.token != null || session.currentUser != null
             val strictDemo = DemoMode.isDemoRestSession(storedToken, storedUser) &&
@@ -1468,8 +1470,8 @@ class ApiBackendService(
         // guard BEFORE restore() fires its transition listeners.
         try {
             if (DemoMode.isDemoRestSession(
-                    prefs.getString("api_hub_token", null),
-                    prefs.getString("api_hub_user", null),
+                    sessionStore.loadToken(),
+                    sessionStore.loadUserJson(),
                 )
             ) {
                 DemoMode.active = true
@@ -1522,8 +1524,8 @@ class ApiBackendService(
         // is demo only when BOTH sides match. A mixed/corrupt store keeps its
         // raw bytes - the in-memory demo session is dropped without touching
         // the store, and demo disk residue is erased only when provably demo.
-        val storedToken = try { prefs.getString("api_hub_token", null) } catch (_: Exception) { null }
-        val storedUser = try { prefs.getString("api_hub_user", null) } catch (_: Exception) { null }
+        val storedToken = runCatching { sessionStore.loadToken() }.getOrNull()
+        val storedUser = runCatching { sessionStore.loadUserJson() }.getOrNull()
         val storedStrictDemo = DemoMode.isDemoRestSession(storedToken, storedUser)
         val memoryIsDemo = DemoMode.isDemoUser(session.currentUser?.id) || session.token == DemoMode.TOKEN
         when {
@@ -1717,8 +1719,8 @@ class ApiBackendService(
         val signingOutDemo = isDemoSession
         val storedStrictDemo = try {
             DemoMode.isDemoRestSession(
-                prefs.getString("api_hub_token", null),
-                prefs.getString("api_hub_user", null),
+                sessionStore.loadToken(),
+                sessionStore.loadUserJson(),
             )
         } catch (_: Exception) { false }
         if (signingOutDemo && !storedStrictDemo) {
@@ -1749,14 +1751,13 @@ class ApiBackendService(
 
     private fun saveRefreshToken(token: String?) {
         try {
-            if (token.isNullOrBlank()) prefs.edit().remove("api_hub_refresh_token").apply()
-            else prefs.edit().putString("api_hub_refresh_token", token).apply()
+            sessionStore.saveRefreshToken(token)
         } catch (_: Exception) {
         }
     }
 
     private fun loadRefreshToken(): String? =
-        try { prefs.getString("api_hub_refresh_token", null) } catch (_: Exception) { null }
+        try { sessionStore.loadRefreshToken() } catch (_: Exception) { null }
 
     /** Renews the access token when it expires within [REFRESH_MARGIN_SECONDS]. Waits while a
      *  call is active (a new token is a new account scope, which would end the call). Signs the
