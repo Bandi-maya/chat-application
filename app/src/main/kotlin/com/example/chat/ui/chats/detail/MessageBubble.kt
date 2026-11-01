@@ -1357,6 +1357,63 @@ private fun P2pFileInviteCard(
     accentColor: Color,
     onTap: () -> Unit,
 ) {
+    if (attachment.type == "video") {
+        // Keep the invitation looking like a native video message, not a pasted URL.
+        // The real media bytes stay peer-to-peer and are never embedded in chat metadata.
+        Column(
+            Modifier
+                .widthIn(min = 220.dp, max = 290.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF111820))
+                .border(1.dp, accentColor.copy(alpha = 0.30f), RoundedCornerShape(14.dp))
+                .clickable(onClick = onTap),
+        ) {
+            Box(
+                Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                    .background(Color(0xFF18232E)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Rounded.VideocamOff,
+                        contentDescription = "Video transfer",
+                        tint = Color.White.copy(alpha = 0.72f),
+                        modifier = Modifier.size(38.dp),
+                    )
+                    Text("SECURE VIDEO", color = Color.White.copy(alpha = 0.70f), fontSize = 9.sp, fontWeight = FontWeight.W800)
+                }
+                Box(
+                    Modifier.align(Alignment.Center).size(48.dp)
+                        .clip(CircleShape).background(accentColor.copy(alpha = 0.92f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.PlayArrow, contentDescription = "Receive video", tint = Color.White, modifier = Modifier.size(30.dp))
+                }
+                Text(
+                    "END-TO-END ENCRYPTED",
+                    modifier = Modifier.align(Alignment.BottomStart).padding(9.dp),
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.W800,
+                )
+            }
+            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Text(attachment.name, color = Color.White, fontWeight = FontWeight.W700, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(attachment.size, color = Color.White.copy(alpha = 0.68f), fontSize = 11.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (isMe) "Waiting for recipient" else "Tap to receive video",
+                        color = accentColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.W700,
+                    )
+                }
+            }
+        }
+        return
+    }
+
     Row(
         Modifier
             .widthIn(min = 220.dp, max = 290.dp)
@@ -1371,11 +1428,7 @@ private fun P2pFileInviteCard(
             Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(accentColor.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center,
         ) {
-            val fileIcon = when (attachment.type) {
-                "image" -> Icons.Outlined.ImageNotSupported
-                "video" -> Icons.Rounded.VideocamOff
-                else -> Icons.Rounded.Description
-            }
+            val fileIcon = if (attachment.type == "image") Icons.Outlined.ImageNotSupported else Icons.Rounded.Description
             Icon(fileIcon, contentDescription = null, tint = accentColor, modifier = Modifier.size(23.dp))
         }
         Spacer(Modifier.width(10.dp))
@@ -1383,7 +1436,7 @@ private fun P2pFileInviteCard(
             Text(attachment.name, color = textColor, fontWeight = FontWeight.W700, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(attachment.size, color = textColor.copy(alpha = 0.68f), fontSize = 11.sp)
             Text(
-                if (isMe) "Encrypted peer transfer · waiting" else "Encrypted peer transfer · receive or play",
+                if (isMe) "Encrypted peer transfer · waiting" else "Encrypted peer transfer · receive",
                 color = accentColor,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.W700,
