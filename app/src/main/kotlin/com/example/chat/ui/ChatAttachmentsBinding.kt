@@ -107,7 +107,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                     }
                 } ?: throw IllegalStateException("The selected file is not accessible on this device.")
                 val finalName = name.replace(Regex("[^A-Za-z0-9._-]"), "_").takeLast(100).ifBlank { "attachment" }
-                val finalFile = java.io.File(context.cacheDir, "chaty-${java.util.UUID.randomUUID()}-$finalName")
+                val finalFile = java.io.File(context.cacheDir, "chaty-outgoing-${java.util.UUID.randomUUID()}-$finalName")
                 check(target.renameTo(finalFile)) { "Unable to stage the selected attachment." }
                 finalFile
             } catch (error: Throwable) {
@@ -146,8 +146,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                                 durationSeconds = durationSeconds,
                             )
                         } finally {
-                            if (stagedFile.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-").not() &&
-                                stagedFile.name.startsWith("chaty-")
+                            if (stagedFile.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")
                             ) stagedFile.delete()
                         }
                     }
@@ -164,7 +163,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                             conversationId, type, payload, file.name, file.mimeType, durationSeconds,
                         )
                     } finally {
-                        if (stagedFile?.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-")) {
+                        if (stagedFile?.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")) {
                             stagedFile.delete()
                         }
                     }
