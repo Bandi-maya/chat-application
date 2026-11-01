@@ -1369,7 +1369,7 @@ private fun P2pFileInviteCard(
         "Sent" -> "Sent securely"
         "Failed" -> "Transfer failed · see connection details"
         "Cancelled" -> "Transfer cancelled"
-        else -> transferLabel
+        else -> if (isMe) "Waiting for recipient" else "Tap to receive video"
     }
     if (attachment.type == "video") {
         // Keep the invitation looking like a native video message, not a pasted URL.
