@@ -30,3 +30,4 @@ Build fixes: repair connection diagnostics metrics, add account-scope seams to c
 Adaptive AAC-LC voice-note compression and streamed custom API upload; latest transfer/call/voice sources restored after CI parity overlay: 2026-11-01
 CI now validates the custom Express ICE route and restores all adaptive P2P, voice and custom WebSocket sources after overlay: 2026-11-01
 Chaty hardening screen-share permission gate validation
+Validate screen-share consent and production media fixture gate
