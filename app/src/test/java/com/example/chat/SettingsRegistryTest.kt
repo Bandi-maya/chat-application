@@ -1,9 +1,32 @@
-import com.example.chat.ui.settings.registry.*
-fun main() {
-    check(SettingsRegistry.validateInvariants())
-    check(SettingsRegistry.allSettings.size == 39) { SettingsRegistry.allSettings.size }
-    check(SettingsRegistry.clusters.size == 18)
-    check(SettingsRegistry.allSettings.first().id == "account_display_name")
-    check(SettingsCategory.values().size == 13)
-    println("OK " + SettingsRegistry.allSettings.map { it.defaultValue }.count { it == true })
+package com.example.chat
+
+import com.example.chat.ui.settings.registry.SettingsCategory
+import com.example.chat.ui.settings.registry.SettingsRegistry
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SettingsRegistryTest {
+
+    @Test
+    fun registryContainsUniqueValidatedSettingContracts() {
+        assertTrue(SettingsRegistry.validateInvariants())
+        assertEquals(42, SettingsRegistry.allSettings.size)
+        assertEquals(20, SettingsRegistry.clusters.size)
+        assertEquals("account_display_name", SettingsRegistry.allSettings.first().id)
+        assertEquals(13, SettingsCategory.values().size)
+    }
+
+    @Test
+    fun everyInteractiveControlHasAValidDefaultType() {
+        val invalid = SettingsRegistry.allSettings.filter { setting ->
+            when (setting.controlType) {
+                com.example.chat.ui.settings.registry.SettingControlType.toggle -> setting.defaultValue !is Boolean
+                com.example.chat.ui.settings.registry.SettingControlType.singleChoice -> setting.defaultValue !is String
+                com.example.chat.ui.settings.registry.SettingControlType.slider -> setting.defaultValue !is Number
+                else -> false
+            }
+        }
+        assertTrue("Invalid settings contracts: ${invalid.map { it.id }}", invalid.isEmpty())
+    }
 }
