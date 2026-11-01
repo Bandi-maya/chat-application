@@ -224,6 +224,11 @@ fun ConnectionDetailSheetContent(
                     fontSize = 11.sp,
                 )
                 if (transfer.error != null) Text(transfer.error, color = connectionPoor, fontSize = 11.sp)
+                if (transfer.status.contains("recover", ignoreCase = true) || transfer.status.contains("retry", ignoreCase = true)) {
+                    TextButton(onClick = { onRetryP2pTransfer(transfer.transferId) }) {
+                        Text("Retry direct transfer", color = accentColor)
+                    }
+                }
             }
         }
 
