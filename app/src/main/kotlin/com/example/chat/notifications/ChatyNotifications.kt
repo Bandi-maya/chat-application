@@ -16,6 +16,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.content.ContextCompat
 import com.example.chat.MainActivity
+import com.example.chat.ServiceLocator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -132,6 +133,14 @@ object ChatyNotifications {
             while (list.size > 7) list.removeAt(0)
             list.toList()
         }
+        // Mirror a privacy-safe event in the in-app activity feed. Do not copy
+        // message text into this feed; message content stays in the chat itself.
+        runCatching {
+            ServiceLocator.notifications.triggerEventNotification(
+                title = senderName.ifBlank { "New message" },
+                body = if (isGroup) "New message in ${roomTitle ?: "group"}" else "You received a new message",
+            )
+        }
         val me = Person.Builder().setName("You").build()
         val style = NotificationCompat.MessagingStyle(me)
         if (isGroup) {
@@ -178,6 +187,12 @@ object ChatyNotifications {
         ensureChannels(context)
         synchronized(ringInfo) { ringInfo[callId] = RingInfo(callerId, callerName, isVideo) }
         ringingCallId = callId
+        runCatching {
+            ServiceLocator.notifications.triggerEventNotification(
+                title = "Incoming ${if (isVideo) "video" else "voice"} call",
+                body = callerName.ifBlank { "Unknown caller" },
+            )
+        }
 
         fun activityIntent(action: String) = Intent(context, MainActivity::class.java).apply {
             this.action = action
@@ -251,6 +266,12 @@ object ChatyNotifications {
         ensureChannels(context)
         val name = callerName?.takeIf { it.isNotBlank() } ?: info?.callerName ?: "Unknown"
         val video = isVideo ?: info?.isVideo ?: false
+        runCatching {
+            ServiceLocator.notifications.triggerEventNotification(
+                title = "Missed ${if (video) "video" else "voice"} call",
+                body = name,
+            )
+        }
         val open = Intent(context, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
