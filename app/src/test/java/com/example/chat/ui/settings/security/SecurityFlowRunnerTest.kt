@@ -51,15 +51,14 @@ fun main() = runBlocking {
     check(!SecurityFlowRunner.run(h, SecurityIntent.disableLock), "disable cancelled")
     check(h.log == listOf("overlay", "toast:Verification cancelled."), h.log.toString())
 
-    // Enabled lock with a missing stored credential still requires the verification flow.
-    // The UI may offer credential repair, but the setting change cannot bypass proof.
+    // Enabled lock with a missing stored credential falls back to OS device proof.
     h = FakeHost(method = "PIN", enabled = true)
-    check(SecurityFlowRunner.run(h, SecurityIntent.disableLock), "disable missing credential after proof")
-    check(h.log == listOf("overlay", "apply:null:false:Disable App Lock"), h.log.toString())
+    check(SecurityFlowRunner.run(h, SecurityIntent.disableLock), "disable missing credential with OS proof")
+    check(h.log == listOf("dev:Confirm it is you to continue", "apply:null:false:Disable App Lock"), h.log.toString())
 
-    h = FakeHost(method = "PIN", enabled = true, verify = false)
-    check(!SecurityFlowRunner.run(h, SecurityIntent.disableLock), "missing credential verification cancelled")
-    check(h.log == listOf("overlay", "toast:Verification cancelled."), h.log.toString())
+    h = FakeHost(method = "PIN", enabled = true, dev = false)
+    check(!SecurityFlowRunner.run(h, SecurityIntent.disableLock), "missing credential without OS proof")
+    check(h.log == listOf("dev:Confirm it is you to continue", "toast:Verification cancelled."), h.log.toString())
 
     // change method to pattern: verify -> pick -> setup -> apply
     h = FakeHost(method = "PIN", enabled = true, creds = mutableSetOf("PIN"), pick = LockMethodType.pattern)
