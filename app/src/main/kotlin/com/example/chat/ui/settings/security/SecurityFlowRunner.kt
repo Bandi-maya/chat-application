@@ -69,6 +69,8 @@ object SecurityFlowRunner {
         pinLength: Int = 4,
     ): Boolean {
         val current = methodTypeOf(host.currentLockMethod())
+        val currentHasStoredSecret = SecurityFlowPlan.hasVerifiableSecret(current) &&
+            host.hasCredential(storageKeyOf(current))
         var chosen = target ?: current
         var verifiedCurrent = false
 
@@ -79,7 +81,14 @@ object SecurityFlowRunner {
             // a security-setting change silently bypass current-user proof.
             // The verification UI can offer credential repair, but the flow
             // only continues after an actual successful verification.
-            val valid = verifyCurrent(host, current)
+            val valid = if (SecurityFlowPlan.hasVerifiableSecret(current) && !currentHasStoredSecret) {
+                // If an enabled PIN/pattern/password is missing, use the OS
+                // device credential as the recovery proof. Never treat a
+                // missing local secret as permission to change the lock.
+                host.authenticateDeviceCredential("Confirm it is you to continue")
+            } else {
+                verifyCurrent(host, current)
+            }
             if (!valid || !host.isActive()) return false
             verifiedCurrent = true
         }
