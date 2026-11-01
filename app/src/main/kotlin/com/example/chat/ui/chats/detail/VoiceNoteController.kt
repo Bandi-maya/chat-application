@@ -50,6 +50,8 @@ class VoiceNoteController(
     private val staging: VoiceStagingPort,
     private val uploadAudio: suspend (sourcePath: String, displayName: String, durationSeconds: Int) -> MessageAttachment,
     private val sendAudioMessage: suspend (attachment: MessageAttachment) -> Unit,
+    /** Adaptive AAC-LC profile selected from the current uplink/data-saver state. */
+    private val recordConfig: () -> VoiceRecordConfig = { VoiceRecordConfig() },
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     var isRecording = false
@@ -102,7 +104,7 @@ class VoiceNoteController(
                 throw IllegalStateException("Microphone permission is required.")
             }
             stagingPath = staging.newStagingPath(now())
-            recorder.start(VoiceRecordConfig(), stagingPath)
+            recorder.start(recordConfig(), stagingPath)
             path = stagingPath
             startedAtMs = now()
             isRecording = true
