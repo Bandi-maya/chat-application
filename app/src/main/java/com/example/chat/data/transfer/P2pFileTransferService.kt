@@ -356,7 +356,11 @@ class P2pFileTransferService(
                 else session.peer?.addIceCandidate(ice)
             }
             "file_transfer_restart_request" -> {
-                sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.upload }?.let { restartIce(it) }
+                sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.upload }?.let {
+                    it.restartAttempts = 0
+                    it.restartInProgress = false
+                    restartIce(it)
+                }
             }
             "file_transfer_cancel" -> {
                 sessions[id]?.takeIf { it.peerUserId == sender }?.let { fail(it, "Sender cancelled this transfer") }
