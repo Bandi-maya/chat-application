@@ -22,6 +22,7 @@ import com.example.chat.data.remote.PostgrestQueryClient
 import com.example.chat.data.remote.PostgrestRpcClient
 import com.example.chat.data.remote.SupabaseRealtimeChannel
 import com.example.chat.data.remote.SupabaseStorageClient
+import com.example.chat.data.remote.SupabaseTurnCredentialsClient
 import com.example.chat.data.services.CallHistoryService
 import com.example.chat.data.services.ChatyNotificationService
 import com.example.chat.data.services.ConnectionHealthService
@@ -92,6 +93,11 @@ object ServiceLocator {
     }
 
     private val accessToken: suspend () -> String? = { sessionManager.accessToken() }
+
+    /** Authenticated ephemeral STUN/TURN credentials from the existing Supabase Edge Function. */
+    private val turnCredentialsClient: SupabaseTurnCredentialsClient by lazy {
+        SupabaseTurnCredentialsClient(supabaseUrl, publishableKey, accessToken)
+    }
     private val currentUserId: () -> String? = { sessionManager.currentUserId() }
 
     val authRepository: AuthRepository by lazy {
@@ -588,6 +594,13 @@ object ServiceLocator {
             // verified, and CallHistoryService here is Postgrest-backed. Sink is a
             // no-op until the record plane is confirmed.
             callRecordSink = { },
+            iceServersProvider = {
+                val credentials = turnCredentialsClient.load()
+                if (!credentials.relayConfigured) {
+                    android.util.Log.w("ChatyICE", "TURN relay is not configured; this session can only attempt direct STUN connectivity.")
+                }
+                credentials.iceServers
+            },
             lowDataUsageEnabled = { callPresentationPrefs.value.lowDataUsageEnabled },
             captureAccountScope = { apiBackend.authSnapshot() },
             accountScopeValid = { expected -> apiBackend.authSnapshot() === expected },
