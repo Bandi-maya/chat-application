@@ -497,18 +497,24 @@ class P2pFileTransferService(
             invite.secret.fill(0)
             throw SecurityException("Transfer manifest does not match the invitation.")
         }
-        val safeDestination = validatePrivateReceiveDestination(appContext.filesDir, destination)
-        val availableBytes = android.os.StatFs(safeDestination.parentFile!!.absolutePath).availableBytes
-        if (availableBytes < manifest.sizeBytes) {
+        val safeDestination = try {
+            validatePrivateReceiveDestination(appContext.filesDir, destination).also { safe ->
+                val availableBytes = android.os.StatFs(safe.parentFile!!.absolutePath).availableBytes
+                if (availableBytes < manifest.sizeBytes) {
+                    throw IllegalStateException("Not enough free storage to receive this file.")
+                }
+            }
+        } catch (error: Throwable) {
             invite.secret.fill(0)
-            throw IllegalStateException("Not enough free storage to receive this file.")
+            throw error
         }
         val localUserId = currentUserId() ?: run {
             invite.secret.fill(0)
             throw SecurityException("Sign in before receiving a file.")
         }
-        val session = Session(invite.transferId, offer.senderId, localUserId, null, manifest, invite.secret.copyOf(),
-            TransferDirection.download, destination = null, finalDestination = safeDestination)
+
+        // Validate and create all on-disk paths before copying the invitation
+        // secret into a long-lived session object.
         val resumeKey = invite.transferId + "-" + manifest.sha256Hex.take(16)
         val partFile = File(safeDestination.parentFile!!, "." + resumeKey + ".part")
         if (partFile.canonicalFile.parentFile != safeDestination.parentFile ||
@@ -517,16 +523,16 @@ class P2pFileTransferService(
             invite.secret.fill(0)
             throw SecurityException("Partial receive file path is not safe.")
         }
-        session.destination = partFile
-        invite.secret.fill(0)
-        val ledgerDirectory = File(appContext.filesDir.canonicalFile, "p2p-ledger")
+
+        val appFilesRoot = appContext.filesDir.canonicalFile
+        val ledgerDirectory = File(appFilesRoot, "p2p-ledger")
         if (!ledgerDirectory.exists() && !ledgerDirectory.mkdirs()) {
             invite.secret.fill(0)
             throw IllegalStateException("Unable to create private transfer ledger.")
         }
         val safeLedgerDirectory = ledgerDirectory.canonicalFile
         if (!safeLedgerDirectory.isDirectory || safeLedgerDirectory.name != "p2p-ledger" ||
-            safeLedgerDirectory.parentFile != appContext.filesDir.canonicalFile
+            safeLedgerDirectory.parentFile != appFilesRoot
         ) {
             invite.secret.fill(0)
             throw SecurityException("Private transfer ledger path is not trusted.")
@@ -538,28 +544,63 @@ class P2pFileTransferService(
             invite.secret.fill(0)
             throw SecurityException("Transfer ledger file path is not safe.")
         }
-        session.ledger = ChunkReceiptLedger(ledgerFile, manifest.chunkCount)
-        if (!partFile.isFile) session.ledger?.clear()
-        // The part file and AtomicFile receipt bitmap survive process death. Restore
-        // the visible byte count immediately instead of showing 0% until the first
-        // newly received chunk arrives after the sender re-offers.
-        session.receivedBytes = minOf(
-            session.ledger?.receivedCount()?.times(manifest.chunkBytes.toLong()) ?: 0L,
-            manifest.sizeBytes,
-        )
-        incomingCandidates.remove(invite.transferId)?.let { candidates ->
-            candidates.filter { (candidateSender, _) -> candidateSender == offer.senderId }
-                .forEach { (_, candidate) -> session.queuedCandidates.add(candidate) }
+        val ledger = try {
+            ChunkReceiptLedger(ledgerFile, manifest.chunkCount).also {
+                if (!partFile.isFile) it.clear()
+            }
+        } catch (error: Throwable) {
+            invite.secret.fill(0)
+            throw error
         }
+        val receivedBytes = try {
+            minOf(
+                ledger.receivedCount().toLong() * manifest.chunkBytes.toLong(),
+                manifest.sizeBytes,
+            )
+        } catch (error: Throwable) {
+            invite.secret.fill(0)
+            runCatching { ledger.clear() }
+            throw error
+        }
+
         val transferKind = when {
             manifest.mimeType.startsWith("video/") -> TransferKind.video
             manifest.mimeType.startsWith("image/") -> TransferKind.image
             manifest.mimeType.startsWith("audio/") -> TransferKind.audio
             else -> TransferKind.document
         }
-        session.monitorId = transferMonitor.begin(
-            TransferDirection.download, transferKind, manifest.sizeBytes, manifest.displayName,
-        )
+        val monitorId = try {
+            transferMonitor.begin(
+                TransferDirection.download, transferKind, manifest.sizeBytes, manifest.displayName,
+            )
+        } catch (error: Throwable) {
+            invite.secret.fill(0)
+            runCatching { ledger.clear() }
+            throw error
+        }
+
+        val session = Session(
+            invite.transferId,
+            offer.senderId,
+            localUserId,
+            null,
+            manifest,
+            invite.secret.copyOf(),
+            TransferDirection.download,
+            destination = partFile,
+            finalDestination = safeDestination,
+        ).apply {
+            this.ledger = ledger
+            this.receivedBytes = receivedBytes
+            this.monitorId = monitorId
+        }
+        invite.secret.fill(0)
+        incomingCandidates.remove(invite.transferId)?.let { candidates ->
+            val matchingCandidates = synchronized(candidates) {
+                candidates.filter { (candidateSender, _) -> candidateSender == offer.senderId }
+            }
+            matchingCandidates.forEach { (_, candidate) -> session.queuedCandidates.add(candidate) }
+        }
         sessions[invite.transferId] = session
         return try {
             val peer = createPeer(session)
