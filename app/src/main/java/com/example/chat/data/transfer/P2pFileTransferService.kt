@@ -182,7 +182,12 @@ class P2pFileTransferService(
             TransferDirection.upload)
         sessions[invite.transferId] = session
         val monitorId = transferMonitor.begin(
-            TransferDirection.upload, TransferKind.video, manifest.sizeBytes, manifest.displayName,
+            TransferDirection.upload, when {
+                mimeType.startsWith("video/") -> TransferKind.video
+                mimeType.startsWith("image/") -> TransferKind.image
+                mimeType.startsWith("audio/") -> TransferKind.audio
+                else -> TransferKind.document
+            }, manifest.sizeBytes, manifest.displayName,
         )
         session.monitorId = monitorId
         publish(session, "Waiting for recipient")
@@ -222,7 +227,8 @@ class P2pFileTransferService(
         sourceOwner: java.io.Closeable? = null,
         linkExpirySeconds: Long = 7L * 24L * 60L * 60L,
     ): String = withContext(Dispatchers.IO) {
-        require(targetUserId.isNotBlank() && targetUserId != currentUserId()) { "Choose a valid recipient" }
+        val localUserId = currentUserId() ?: throw SecurityException("Sign in before sending a file.")
+        require(targetUserId.isNotBlank() && targetUserId != localUserId) { "Choose a valid recipient" }
         val invite = NativeP2pTransferProtocol.createInvite()
         val manifest = NativeP2pTransferProtocol.createManifest(
             invite, source, displayName, sizeBytes, mimeType,
@@ -234,7 +240,12 @@ class P2pFileTransferService(
         val session = Session(invite.transferId, targetUserId, localUserId, null, manifest, invite.secret.copyOf(),
             TransferDirection.upload, sourceChannel = source, sourceOwner = sourceOwner)
         sessions[invite.transferId] = session
-        val kind = if (mimeType.startsWith("video/")) TransferKind.video else TransferKind.document
+        val kind = when {
+            mimeType.startsWith("video/") -> TransferKind.video
+            mimeType.startsWith("image/") -> TransferKind.image
+            mimeType.startsWith("audio/") -> TransferKind.audio
+            else -> TransferKind.document
+        }
         session.monitorId = transferMonitor.begin(TransferDirection.upload, kind, manifest.sizeBytes, manifest.displayName)
         publish(session, "Waiting for recipient")
         try {
