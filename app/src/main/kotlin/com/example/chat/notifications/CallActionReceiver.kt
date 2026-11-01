@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.example.chat.ServiceLocator
 import com.example.chat.data.services.CallSessionState
+import com.example.chat.data.services.CallForegroundService
 import kotlinx.coroutines.launch
 
 /** "Decline" on the incoming-call notification. Works without opening the app: declines the
@@ -12,13 +13,19 @@ import kotlinx.coroutines.launch
 class CallActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == ChatyNotifications.ACTION_END_CALL) {
-            // "Hang up" on the ongoing-call notification: ends the live call without
-            // opening the app. The session-end cascade stops the foreground service.
+            // A notification action is bound to the call that created it. Ignore
+            // stale notifications rather than ending a newer call session.
+            val callId = intent.getStringExtra(CallForegroundService.EXTRA_CALL_ID).orEmpty()
+            if (callId.isBlank()) return
+            endCallProbe?.let { it(); return }
             val pending = goAsync()
             ServiceLocator.appScope.launch {
                 try {
-                    val probe = endCallProbe
-                    if (probe != null) probe() else ServiceLocator.callSignaling.endCall()
+                    val calls = ServiceLocator.callSignaling
+                    val active = calls.currentSession
+                    if (active?.callId == callId && active.isActive) {
+                        calls.endCall(reason = "notification_hangup")
+                    }
                 } catch (e: Exception) {
                     android.util.Log.w("CallActionReceiver", "end call failed: $e")
                 } finally {
