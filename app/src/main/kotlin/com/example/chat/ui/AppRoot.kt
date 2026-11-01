@@ -210,6 +210,7 @@ fun AppRoot() {
         var linkedDevicesOnly by remember { mutableStateOf(false) }
         var newChatBroadcast by remember { mutableStateOf(false) }
         val scope = androidx.compose.runtime.rememberCoroutineScope()
+        val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
         // Dart AuthChangeEvent.signedOut: reset lock/prompt state and replace the stack
         // with WelcomeScreen (pushAndRemoveUntil).
         androidx.compose.runtime.DisposableEffect(Unit) {
@@ -220,6 +221,8 @@ fun AppRoot() {
                         route == AuthRoute.HiddenVault || route == AuthRoute.MessageManagement || route == AuthRoute.LinkedDevices ||
                         route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch || route == AuthRoute.Notifications)
                 ) {
+                    ServiceLocator.notifications.clearAll()
+                    com.example.chat.notifications.ChatyNotifications.clearForSignOut(appContext)
                     ServiceLocator.appLock.onSignedOut()
                     ServiceLocator.lockBiometrics.stopAuthentication()
                     promptPending = false
