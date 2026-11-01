@@ -94,6 +94,11 @@ class WebRtcCallMediaController(
 
     override var onLocalIceCandidate: ((String, String?, Int?) -> Unit)? = null
     override var onRemoteStream: (() -> Unit)? = null
+    private var onScreenShareStopped: (() -> Unit)? = null
+
+    override fun setOnScreenShareStopped(listener: (() -> Unit)?) {
+        onScreenShareStopped = listener
+    }
     override var onConnectionState: ((CallTransportState) -> Unit)? = null
     override var onIceFailed: (() -> Unit)? = null
 
@@ -455,8 +460,9 @@ class WebRtcCallMediaController(
                 permission,
                 object : MediaProjection.Callback() {
                     override fun onStop() {
-                        // Android/user revoked projection: restore the camera
-                        // and release all projection-owned resources.
+                        // Android/user revoked projection: restore the camera,
+                        // release resources, and let the call state drop the
+                        // mediaProjection foreground-service type.
                         Handler(Looper.getMainLooper()).post { stopScreenShareInternal() }
                     }
                 },
@@ -502,6 +508,7 @@ class WebRtcCallMediaController(
     }
 
     private fun stopScreenShareInternal() {
+        val wasActive = screenCapturer != null || screenStream != null
         val capturer = screenCapturer
         screenCapturer = null
         try {
@@ -524,6 +531,7 @@ class WebRtcCallMediaController(
         screenSurfaceTextureHelper?.dispose()
         screenSurfaceTextureHelper = null
         screenCapturePermission = null
+        if (wasActive) onScreenShareStopped?.invoke()
     }
 
     /** Attach a SurfaceViewRenderer created by the Compose UI. */
