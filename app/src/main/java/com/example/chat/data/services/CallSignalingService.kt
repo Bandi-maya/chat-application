@@ -131,6 +131,9 @@ interface CallMediaController {
     /** Restore the camera track and stop the screen stream. */
     suspend fun stopScreenShare()
 
+    /** Called when Android/user revokes the MediaProjection outside the normal stop flow. */
+    fun setOnScreenShareStopped(listener: (() -> Unit)?) { }
+
     /** Full teardown (Dart _disposeMediaTransport). */
     suspend fun dispose()
 
@@ -995,6 +998,15 @@ class CallSignalingService(
         requireCallIdentity(expectedAccount, callId)
         val peer = mediaFactory()
         lastAppliedNetworkProfile = null
+        peer.setOnScreenShareStopped {
+            guardCall(expectedAccount, callId, peer) {
+                val active = currentSession
+                if (active?.isSharingScreen == true) {
+                    currentSession = active.copy(isSharingScreen = false)
+                    notifyChanged()
+                }
+            }
+        }
         if (!guardCall(expectedAccount, callId) { media = peer }) { peer.dispose(); throw kotlinx.coroutines.CancellationException("Call changed") }
 
         peer.onLocalIceCandidate = { candidate, sdpMid, sdpMLineIndex ->
