@@ -50,3 +50,5 @@ Compile recovery and P2P resume slice: owner-token-compatible screen-share foreg
 P2P recovery permission hardening: persist sender source URIs only when Android confirms durable read permission; notify the sender to keep Chaty open when the provider does not grant it.
 Screen-share startup handshake now coalesces concurrent requests, times out safely, and propagates coroutine cancellation instead of swallowing it. Verify latest branch sources.
 P2P journal failure path now zeroes the in-memory transfer secret and closes the picker descriptor before aborting; verify with latest foreground-service and transfer recovery changes.
+
+A-Z hardening implementation verification: 2026-11-01
