@@ -216,6 +216,7 @@ jobs:
             app/src/main/java/com/example/chat/data/services/LocalLockService.kt \
             app/src/main/java/com/example/chat/data/services/CallForegroundService.kt \
             app/src/main/AndroidManifest.xml \
+            app/src/debug/java/com/example/chat/LockBadgeProofActivity.kt \
             app/src/main/kotlin/com/example/chat/data/api/EncryptedApiSessionStore.kt \
             app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt \
             app/src/main/kotlin/com/example/chat/data/auth/SessionStore.kt \
