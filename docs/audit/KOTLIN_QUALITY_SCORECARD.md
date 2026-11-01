@@ -34,7 +34,8 @@ A score is an evidence rating, not a promise that software is bug-free. A 5/5 ra
 - Home header Notifications icon routes to a dedicated in-app activity screen, not Notification Settings.
 - Chats and Groups hosts both route to the dedicated screen.
 - Notification Settings remains a distinct Settings destination.
-- The activity screen uses a single list with separators, an explicit empty state, a settings shortcut and a confirmation before clearing the local activity feed.
+- The activity screen uses a single list with separators, an explicit empty state, a settings shortcut and a confirmation before clearing the local activity feed. Privacy-safe message and call activity events are mirrored into that local feed without copying message bodies.
+- Notification preference sections no longer wrap a preview card inside another shadowed card; previews are inline within one section surface, and settings-row chevrons are smaller and visually quieter.
 - Local notification activity storage now synchronizes list mutations/snapshots and uses UUID event IDs.
 - GoTrue sign-out commits a durable encrypted tombstone before clearing legacy DataStore values. A stale legacy session cannot be migrated after sign-out.
 - Call media permission flow checks Android's actual grant state again after the runtime prompt.
