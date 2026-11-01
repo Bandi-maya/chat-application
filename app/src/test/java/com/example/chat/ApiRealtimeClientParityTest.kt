@@ -175,6 +175,33 @@ class ApiRealtimeClientParityTest {
     }
 
     @Test
+    fun rejectsInsecureRemoteWebSocketsAndConfiguredBearerTokens() {
+        val invalid = listOf(
+            "ws://chat.example.com/socket",
+            "wss://chat.example.com/socket?token=stale",
+            "wss://user:pass@chat.example.com/socket",
+            "wss://chat.example.com/socket#fragment",
+        )
+        invalid.forEach { url ->
+            var rejected = false
+            try {
+                ApiRealtimeClient.resolveWebSocketUrl("u1", url, "", "https://rest.example.com")
+            } catch (_: IllegalArgumentException) {
+                rejected = true
+            }
+            assertTrue("unsafe websocket URL must be rejected: $url", rejected)
+        }
+    }
+
+    @Test
+    fun acceptsLoopbackWsButNotRemoteCleartextWs() {
+        assertEquals(
+            "ws://10.0.2.2:8000/chat/ws/u1",
+            ApiRealtimeClient.resolveWebSocketUrl("u1", null, "", "http://10.0.2.2:8000"),
+        )
+    }
+
+    @Test
     fun urlDefaultsToWsSchemeOnRestBase() {
         assertEquals(
             "ws://10.0.2.2:8000/chat/ws/u1",
@@ -247,8 +274,8 @@ class ApiRealtimeClientParityTest {
     @Test
     fun urlEnvSchoolPathIgnoredFallsToRestBase() {
         assertEquals(
-            "ws://x/chat/ws/u1",
-            ApiRealtimeClient.resolveWebSocketUrl("u1", null, "wss://s.example.com/ws/school", "http://x"),
+            "ws://10.0.2.2/chat/ws/u1",
+            ApiRealtimeClient.resolveWebSocketUrl("u1", null, "wss://s.example.com/ws/school", "http://10.0.2.2"),
         )
     }
 
