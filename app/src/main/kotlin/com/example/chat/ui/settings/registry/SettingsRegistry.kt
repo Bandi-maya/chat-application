@@ -524,6 +524,15 @@ object SettingsRegistry {
      * verify that every declared destination is actually registered.
      */
     fun validateInvariants(validRoutes: Set<String>? = null): Boolean {
+        val categoryIds = HashSet<String>()
+        for (category in SettingsCategory.values()) {
+            require(category.id.matches(Regex("^[a-z][a-z0-9_]*$"))) { "Invalid settings category ID: ${category.id}" }
+            require(categoryIds.add(category.id)) { "Duplicate settings category ID: ${category.id}" }
+            require(category.title.isNotBlank() && category.subtitle.isNotBlank()) {
+                "Settings category ${category.id} must have a title and subtitle."
+            }
+        }
+
         val clusterIds = HashSet<String>()
         for (cluster in clusters) {
             require(cluster.id.matches(Regex("^[a-z][a-z0-9_]*$"))) { "Invalid settings cluster ID: ${cluster.id}" }
@@ -531,6 +540,7 @@ object SettingsRegistry {
             require(cluster.title.isNotBlank() && cluster.description.isNotBlank()) {
                 "Settings cluster ${cluster.id} must have a title and description."
             }
+            require(cluster.settings.isNotEmpty()) { "Settings cluster ${cluster.id} must contain at least one setting." }
             require(cluster.settings.all { it.category == cluster.category }) {
                 "Settings cluster ${cluster.id} contains an item from another category."
             }
@@ -543,9 +553,16 @@ object SettingsRegistry {
             require(setting.title.isNotBlank() && setting.description.isNotBlank()) {
                 "Setting ${setting.id} must have a title and description."
             }
-            require(setting.canonicalRoute.startsWith("/settings/") &&
-                !setting.canonicalRoute.contains("..") && !setting.canonicalRoute.contains("//")
+            require(
+                setting.canonicalRoute.matches(Regex("^/settings/[a-z0-9_-]+(/[a-z0-9_-]+)*$")) &&
+                    setting.canonicalRoute.split('/').none { it == "." || it == ".." }
             ) { "Setting ${setting.id} has an invalid canonical route: ${setting.canonicalRoute}" }
+            require(setting.subcategory.isNotBlank()) {
+                "Setting ${setting.id} must define a subcategory."
+            }
+            require(setting.searchKeywords.none { it.isBlank() }) {
+                "Setting ${setting.id} contains a blank search keyword."
+            }
             validRoutes?.let { routes ->
                 require(setting.canonicalRoute in routes) {
                     "Setting ${setting.id} points to an unregistered route: ${setting.canonicalRoute}"
