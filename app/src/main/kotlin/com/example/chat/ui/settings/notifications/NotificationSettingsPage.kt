@@ -77,8 +77,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.chat.core.preferences.ChatyPreferencesController
-import com.example.chat.ui.kit.GbCardContainer
-import com.example.chat.ui.kit.GbLivePreviewCard
 import com.example.chat.ui.kit.GbSettingRow
 import com.example.chat.ui.kit.GbSliderTile
 import com.example.chat.ui.kit.GbSwitchTile
@@ -415,12 +413,13 @@ fun NotificationSettingsPage(
                 )
                 }
             }
-            GbCardContainer(headerText = "Contact Online Toast Customization") {
+            ChatySettingsSection(title = "Contact online toast", description = "Preview and tune the alert shown when a contact comes online.") {
                 Column {
-                    GbLivePreviewCard(height = 70.dp) {
-                        Box(Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center) {
-                            ToastPreview("Bandi Maya Online", p.onlineWithProfilePic, p.onlineElevation, p.onlineRadius, p.onlineBgColor, p.onlineTextColor, Color(0xFF1E2630))
-                        }
+                    Box(
+                        Modifier.fillMaxWidth().height(70.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ToastPreview("Bandi Maya Online", p.onlineWithProfilePic, p.onlineElevation, p.onlineRadius, p.onlineBgColor, p.onlineTextColor, Color(0xFF1E2630))
                     }
                     GbSwitchTile(
                         icon = Icons.Rounded.NotificationsNone, title = "Notification in the Notification Bar", subtitle = "Show a notification on the phone's status bar", value = p.onlineInNotificationBar,
@@ -461,12 +460,13 @@ fun NotificationSettingsPage(
                 }
             }
             Spacer(Modifier.height(14.dp))
-            GbCardContainer(headerText = "Viewed Story Toast Customization") {
+            ChatySettingsSection(title = "Viewed story toast", description = "Preview and tune the alert shown when someone views your status.") {
                 Column {
-                    GbLivePreviewCard(height = 70.dp) {
-                        Box(Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center) {
-                            ToastPreview("Bandi Maya Status", p.storyWithProfilePic, p.storyElevation, p.storyRadius, p.storyBgColor, p.storyTextColor, Color(0xFF1E2630))
-                        }
+                    Box(
+                        Modifier.fillMaxWidth().height(70.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ToastPreview("Bandi Maya Status", p.storyWithProfilePic, p.storyElevation, p.storyRadius, p.storyBgColor, p.storyTextColor, Color(0xFF1E2630))
                     }
                     GbSwitchTile(
                         icon = Icons.Rounded.NotificationsNone, title = "Notification in the Notification Bar", subtitle = "Show in status bar", value = p.storyInNotificationBar,
@@ -499,12 +499,13 @@ fun NotificationSettingsPage(
                 }
             }
             Spacer(Modifier.height(14.dp))
-            GbCardContainer(headerText = "Profile Toast Customization") {
+            ChatySettingsSection(title = "Profile toast", description = "Preview and tune profile-view activity alerts.") {
                 Column {
-                    GbLivePreviewCard(height = 70.dp) {
-                        Box(Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center) {
-                            ToastPreview("Bandi Maya Profile", p.profileWithProfilePic, p.profileElevation, p.profileRadius, p.profileBgColor, p.profileTextColor, Color(0xFF1E2630))
-                        }
+                    Box(
+                        Modifier.fillMaxWidth().height(70.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ToastPreview("Bandi Maya Profile", p.profileWithProfilePic, p.profileElevation, p.profileRadius, p.profileBgColor, p.profileTextColor, Color(0xFF1E2630))
                     }
                     GbSwitchTile(
                         icon = Icons.Rounded.AccountBox, title = "Profile Toast", subtitle = "Know immediately when anyone views your profile via a Toast message", value = p.profileToast,
@@ -533,12 +534,13 @@ fun NotificationSettingsPage(
                 }
             }
             Spacer(Modifier.height(14.dp))
-            GbCardContainer(headerText = "Typing Toast Customization") {
+            ChatySettingsSection(title = "Typing toast", description = "Preview and tune typing activity alerts.") {
                 Column {
-                    GbLivePreviewCard(height = 70.dp) {
-                        Box(Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center) {
-                            ToastPreview("Bandi Maya Typing...", p.typingWithProfilePic, p.typingElevation, p.typingRadius, p.typingBgColor, p.typingTextColor, Color(0xFF1E2630))
-                        }
+                    Box(
+                        Modifier.fillMaxWidth().height(70.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ToastPreview("Bandi Maya Typing...", p.typingWithProfilePic, p.typingElevation, p.typingRadius, p.typingBgColor, p.typingTextColor, Color(0xFF1E2630))
                     }
                     GbSwitchTile(
                         icon = Icons.Rounded.Keyboard, title = "Typing Toast", subtitle = "Know immediately when anyone starts typing to you via a floating toast message", value = p.typingToast,
