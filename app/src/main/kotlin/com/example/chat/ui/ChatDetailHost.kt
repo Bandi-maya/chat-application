@@ -191,8 +191,16 @@ fun ChatDetailHost(
             var sourceOwner: android.os.ParcelFileDescriptor.AutoCloseInputStream? = null
             var transferId: String? = null
             try {
-                runCatching {
-                    context.contentResolver.takePersistableUriPermission(selectedUri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val sourceReadPermissionPersisted = runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        selectedUri,
+                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                    true
+                }.getOrElse {
+                    context.contentResolver.persistedUriPermissions.any {
+                        it.uri == selectedUri && it.isReadPermission
+                    }
                 }
                 val details = withContext(kotlinx.coroutines.Dispatchers.IO) {
                     var name = "video"
@@ -230,7 +238,7 @@ fun ChatDetailHost(
                 val link = p2pTransfers.offerFile(
                     otherId, channel, safeName, size, mime,
                     sourceOwner = sourceOwner,
-                    sourceUri = selectedUri.toString(),
+                    sourceUri = selectedUri.toString().takeIf { sourceReadPermissionPersisted },
                 )
                 sourceOwner = null // service owns the file descriptor until transfer completion
                 val invite = com.example.chat.data.transfer.NativeP2pTransferProtocol.parseInvite(link)
@@ -269,7 +277,10 @@ fun ChatDetailHost(
                     ),
                 )
                 if (sent == null) throw IllegalStateException("The transfer offer was created but the chat message could not be sent.")
-                toast("Secure transfer link sent.")
+                toast(
+                    if (sourceReadPermissionPersisted) "Secure transfer link sent."
+                    else "Secure transfer link sent. Keep Chaty open: this provider does not allow restart recovery.",
+                )
                 rev++
             } catch (e: Exception) {
                 transferId?.let { p2pTransfers.cancel(it) }
