@@ -540,6 +540,41 @@ class ApiRealtimeClientParityTest {
     }
 
     @Test
+    fun allRoomFramesRejectUnsafeIdentifiersBeforeSending() {
+        val rig = Rig().connect()
+        assertFalse(rig.client.sendMessageFallback("../admin", "secret"))
+        assertFalse(rig.client.sendTyping("room?next=/admin", true))
+        assertFalse(rig.client.sendDelivered("room#fragment"))
+        assertTrue(rig.socket.sent.isEmpty())
+    }
+
+    @Test
+    fun allRoomFramesStopSendingAfterAccountScopeChanges() {
+        val scheduler = FakeScheduler()
+        val factory = FakeFactory()
+        var current: Any = Any()
+        val client = ApiRealtimeClient(
+            { "wss://example.invalid/chat/ws/u1" },
+            { "same-token" },
+            factory,
+            scheduler,
+            connectionScopeIdentity = { current },
+            connectionScopeGuard = { expected, action ->
+                if (expected === current) { action(); true } else false
+            },
+        )
+        client.connect()
+        scheduler.drain()
+        val oldSocket = factory.sockets.single()
+        current = Any()
+        assertFalse(client.sendMessageFallback("r1", "private message"))
+        assertFalse(client.sendTyping("r1", true))
+        assertFalse(client.sendDelivered("r1"))
+        assertFalse(client.sendCallSignal("u2", mapOf("call_id" to "private-call")))
+        assertTrue(oldSocket.sent.isEmpty())
+    }
+
+    @Test
     fun sendMessageFallbackIsNoOpWhenDisconnected() {
         val rig = Rig()
         assertFalse(rig.client.sendMessageFallback("r1", "x"))
