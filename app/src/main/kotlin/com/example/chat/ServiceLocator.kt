@@ -623,6 +623,7 @@ object ServiceLocator {
             sendSignal = { targetUserId, data -> apiBackend.sendCallSignal(targetUserId, data) },
             transferMonitor = transferMonitor,
             iceServers = { com.example.chat.data.transfer.P2pFileTransferService.parseIceServers(callSignaling.iceServersForTransfer()) },
+            networkStatus = { networkMonitor.state.value },
         ).also { service ->
             apiBackend.addScopedCallSignalListener { expected, data ->
                 if (data["signal_type"]?.toString()?.startsWith("file_transfer_") == true) {
