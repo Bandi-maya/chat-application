@@ -214,15 +214,20 @@ fun AppRoot() {
         // Dart AuthChangeEvent.signedOut: reset lock/prompt state and replace the stack
         // with WelcomeScreen (pushAndRemoveUntil).
         androidx.compose.runtime.DisposableEffect(Unit) {
+            var wasAuthenticated = ServiceLocator.apiBackend.isAuthenticated
             val signOutListener: () -> Unit = {
-                if (!ServiceLocator.apiBackend.isAuthenticated &&
+                val authenticated = ServiceLocator.apiBackend.isAuthenticated
+                if (wasAuthenticated && !authenticated) {
+                    ServiceLocator.notifications.clearAll()
+                    com.example.chat.notifications.ChatyNotifications.clearForSignOut(appContext)
+                }
+                wasAuthenticated = authenticated
+                if (!authenticated &&
                     (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security ||
                         route == AuthRoute.LockedChats ||
                         route == AuthRoute.HiddenVault || route == AuthRoute.MessageManagement || route == AuthRoute.LinkedDevices ||
                         route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch || route == AuthRoute.Notifications)
                 ) {
-                    ServiceLocator.notifications.clearAll()
-                    com.example.chat.notifications.ChatyNotifications.clearForSignOut(appContext)
                     ServiceLocator.appLock.onSignedOut()
                     ServiceLocator.lockBiometrics.stopAuthentication()
                     promptPending = false
