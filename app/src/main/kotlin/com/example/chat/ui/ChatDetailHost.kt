@@ -743,7 +743,11 @@ fun ChatDetailHost(
         com.example.chat.ui.chats.detail.MediaViewerScreen(
             theme = theme,
             title = localP2pFile.name,
-            type = "video",
+            type = when (localP2pFile.extension.lowercase()) {
+                "mp4", "mkv", "mov", "webm", "m4v", "avi", "3gp", "mpeg", "mpg" -> "video"
+                "jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "bmp" -> "image"
+                else -> "document"
+            },
             size = com.example.chat.data.services.ChatMediaService.formatBytes(localP2pFile.length()),
             storagePath = localP2pFile.toURI().toString(),
             createSignedUrl = { path, _ -> path },
@@ -752,13 +756,35 @@ fun ChatDetailHost(
             ownedActions = true,
             onOwnedOpen = {
                 val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", localP2pFile)
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, "video/*")
+                val mime = when (localP2pFile.extension.lowercase()) {
+                    "mp4", "m4v" -> "video/mp4"
+                    "mkv" -> "video/x-matroska"
+                    "mov" -> "video/quicktime"
+                    "webm" -> "video/webm"
+                    "jpg", "jpeg" -> "image/jpeg"
+                    "png" -> "image/png"
+                    "webp" -> "image/webp"
+                    "gif" -> "image/gif"
+                    else -> "*/*"
+                }
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, mime)
                     .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 context.startActivity(intent)
             },
             onOwnedShare = {
                 val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", localP2pFile)
-                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).setType("video/*")
+                val mime = when (localP2pFile.extension.lowercase()) {
+                    "mp4", "m4v" -> "video/mp4"
+                    "mkv" -> "video/x-matroska"
+                    "mov" -> "video/quicktime"
+                    "webm" -> "video/webm"
+                    "jpg", "jpeg" -> "image/jpeg"
+                    "png" -> "image/png"
+                    "webp" -> "image/webp"
+                    "gif" -> "image/gif"
+                    else -> "*/*"
+                }
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).setType(mime)
                     .putExtra(android.content.Intent.EXTRA_STREAM, uri)
                     .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 context.startActivity(android.content.Intent.createChooser(intent, "Share video"))
