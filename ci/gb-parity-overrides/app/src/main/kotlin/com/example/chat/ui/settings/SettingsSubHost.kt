@@ -227,10 +227,11 @@ fun SettingsSubHost(
             canUseBiometrics = { ServiceLocator.localLockService.canUseBiometrics() },
             authenticateBiometric = { reason -> ServiceLocator.localLockService.authenticateBiometric(reason) },
         )
-        // Dart clear-cache action is not ported; the toggles on this page are static in the Kotlin port.
+        // Storage quality controls are backed by the shared media-upload preferences.
         SettingsDestination.StorageMedia -> {
             var cacheLimitMb by remember { mutableStateOf(com.example.chat.data.local.MediaCacheSettings.limitMb(context)) }
             StorageMediaScreen(
+                preferences = prefs,
                 onBack = onBack,
                 onClearCache = {
                     ServiceLocator.mediaCache.clearCurrentAccount()
