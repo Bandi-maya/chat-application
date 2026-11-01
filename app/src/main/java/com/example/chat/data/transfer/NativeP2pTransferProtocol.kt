@@ -165,6 +165,9 @@ object NativeP2pTransferProtocol {
     /** Read only the requested byte range; never loads the whole source file into memory. */
     fun encryptChunk(source: File, manifest: Manifest, secret: ByteArray, index: Long): EncryptedChunk {
         require(source.isFile && source.length() == manifest.sizeBytes)
+        require(secret.size == KEY_BYTES && index in 0 until manifest.chunkCount) {
+            "Invalid transfer key or chunk index"
+        }
         val offset = Math.multiplyExact(index, manifest.chunkBytes.toLong())
         val length = minOf(manifest.chunkBytes.toLong(), manifest.sizeBytes - offset).toInt()
         val plain = ByteArray(length)
