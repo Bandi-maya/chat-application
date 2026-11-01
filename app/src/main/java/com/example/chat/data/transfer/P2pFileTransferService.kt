@@ -315,6 +315,7 @@ class P2pFileTransferService(
                         activeReceiver.manifest, unb64(authentication), activeReceiver.secret,
                     )
                     activeReceiver.remoteDescriptionSet = false
+                    activeReceiver.signalingReady = false
                     setRemoteDescription(peer, SessionDescription.Type.OFFER, signal["sdp"]?.toString() ?: return)
                     activeReceiver.remoteDescriptionSet = true
                     flushCandidates(activeReceiver)
@@ -452,6 +453,7 @@ class P2pFileTransferService(
             restartIce(session)
         } else {
             session.remoteDescriptionSet = false
+            session.signalingReady = false
             val queued = sendSignalScoped(session, mapOf(
                 "signal_type" to "file_transfer_restart_request",
                 "call_id" to session.id,
