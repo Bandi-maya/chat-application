@@ -62,3 +62,5 @@ Security, bounded upload and poll validation regression: 2026-11-01
 API route and location validation regression: 2026-11-01
 
 Atomic API session and multipart filename hardening: 2026-11-01
+
+Organization route regression and multipart injection tests: 2026-11-01
