@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Key
@@ -28,7 +27,6 @@ import androidx.compose.material.icons.rounded.PhonelinkLock
 import androidx.compose.material.icons.rounded.Screenshot
 import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.TouchApp
-import androidx.compose.material.icons.rounded.VerifiedUser
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -48,9 +46,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -75,7 +71,6 @@ private sealed interface Modal {
     class Pick(val current: LockMethodType, val result: CompletableDeferred<LockMethodType?>) : Modal
     class Setup(val method: String, val pinLength: Int, val result: CompletableDeferred<Boolean>) : Modal
     class TestLock(val result: CompletableDeferred<Boolean>) : Modal
-    object SafetyNumber : Modal
     class SecretPhrase(val result: CompletableDeferred<String?>) : Modal
 }
 
@@ -379,7 +374,6 @@ fun SecurityCenterScreen(
         is Modal.Pick -> LockMethodSelectorSheet(LockSetupServiceAdapter(lockService), m.current) { m.result.complete(it) }
         is Modal.Setup -> LockCredentialSetupSheet(m.method, m.pinLength, LockSetupServiceAdapter(lockService), replaceExisting = true) { m.result.complete(it) }
         is Modal.SecretPhrase -> SecretPhraseDialog(m.result)
-        Modal.SafetyNumber -> SafetyNumberDialog { modal = null }
         null -> {}
     }
 }
@@ -442,37 +436,5 @@ private fun SecretPhraseDialog(result: CompletableDeferred<String?>) {
         confirmButton = {
             Button(onClick = { val t = text.trim(); if (t.isNotEmpty()) result.complete(t) }) { Text("Save Word") }
         },
-    )
-}
-
-@Composable
-private fun SafetyNumberDialog(onClose: () -> Unit) {
-    val colors = LocalAppColors.current
-    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
-        onDismissRequest = onClose,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.VerifiedUser, null, tint = colors.success)
-                Spacer(Modifier.width(8.dp))
-                Text("Safety Number Verification")
-            }
-        },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.background(colors.surfaceSecondary, RoundedCornerShape(12.dp)).padding(12.dp)) {
-                    Text(
-                        "05423 89104 33812 77192\n44901 88321 00192 44381",
-                        textAlign = TextAlign.Center, fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "Demo Security Model \u2022 End-to-end encryption state verified with prekey identity.",
-                    textAlign = TextAlign.Center, fontSize = 12.sp, color = colors.foregroundSecondary,
-                )
-            }
-        },
-        confirmButton = { Button(onClick = onClose) { Text("Verified") } },
     )
 }
