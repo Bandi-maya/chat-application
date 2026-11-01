@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -51,6 +53,51 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
                 android.widget.Toast.makeText(hostContext, failureMessage, android.widget.Toast.LENGTH_SHORT).show()
             }, action = action)
         }
+    }
+    var requestedScreenShareCallId by remember { mutableStateOf<String?>(null) }
+    val screenSharePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val expectedCallId = requestedScreenShareCallId
+        requestedScreenShareCallId = null
+        val current = service.currentSession
+        if (result.resultCode != android.app.Activity.RESULT_OK || result.data == null) {
+            android.widget.Toast.makeText(hostContext, "Screen sharing was not started. Permission was cancelled.", android.widget.Toast.LENGTH_SHORT).show()
+        } else if (
+            expectedCallId == null || current?.callId != expectedCallId ||
+            current.state != CallSessionState.connected || !current.isVideo || !service.hasLocalMedia
+        ) {
+            android.widget.Toast.makeText(hostContext, "The call changed before screen sharing could start.", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            val media = service.activeMedia as? com.example.chat.data.services.WebRtcCallMediaController
+            if (media == null) {
+                android.widget.Toast.makeText(hostContext, "Screen sharing is unavailable for this call session.", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                media.setScreenCapturePermission(result.data!!)
+                callAction(expectedCallId, "Unable to start screen sharing. Check the call connection and try again.") {
+                    service.toggleScreenShare()
+                }
+            }
+        }
+    }
+    fun requestOrStopScreenShare(callId: String, currentlySharing: Boolean) {
+        val current = service.currentSession
+        if (current?.callId != callId || current.state != CallSessionState.connected || !current.isVideo || !service.hasLocalMedia) {
+            android.widget.Toast.makeText(hostContext, "Screen sharing is available only after a video call is connected.", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (currentlySharing) {
+            callAction(callId, "Unable to stop screen sharing.") { service.toggleScreenShare() }
+            return
+        }
+        val manager = hostContext.getSystemService(android.content.Context.MEDIA_PROJECTION_SERVICE)
+            as? android.media.projection.MediaProjectionManager
+        if (manager == null) {
+            android.widget.Toast.makeText(hostContext, "Screen sharing is not supported on this device.", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        requestedScreenShareCallId = callId
+        screenSharePermissionLauncher.launch(manager.createScreenCaptureIntent())
     }
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(service, presentation) {
@@ -159,7 +206,7 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             onToggleMute = { service.toggleMute() },
             onToggleCamera = { service.toggleCamera() },
             onSwitchCamera = { callAction(session.callId, "Unable to switch camera.") { service.switchCamera() } },
-            onToggleScreenShare = { callAction(session.callId, "Unable to change screen sharing.") { service.toggleScreenShare() } },
+            onToggleScreenShare = { requestOrStopScreenShare(session.callId, session.isSharingScreen) },
             onToggleAudioRoute = { route: AudioRouteType -> callAction(session.callId, "Choose Bluetooth or a headset through the system audio controls.") { service.setAudioRoute(route) } },
             onEnterNativePip = {
                 // Dart _enterNativePip: settings gate, then system PiP, else a message.
