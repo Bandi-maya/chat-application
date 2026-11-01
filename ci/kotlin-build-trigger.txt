@@ -58,3 +58,5 @@ A-Z hardening follow-up verification: 2026-11-01
 Kotlin repair verification: 2026-11-01
 
 Security, bounded upload and poll validation regression: 2026-11-01
+
+API route and location validation regression: 2026-11-01
