@@ -242,7 +242,7 @@ class ApiAuthClient(
         } ?: throw IllegalArgumentException("Organization ID contains invalid characters.")
         val encodedWorkspace = java.net.URLEncoder.encode(safeWorkspace, "UTF-8")
 
-        val primary = "${baseUrl()}/organization/$encodedWorkspace"
+        val primary = "${baseUrl()}/organization/check/$encodedWorkspace"
         val fallback = "${baseUrl()}/tenants/config?tenant_id=$encodedWorkspace"
         var response: Pair<Int, String>? = null
         try {
