@@ -6,6 +6,7 @@ import com.example.chat.data.network.TransferDirection
 import com.example.chat.data.network.TransferKind
 import com.example.chat.data.network.TransferMonitor
 import com.example.chat.data.network.TransferStatus
+import com.example.chat.data.network.NetworkStatusMonitor
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -51,6 +52,8 @@ class P2pFileTransferService(
     private val sendSignal: (targetUserId: String, data: Map<String, Any?>) -> Boolean,
     private val transferMonitor: TransferMonitor,
     private val iceServers: suspend () -> List<PeerConnection.IceServer> = { defaultIceServers() },
+    /** Current link estimate; used only to tune bounded chunk windows and buffering. */
+    private val networkStatus: () -> NetworkStatusMonitor.Status? = { null },
 ) {
     data class PendingOffer(
         val transferId: String,
@@ -176,6 +179,7 @@ class P2pFileTransferService(
         val invite = NativeP2pTransferProtocol.createInvite()
         val manifest = NativeP2pTransferProtocol.createManifest(
             invite, file, mimeType, System.currentTimeMillis() / 1000L + linkExpirySeconds,
+            chunkBytes = preferredChunkBytes(),
         )
         val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
         val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes, manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
@@ -234,6 +238,7 @@ class P2pFileTransferService(
         val manifest = NativeP2pTransferProtocol.createManifest(
             invite, source, displayName, sizeBytes, mimeType,
             System.currentTimeMillis() / 1000L + linkExpirySeconds,
+            chunkBytes = preferredChunkBytes(),
         )
         val auth = NativeP2pTransferProtocol.authenticateManifest(manifest, invite.secret)
         val wireManifest = WireManifest(manifest.transferId, manifest.displayName, manifest.mimeType, manifest.sizeBytes,
@@ -601,7 +606,7 @@ class P2pFileTransferService(
         val ledger = session.ledger ?: return@withLock
         while (channel.state() == DataChannel.State.OPEN && session.peer?.connectionState() == PeerConnection.PeerConnectionState.CONNECTED && !ledger.isComplete()) {
             // Small windows keep DataChannel buffering bounded on 1G/2G links; do not resend a slow batch after 10 seconds.
-            val indices = ledger.missingIndices(MAX_REQUEST_CHUNKS)
+            val indices = ledger.missingIndices(maxRequestChunks())
             if (indices.isEmpty()) break
             val json = JSONObject().put("kind", "request").put("indices", JSONArray().apply { indices.forEach { put(it) } })
             if (!channel.send(DataChannel.Buffer(ByteBuffer.wrap(json.toString().toByteArray()), false))) {
@@ -632,11 +637,11 @@ class P2pFileTransferService(
         if (file == null && sourceChannel == null) return
         val channel = session.channel ?: return
         if (channel.state() != DataChannel.State.OPEN) return
-        val count = minOf(array?.length() ?: 0, MAX_REQUEST_CHUNKS)
+        val count = minOf(array?.length() ?: 0, maxRequestChunks())
         for (i in 0 until count) {
             if (channel.state() != DataChannel.State.OPEN) break
             var backpressureWaits = 0
-            while (channel.bufferedAmount() > MAX_BUFFERED_BYTES && channel.state() == DataChannel.State.OPEN && backpressureWaits < 250) {
+            while (channel.bufferedAmount() > maxBufferedBytes() && channel.state() == DataChannel.State.OPEN && backpressureWaits < 250) {
                 kotlinx.coroutines.delay(40)
                 backpressureWaits++
             }
@@ -857,6 +862,42 @@ class P2pFileTransferService(
     private fun sendSignalScoped(session: Session, data: Map<String, Any?>): Boolean {
         if (currentUserId() != session.localUserId) return false
         return sendSignal(session.peerUserId, data)
+    }
+
+    /** Pick a smaller authenticated frame on weak uplinks. The manifest locks this
+     *  value for the life of a transfer, so reconnects cannot change chunk geometry. */
+    private fun preferredChunkBytes(): Int {
+        val upstream = networkStatus()?.upstreamKbps ?: 0
+        return when {
+            upstream in 1..128 -> 16 * 1024
+            upstream in 129..400 -> 24 * 1024
+            upstream in 401..900 -> 32 * 1024
+            else -> NativeP2pTransferProtocol.DEFAULT_CHUNK_BYTES
+        }
+    }
+
+    /** Small request windows prevent a weak receiver from building a large queue. */
+    private fun maxRequestChunks(): Int {
+        val downstream = networkStatus()?.downstreamKbps ?: 0
+        return when {
+            downstream in 1..128 -> 1
+            downstream in 129..300 -> 2
+            downstream in 301..700 -> 4
+            downstream in 701..1_500 -> 8
+            else -> MAX_REQUEST_CHUNKS
+        }
+    }
+
+    /** Bound DataChannel buffering to roughly one/two chunks on weak cellular links. */
+    private fun maxBufferedBytes(): Long {
+        val upstream = networkStatus()?.upstreamKbps ?: 0
+        return when {
+            upstream in 1..128 -> 64L * 1024L
+            upstream in 129..300 -> 128L * 1024L
+            upstream in 301..700 -> 384L * 1024L
+            upstream in 701..1_500 -> 768L * 1024L
+            else -> MAX_BUFFERED_BYTES
+        }
     }
 
     private fun sendCandidate(session: Session, candidate: IceCandidate) {
