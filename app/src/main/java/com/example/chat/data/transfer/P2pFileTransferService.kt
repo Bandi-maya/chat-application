@@ -371,9 +371,18 @@ class P2pFileTransferService(
     }
 
     /** User taps Receive on the in-chat transfer card and selects a private destination. */
-    suspend fun acceptInvite(link: String, destination: File): Boolean {
+    suspend fun acceptInvite(link: String, destination: File, senderUserId: String? = null): Boolean {
         val invite = NativeP2pTransferProtocol.parseInvite(link)
-        var pending = incoming[invite.transferId]
+        if (incoming[invite.transferId] == null && !senderUserId.isNullOrBlank() && currentUserId() != null) {
+            // Re-request the offer after the receiver app reconnects; the sender reuses its source and receiver ledger.
+        if (pending == null && !senderUserId.isNullOrBlank()) {
+            sendSignal(senderUserId, mapOf(
+                "signal_type" to "file_transfer_restart_request",
+                "call_id" to invite.transferId,
+                "transfer_id" to invite.transferId,
+                "request_nonce" to java.util.UUID.randomUUID().toString(),
+            ))
+        }
         var waitSteps = 0
         while (pending == null && waitSteps < 20) {
             kotlinx.coroutines.delay(500)
