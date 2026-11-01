@@ -69,13 +69,16 @@ object SecurityFlowRunner {
         pinLength: Int = 4,
     ): Boolean {
         val current = methodTypeOf(host.currentLockMethod())
-        val currentHasSecret = if (SecurityFlowPlan.hasVerifiableSecret(current)) host.hasCredential(storageKeyOf(current)) else false
         var chosen = target ?: current
         var verifiedCurrent = false
 
         val requiresCurrentProof = host.isAppLockEnabled() &&
             (intent == SecurityIntent.changeMethod || intent == SecurityIntent.changeCredential || intent == SecurityIntent.disableLock)
-        if (requiresCurrentProof && (!SecurityFlowPlan.hasVerifiableSecret(current) || currentHasSecret)) {
+        if (requiresCurrentProof) {
+            // Even when the stored credential is missing/corrupt, do not let
+            // a security-setting change silently bypass current-user proof.
+            // The verification UI can offer credential repair, but the flow
+            // only continues after an actual successful verification.
             val valid = verifyCurrent(host, current)
             if (!valid || !host.isActive()) return false
             verifiedCurrent = true
