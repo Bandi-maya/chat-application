@@ -203,7 +203,13 @@ class P2pFileTransferService(
             invite.transferId, targetUserId, localUserId, file, manifest, invite.secret.copyOf(),
             TransferDirection.upload, sourceUri = file.toURI().toString(),
         )
-        persistSenderResume(session)
+        try {
+            persistSenderResume(session)
+        } catch (error: Throwable) {
+            invite.secret.fill(0)
+            session.secret.fill(0)
+            throw error
+        }
         sessions[invite.transferId] = session
         val monitorId = transferMonitor.begin(
             TransferDirection.upload, when {
@@ -268,7 +274,14 @@ class P2pFileTransferService(
             invite.transferId, targetUserId, localUserId, null, manifest, invite.secret.copyOf(),
             TransferDirection.upload, sourceChannel = source, sourceOwner = sourceOwner, sourceUri = sourceUri,
         )
-        persistSenderResume(session)
+        try {
+            persistSenderResume(session)
+        } catch (error: Throwable) {
+            invite.secret.fill(0)
+            session.secret.fill(0)
+            runCatching { (sourceOwner ?: source).close() }
+            throw error
+        }
         sessions[invite.transferId] = session
         val kind = when {
             mimeType.startsWith("video/") -> TransferKind.video
