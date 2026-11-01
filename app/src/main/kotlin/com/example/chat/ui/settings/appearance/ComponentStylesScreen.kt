@@ -1,5 +1,7 @@
 package com.example.chat.ui.settings.appearance
 
+import android.widget.Toast
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -144,6 +146,7 @@ fun ComponentStylesScreen(
 ) {
     val colors = LocalAppColors.current
     val view = LocalView.current
+    val context = view.context
     val scope = rememberCoroutineScope()
     rememberCustomizationVersion(controller)
     var selectedTab by remember { mutableIntStateOf(0) }
