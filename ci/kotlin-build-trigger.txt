@@ -49,3 +49,4 @@ P2P sender process recovery: encrypted transfer secret/manifest/source URI journ
 Compile recovery and P2P resume slice: owner-token-compatible screen-share foreground service, typed staged-file path, coroutine-safe media host, encrypted sender source/manifest recovery, and debug fixture compatibility cleanup. Verify Kotlin debug APK and tests.
 P2P recovery permission hardening: persist sender source URIs only when Android confirms durable read permission; notify the sender to keep Chaty open when the provider does not grant it.
 Screen-share startup handshake now coalesces concurrent requests, times out safely, and propagates coroutine cancellation instead of swallowing it. Verify latest branch sources.
+P2P journal failure path now zeroes the in-memory transfer secret and closes the picker descriptor before aborting; verify with latest foreground-service and transfer recovery changes.
