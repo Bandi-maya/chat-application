@@ -11,8 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
-private val Context.legacyAuthDataStore by preferencesDataStore(name = "chaty_session")
-
 /** Production Keystore-backed session store; migrates the old DataStore session without logging users out. */
 class EncryptedGoTrueSessionStorage(private val context: Context) : SessionStorage {
     private val encrypted by lazy {
@@ -45,7 +43,7 @@ class EncryptedGoTrueSessionStorage(private val context: Context) : SessionStora
             return@withContext SessionStore.StoredSession(access, refresh, expiry, user)
         }
 
-        val old = context.legacyAuthDataStore.data.first()
+        val old = context.sessionDataStore.data.first()
         val oldAccess = old[stringPreferencesKey("access_token")]
         val oldRefresh = old[stringPreferencesKey("refresh_token")]
         val oldExpiry = old[longPreferencesKey("expires_at_epoch_ms")]
