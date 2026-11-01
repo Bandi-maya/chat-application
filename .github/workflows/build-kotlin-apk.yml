@@ -169,7 +169,8 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/media/PdfWorkspaceScreen.kt \
             app/src/test/java/com/example/chat/LocalLockServiceFullTest.kt \
-            app/src/test/java/com/example/chat/ProtectedResourceGateParityTest.kt
+            app/src/test/java/com/example/chat/ProtectedResourceGateParityTest.kt \
+            app/src/test/java/com/example/chat/ui/media/MediaLibraryServiceHardeningTest.kt
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
       - uses: actions/setup-java@v4
