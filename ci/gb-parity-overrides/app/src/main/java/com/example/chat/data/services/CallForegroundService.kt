@@ -182,8 +182,7 @@ class CallForegroundService : Service() {
     }
 
     private fun buildNotification(title: String, text: String, sessionId: String): Notification {
-        // Tapping returns to the in-app call UI: MainActivity routes ACTION_SHOW_CALL
-        // to the call presentation controller, only while a session is actually live.
+        // Tapping returns to the in-app call UI only while a real session is active.
         val showCall = android.app.PendingIntent.getActivity(
             this, SERVICE_ID,
             Intent(this, com.example.chat.MainActivity::class.java).apply {
@@ -192,31 +191,32 @@ class CallForegroundService : Service() {
             },
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
         )
-        // The connected call previously exposed no notification action at all, so a
-        // backgrounded call had no system-level hangup. CallStyle gives a standard
-        // system-rendered hang-up button (no custom styling is promised).
-        val hangUp = android.app.PendingIntent.getBroadcast(
-            this, if (sessionId.isBlank()) SERVICE_ID + 1 else sessionId.hashCode(),
-            Intent(this, com.example.chat.notifications.CallActionReceiver::class.java).apply {
-                action = com.example.chat.notifications.ChatyNotifications.ACTION_END_CALL
-                if (sessionId.isNotBlank()) {
-                    data = android.net.Uri.Builder().scheme("chaty-call").authority("hangup").appendPath(sessionId).build()
-                    putExtra(com.example.chat.notifications.ChatyNotifications.EXTRA_CALL_ID, sessionId)
-                }
-            },
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
-        )
         val caller = androidx.core.app.Person.Builder().setName(title).build()
-        return androidx.core.app.NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = androidx.core.app.NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.sym_call_incoming)
             .setContentTitle(title)
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setCategory(androidx.core.app.NotificationCompat.CATEGORY_CALL)
-            .setStyle(androidx.core.app.NotificationCompat.CallStyle.forOngoingCall(caller, hangUp))
             .setContentIntent(showCall)
-            .build()
+        if (sessionId.isNotBlank()) {
+            val hangUp = android.app.PendingIntent.getBroadcast(
+                this, sessionId.hashCode(),
+                Intent(this, com.example.chat.notifications.CallActionReceiver::class.java).apply {
+                    action = com.example.chat.notifications.ChatyNotifications.ACTION_END_CALL
+                    data = android.net.Uri.Builder().scheme("chaty-call").authority("hangup").appendPath(sessionId).build()
+                    putExtra(com.example.chat.notifications.ChatyNotifications.EXTRA_CALL_ID, sessionId)
+                },
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+            )
+            // CallStyle provides the standard system-rendered hang-up action.
+            builder
+                .setCategory(androidx.core.app.NotificationCompat.CATEGORY_CALL)
+                .setStyle(androidx.core.app.NotificationCompat.CallStyle.forOngoingCall(caller, hangUp))
+        } else {
+            builder.setCategory(androidx.core.app.NotificationCompat.CATEGORY_SERVICE)
+        }
+        return builder.build()
     }
 
     // Nested at class level, not inside the companion object: Kotlin does
