@@ -206,17 +206,24 @@ class ApiRealtimeClient(
     /** Recording indicator on the custom backend WebSocket; no Supabase RPC. */
     fun sendRecording(roomId: String, isRecording: Boolean): Boolean {
         val s = socket ?: return false
-        return try {
-            s.send(
-                JSONObject()
-                    .put("type", "recording")
-                    .put("room_id", roomId)
-                    .put("is_recording", isRecording)
-                    .toString(),
-            )
-        } catch (_: Exception) {
-            false
+        val expectedScope = socketScope
+        var queued = false
+        val accepted = connectionScopeGuard(expectedScope) {
+            if (s === socket && socketToken == token() && socketUrl == webSocketUrl() &&
+                expectedScope === connectionScopeIdentity()
+            ) {
+                queued = try {
+                    s.send(
+                        JSONObject()
+                            .put("type", "recording")
+                            .put("room_id", roomId)
+                            .put("is_recording", isRecording)
+                            .toString(),
+                    )
+                } catch (_: Exception) { false }
+            }
         }
+        return accepted && queued
     }
 
     /** Delivery ack: tells the server a new message for [roomId] reached this device
