@@ -52,8 +52,9 @@ class SupabaseStorageClient(
                         onProgress?.invoke(transferred, rawBody.contentLength())
                     }
                 }
-                rawBody.writeTo(forwarding.buffer())
-                forwarding.flush()
+                val buffered = forwarding.buffer()
+                rawBody.writeTo(buffered)
+                buffered.flush()
             }
         }
         val request = Request.Builder()
