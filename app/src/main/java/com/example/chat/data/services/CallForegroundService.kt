@@ -10,6 +10,8 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
 /**
@@ -174,10 +176,9 @@ class CallForegroundService : Service() {
          */
         suspend fun ensureScreenProjectionForeground(context: Context): Boolean {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
-            val ready = CompletableDeferred<Boolean>()
-            synchronized(projectionReadyLock) {
-                projectionForegroundReady?.cancel()
-                projectionForegroundReady = ready
+            val ready = synchronized(projectionReadyLock) {
+                projectionForegroundReady?.takeIf { !it.isCompleted }
+                    ?: CompletableDeferred<Boolean>().also { projectionForegroundReady = it }
             }
             val intent = Intent(context, CallForegroundService::class.java).apply {
                 putExtra(EXTRA_TITLE, "Chaty screen sharing")
@@ -192,6 +193,11 @@ class CallForegroundService : Service() {
                     context.startService(intent)
                 }
                 withTimeout(5_000L) { ready.await() }
+            } catch (timeout: TimeoutCancellationException) {
+                android.util.Log.e("CallForegroundService", "Timed out waiting for mediaProjection foreground mode", timeout)
+                false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 android.util.Log.e("CallForegroundService", "Screen-share foreground setup failed", error)
                 false
