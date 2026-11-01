@@ -257,8 +257,8 @@ fun NotificationSettingsPage(
 
     Box(Modifier.fillMaxWidth()) {
         ChatySettingsPage(
-            title = "Notifications",
-            subtitle = "In-app alerts, realtime contact events & toast notification customizations",
+            title = "Notification settings",
+            subtitle = "Manage in-app alerts, Dynamic Island and toast preferences",
             onBack = onBack,
             trailingHeaderWidget = {
                 Row(
