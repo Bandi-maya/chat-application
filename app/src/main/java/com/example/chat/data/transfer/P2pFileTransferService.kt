@@ -1072,6 +1072,10 @@ class P2pFileTransferService(
                     noncePrefix = unb64(record.getString("nonce_prefix")),
                     expiresAtEpochSeconds = record.getLong("expires_at"),
                 )
+                if (manifest.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L) {
+                    clearSenderResume(transferId)
+                    throw SecurityException("This transfer link has expired.")
+                }
                 NativeP2pTransferProtocol.verifyManifest(
                     manifest,
                     NativeP2pTransferProtocol.authenticateManifest(manifest, secret),
@@ -1127,6 +1131,12 @@ class P2pFileTransferService(
             }
         } catch (error: Throwable) {
             android.util.Log.w("ChatyP2P", "Unable to restore sender transfer $transferId", error)
+            _transfers.value = _transfers.value.map { item ->
+                if (item.transferId == transferId) item.copy(
+                    status = "Resume unavailable",
+                    error = error.message ?: "Could not restore the original file source.",
+                ) else item
+            }
             return false
         } finally {
             restoringUploads.remove(transferId)
