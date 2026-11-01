@@ -124,6 +124,11 @@ jobs:
             app/src/main/java/com/example/chat/data/services/ChatMediaService.kt \
             app/src/main/java/com/example/chat/data/services/CallSignalingService.kt \
             app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt \
+            app/src/main/java/com/example/chat/data/transfer/NativeP2pTransferProtocol.kt \
+            app/src/main/java/com/example/chat/data/transfer/ChunkReceiptLedger.kt \
+            app/src/main/java/com/example/chat/data/transfer/P2pFileTransferService.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionDetailSheet.kt \
+            app/src/main/res/xml/file_paths.xml \
             app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt \
             app/src/main/kotlin/com/example/chat/ui/AppRoot.kt \
             app/src/main/java/com/example/chat/domain/models/ChatMessage.kt \
