@@ -11,6 +11,25 @@ import org.junit.Test
 
 class NativeP2pTransferProtocolTest {
     @Test
+    fun rejectsNonCanonicalUppercaseTransferIds() {
+        val invite = NativeP2pTransferProtocol.createInvite()
+        try {
+            val parts = invite.toUri().split("#", limit = 2)
+            val id = invite.transferId.uppercase()
+            val forged = "chaty://transfer/$id#${parts.getOrNull(1).orEmpty()}"
+            var rejected = false
+            try {
+                NativeP2pTransferProtocol.parseInvite(forged)
+            } catch (_: SecurityException) {
+                rejected = true
+            }
+            assertTrue("non-canonical transfer IDs must be rejected", rejected)
+        } finally {
+            invite.secret.fill(0)
+        }
+    }
+
+    @Test
     fun encryptsAndVerifiesChunkedFileEndToEnd() {
         val root = Files.createTempDirectory("chaty-p2p").toFile()
         try {
