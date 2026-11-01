@@ -425,7 +425,8 @@ class P2pFileTransferService(
         val partFile = File(destination.parentFile ?: appContext.filesDir, "." + resumeKey + ".part")
         session.destination = partFile
         invite.secret.fill(0)
-        session.ledger = ChunkReceiptLedger(File(appContext.filesDir, "p2p-ledger/" + resumeKey + ".state"), manifest.chunkCount)
+        val ledgerDirectory = File(appContext.filesDir, "p2p-ledger").apply { mkdirs() }
+        session.ledger = ChunkReceiptLedger(File(ledgerDirectory, resumeKey + ".state"), manifest.chunkCount)
         incomingCandidates.remove(invite.transferId)?.let { session.queuedCandidates.addAll(it) }
         val transferKind = when {
             manifest.mimeType.startsWith("video/") -> TransferKind.video
