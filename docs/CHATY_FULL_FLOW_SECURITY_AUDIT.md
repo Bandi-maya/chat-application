@@ -151,7 +151,7 @@ Apply these contracts to every interactive component, not only screens:
 - MLS attachment exporter material exists, but attachment bytes are not yet encrypted end-to-end on every upload/download path. Do not describe media attachments as E2EE until encrypted storage, recipient-side decryption, tamper rejection and membership/epoch tests all pass.
 - CI candidate overlay restore list was expanded for branch-owned hardening sources so the build job compiles the intended versions.
 
-## 7. Next implementation order
+## 8. Next implementation order
 
 1. Fix auth token storage (SEC-001/012) with encrypted migration and tests.
 2. Remove full-file memory reads and cache-copy picker path (SEC-004/005/006).
