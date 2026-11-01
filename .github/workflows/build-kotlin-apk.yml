@@ -150,10 +150,19 @@ jobs:
                               break
                   if end is not None:
                       source = source[:start] + 'Text("🔒", fontSize = 14.sp)' + source[end:]
-              def ensure_import(text, import_line):
-                  if import_line in text:
-                      return text
-                  match = re.search(r'(?m)^package\\s+[A-Za-z0-9_.]+\\s*
+              source_lines = source.splitlines()
+              package_index = next((i for i, line in enumerate(source_lines) if line.startswith('package ')), None)
+              if package_index is None:
+                  raise SystemExit('Lock badge fixture has no package declaration')
+              for import_line in (
+                  'import androidx.compose.material3.Text',
+                  'import androidx.compose.ui.unit.sp',
+              ):
+                  if import_line not in source_lines:
+                      source_lines.insert(package_index + 1, import_line)
+                      package_index += 1
+              source = chr(10).join(source_lines) + (chr(10) if source.endswith(chr(10)) else '')
+              p.write_text(source)
           voice = pathlib.Path('app/src/debug/java/com/example/chat/VoiceGestureFixtureActivity.kt')
           if voice.exists():
               source = voice.read_text()
