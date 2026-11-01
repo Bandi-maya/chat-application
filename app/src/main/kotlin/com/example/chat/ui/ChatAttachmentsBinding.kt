@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.example.chat.ServiceLocator
+import com.example.chat.data.local.BoundedFileReader
 import com.example.chat.domain.models.MessageAttachment
 import com.example.chat.domain.models.MessageType
 import com.example.chat.ui.chats.detail.AttachmentBackendPort
@@ -150,14 +151,29 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                             ) stagedFile.delete()
                         }
                     }
-                    // Legacy storage adapter accepts bytes only; retain its existing bounded-size
-                    // compatibility path while the custom backend uses streaming file uploads.
-                    val payload = file.bytes ?: stagedFile?.let { source ->
-                        if (source.length() > ServiceLocator.chatMedia.maxBytes(type)) {
-                            throw IllegalStateException("Large-file streaming is not configured for this storage provider.")
+                    // The legacy Supabase storage adapter accepts ByteArray only.
+                    // Never let a 100–700 MB configured media limit turn into an
+                    // equally large heap allocation: keep this compatibility route
+                    // to a strict 16 MB buffer. The API route above is file-streamed.
+                    val payload = try {
+                        file.bytes ?: stagedFile?.let { source ->
+                            val bufferLimit = minOf(
+                                ServiceLocator.chatMedia.maxBytes(type),
+                                BoundedFileReader.MAX_IN_MEMORY_UPLOAD_BYTES,
+                            )
+                            if (source.length() > bufferLimit) {
+                                throw IllegalStateException(
+                                    "This upload route buffers at most 16 MB in memory. Use Send Large File where available, or choose a smaller file.",
+                                )
+                            }
+                            withContext(Dispatchers.IO) { BoundedFileReader.read(source, bufferLimit) }
+                        } ?: throw IllegalStateException("The selected file is empty.")
+                    } catch (error: Throwable) {
+                        if (stagedFile?.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")) {
+                            stagedFile.delete()
                         }
-                        withContext(Dispatchers.IO) { source.readBytes() }
-                    } ?: throw IllegalStateException("The selected file is empty.")
+                        throw error
+                    }
                     try {
                         return ServiceLocator.chatMedia.uploadBytes(
                             conversationId, type, payload, file.name, file.mimeType, durationSeconds,
