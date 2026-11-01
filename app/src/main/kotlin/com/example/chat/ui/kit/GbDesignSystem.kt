@@ -175,7 +175,7 @@ fun GbSettingRow(
                     .clickable { onColorTap?.invoke() },
             )
             trailing != null -> trailing()
-            showChevron || hasSubScreen -> Icon(Icons.Rounded.ChevronRight, null, tint = accent, modifier = Modifier.size(22.dp))
+            showChevron || hasSubScreen -> Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary.copy(alpha = 0.72f), modifier = Modifier.padding(start = 8.dp).size(18.dp))
         }
     }
 }
