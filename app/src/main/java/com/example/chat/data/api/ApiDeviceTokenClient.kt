@@ -32,7 +32,7 @@ class ApiDeviceTokenClient(
         } }
 
     fun registerDeviceToken(fcmToken: String, deviceType: String = "android") {
-        val bearer = token()
+        val bearer = token()?.takeIf { it.isNotBlank() } ?: return
         val safeToken = safeFcmToken(fcmToken) ?: return
         val safeDeviceType = deviceType.takeIf { it in setOf("android", "ios", "web") } ?: return
         val base = restApiBaseUrl().trimEnd('/')

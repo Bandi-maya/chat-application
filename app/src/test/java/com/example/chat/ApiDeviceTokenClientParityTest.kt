@@ -59,6 +59,14 @@ class ApiDeviceTokenClientParityTest {
     }
 
     @Test
+    fun registerRejectsMalformedTokenAndSkipsMissingBearer() {
+        val t = FakeTransport()
+        client(t, token = null).registerDeviceToken("fcm-valid")
+        client(t).registerDeviceToken("fcm-token\\r\\n\\\"attack")
+        assertTrue(t.calls.isEmpty())
+    }
+
+    @Test
     fun registerSwallowsTransportFailure() {
         val t = object : ApiDeviceTokenClient.Transport {
             override fun send(method: String, url: String, headers: Map<String, String>, body: String?): Int {
