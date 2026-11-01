@@ -1,7 +1,7 @@
 # Chaty Full-Flow, Validation & Security Boundary Audit
 
 **Branch:** `kotlin`  
-**Audit baseline:** current `kotlin` tree at commit `46c7ffa653d77949f1af48e162833c81f139fcc8` (includes the prior screen-share consent and debug-fixture changes in the branch history; confirm the exact head before release).  
+**Audit baseline:** current `kotlin` tree at commit `999c6395409e6ff28fd19295f4a7e9a1143fe789` (the audit report itself is committed immediately afterward).  
 **Scope:** Android/Kotlin app, native MLS/OpenMLS layer, custom API client, legacy Supabase-backed services, media/file paths, calls, permissions, local storage, and CI/release configuration.
 
 > This is a source-level audit, not a claim that every runtime path has been executed. Findings below are grounded in the files and code paths listed. Device tests, backend source review, dependency/SBOM scans, APK static/dynamic analysis, and independent penetration testing are still required. “No bugs” cannot be guaranteed.
