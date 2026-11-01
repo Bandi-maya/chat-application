@@ -13,7 +13,7 @@ import kotlinx.serialization.json.put
  */
 class AuthRepository(
     private val auth: SupabaseAuthClient = SupabaseAuthClient(),
-    private val sessions: SessionStore,
+    private val sessions: SessionStorage,
     private val rpc: SupabaseRpc? = null,
     /** When supplied by the service locator, session adoption and sign-out
      *  route through it so auth state events fire and auto-refresh is
