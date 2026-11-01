@@ -178,31 +178,58 @@ class ApiRealtimeClient(
      *  fallback used only when the HTTP POST did not confirm. Fire-and-forget;
      *  Dart swallows errors. Returns whether a frame was queued (informational
      *  for logging/tests). */
-    fun sendMessageFallback(roomId: String, content: String): Boolean {
-        val s = socket ?: return false
-        return try {
-            s.send(
-                JSONObject()
-                    .put("type", "send_message")
-                    .put("room_id", roomId)
-                    .put("content", content)
-                    .toString(),
-            )
-        } catch (_: Exception) {
-            false
+    /** A frame is sent only on the socket still owned by the initiating account. */
+    private fun sendScopedFrame(
+        expectedSocket: Socket,
+        expectedScope: Any?,
+        frame: JSONObject,
+    ): Boolean {
+        var queued = false
+        val accepted = connectionScopeGuard(expectedScope) {
+            if (expectedSocket === socket &&
+                socketToken == token() &&
+                socketUrl == webSocketUrl() &&
+                expectedScope === connectionScopeIdentity()
+            ) {
+                queued = try { expectedSocket.send(frame.toString()) } catch (_: Exception) { false }
+            }
         }
+        return accepted && queued
     }
 
-    /** Typing indicator for [roomId]; the server only relays it to that room's
-     *  participants (and only while the sender's typing indicators are enabled). */
-    fun sendTyping(roomId: String, isTyping: Boolean): Boolean {
-        val s = socket ?: return false
-        return try {
-            s.send(JSONObject().put("type", "typing").put("room_id", roomId).put("is_typing", isTyping).toString())
-        } catch (_: Exception) {
-            false
-        }
+    /** Message fallback sends only on the socket still owned by this account. */
+    fun sendMessageFallback(roomId: String, content: String): Boolean {
+        val safeRoomId = ApiPathSegments.safe(roomId) ?: return false
+        val currentSocket = socket ?: return false
+        return sendScopedFrame(
+            currentSocket,
+            socketScope,
+            JSONObject().put("type", "send_message").put("room_id", safeRoomId).put("content", content),
+        )
     }
+
+    /** Typing indicator is account-scoped and only sent to a validated room. */
+    fun sendTyping(roomId: String, isTyping: Boolean): Boolean {
+        val safeRoomId = ApiPathSegments.safe(roomId) ?: return false
+        val currentSocket = socket ?: return false
+        return sendScopedFrame(
+            currentSocket,
+            socketScope,
+            JSONObject().put("type", "typing").put("room_id", safeRoomId).put("is_typing", isTyping),
+        )
+    }
+
+    /** Delivery ack is scoped to the account/socket that observed the message. */
+    fun sendDelivered(roomId: String): Boolean {
+        val safeRoomId = ApiPathSegments.safe(roomId) ?: return false
+        val currentSocket = socket ?: return false
+        return sendScopedFrame(
+            currentSocket,
+            socketScope,
+            JSONObject().put("type", "delivered").put("room_id", safeRoomId),
+        )
+    }
+
 
     /** Recording indicator on the custom backend WebSocket; no Supabase RPC. */
     fun sendRecording(roomId: String, isRecording: Boolean): Boolean {
@@ -241,13 +268,14 @@ class ApiRealtimeClient(
     /** Dart sendCallSignal (api_backend_service.dart:807): sends
      *  {type: call_signal, target_user_id, data}; no-op when disconnected. */
     fun sendCallSignal(targetUserId: String, data: Map<String, Any?>): Boolean {
+        val safeTargetUserId = ApiPathSegments.safe(targetUserId) ?: return false
         val s = socket ?: return false
         val expectedScope = socketScope
         var queued = false
         val accepted = connectionScopeGuard(expectedScope) {
             if (s === socket && socketToken == token() && socketUrl == webSocketUrl() && expectedScope === connectionScopeIdentity()) {
                 queued = try {
-                    s.send(JSONObject().put("type", "call_signal").put("target_user_id", targetUserId).put("data", toJson(data)).toString())
+                    s.send(JSONObject().put("type", "call_signal").put("target_user_id", safeTargetUserId).put("data", toJson(data)).toString())
                 } catch (_: Exception) { false }
             }
         }
