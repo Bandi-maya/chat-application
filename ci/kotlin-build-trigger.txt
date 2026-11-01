@@ -39,3 +39,4 @@ Use a single legacy DataStore delegate for safe GoTrue token migration; verify l
 Security and media hardening: Keystore auth sessions, no full-file RAM upload fallback, protected-chat credential revalidation, off-main-thread media indexing, and WebRTC screen-share cleanup. Build and test Kotlin branch: 2026-11-01
 CI source-overlay correction: restore branch-owned encrypted session, lock-gate, attachment, media-indexing, WebRTC, and regression-test files before compilation.
 Media indexing cancellation regression fix: cancellation propagates cleanly and the latest branch sources are restored after CI overlay.
+Android screen-share foreground hardening: consent is obtained first, mediaProjection FGS type is enabled and acknowledged before WebRTC creates the projection; failed upgrade preserves an existing call. Verify API 29-35 build/tests.
