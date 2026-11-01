@@ -48,3 +48,26 @@ The response shape is:
 If TURN is not configured, the route returns STUN-only with `relay_configured: false`. That is not a relay fallback; configure coturn to make restrictive-NAT transfers/calls reliable.
 
 The existing custom WebSocket `call_signal` event continues to carry WebRTC offer/answer/ICE and file-transfer control messages. The actual file bytes remain end-to-end encrypted over the DataChannel; this endpoint never receives file content or transfer secrets.
+
+## Voice-note recording indicator over the custom WebSocket
+
+The Android client publishes recording state on the existing authenticated socket:
+
+```json
+{ "type": "recording", "room_id": "conversation-id", "is_recording": true }
+```
+
+The custom WebSocket handler should validate that the authenticated socket user belongs to `room_id`, then broadcast to the other room participants:
+
+```json
+{
+  "type": "recording",
+  "data": {
+    "room_id": "conversation-id",
+    "user_id": "authenticated-sender-id",
+    "is_recording": true
+  }
+}
+```
+
+Do not accept `user_id` from the client payload. Derive it from the authenticated socket session. Broadcast `is_recording: false` on stop, cancel, socket close and session expiry. Apply the user's recording-indicator privacy preference server-side.
