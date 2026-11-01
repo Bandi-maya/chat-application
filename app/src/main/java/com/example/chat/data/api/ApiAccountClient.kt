@@ -50,15 +50,14 @@ class ApiAccountClient(
     private fun safeOrganizationSegment(value: String): String? =
         value.takeIf { candidate ->
             candidate.length in 1..64 && candidate != "." && candidate != ".." &&
-                candidate.first().isLetterOrDigit() &&
-                candidate.all { it.isLetterOrDigit() || it == '-' || it == '_' || it == '.' }
+                candidate.first().let { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' } &&
+                candidate.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' || it == '.' }
         }
 
     private fun safeMultipartFilename(value: String): String =
-        value.replace(Regex("[\\\\/\\r\\n\\u0000-\\u001f\\\"\\\\]"), "_")
-            .trim()
-            .take(120)
-            .ifBlank { "upload.bin" }
+        value.map { ch ->
+            if (ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9' || ch == '.' || ch == '_' || ch == '-') ch else '_'
+        }.joinToString("").trim('.', '_').take(120).ifBlank { "upload.bin" }
 
     /** Dart uploadProfilePhoto: multipart POST of field `file`; 404 retries
      *  against /api/v1; 200 returns (data.avatarUrl ?: data.url ?: ''); the
