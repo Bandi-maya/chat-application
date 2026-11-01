@@ -77,6 +77,23 @@ class ApiAccountClientParityTest {
     }
 
     @Test
+    fun uploadFilenameCannotInjectMultipartHeaders() {
+        val b = FakeBinaryTransport { call ->
+            val body = String(call.body, Charsets.UTF_8)
+            assertTrue(body.contains("filename=\"avatar.jpg___X-Evil__1\""))
+            assertFalse(body.contains("\r\nX-Evil:"))
+            200 to """{"data":{"avatarUrl":"https://cdn.example/safe.jpg"}}"""
+        }
+        assertEquals(
+            "https://cdn.example/safe.jpg",
+            client(FakeTransport { 500 to "" }, b).uploadProfilePhoto(
+                "avatar.jpg\"\r\nX-Evil: 1",
+                byteArrayOf(1, 2, 3),
+            ),
+        )
+    }
+
+    @Test
     fun uploadFallsBackToApiV1On404() {
         val b = FakeBinaryTransport { call ->
             if (call.url.contains("/api/v1/")) 200 to """{"data":{"avatarUrl":"https://cdn.example/u2.jpg"}}"""
