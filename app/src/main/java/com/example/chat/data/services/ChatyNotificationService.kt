@@ -14,7 +14,7 @@ data class ChatyEventNotification(
     val title: String,
     val body: String,
     val icon: EventNotificationIcon = EventNotificationIcon.notifications,
-    val colorArgb: Long = 0xFF6366F1,
+    val colorArgb: Long = 0xFF2563EB,
     /** Optional custom text tint for title/body (GB toast `_tc` keys). */
     val textColorArgb: Long? = null,
     val timestamp: Instant,
@@ -45,7 +45,7 @@ class ChatyNotificationService(
         title: String,
         body: String,
         icon: EventNotificationIcon = EventNotificationIcon.notifications,
-        colorArgb: Long = 0xFF6366F1,
+        colorArgb: Long = 0xFF2563EB,
         textColorArgb: Long? = null,
         userId: String? = null,
         avatarInitials: String? = null,
