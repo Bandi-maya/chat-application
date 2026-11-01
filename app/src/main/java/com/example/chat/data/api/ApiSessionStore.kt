@@ -8,6 +8,8 @@ interface ApiSessionStore {
     fun loadToken(): String?
     fun loadUserJson(): String?
     fun save(token: String, userJson: String)
+    fun loadRefreshToken(): String? = null
+    fun saveRefreshToken(token: String?) { }
     fun clear()
 }
 
