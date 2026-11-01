@@ -25,6 +25,21 @@ class ApiChatClientParityTest {
         ApiChatClient({ "http://10.0.2.2:8000" }, { "chat-application" }, { tok }, t)
 
     @Test
+    fun rejectsUnsafePathIdentifiersBeforeCallingTransport() {
+        val t = FakeTransport { 200 to """{"data":[]}""" }
+        assertNull(client(t).listMessages("../admin"))
+        assertNull(client(t).sendMessage("room?next=/admin", "hello"))
+        assertEquals(
+            ApiChatClient.SendResult.Rejected(400, "Invalid conversation identifier."),
+            client(t).sendMessageResult("room#fragment", "hello", null),
+        )
+        client(t).editMessage("room/other", "message", "edited")
+        client(t).deleteMessage("room", "../message")
+        client(t).deleteUser("..")
+        assertTrue("unsafe path IDs must be rejected before network I/O", t.calls.isEmpty())
+    }
+
+    @Test
     fun listRoomsSendsAuthAndTenantHeaders() {
         val t = FakeTransport { call ->
             assertEquals("http://10.0.2.2:8000/chat/rooms?include_tasks=false", call.url)

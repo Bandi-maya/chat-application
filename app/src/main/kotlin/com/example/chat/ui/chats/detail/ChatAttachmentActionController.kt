@@ -107,6 +107,13 @@ interface AttachmentBackendPort {
  *  location, contacts) are injected seams; the controller is pure JVM.
  *  conversationId is carried for the backend port binding (Dart instance
  *  field); effect closures capture it at wiring time. */
+/** Reject NaN, infinite, out-of-range coordinates, and negative accuracy from faulty providers. */
+internal fun validateLocationFix(latitude: Double, longitude: Double, accuracyMeters: Double) {
+    require(latitude.isFinite() && latitude in -90.0..90.0) { "The location provider returned an invalid latitude." }
+    require(longitude.isFinite() && longitude in -180.0..180.0) { "The location provider returned an invalid longitude." }
+    require(accuracyMeters.isFinite() && accuracyMeters >= 0.0) { "The location provider returned invalid accuracy." }
+}
+
 class ChatAttachmentActionController(
     val conversationId: String,
     private val backend: AttachmentBackendPort,
@@ -212,6 +219,7 @@ class ChatAttachmentActionController(
                 )
             }
             val (latitude, longitude, accuracy) = location.getCurrentPosition()
+            validateLocationFix(latitude, longitude, accuracy)
             val mapsUrl = "https://maps.google.com/?q=$latitude,$longitude"
             backend.sendStructuredMessage(
                 "location",
