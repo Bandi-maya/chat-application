@@ -574,8 +574,7 @@ fun ChatDetailHost(
         onMediaTapWithBounds = { m, rect ->
             val path = m.attachment?.url.orEmpty()
             if (path.startsWith("chaty://transfer/")) {
-                val localDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
-                    ?: File(context.filesDir, "Movies")
+                val localDir = File(context.filesDir, "p2p-received")
                 val localName = com.example.chat.data.services.ChatMediaService.safeFileName(m.attachment?.name ?: "video")
                 val knownFile = p2pTransfers.transfers.value.firstOrNull {
                     it.transferId == path.substringAfterLast('/') && it.status == "Received and verified"
@@ -838,7 +837,7 @@ fun ChatDetailHost(
                     if (required > 0 && free < required) {
                         toast("Not enough free storage for this file.")
                     } else if (destination.exists()) {
-                        toast("A file with that name already exists in Chaty Movies.")
+                        toast("A file with that name already exists in Chaty storage.")
                     } else {
                         scope.launch {
                             try {
