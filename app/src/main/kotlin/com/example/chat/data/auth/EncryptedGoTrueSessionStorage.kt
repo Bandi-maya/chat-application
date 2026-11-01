@@ -55,13 +55,17 @@ class EncryptedGoTrueSessionStorage(private val context: Context) : SessionStora
             .putLong(EXPIRY, oldExpiry).putString(USER, oldUser).commit()) {
             "Could not migrate sign-in session to encrypted storage."
         }
-        context.legacyAuthDataStore.edit { it.clear() }
+        context.sessionDataStore.edit { it.clear() }
         SessionStore.StoredSession(oldAccess, oldRefresh, oldExpiry, oldUser)
     }
 
-    override suspend fun clear() = withContext(Dispatchers.IO) {
-        encrypted.edit().remove(ACCESS).remove(REFRESH).remove(EXPIRY).remove(USER).commit()
-        context.legacyAuthDataStore.edit { it.clear() }
+    override suspend fun clear() {
+        withContext(Dispatchers.IO) {
+            check(encrypted.edit().remove(ACCESS).remove(REFRESH).remove(EXPIRY).remove(USER).commit()) {
+                "Could not clear encrypted sign-in session."
+            }
+            context.sessionDataStore.edit { it.clear() }
+        }
     }
 
     private companion object {
