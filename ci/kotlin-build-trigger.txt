@@ -66,3 +66,5 @@ Atomic API session and multipart filename hardening: 2026-11-01
 Organization route regression and multipart injection tests: 2026-11-01
 
 Transfer destination and immutable upload scope hardening: 2026-11-01
+
+P2P receiver secret lifecycle and ledger cleanup: 2026-11-01
