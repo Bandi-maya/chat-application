@@ -31,3 +31,4 @@ Adaptive AAC-LC voice-note compression and streamed custom API upload; latest tr
 CI now validates the custom Express ICE route and restores all adaptive P2P, voice and custom WebSocket sources after overlay: 2026-11-01
 Chaty hardening screen-share permission gate validation
 Validate screen-share consent and production media fixture gate
+URI-to-disk attachment staging and streamed custom-backend uploads; Keystore-backed auth session migration verification: 2026-11-01
