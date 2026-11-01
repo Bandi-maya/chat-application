@@ -558,20 +558,19 @@ fun ChatMessageBubble(
                         ViewOnceExpiredCard(textColor = Color(textColor))
                     } else {
                         when (message.attachment?.type) {
-                            "image" -> ImageAttachmentPreview(
-                                attachment = message.attachment!!,
-                                remoteImage = remoteImage,
-                                message = message, binding = attachmentBinding,
-                                resolveUrl = voiceUrlResolver,
-                                onTap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() },
-                            )
+                            "image" -> {
+                                val attachment = message.attachment!!
+                                val tap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() }
+                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
+                                else ImageAttachmentPreview(attachment = attachment, remoteImage = remoteImage, message = message, binding = attachmentBinding, resolveUrl = voiceUrlResolver, onTap = tap)
+                            }
                             "video" -> {
                                 val attachment = message.attachment!!
                                 val tap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() }
                                 if (attachment.url?.startsWith("chaty://transfer/") == true &&
                                     message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true
                                 ) {
-                                    P2pVideoInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
+                                    P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
                                 } else {
                                     VideoAttachmentPreview(
                                         attachment = attachment,
@@ -595,12 +594,12 @@ fun ChatMessageBubble(
                                 message = message, binding = attachmentBinding,
                                 onPlay = onVoicePlay,
                             )
-                            "document" -> DocumentPreview(
-                                attachment = message.attachment!!,
-                                textColor = Color(textColor),
-                                accentColor = Color(theme.accentColor),
-                                onTap = onMediaTap,
-                            )
+                            "document" -> {
+                                val attachment = message.attachment!!
+                                val tap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() }
+                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
+                                else DocumentPreview(attachment = attachment, textColor = Color(textColor), accentColor = Color(theme.accentColor), onTap = tap)
+                            }
                         }
                         if (message.type == MessageType.location) {
                             LocationCard(
@@ -1372,7 +1371,12 @@ private fun P2pVideoInviteCard(
             Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(accentColor.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.VideocamOff, contentDescription = null, tint = accentColor, modifier = Modifier.size(23.dp))
+            val fileIcon = when (attachment.type) {
+                "image" -> Icons.Rounded.Image
+                "video" -> Icons.Rounded.VideocamOff
+                else -> Icons.Rounded.InsertDriveFile
+            }
+            Icon(fileIcon, contentDescription = null, tint = accentColor, modifier = Modifier.size(23.dp))
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
