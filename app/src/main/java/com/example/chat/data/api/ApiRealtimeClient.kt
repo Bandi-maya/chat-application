@@ -203,6 +203,22 @@ class ApiRealtimeClient(
         }
     }
 
+    /** Recording indicator on the custom backend WebSocket; no Supabase RPC. */
+    fun sendRecording(roomId: String, isRecording: Boolean): Boolean {
+        val s = socket ?: return false
+        return try {
+            s.send(
+                JSONObject()
+                    .put("type", "recording")
+                    .put("room_id", roomId)
+                    .put("is_recording", isRecording)
+                    .toString(),
+            )
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     /** Delivery ack: tells the server a new message for [roomId] reached this device
      *  (the sender's second grey tick). No-op when disconnected. */
     fun sendDelivered(roomId: String): Boolean {
