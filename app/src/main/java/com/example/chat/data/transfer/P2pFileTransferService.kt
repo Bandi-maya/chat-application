@@ -751,6 +751,8 @@ class P2pFileTransferService(
                 "request_nonce" to java.util.UUID.randomUUID().toString(),
             ))
             publish(session, "Waiting for sender to reconnect")
+        } else if (session.restartAttempts >= MAX_ICE_RESTARTS) {
+            publish(session, "Connection could not recover", error = "Tap Retry direct transfer when your connection is stable.")
         }
     }
 
