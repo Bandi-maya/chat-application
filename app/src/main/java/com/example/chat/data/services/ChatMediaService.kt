@@ -162,7 +162,7 @@ class ChatMediaService(
         "video" -> TransferKind.video
         "audio" -> TransferKind.audio
         "document" -> TransferKind.document
-        "text" || "message" -> TransferKind.message
+        "text", "message" -> TransferKind.message
         else -> TransferKind.other
     }
 
