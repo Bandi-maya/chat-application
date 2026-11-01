@@ -155,8 +155,9 @@ class ApiMediaUploadClient(
                             onProgress(transferred, total)
                         }
                     }
-                    multipart.writeTo(forwarding.buffer())
-                    forwarding.flush()
+                    val buffered = forwarding.buffer()
+                    multipart.writeTo(buffered)
+                    buffered.flush()
                 }
             }
             val request = okhttp3.Request.Builder()
