@@ -1,5 +1,6 @@
 package com.example.chat.ui.media
 
+import com.example.chat.BuildConfig
 import java.io.File
 import java.time.Instant
 
@@ -98,7 +99,7 @@ class MediaLibraryService(
 
             // If no local files exist on this device/emulator, provide
             // pre-populated starter demo assets (exact Dart demo list).
-            if (_files.isEmpty()) {
+            if (_files.isEmpty() && BuildConfig.DEBUG) {
                 val n = now()
                 _files.addAll(
                     listOf(
