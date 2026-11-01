@@ -43,6 +43,7 @@ import com.example.chat.ui.chats.detail.VoiceLevelMeter
 import com.example.chat.ui.chats.detail.VoiceLevelMeterBar
 import com.example.chat.ui.chats.detail.VoiceLevelSampler
 import com.example.chat.ui.chats.detail.VoiceNoteController
+import com.example.chat.ui.chats.detail.VoiceRecordConfig
 import com.example.chat.ui.chats.detail.VoiceSessionController
 import com.example.chat.ui.chats.detail.VoiceUiState
 import kotlinx.coroutines.Dispatchers
@@ -112,6 +113,16 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
             },
             sendAudioMessage = { attachment ->
                 ServiceLocator.apiBackend.sendMessage(conversationId, "", MessageType.audio, attachment)
+            },
+            recordConfig = {
+                val uplink = ServiceLocator.networkMonitor.state.value.upstreamKbps
+                val voiceBitrate = when {
+                    uplink in 1..128 -> 32_000
+                    uplink in 129..400 -> 48_000
+                    uplink in 401..900 -> 64_000
+                    else -> 96_000
+                }
+                VoiceRecordConfig(bitRate = voiceBitrate)
             },
         )
     }
