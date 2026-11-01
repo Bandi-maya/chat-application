@@ -130,7 +130,6 @@ class WebRtcCallMediaController(
         lowData: Boolean,
         iceServers: List<Map<String, Any?>>,
     ) {
-        android.util.Log.w("CALLEND-DIAG", "media prepare enter isVideo=" + isVideo + " thread=" + Thread.currentThread().name + " inst=" + Integer.toHexString(System.identityHashCode(this)))
         CallPermissionGate.ensure(appContext, isVideo)
         disposeInternal()
 
@@ -560,7 +559,6 @@ class WebRtcCallMediaController(
 
     private fun disposeInternal() {
         stopTrafficStats()
-        android.util.Log.w("CALLEND-DIAG", "media disposeInternal enter thread=" + Thread.currentThread().name + " inst=" + Integer.toHexString(System.identityHashCode(this)))
         hasLocalMedia = false
         hasRemoteMedia = false
         val screen = screenCapturer
@@ -599,7 +597,6 @@ class WebRtcCallMediaController(
         peerConnection = null
         peerConnectionFactory?.dispose()
         peerConnectionFactory = null
-        android.util.Log.w("CALLEND-DIAG", "media disposeInternal exit")
     }
 
     private fun parseIceServers(raw: List<Map<String, Any?>>): List<PeerConnection.IceServer> {
