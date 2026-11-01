@@ -36,3 +36,4 @@ Secret-phrase failed-attempt cooldown and staged-file cleanup; latest Chaty atta
 Harden encrypted API session migration and verify streaming attachment path: 2026-11-01
 Add regression coverage for secret-phrase cooldown; verify latest encrypted-session and streaming media changes: 2026-11-01
 Use a single legacy DataStore delegate for safe GoTrue token migration; verify latest auth storage and media changes: 2026-11-01
+Security and media hardening: Keystore auth sessions, no full-file RAM upload fallback, protected-chat credential revalidation, off-main-thread media indexing, and WebRTC screen-share cleanup. Build and test Kotlin branch: 2026-11-01
