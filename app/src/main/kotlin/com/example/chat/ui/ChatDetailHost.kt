@@ -83,6 +83,7 @@ fun ChatDetailHost(
     val liveNetworkStatus by ServiceLocator.networkMonitor.state.collectAsState()
     val liveP2pTransfers by p2pTransfers.transfers.collectAsState()
     val liveTransferItems by ServiceLocator.transferMonitor.items.collectAsState()
+    val liveAppTraffic by ServiceLocator.appTrafficMonitor.state.collectAsState()
     val prefs = ServiceLocator.preferencesController
     val repo = ServiceLocator.conversationsRepository
     val rt = ServiceLocator.richRealtime
@@ -389,6 +390,7 @@ fun ChatDetailHost(
         },
         connectionState = ServiceLocator.connectionHealth.state,
         networkStatus = liveNetworkStatus,
+        appTraffic = liveAppTraffic,
         p2pTransferStates = liveP2pTransfers,
         onRetryP2pTransfer = { transferId ->
             if (!p2pTransfers.retryTransfer(transferId)) toast("Could not queue a secure retry. Check your connection and try again.")
