@@ -27,3 +27,4 @@ Authenticated TURN Edge Function wired to Kotlin call and P2P ICE; compile verif
 Connection diagnostics now include measured app UID upload/download totals: 2026-11-01
 Custom ICE endpoint, adaptive low-signal P2P windows, native video invitation cards, audio-only call bitrate adaptation, and streamed custom-backend voice uploads: 2026-11-01
 Build fixes: repair connection diagnostics metrics, add account-scope seams to conversation/session services, and restore the custom FCM registrar holder dependency: 2026-11-01
+Adaptive AAC-LC voice-note compression and streamed custom API upload; latest transfer/call/voice sources restored after CI parity overlay: 2026-11-01
