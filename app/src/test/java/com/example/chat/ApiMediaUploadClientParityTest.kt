@@ -114,6 +114,15 @@ class ApiMediaUploadClientParityTest {
     }
 
     @Test
+    fun rejectsSuccessfulResponsesWithoutAnObjectEnvelope() {
+        val t = FakeTransport(ApiMediaUploadClient.Response(200, """[]"""))
+        val error = assertThrows(ApiMediaUploadClient.UploadException::class.java) {
+            client(t).uploadMedia(tempFile())
+        }
+        assertEquals("Upload response did not contain a media object.", error.message)
+    }
+
+    @Test
     fun nonSuccessSurfacesServerDetail() {
         val t = FakeTransport(ApiMediaUploadClient.Response(413, """{"detail":"too large"}"""))
         val e = assertThrows(ApiMediaUploadClient.UploadException::class.java) {

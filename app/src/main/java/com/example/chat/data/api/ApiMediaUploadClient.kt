@@ -183,6 +183,31 @@ class ApiMediaUploadClient(
         return result
     }
 
+    /**
+     * Parses both supported server envelopes: {data:{...}} and the legacy
+     * top-level object. Never returns a partial success object for malformed
+     * or non-2xx responses.
+     */
+    private fun decodeResponse(response: Response): Map<String, Any> {
+        val root = runCatching { org.json.JSONObject(response.body) }.getOrNull()
+        if (response.statusCode !in 200..299) {
+            val detail = root?.let { json ->
+                json.optString("detail").takeIf { it.isNotBlank() }
+                    ?: json.optString("message").takeIf { it.isNotBlank() }
+            }
+            throw UploadException(detail ?: "Failed to upload media (${response.statusCode})")
+        }
+        val payload = root?.let { json ->
+            if (json.has("data") && !json.isNull("data")) {
+                json.optJSONObject("data")
+            } else json
+        } ?: throw UploadException("Upload response did not contain a media object.")
+
+        return ApiChatClient.deepMap(payload)
+            .mapNotNull { (key, value) -> value?.let { key to it } }
+            .toMap()
+    }
+
     /** Device transport over OkHttp, mirroring http.MultipartRequest: one
      *  'file' part, Bearer + x-tenant-id headers, no extra fields. */
     class OkHttpTransport : ProgressTransport, FileProgressTransport {
