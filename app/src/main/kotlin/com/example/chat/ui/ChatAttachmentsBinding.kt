@@ -135,15 +135,21 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                     // matching Dart ChatMediaService.uploadFile(sourcePath:).
                     val stagedFile = file.path?.let(::java.io.File)
                     if (api.isAuthenticated && stagedFile != null) {
-                        val uploaded = api.uploadMedia(stagedFile) { _, _ -> }
-                        return MessageAttachment(
-                            id = java.util.UUID.randomUUID().toString(),
-                            type = type,
-                            name = file.name,
-                            size = com.example.chat.data.services.ChatMediaService.formatBytes(stagedFile.length()),
-                            url = uploaded["url"]?.toString() ?: throw IllegalStateException("Upload response did not contain a media URL."),
-                            durationSeconds = durationSeconds,
-                        )
+                        try {
+                            val uploaded = api.uploadMedia(stagedFile) { _, _ -> }
+                            return MessageAttachment(
+                                id = java.util.UUID.randomUUID().toString(),
+                                type = type,
+                                name = file.name,
+                                size = com.example.chat.data.services.ChatMediaService.formatBytes(stagedFile.length()),
+                                url = uploaded["url"]?.toString() ?: throw IllegalStateException("Upload response did not contain a media URL."),
+                                durationSeconds = durationSeconds,
+                            )
+                        } finally {
+                            if (stagedFile.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-").not() &&
+                                stagedFile.name.startsWith("chaty-")
+                            ) stagedFile.delete()
+                        }
                     }
                     // Legacy storage adapter accepts bytes only; retain its existing bounded-size
                     // compatibility path while the custom backend uses streaming file uploads.
@@ -153,9 +159,15 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                         }
                         withContext(Dispatchers.IO) { source.readBytes() }
                     } ?: throw IllegalStateException("The selected file is empty.")
-                    return ServiceLocator.chatMedia.uploadBytes(
-                        conversationId, type, payload, file.name, file.mimeType, durationSeconds,
-                    )
+                    try {
+                        return ServiceLocator.chatMedia.uploadBytes(
+                            conversationId, type, payload, file.name, file.mimeType, durationSeconds,
+                        )
+                    } finally {
+                        if (stagedFile?.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-")) {
+                            stagedFile.delete()
+                        }
+                    }
                 }
                 override suspend fun sendMessage(text: String, type: MessageType, attachment: MessageAttachment?, extraMetadata: Map<String, Any?>?) {
                     api.sendMessage(conversationId, text, type, attachment, extraMetadata)
