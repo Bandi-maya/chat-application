@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
 
 /**
  * Android foreground-execution wrapper for an already-authorized WebRTC call.
@@ -22,7 +24,7 @@ import android.os.IBinder
  *
  * Manifest (integration owner):
  *   <service android:name=".data.services.CallForegroundService"
- *       android:foregroundServiceType="microphone|camera" android:stopWithTask="true"/>
+ *       android:foregroundServiceType="microphone|camera|mediaProjection" android:stopWithTask="true"/>
  */
 class CallForegroundService : Service() {
 
@@ -69,25 +71,29 @@ class CallForegroundService : Service() {
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Chaty call"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) == true
+        val isScreenProjection = intent?.getBooleanExtra(EXTRA_SCREEN_PROJECTION, false) == true
         acquireLocks()
         ensureChannel()
         val notification = buildNotification(title, text)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val types = if (isVideo) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                var types = if (isVideo) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                } else {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                }
+                if (isScreenProjection) {
+                    types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                }
+                startForeground(SERVICE_ID, notification, types)
             } else {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                startForeground(SERVICE_ID, notification)
             }
-            startForeground(SERVICE_ID, notification, types)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val types = if (isVideo) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-            } else {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            }
-            startForeground(SERVICE_ID, notification, types)
-        } else {
-            startForeground(SERVICE_ID, notification)
+            if (isScreenProjection) projectionForegroundReady?.complete(true)
+        } catch (error: Exception) {
+            if (isScreenProjection) projectionForegroundReady?.complete(false)
+            android.util.Log.e("CallForegroundService", "Unable to enter requested foreground-service mode", error)
+            stopSelf(startId)
         }
         // Dart allowAutoRestart=false: never recreated by the system without a live call.
         return START_NOT_STICKY
@@ -149,6 +155,46 @@ class CallForegroundService : Service() {
         const val EXTRA_TITLE = "chaty.call.title"
         const val EXTRA_TEXT = "chaty.call.text"
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
+        const val EXTRA_SCREEN_PROJECTION = "chaty.call.screen_projection"
+
+        private val projectionReadyLock = Any()
+        @Volatile private var projectionForegroundReady: CompletableDeferred<Boolean>? = null
+
+        /**
+         * Wait until Android confirms the running call service has entered the
+         * mediaProjection foreground-service type. The Activity obtains
+         * consent first; this handshake prevents ScreenCapturerAndroid from
+         * creating a MediaProjection too early.
+         */
+        suspend fun ensureScreenProjectionForeground(context: Context): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
+            val ready = CompletableDeferred<Boolean>()
+            synchronized(projectionReadyLock) {
+                projectionForegroundReady?.cancel()
+                projectionForegroundReady = ready
+            }
+            val intent = Intent(context, CallForegroundService::class.java).apply {
+                putExtra(EXTRA_TITLE, "Chaty screen sharing")
+                putExtra(EXTRA_TEXT, "Sharing your screen in an active video call")
+                putExtra(EXTRA_IS_VIDEO, true)
+                putExtra(EXTRA_SCREEN_PROJECTION, true)
+            }
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                withTimeout(5_000L) { ready.await() }
+            } catch (error: Exception) {
+                android.util.Log.e("CallForegroundService", "Screen-share foreground setup failed", error)
+                false
+            } finally {
+                synchronized(projectionReadyLock) {
+                    if (projectionForegroundReady === ready) projectionForegroundReady = null
+                }
+            }
+        }
 
         /** Sync entry point consumed by CallLifecycleCoordinator's
          *  foregroundSync seam. */
@@ -162,6 +208,7 @@ class CallForegroundService : Service() {
                 putExtra(EXTRA_TITLE, CallForegroundPolicy.notificationTitle(active))
                 putExtra(EXTRA_TEXT, CallForegroundPolicy.notificationText(active))
                 putExtra(EXTRA_IS_VIDEO, active.isVideo)
+                putExtra(EXTRA_SCREEN_PROJECTION, active.isSharingScreen)
             }
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
