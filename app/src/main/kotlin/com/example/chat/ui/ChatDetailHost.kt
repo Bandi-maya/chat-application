@@ -227,7 +227,11 @@ fun ChatDetailHost(
                 if (size !in 1..com.example.chat.data.transfer.NativeP2pTransferProtocol.MAX_FILE_BYTES) {
                     throw IllegalStateException("This file is empty, not seekable, or larger than 100 GB.")
                 }
-                val link = p2pTransfers.offerFile(otherId, channel, safeName, size, mime, sourceOwner = sourceOwner)
+                val link = p2pTransfers.offerFile(
+                    otherId, channel, safeName, size, mime,
+                    sourceOwner = sourceOwner,
+                    sourceUri = selectedUri.toString(),
+                )
                 sourceOwner = null // service owns the file descriptor until transfer completion
                 val invite = com.example.chat.data.transfer.NativeP2pTransferProtocol.parseInvite(link)
                 transferId = invite.transferId
