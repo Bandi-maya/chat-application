@@ -8,6 +8,11 @@ interface ApiSessionStore {
     fun loadToken(): String?
     fun loadUserJson(): String?
     fun save(token: String, userJson: String)
+    /** Atomic encrypted implementations persist the complete identity pair before publication. */
+    fun saveSession(token: String, userJson: String, refreshToken: String?) {
+        save(token, userJson)
+        saveRefreshToken(refreshToken)
+    }
     fun loadRefreshToken(): String? = null
     fun saveRefreshToken(token: String?) { }
     fun clear()

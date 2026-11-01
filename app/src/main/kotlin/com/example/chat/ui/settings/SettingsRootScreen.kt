@@ -160,7 +160,7 @@ private val allRootGroups: List<RootGroup> = listOf(
     )),
     RootGroup("About", listOf(
         RootRow(SettingsDestination.About, Icons.Outlined.Info, { LocalAppColors.current.foregroundSecondary }, "About Chaty", "App version, build information and licenses"),
-        RootRow(SettingsDestination.PrivacyPolicy, Icons.Outlined.Shield, { LocalAppColors.current.foregroundSecondary }, "Privacy Policy", "Read our zero-telemetry security & privacy policy"),
+        RootRow(SettingsDestination.PrivacyPolicy, Icons.Outlined.Shield, { LocalAppColors.current.foregroundSecondary }, "Privacy Policy", "Learn how service requests, messages and local data are handled"),
         RootRow(SettingsDestination.ShareChaty, Icons.Rounded.Share, { LocalAppColors.current.foregroundSecondary }, "Share Chaty", "Invite friends and family to join Chaty"),
     )),
 )

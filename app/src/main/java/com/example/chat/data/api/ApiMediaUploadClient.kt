@@ -76,13 +76,14 @@ class ApiMediaUploadClient(
         val base = restApiBaseUrl().trimEnd('/')
         val fileTransport = transport as? FileProgressTransport
             ?: throw UploadException("Streaming upload is unavailable; refusing to load the full file into memory.")
+        val safeFilename = safeMultipartFilename(file.name)
         val response = try {
             val primary = fileTransport.uploadFileWithProgress(
-                "$base/chat/upload", "Bearer $bearer", tenantId(), file.name, file, onProgress,
+                "$base/chat/upload", "Bearer $bearer", tenantId(), safeFilename, file, onProgress,
             )
             if (primary.statusCode == 404) {
                 fileTransport.uploadFileWithProgress(
-                    "$base/api/v1/chat/upload", "Bearer $bearer", tenantId(), file.name, file, onProgress,
+                    "$base/api/v1/chat/upload", "Bearer $bearer", tenantId(), safeFilename, file, onProgress,
                 )
             } else primary
         } catch (error: UploadException) {
@@ -92,6 +93,12 @@ class ApiMediaUploadClient(
         }
         return decodeResponse(response)
     }
+
+    private fun safeMultipartFilename(value: String): String =
+        value.replace(Regex("[\\\\/\\r\\n\\u0000-\\u001f\\\"\\\\]"), "_")
+            .trim()
+            .take(120)
+            .ifBlank { "upload.bin" }
 
     /** Account-scoped file upload. The account must remain identical through completion. */
     fun uploadMedia(
@@ -116,13 +123,14 @@ class ApiMediaUploadClient(
     ): Map<String, Any> {
         val bearer = token() ?: throw UploadException("Not authenticated")
         val base = restApiBaseUrl().trimEnd('/')
+        val safeFilename = safeMultipartFilename(filename)
 
         val response: Response = try {
             fun send(url: String): Response =
                 if (onProgress != null && transport is ProgressTransport) {
-                    transport.uploadWithProgress(url, "Bearer $bearer", tenantId(), filename, bytes, onProgress)
+                    transport.uploadWithProgress(url, "Bearer $bearer", tenantId(), safeFilename, bytes, onProgress)
                 } else {
-                    transport.upload(url, "Bearer $bearer", tenantId(), filename, bytes)
+                    transport.upload(url, "Bearer $bearer", tenantId(), safeFilename, bytes)
                 }
             val primary = send("$base/chat/upload")
             if (primary.statusCode == 404) send("$base/api/v1/chat/upload") else primary
