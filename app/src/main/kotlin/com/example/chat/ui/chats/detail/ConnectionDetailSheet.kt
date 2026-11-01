@@ -62,6 +62,7 @@ fun ConnectionDetailSheetContent(
     networkStatus: NetworkStatusMonitor.Status? = null,
     p2pTransferStates: List<P2pFileTransferService.TransferState> = emptyList(),
     liveTransfers: List<TransferItem> = emptyList(),
+    onRetryP2pTransfer: (String) -> Unit = {},
 ) {
     val statusColor = when (state.health) {
         ConnectionHealth.excellent -> connectionExcellent
