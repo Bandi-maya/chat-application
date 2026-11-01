@@ -96,11 +96,26 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
         if (size > 0 && type != "image" && size > max) {
             throw IllegalStateException("This $type exceeds the ${max / (1024 * 1024)} MB storage limit.")
         }
-        val bytes = withContext(Dispatchers.IO) {
-            cr.openInputStream(uri)?.use { it.readBytes() }
-                ?: throw IllegalStateException("The selected file is not accessible on this device.")
+        // Copy the provider URI to an app-private temporary file using a bounded buffer.
+        // This preserves access after the picker closes without materializing large media in RAM.
+        val staged = withContext(Dispatchers.IO) {
+            val target = java.io.File.createTempFile("chaty-outgoing-", ".part", context.cacheDir)
+            try {
+                cr.openInputStream(uri)?.use { input ->
+                    target.outputStream().buffered(64 * 1024).use { output ->
+                        input.copyTo(output, 64 * 1024)
+                    }
+                } ?: throw IllegalStateException("The selected file is not accessible on this device.")
+                val finalName = name.replace(Regex("[^A-Za-z0-9._-]"), "_").takeLast(100).ifBlank { "attachment" }
+                val finalFile = java.io.File(context.cacheDir, "chaty-${java.util.UUID.randomUUID()}-$finalName")
+                check(target.renameTo(finalFile)) { "Unable to stage the selected attachment." }
+                finalFile
+            } catch (error: Throwable) {
+                target.delete()
+                throw error
+            }
         }
-        return PickedFile(name = name, bytes = bytes, mimeType = cr.getType(uri))
+        return PickedFile(name = name, path = staged.absolutePath, mimeType = cr.getType(uri))
     }
 
     val controller = remember(conversationId) {
@@ -110,8 +125,25 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                 override suspend fun upload(type: String, file: PickedFile, durationSeconds: Int): MessageAttachment {
                     // Camera captures arrive as a file path (no picker bytes): read them here,
                     // matching Dart ChatMediaService.uploadFile(sourcePath:).
-                    val payload = file.bytes ?: file.path?.let { p ->
-                        withContext(Dispatchers.IO) { java.io.File(p).readBytes() }
+                    val stagedFile = file.path?.let(::java.io.File)
+                    if (api.isAuthenticated && stagedFile != null) {
+                        val uploaded = api.uploadMedia(stagedFile) { _, _ -> }
+                        return MessageAttachment(
+                            id = java.util.UUID.randomUUID().toString(),
+                            type = type,
+                            name = file.name,
+                            size = ServiceLocator.chatMedia.run { formatBytes(stagedFile.length()) },
+                            url = uploaded["url"]?.toString() ?: throw IllegalStateException("Upload response did not contain a media URL."),
+                            durationSeconds = durationSeconds,
+                        )
+                    }
+                    // Legacy storage adapter accepts bytes only; retain its existing bounded-size
+                    // compatibility path while the custom backend uses streaming file uploads.
+                    val payload = file.bytes ?: stagedFile?.let { source ->
+                        if (source.length() > ServiceLocator.chatMedia.maxBytes(type)) {
+                            throw IllegalStateException("Large-file streaming is not configured for this storage provider.")
+                        }
+                        withContext(Dispatchers.IO) { source.readBytes() }
                     } ?: throw IllegalStateException("The selected file is empty.")
                     return ServiceLocator.chatMedia.uploadBytes(
                         conversationId, type, payload, file.name, file.mimeType, durationSeconds,
