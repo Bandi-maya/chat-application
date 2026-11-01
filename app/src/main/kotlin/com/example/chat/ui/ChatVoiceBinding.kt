@@ -53,8 +53,8 @@ import kotlinx.coroutines.withContext
 
 /** Binding of VoiceNoteController/VoiceSessionController (Dart voice_note_service.dart and the
  *  screen's _beginVoice/_finishVoice/_cancelVoice) for ChatDetailHost. Bound: MediaRecorder capture,
- *  RECORD_AUDIO runtime prompt, record/lock/cancel/send, upload via ChatMediaService (REST
- *  /chat/upload) and send with the Dart JSON envelope. Capture runs the record_android 2.1.2
+ *  RECORD_AUDIO runtime prompt, record/lock/cancel/send, streamed upload via the custom
+ *  ApiBackendService REST /chat/upload endpoint and send with the Dart JSON envelope. Capture runs the record_android 2.1.2
  *  default engine port (AndroidPcmVoiceRecorderPort: PCM AudioRecord + AGC/AEC/NS on the record
  *  session + MediaCodec AAC-LC + MediaMuxer .m4a), and the overlay renders the Dart
  *  ChatyVoiceLevelMeter port fed by VoiceLevelSampler at the Dart 90ms poll.
