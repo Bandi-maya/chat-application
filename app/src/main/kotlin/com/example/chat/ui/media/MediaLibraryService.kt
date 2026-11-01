@@ -3,6 +3,8 @@ package com.example.chat.ui.media
 import com.example.chat.BuildConfig
 import java.io.File
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Exact port of lib/features/media/services/media_library_service.dart.
  *
@@ -55,18 +57,26 @@ class MediaLibraryService(
         notifyListeners()
     }
 
-    fun refreshLibrary() {
+    suspend fun refreshLibrary() {
         _isLoading = true
         notifyListeners()
 
-        _files.clear()
-        try {
-            for (dir in libraryDirectories()) {
-                if (!dir.exists()) continue
-                dir.listFiles()?.forEach { entity ->
-                    if (entity.isFile) {
+        // Directory enumeration and file-header inspection can touch thousands
+        // of files. Keep all disk I/O off the UI dispatcher.
+        val scannedFiles = withContext(Dispatchers.IO) {
+            val result = mutableListOf<MediaFileDescriptor>()
+            try {
+                for (dir in libraryDirectories()) {
+                    if (!dir.exists() || !dir.isDirectory) continue
+                    dir.listFiles()?.forEach entityLoop@{ entity ->
+                        if (!entity.isFile) return@entityLoop
                         val name = entity.name
-                        if (name.startsWith(".")) return@forEach // skip hidden
+                        // Ignore hidden entries and Chaty transient transfer/cache
+                        // files; they are implementation data, not user media.
+                        if (name.startsWith(".") || name.startsWith("chaty-outgoing-") ||
+                            name.endsWith(".part", ignoreCase = true) ||
+                            name.endsWith(".tmp", ignoreCase = true)
+                        ) return@entityLoop
                         val classification = FileTypeDetector.classifyFile(
                             headerBytesOf = {
                                 try {
@@ -81,8 +91,7 @@ class MediaLibraryService(
                             },
                             filePath = entity.path,
                         )
-
-                        _files.add(
+                        result.add(
                             MediaFileDescriptor(
                                 id = entity.path,
                                 name = name,
@@ -95,13 +104,13 @@ class MediaLibraryService(
                         )
                     }
                 }
+            } catch (_: Exception) {
+                // A directory can disappear or become inaccessible during a scan.
             }
 
-            // If no local files exist on this device/emulator, provide
-            // pre-populated starter demo assets (exact Dart demo list).
-            if (_files.isEmpty() && BuildConfig.DEBUG) {
+            if (result.isEmpty() && BuildConfig.DEBUG) {
                 val n = now()
-                _files.addAll(
+                result.addAll(
                     listOf(
                         MediaFileDescriptor(
                             id = "demo_doc_spec",
@@ -146,15 +155,14 @@ class MediaLibraryService(
                     ),
                 )
             }
-
-            // Sort recent first
-            _files.sortByDescending { it.modifiedAt }
-        } catch (_: Exception) {
-            // Handled gracefully
-        } finally {
-            _isLoading = false
-            notifyListeners()
+            result.sortByDescending { it.modifiedAt }
+            result
         }
+
+        _files.clear()
+        _files.addAll(scannedFiles)
+        _isLoading = false
+        notifyListeners()
     }
 
     fun getStorageBreakdown(): Map<MediaCategory, Long> {
