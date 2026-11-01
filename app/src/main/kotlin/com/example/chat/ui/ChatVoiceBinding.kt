@@ -34,6 +34,11 @@ import com.example.chat.ServiceLocator
 import com.example.chat.data.services.AndroidPcmVoiceRecorderPort
 import com.example.chat.data.services.AndroidVoiceStagingPort
 import com.example.chat.domain.models.MessageType
+import com.example.chat.domain.models.MessageAttachment
+import com.example.chat.data.services.ChatMediaService
+import com.example.chat.data.network.TransferDirection
+import com.example.chat.data.network.TransferKind
+import com.example.chat.data.network.TransferStatus
 import com.example.chat.ui.chats.detail.VoiceLevelMeter
 import com.example.chat.ui.chats.detail.VoiceLevelMeterBar
 import com.example.chat.ui.chats.detail.VoiceLevelSampler
@@ -70,15 +75,40 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var ui by remember(conversationId) { mutableStateOf(VoiceUiState()) }
-    val rt = ServiceLocator.richRealtime
     val note = remember(conversationId) {
         VoiceNoteController(
             conversationId = conversationId,
             recorder = AndroidPcmVoiceRecorderPort(context.applicationContext),
             staging = AndroidVoiceStagingPort(context.applicationContext),
             uploadAudio = { path, name, seconds ->
-                val bytes = withContext(Dispatchers.IO) { java.io.File(path).readBytes() }
-                ServiceLocator.chatMedia.uploadBytes(conversationId, "audio", bytes, name, "audio/mp4", seconds)
+                val file = java.io.File(path)
+                val transferId = ServiceLocator.transferMonitor.begin(
+                    TransferDirection.upload,
+                    TransferKind.audio,
+                    file.length(),
+                    name,
+                )
+                try {
+                    val uploaded = ServiceLocator.apiBackend.uploadMedia(file) { sent, total ->
+                        ServiceLocator.transferMonitor.update(transferId, sent, total)
+                    }
+                    val mediaUrl = uploaded["url"]?.toString()?.takeIf { it.isNotBlank() }
+                        ?: uploaded["path"]?.toString()?.takeIf { it.isNotBlank() }
+                        ?: throw IllegalStateException("Custom media endpoint returned no media URL.")
+                    ServiceLocator.transferMonitor.update(transferId, file.length(), file.length())
+                    ServiceLocator.transferMonitor.finish(transferId)
+                    MessageAttachment(
+                        id = java.util.UUID.randomUUID().toString(),
+                        type = "audio",
+                        name = name,
+                        size = ChatMediaService.formatBytes(file.length()),
+                        url = mediaUrl,
+                        durationSeconds = seconds,
+                    )
+                } catch (error: Throwable) {
+                    ServiceLocator.transferMonitor.finish(transferId, TransferStatus.failed)
+                    throw error
+                }
             },
             sendAudioMessage = { attachment ->
                 ServiceLocator.apiBackend.sendMessage(conversationId, "", MessageType.audio, attachment)
@@ -104,7 +134,7 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
         VoiceSessionController(
             voice = note,
             scope = scope,
-            setRecordingIndicator = { v -> try { rt.setRecording(conversationId, v) } catch (_: Exception) {} },
+            setRecordingIndicator = { v -> ServiceLocator.apiBackend.sendRecording(conversationId, v) },
             clearTyping = clearTyping,
             onSent = { afterSend() },
             showError = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
