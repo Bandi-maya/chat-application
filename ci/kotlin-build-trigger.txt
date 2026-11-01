@@ -54,3 +54,5 @@ P2P journal failure path now zeroes the in-memory transfer secret and closes the
 A-Z hardening implementation verification: 2026-11-01
 
 A-Z hardening follow-up verification: 2026-11-01
+
+Kotlin repair verification: 2026-11-01
