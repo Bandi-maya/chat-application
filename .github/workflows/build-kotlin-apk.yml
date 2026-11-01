@@ -156,7 +156,18 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt \
             app/src/main/kotlin/com/example/chat/ui/settings/SettingsRootScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/settings/NetworkDataUsageScreen.kt
+            app/src/main/kotlin/com/example/chat/ui/settings/NetworkDataUsageScreen.kt \
+            app/src/main/java/com/example/chat/data/services/ProtectedResourceGate.kt \
+            app/src/main/java/com/example/chat/data/services/LocalLockService.kt \
+            app/src/main/kotlin/com/example/chat/data/api/EncryptedApiSessionStore.kt \
+            app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt \
+            app/src/main/kotlin/com/example/chat/data/auth/SessionStore.kt \
+            app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/MediaLibraryService.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/PdfWorkspaceScreen.kt \
+            app/src/test/java/com/example/chat/LocalLockServiceFullTest.kt \
+            app/src/test/java/com/example/chat/ProtectedResourceGateParityTest.kt
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
       - uses: actions/setup-java@v4
