@@ -77,6 +77,7 @@ class CallNotificationActionsProofTest {
             .putExtra(CallForegroundService.EXTRA_TITLE, "Proof Caller")
             .putExtra(CallForegroundService.EXTRA_TEXT, "Voice call")
             .putExtra(CallForegroundService.EXTRA_IS_VIDEO, false)
+            .putExtra(CallForegroundService.EXTRA_CALL_ID, "proof-call-hangup")
             .putExtra(CallForegroundService.EXTRA_OWNER, "test:zz-callnotif-hangup")
         context.startForegroundService(start)
         awaitCondition(8000, "ongoing-call notification to post") {
