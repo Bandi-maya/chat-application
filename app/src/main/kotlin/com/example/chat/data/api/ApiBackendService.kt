@@ -487,6 +487,15 @@ class ApiBackendService(
         realtime.sendTyping(roomId, isTyping)
     }
 
+    /** Publishes voice-note recording state through the custom backend socket. */
+    fun sendRecording(roomId: String, isRecording: Boolean): Boolean {
+        val expected = authSnapshot()
+        if (expected.token.isNullOrBlank() || roomId.isBlank()) return false
+        var queued = false
+        withAuthScope(expected) { queued = realtime.sendRecording(roomId, isRecording) }
+        return queued
+    }
+
     /** Marks the room read on the server and clears the local unread badge. */
     fun markConversationRead(chatId: String) {
         if (session.token == null || chatId.isEmpty()) return
