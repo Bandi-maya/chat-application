@@ -1010,7 +1010,11 @@ class P2pFileTransferService(
             return null
         }
         if (record.optString("transfer_id") != transferId ||
-            record.optString("source_uri").isBlank() ||
+            record.optString("source_uri").isBlank() || record.optString("source_uri").length > 4096 ||
+            record.optString("local_user_id").isBlank() || record.optString("local_user_id").length > 256 ||
+            record.optString("peer_user_id").isBlank() || record.optString("peer_user_id").length > 256 ||
+            record.optString("display_name").length > 180 ||
+            record.optString("mime_type").length > 120 ||
             record.optString("secret").length !in 40..64
         ) {
             clearSenderResume(transferId)
@@ -1134,6 +1138,8 @@ class P2pFileTransferService(
             } finally {
                 secret.fill(0)
             }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (error: Throwable) {
             android.util.Log.w("ChatyP2P", "Unable to restore sender transfer $transferId", error)
             _transfers.value = _transfers.value.map { item ->
