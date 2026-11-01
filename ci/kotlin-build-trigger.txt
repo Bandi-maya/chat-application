@@ -68,3 +68,5 @@ Organization route regression and multipart injection tests: 2026-11-01
 Transfer destination and immutable upload scope hardening: 2026-11-01
 
 P2P receiver secret lifecycle and ledger cleanup: 2026-11-01
+
+CI overlay storage parameter and package-independent Compose imports: 2026-11-01
