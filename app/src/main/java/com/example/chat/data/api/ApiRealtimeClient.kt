@@ -142,7 +142,7 @@ class ApiRealtimeClient(
         reconnectCancel?.cancel()
         reconnectCancel = null
         connecting = true
-        socketToken = token(); socketUrl = url; socketScope = connectionScopeIdentity()
+        socketToken = token(); socketUrl = configuredUrl; socketScope = connectionScopeIdentity()
         val expectedScope = socketScope
         var registered: Socket? = null
         val created = try {
