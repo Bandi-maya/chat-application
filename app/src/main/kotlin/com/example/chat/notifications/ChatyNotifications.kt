@@ -66,6 +66,23 @@ object ChatyNotifications {
     fun requestCallAction(action: PendingCallAction) { _pendingCallAction.value = action }
     fun consumeCallAction() { _pendingCallAction.value = null }
 
+    /**
+     * Clear account-scoped notification state on sign-out. A pending room or
+     * call action from one account must never be replayed after another user
+     * signs in on the same device.
+     */
+    fun clearForSignOut(context: Context) {
+        consumeOpenRoom()
+        consumeCallAction()
+        synchronized(linesByRoom) {
+            linesByRoom.clear()
+            shownMessageIds.clear()
+        }
+        synchronized(ringInfo) { ringInfo.clear() }
+        ringingCallId = null
+        NotificationManagerCompat.from(context).cancelAll()
+    }
+
     // ── channels ───────────────────────────────────────────────────────
 
     fun ensureChannels(context: Context) {
