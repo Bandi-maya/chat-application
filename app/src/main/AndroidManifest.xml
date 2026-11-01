@@ -21,6 +21,8 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- Required when the active call service also hosts user-consented screen capture. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -158,7 +160,7 @@
 
         <service
             android:name="com.example.chat.data.services.CallForegroundService"
-            android:foregroundServiceType="microphone|camera"
+            android:foregroundServiceType="microphone|camera|mediaProjection"
             android:stopWithTask="true" />
 
         <provider
