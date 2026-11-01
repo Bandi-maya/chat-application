@@ -439,7 +439,7 @@ class P2pFileTransferService(
             TransferDirection.download, transferKind, manifest.sizeBytes, manifest.displayName,
         )
         sessions[invite.transferId] = session
-        try {
+        return try {
             val peer = createPeer(session)
             setRemoteDescription(peer, SessionDescription.Type.OFFER, signal["sdp"]?.toString() ?: throw SecurityException("Offer missing"))
             session.remoteDescriptionSet = true
