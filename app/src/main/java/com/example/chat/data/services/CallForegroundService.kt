@@ -75,9 +75,10 @@ class CallForegroundService : Service() {
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) == true
         val isScreenProjection = intent?.getBooleanExtra(EXTRA_SCREEN_PROJECTION, false) == true
+        val callId = intent?.getStringExtra(EXTRA_CALL_ID).orEmpty()
         acquireLocks()
         ensureChannel()
-        val notification = buildNotification(title, text)
+        val notification = buildNotification(title, text, callId)
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 var types = if (isVideo) {
@@ -127,7 +128,7 @@ class CallForegroundService : Service() {
         }
     }
 
-    private fun buildNotification(title: String, text: String): Notification {
+    private fun buildNotification(title: String, text: String, callId: String): Notification {
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
         } else {
@@ -146,13 +147,32 @@ class CallForegroundService : Service() {
                 ),
             )
         }
-        return builder
+        builder
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.sym_call_incoming)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .build()
+        if (callId.isNotBlank()) {
+            val hangUp = Intent(this, com.example.chat.notifications.CallActionReceiver::class.java).apply {
+                action = com.example.chat.notifications.ChatyNotifications.ACTION_END_CALL
+                putExtra(EXTRA_CALL_ID, callId)
+            }
+            val hangUpPendingIntent = android.app.PendingIntent.getBroadcast(
+                this,
+                callId.hashCode(),
+                hangUp,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+            )
+            builder.addAction(
+                android.app.Notification.Action.Builder(
+                    android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
+                    "Hang up",
+                    hangUpPendingIntent,
+                ).build(),
+            )
+        }
+        return builder.build()
     }
 
     companion object {
@@ -162,6 +182,10 @@ class CallForegroundService : Service() {
         const val EXTRA_TEXT = "chaty.call.text"
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
         const val EXTRA_SCREEN_PROJECTION = "chaty.call.screen_projection"
+        const val EXTRA_CALL_ID = "chaty.call.call_id"
+
+        private fun activeCallId(context: Context): String? =
+            runCatching { com.example.chat.ServiceLocator.callSignaling.currentSession?.callId }.getOrNull()
 
         private val projectionReadyLock = Any()
         private val ownerLock = Any()
@@ -185,6 +209,7 @@ class CallForegroundService : Service() {
                 putExtra(EXTRA_TEXT, "Sharing your screen in an active video call")
                 putExtra(EXTRA_IS_VIDEO, true)
                 putExtra(EXTRA_SCREEN_PROJECTION, true)
+                putExtra(EXTRA_CALL_ID, activeCallId(context).orEmpty())
             }
             return try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -221,6 +246,7 @@ class CallForegroundService : Service() {
                 putExtra(EXTRA_TEXT, CallForegroundPolicy.notificationText(active))
                 putExtra(EXTRA_IS_VIDEO, active.isVideo)
                 putExtra(EXTRA_SCREEN_PROJECTION, active.isSharingScreen)
+                putExtra(EXTRA_CALL_ID, active.callId)
             }
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
