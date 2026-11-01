@@ -26,6 +26,7 @@ class MediaLibraryService(
 
     private val _files = mutableListOf<MediaFileDescriptor>()
     private var _isLoading = false
+    private var refreshGeneration = 0L
     private var _searchQuery = ""
     private var _activeCategoryFilter: MediaCategory? = null
 
@@ -58,12 +59,14 @@ class MediaLibraryService(
     }
 
     suspend fun refreshLibrary() {
+        val generation = ++refreshGeneration
         _isLoading = true
         notifyListeners()
 
-        // Directory enumeration and file-header inspection can touch thousands
-        // of files. Keep all disk I/O off the UI dispatcher.
-        val scannedFiles = withContext(Dispatchers.IO) {
+        try {
+            // Directory enumeration and file-header inspection can touch thousands
+            // of files. Keep all disk I/O off the UI dispatcher.
+            val scannedFiles = withContext(Dispatchers.IO) {
             val result = mutableListOf<MediaFileDescriptor>()
             try {
                 for (dir in libraryDirectories()) {
@@ -159,10 +162,17 @@ class MediaLibraryService(
             result
         }
 
-        _files.clear()
-        _files.addAll(scannedFiles)
-        _isLoading = false
-        notifyListeners()
+            // A later refresh supersedes this result; never let an older scan
+            // overwrite a newer directory snapshot.
+            if (generation != refreshGeneration) return
+            _files.clear()
+            _files.addAll(scannedFiles)
+        } finally {
+            if (generation == refreshGeneration) {
+                _isLoading = false
+                notifyListeners()
+            }
+        }
     }
 
     fun getStorageBreakdown(): Map<MediaCategory, Long> {
