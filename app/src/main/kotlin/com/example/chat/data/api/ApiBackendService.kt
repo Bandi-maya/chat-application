@@ -34,27 +34,7 @@ class ApiBackendService(
     private val authScopeLock = Any()
     val config = ApiBackendConfig(context, authScopeLock, ::notifyAuthScopeTransition)
 
-    private val prefs = context.applicationContext
-        .getSharedPreferences("chaty_api_backend", Context.MODE_PRIVATE)
-
-    private val sessionStore = object : ApiSessionStore {
-        override fun loadToken(): String? =
-            try { prefs.getString("api_hub_token", null) } catch (_: Exception) { null }
-        override fun loadUserJson(): String? =
-            try { prefs.getString("api_hub_user", null) } catch (_: Exception) { null }
-        override fun save(token: String, userJson: String) {
-            try {
-                prefs.edit()
-                    .putString("api_hub_token", token)
-                    .putString("api_hub_user", userJson)
-                    .apply()
-            } catch (_: Exception) {
-            }
-        }
-        override fun clear() {
-            try { prefs.edit().remove("api_hub_token").remove("api_hub_user").apply() } catch (_: Exception) {}
-        }
-    }
+    private val sessionStore: ApiSessionStore = EncryptedApiSessionStore(context.applicationContext)
 
     private val auth = ApiAuthClient(
         baseUrl = { config.restApiBaseUrl },
