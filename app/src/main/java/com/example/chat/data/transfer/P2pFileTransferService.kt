@@ -532,8 +532,13 @@ class P2pFileTransferService(
         session.restartAttempts = 0
         session.restartInProgress = false
         if (session.direction == TransferDirection.upload) {
-            if (session.peer == null) scope.launch { startRestoredSenderOffer(session) }
-            else restartIce(session)
+            if (session.peer == null) scope.launch {
+                try {
+                    startRestoredSenderOffer(session)
+                } catch (error: Throwable) {
+                    fail(session, error.message ?: "Could not restart sender transfer")
+                }
+            } else restartIce(session)
         } else {
             session.remoteDescriptionSet = false
             session.signalingReady = false
