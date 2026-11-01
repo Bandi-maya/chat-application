@@ -395,8 +395,14 @@ class P2pFileTransferService(
         invite.secret.fill(0)
         session.ledger = ChunkReceiptLedger(File(appContext.filesDir, "p2p-ledger/${invite.transferId}.state"), manifest.chunkCount)
         incomingCandidates.remove(invite.transferId)?.let { session.queuedCandidates.addAll(it) }
+        val transferKind = when {
+            manifest.mimeType.startsWith("video/") -> TransferKind.video
+            manifest.mimeType.startsWith("image/") -> TransferKind.image
+            manifest.mimeType.startsWith("audio/") -> TransferKind.audio
+            else -> TransferKind.document
+        }
         session.monitorId = transferMonitor.begin(
-            TransferDirection.download, TransferKind.video, manifest.sizeBytes, manifest.displayName,
+            TransferDirection.download, transferKind, manifest.sizeBytes, manifest.displayName,
         )
         sessions[invite.transferId] = session
         try {
