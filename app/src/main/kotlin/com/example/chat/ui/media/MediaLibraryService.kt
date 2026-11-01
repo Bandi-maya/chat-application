@@ -3,6 +3,7 @@ package com.example.chat.ui.media
 import com.example.chat.BuildConfig
 import java.io.File
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -107,6 +108,8 @@ class MediaLibraryService(
                         )
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 // A directory can disappear or become inaccessible during a scan.
             }
