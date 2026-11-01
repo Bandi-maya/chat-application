@@ -784,6 +784,10 @@ fun ChatDetailScreen(
                             voicePlaybackSpeed = convPrefs.voicePlaybackSpeed,
                             voiceUrlResolver = voiceUrlResolver,
                             attachmentBinding = attachmentBinding,
+                            p2pTransferState = p2pTransferStates.firstOrNull { transfer ->
+                                transfer.transferId == message.attachment?.id ||
+                                    transfer.transferId == message.attachment?.url?.substringAfterLast('/')
+                            },
                             isSelected = selectedIds.contains(message.id) ||
                                 contextMenuMessage?.id == message.id ||
                                 highlightedMessageId == message.id,
