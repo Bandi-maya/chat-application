@@ -32,6 +32,27 @@ class CallPermissionGateTest {
     }
 
     @Test
+    fun grantedCallbackCannotOverrideMissingAndroidPermission() {
+        val ctx = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val saved = CallPermissionGate.requester
+        try {
+            val alreadyGranted = CallPermissionGate.missing(
+                { androidx.core.content.ContextCompat.checkSelfPermission(ctx, it) == 0 }, false,
+            ).isEmpty()
+            if (alreadyGranted) return
+            CallPermissionGate.requester = { perms -> perms.associateWith { true } }
+            try {
+                runBlocking { CallPermissionGate.ensure(ctx, false) }
+                fail("a positive activity result must not override an OS permission that remains denied")
+            } catch (e: IllegalStateException) {
+                assertTrue(e.message!!.contains("not available"))
+            }
+        } finally {
+            CallPermissionGate.requester = saved
+        }
+    }
+
+    @Test
     fun deniedRequestFailsTheCallSafely() {
         val ctx = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
         val saved = CallPermissionGate.requester
