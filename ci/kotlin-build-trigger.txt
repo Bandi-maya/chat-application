@@ -16,3 +16,4 @@ Native P2P integration: WebRTC DataChannel offers/answers/trickle ICE through ex
 P2P direct transfer, image/document attachment integration, and 48 KiB SCTP-safe chunks build verification: 2026-11-01
 P2P retry controls, private-file cleanup, image/document cards, and crypto tests build verification: 2026-11-01
 P2P final retry-state and digest-bound resume hardening verification: 2026-11-01
+Receiver re-offer recovery, sender ICE reset, and final P2P UI integration verification: 2026-11-01
