@@ -144,6 +144,7 @@ class P2pFileTransferService(
         val pendingLocalCandidates: MutableList<IceCandidate> = mutableListOf(),
         val receiveMutex: Mutex = Mutex(),
         val sendMutex: Mutex = Mutex(),
+        val requestMutex: Mutex = Mutex(),
     )
 
     private val appContext = context.applicationContext
@@ -571,11 +572,12 @@ class P2pFileTransferService(
         })
     }
 
-    private suspend fun requestMissing(session: Session) {
-        val channel = session.channel ?: return
-        val ledger = session.ledger ?: return
+    private suspend fun requestMissing(session: Session) = session.requestMutex.withLock {
+        val channel = session.channel ?: return@withLock
+        val ledger = session.ledger ?: return@withLock
         while (channel.state() == DataChannel.State.OPEN && !ledger.isComplete()) {
-            val indices = ledger.missingIndices(128)
+            // Small windows keep DataChannel buffering bounded on 1G/2G links; do not resend a slow batch after 10 seconds.
+            val indices = ledger.missingIndices(MAX_REQUEST_CHUNKS)
             if (indices.isEmpty()) break
             val json = JSONObject().put("kind", "request").put("indices", JSONArray().apply { indices.forEach { put(it) } })
             if (!channel.send(DataChannel.Buffer(ByteBuffer.wrap(json.toString().toByteArray()), false))) {
@@ -586,7 +588,7 @@ class P2pFileTransferService(
             val before = ledger.receivedCount()
             val expectedAfterBatch = before + indices.size
             var waitCount = 0
-            while (ledger.receivedCount() < expectedAfterBatch && !ledger.isComplete() && channel.state() == DataChannel.State.OPEN && waitCount < 40) {
+            while (ledger.receivedCount() < expectedAfterBatch && !ledger.isComplete() && channel.state() == DataChannel.State.OPEN && waitCount < SLOW_LINK_BATCH_WAIT_ITERATIONS) {
                 kotlinx.coroutines.delay(250)
                 waitCount++
             }
@@ -606,7 +608,7 @@ class P2pFileTransferService(
         if (file == null && sourceChannel == null) return
         val channel = session.channel ?: return
         if (channel.state() != DataChannel.State.OPEN) return
-        val count = minOf(array?.length() ?: 0, 128)
+        val count = minOf(array?.length() ?: 0, MAX_REQUEST_CHUNKS)
         for (i in 0 until count) {
             if (channel.state() != DataChannel.State.OPEN) break
             var backpressureWaits = 0
@@ -865,6 +867,8 @@ class P2pFileTransferService(
     companion object {
         private const val MAX_BUFFERED_BYTES = 2L * 1024L * 1024L
         private const val MAX_PENDING_OFFERS = 20
+        private const val MAX_REQUEST_CHUNKS = 16
+        private const val SLOW_LINK_BATCH_WAIT_ITERATIONS = 4_800
         private const val MAX_ICE_RESTARTS = 5
         private fun b64(bytes: ByteArray) = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         private fun unb64(value: String) = Base64.decode(value, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
