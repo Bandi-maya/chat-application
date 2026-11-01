@@ -34,8 +34,6 @@ import androidx.compose.material.icons.outlined.ImageNotSupported
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.LocationOn
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Checklist
@@ -562,13 +560,13 @@ fun ChatMessageBubble(
                         when (message.attachment?.type) {
                             "image" -> {
                                 val attachment = message.attachment!!
-                                val tap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() }
+                                val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
                                 if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
                                 else ImageAttachmentPreview(attachment = attachment, remoteImage = remoteImage, message = message, binding = attachmentBinding, resolveUrl = voiceUrlResolver, onTap = tap)
                             }
                             "video" -> {
                                 val attachment = message.attachment!!
-                                val tap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() }
+                                val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
                                 if (attachment.url?.startsWith("chaty://transfer/") == true &&
                                     message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true
                                 ) {
@@ -598,7 +596,7 @@ fun ChatMessageBubble(
                             )
                             "document" -> {
                                 val attachment = message.attachment!!
-                                val tap = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke() }
+                                val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
                                 if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap)
                                 else DocumentPreview(attachment = attachment, textColor = Color(textColor), accentColor = Color(theme.accentColor), onTap = tap)
                             }
@@ -1352,7 +1350,7 @@ private fun ContactCard(message: ChatMessage, textColor: Color, accentColor: Col
 }
 
 @Composable
-private fun P2pVideoInviteCard(
+private fun P2pFileInviteCard(
     attachment: MessageAttachment,
     isMe: Boolean,
     textColor: Color,
@@ -1374,9 +1372,9 @@ private fun P2pVideoInviteCard(
             contentAlignment = Alignment.Center,
         ) {
             val fileIcon = when (attachment.type) {
-                "image" -> Icons.Rounded.Image
+                "image" -> Icons.Outlined.ImageNotSupported
                 "video" -> Icons.Rounded.VideocamOff
-                else -> Icons.Rounded.InsertDriveFile
+                else -> Icons.Rounded.Description
             }
             Icon(fileIcon, contentDescription = null, tint = accentColor, modifier = Modifier.size(23.dp))
         }
