@@ -20,3 +20,4 @@ Receiver re-offer recovery, sender ICE reset, and final P2P UI integration verif
 Slow-link 16-chunk DataChannel windows and reconnect-aware receive loop build verification: 2026-11-01
 P2P storage checkpoint directory and slow-link resume safety checks: 2026-11-01
 Compiler fixes: P2P return, upload progress sink, attachment card, account lifecycle, call actions and candidate overlay compatibility: 2026-11-01
+Final CI workflow syntax and Kotlin compile compatibility fixes: 2026-11-01
