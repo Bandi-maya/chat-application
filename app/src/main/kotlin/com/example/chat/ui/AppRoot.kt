@@ -221,6 +221,7 @@ fun AppRoot() {
             val signOutListener: () -> Unit = {
                 val authenticated = ServiceLocator.apiBackend.isAuthenticated
                 if (wasAuthenticated && !authenticated) {
+                    pendingSettingsDestination = null
                     ServiceLocator.notifications.clearAll()
                     com.example.chat.notifications.ChatyNotifications.clearForSignOut(appContext)
                 }
