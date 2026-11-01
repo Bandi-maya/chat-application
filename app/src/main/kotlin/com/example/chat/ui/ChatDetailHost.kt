@@ -617,7 +617,7 @@ fun ChatDetailHost(
             com.example.chat.ui.camera.ChatyCameraCaptureScreen(
                 mode = com.example.chat.ui.camera.ChatyCaptureMode.chat,
                 contactName = live.title,
-                callsAllowed = callsAllowed,
+                callsAllowed = connection?.callsAllowed ?: true,
                 onResult = { r ->
                     chatCameraOpen = false
                     scope.launch {
