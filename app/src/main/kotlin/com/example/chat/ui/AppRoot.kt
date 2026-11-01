@@ -218,7 +218,7 @@ fun AppRoot() {
                     (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security ||
                         route == AuthRoute.LockedChats ||
                         route == AuthRoute.HiddenVault || route == AuthRoute.MessageManagement || route == AuthRoute.LinkedDevices ||
-                        route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch)
+                        route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch || route == AuthRoute.Notifications)
                 ) {
                     ServiceLocator.appLock.onSignedOut()
                     ServiceLocator.lockBiometrics.stopAuthentication()
