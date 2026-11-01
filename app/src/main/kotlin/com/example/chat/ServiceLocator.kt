@@ -618,7 +618,7 @@ object ServiceLocator {
             context = requireContext(),
             scope = appScope,
             currentUserId = { apiBackend.currentUser?.id },
-            sendSignal = { targetUserId, data -> apiBackend.sendCallSignal(targetUserId, data); true },
+            sendSignal = { targetUserId, data -> apiBackend.sendCallSignal(targetUserId, data) },
             transferMonitor = transferMonitor,
             iceServers = { com.example.chat.data.transfer.P2pFileTransferService.parseIceServers(callSignaling.iceServersForTransfer()) },
         ).also { service ->
