@@ -117,7 +117,7 @@ fun MediaWorkspaceScreen(
                     }) {
                         Icon(Icons.Rounded.CleaningServices, contentDescription = "Clean temporary cache")
                     }
-                    IconButton(onClick = { library.refreshLibrary() }) {
+                    IconButton(onClick = { scope.launch { library.refreshLibrary() } }) {
                         Icon(Icons.Rounded.Refresh, contentDescription = "Refresh library")
                     }
                     Spacer(Modifier.width(6.dp))
