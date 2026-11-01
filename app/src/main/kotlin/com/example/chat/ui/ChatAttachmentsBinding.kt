@@ -93,7 +93,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
         }
         val max = ServiceLocator.chatMedia.maxBytes(type)
         // Guard before reading the stream: images are compressed after, so allow headroom for them.
-        if (size > 0 && type != "image" && size > max) {
+        if (size > 0 && size > max) {
             throw IllegalStateException("This $type exceeds the ${max / (1024 * 1024)} MB storage limit.")
         }
         // Copy the provider URI to an app-private temporary file using a bounded buffer.
