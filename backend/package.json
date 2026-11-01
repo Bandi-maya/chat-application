@@ -1,0 +1,14 @@
+{
+  "name": "chaty-custom-webrtc-endpoint",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Drop-in Express route module for Chaty's authenticated Coturn ICE credentials endpoint",
+  "main": "routes/chaty-webrtc-ice.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
