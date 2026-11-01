@@ -290,8 +290,12 @@ class P2pFileTransferService(
             "file_transfer_offer" -> {
                 val manifest = WireManifest.parse(signal["manifest"])
                 if (manifest.transferId != id || manifest.sizeBytes !in 1..NativeP2pTransferProtocol.MAX_FILE_BYTES) return
+                if (manifest.chunkBytes !in (16 * 1024)..(64 * 1024) || manifest.noncePrefix.size != 4) return
+                if (!manifest.sha256Hex.matches(Regex("[0-9a-f]{64}"))) return
+                if (manifest.expiresAtEpochSeconds <= System.currentTimeMillis() / 1000L) return
                 if (signal["sdp"]?.toString().orEmpty().length !in 1..256_000) return
                 if (manifest.displayName.length > 180 || manifest.mimeType.length > 120) return
+                if (incoming.size >= MAX_PENDING_OFFERS && !incoming.containsKey(id)) return
                 val offer = PendingOffer(id, sender, manifest.displayName, manifest.sizeBytes, manifest.mimeType, manifest.expiresAtEpochSeconds)
                 val activeReceiver = sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.download }
                 if (activeReceiver != null) {
@@ -344,6 +348,7 @@ class P2pFileTransferService(
                 val ice = IceCandidate(signal["sdp_mid"]?.toString(), (signal["sdp_mline"] as? Number)?.toInt() ?: 0, candidate)
                 val session = sessions[id]?.takeIf { it.peerUserId == sender }
                 if (session == null) {
+                    if (!incomingCandidates.containsKey(id) && incomingCandidates.size >= MAX_PENDING_OFFERS) return
                     val queue = incomingCandidates.getOrPut(id) { java.util.Collections.synchronizedList(mutableListOf()) }
                     if (queue.size < 256) queue.add(ice)
                 } else if (!session.remoteDescriptionSet) session.queuedCandidates.add(ice)
@@ -844,6 +849,7 @@ class P2pFileTransferService(
 
     companion object {
         private const val MAX_BUFFERED_BYTES = 2L * 1024L * 1024L
+        private const val MAX_PENDING_OFFERS = 20
         private const val MAX_ICE_RESTARTS = 5
         private fun b64(bytes: ByteArray) = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         private fun unb64(value: String) = Base64.decode(value, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
