@@ -78,3 +78,5 @@ Settings preview and Dynamic Island documentation hardening: 2026-11-01
 Settings notification bridge comment verification: 2026-11-01
 
 Dynamic Island fail-closed notification capture policy: 2026-11-01
+
+Kotlin-only settings contract validation, accurate release/security copy, and current branch verification: 2026-11-01
