@@ -5,6 +5,7 @@ import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,6 +27,26 @@ class NativeP2pTransferProtocolTest {
             assertTrue("non-canonical transfer IDs must be rejected", rejected)
         } finally {
             invite.secret.fill(0)
+        }
+    }
+
+    @Test
+    fun normalizesUntrustedMimeTypesAndKeepsValidTypes() {
+        val root = Files.createTempDirectory("chaty-p2p-mime").toFile()
+        try {
+            val source = File(root, "payload.bin").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val invite = NativeP2pTransferProtocol.createInvite()
+            val valid = NativeP2pTransferProtocol.createManifest(
+                invite, source, "video/mp4", System.currentTimeMillis() / 1000L + 600,
+            )
+            assertEquals("video/mp4", valid.mimeType)
+            val untrusted = NativeP2pTransferProtocol.createManifest(
+                invite, source, "text/plain; charset=utf-8", System.currentTimeMillis() / 1000L + 600,
+            )
+            assertEquals("application/octet-stream", untrusted.mimeType)
+            invite.secret.fill(0)
+        } finally {
+            root.deleteRecursively()
         }
     }
 
