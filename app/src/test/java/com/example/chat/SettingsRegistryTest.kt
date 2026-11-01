@@ -15,6 +15,8 @@ class SettingsRegistryTest {
         assertEquals(20, SettingsRegistry.clusters.size)
         assertEquals("account_display_name", SettingsRegistry.allSettings.first().id)
         assertEquals(13, SettingsCategory.values().size)
+        assertEquals(SettingsCategory.values().size, SettingsCategory.values().map { it.id }.distinct().size)
+        assertTrue(SettingsRegistry.allSettings.all { it.canonicalRoute.matches(Regex("^/settings/[a-z0-9_-]+(/[a-z0-9_-]+)*$")) })
     }
 
     @Test
