@@ -32,6 +32,7 @@ class CallForegroundService : Service() {
     // (i.e. an active call per CallForegroundPolicy) runs, released in onDestroy.
     private var wakeLock: android.os.PowerManager.WakeLock? = null
     private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
+    @Volatile private var foregroundStarted = false
 
     private fun acquireLocks() {
         try {
@@ -89,11 +90,14 @@ class CallForegroundService : Service() {
             } else {
                 startForeground(SERVICE_ID, notification)
             }
+            foregroundStarted = true
             if (isScreenProjection) projectionForegroundReady?.complete(true)
         } catch (error: Exception) {
             if (isScreenProjection) projectionForegroundReady?.complete(false)
             android.util.Log.e("CallForegroundService", "Unable to enter requested foreground-service mode", error)
-            stopSelf(startId)
+            // Preserve an already-running voice/video call if only the optional
+            // screen-projection upgrade was rejected by Android.
+            if (!foregroundStarted) stopSelf(startId)
         }
         // Dart allowAutoRestart=false: never recreated by the system without a live call.
         return START_NOT_STICKY
