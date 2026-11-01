@@ -637,7 +637,7 @@ class P2pFileTransferService(
         if (file == null && sourceChannel == null) return
         val channel = session.channel ?: return
         if (channel.state() != DataChannel.State.OPEN) return
-        val count = minOf(array?.length() ?: 0, maxSendChunks())
+        val count = minOf(array?.length() ?: 0, MAX_REQUEST_CHUNKS)
         for (i in 0 until count) {
             if (channel.state() != DataChannel.State.OPEN) break
             var backpressureWaits = 0
@@ -884,18 +884,6 @@ class P2pFileTransferService(
             downstream in 129..300 -> 2
             downstream in 301..700 -> 4
             downstream in 701..1_500 -> 8
-            else -> MAX_REQUEST_CHUNKS
-        }
-    }
-
-    /** Sender window follows uplink capacity; receiver request window follows downlink. */
-    private fun maxSendChunks(): Int {
-        val upstream = networkStatus()?.upstreamKbps ?: 0
-        return when {
-            upstream in 1..128 -> 1
-            upstream in 129..300 -> 2
-            upstream in 301..700 -> 4
-            upstream in 701..1_500 -> 8
             else -> MAX_REQUEST_CHUNKS
         }
     }
