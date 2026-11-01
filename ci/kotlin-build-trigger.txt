@@ -72,3 +72,5 @@ P2P receiver secret lifecycle and ledger cleanup: 2026-11-01
 CI overlay storage parameter and package-independent Compose imports: 2026-11-01
 
 Known-good CI workflow with corrected com.logybyte package import matching: 2026-11-01
+
+Settings preview and Dynamic Island documentation hardening: 2026-11-01
