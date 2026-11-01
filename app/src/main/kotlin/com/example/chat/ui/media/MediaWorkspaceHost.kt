@@ -6,7 +6,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 
 /** Media-area navigation host replacing Flutter's imperative Navigator pushes
  *  across media_workspace_screen / custom_file_picker_screen /
@@ -28,6 +30,7 @@ fun MediaWorkspaceHost(
     onClose: () -> Unit = {},
 ) {
     var stack by remember { mutableStateOf<List<MediaDestination>>(listOf(MediaDestination.Workspace)) }
+    val scope = rememberCoroutineScope()
 
     fun push(d: MediaDestination) { stack = stack + d }
     fun pop(): Boolean {
@@ -36,7 +39,7 @@ fun MediaWorkspaceHost(
             stack = stack.dropLast(1)
             // Dart refresh-on-return for the two workspace pushes
             if (popped is MediaDestination.FileExplorer || popped is MediaDestination.PdfStudio) {
-                library.refreshLibrary()
+                scope.launch { library.refreshLibrary() }
             }
             true
         } else false
