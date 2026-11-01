@@ -18,6 +18,8 @@ interface LockBiometrics {
     suspend fun canCheckBiometrics(): Boolean
     suspend fun availableBiometrics(): List<String>
     suspend fun isDeviceSupported(): Boolean
+    /** True only when Android device PIN/pattern/password is configured and available. */
+    suspend fun isDeviceCredentialSupported(): Boolean = isDeviceSupported()
     /** biometricOnly=true, stickyAuth, sensitiveTransaction. */
     suspend fun authenticateBiometricOnly(reason: String): Boolean
     /** biometricOnly=false (device PIN/pattern/password allowed). */
@@ -274,7 +276,7 @@ class LocalLockService(
     }
 
     suspend fun canUseDeviceCredential(): Boolean = try {
-        biometrics?.isDeviceSupported() == true
+        biometrics?.isDeviceCredentialSupported() == true
     } catch (_: Exception) {
         false
     }

@@ -382,10 +382,10 @@ fun SettingsRootScreen(
                     Text("Your Privacy is Our Priority", color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "\u2022 Local End-to-End Encryption:\nYour messages and calls are encrypted and stored safely on your device.\n\n" +
-                            "\u2022 No Remote Telemetry:\nChaty never tracks your browsing, locations, or personal data.\n\n" +
-                            "\u2022 Security & App Lock:\nLocal PIN, Pattern, and Biometric lock protect your messages completely offline.\n\n" +
-                            "\u2022 Full Data Ownership:\nYou can clear chat histories, media caches, and revoke device links at any time.",
+                        "\u2022 Message and call transport:\nStandard chat messages use HTTPS to reach the configured service. In this Kotlin release they are not end-to-end encrypted; the service can access their content. Calls and realtime features also exchange required signaling data with the service.\n\n" +
+                            "\u2022 File transfer:\nLarge peer-to-peer transfers encrypt file chunks with AES-GCM and protect the invitation through the MLS path. This does not mean ordinary chat messages or standard cloud uploads are end-to-end encrypted.\n\n" +
+                            "\u2022 Local App Lock:\nPIN, Pattern, Password, biometric, or device credential can restrict access to this device. App Lock does not encrypt content stored by the service.\n\n" +
+                            "\u2022 Data and telemetry:\nChaty sends the service requests needed for authentication, messages, presence, calls, and uploads. This build does not make a verified zero-telemetry or linked-device-revocation guarantee. Clear Local Media Cache removes local cached copies only.",
                         color = colors.foregroundSecondary, fontSize = 13.sp, lineHeight = 18.2.sp,
                     )
                 }
