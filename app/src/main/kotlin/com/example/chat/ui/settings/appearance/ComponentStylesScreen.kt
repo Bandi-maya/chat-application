@@ -306,14 +306,14 @@ private fun LivePreviewCard(
             variantId = snapshot.headerVariant,
             data = ChatyHeaderData(
                 title = conversationTitle ?: "Alex Morgan",
-                subtitle = "online • end-to-end encrypted",
+                subtitle = "online • component preview",
                 avatar = { StylesAvatarCore(initials = "AM", color = Color(0xFF3B82F6), size = 36) },
                 actions = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Outlined.Call, "Voice call", tint = colors.foreground, modifier = Modifier.size(20.dp))
+                    IconButton(onClick = {}, enabled = false) {
+                        Icon(Icons.Outlined.Call, "Voice call preview", tint = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
                     }
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Outlined.Videocam, "Video call", tint = colors.foreground, modifier = Modifier.size(22.dp))
+                    IconButton(onClick = {}, enabled = false) {
+                        Icon(Icons.Outlined.Videocam, "Video call preview", tint = colors.foregroundSecondary, modifier = Modifier.size(22.dp))
                     }
                 },
             ),
@@ -371,11 +371,13 @@ private fun LivePreviewCard(
                 onTextChange = onDummyTextChange,
                 focusRequester = dummyFocus,
                 hasText = true,
-                onSend = {},
-                onMicPress = {},
-                onAttach = {},
-                onCamera = {},
-                onEmojiToggle = {},
+                // This card is a style preview, not a live conversation. Give
+                // visible feedback instead of presenting inert controls.
+                onSend = { Toast.makeText(context, "Send is unavailable in the component preview.", Toast.LENGTH_SHORT).show() },
+                onMicPress = { Toast.makeText(context, "Voice recording is unavailable in the component preview.", Toast.LENGTH_SHORT).show() },
+                onAttach = { Toast.makeText(context, "Attachments are unavailable in the component preview.", Toast.LENGTH_SHORT).show() },
+                onCamera = { Toast.makeText(context, "Camera is unavailable in the component preview.", Toast.LENGTH_SHORT).show() },
+                onEmojiToggle = { Toast.makeText(context, "Emoji picker is unavailable in the component preview.", Toast.LENGTH_SHORT).show() },
             ),
             reducedMotion = reducedMotion,
         )
@@ -385,12 +387,12 @@ private fun LivePreviewCard(
                 ChatyNavItemData(
                     id = "chats", label = "Chats",
                     icon = Icons.Rounded.ChatBubbleOutline, activeIcon = Icons.Rounded.ChatBubble,
-                    badgeCount = 2, isSelected = true, onTap = {},
+                    badgeCount = 2, isSelected = true, onTap = { Toast.makeText(context, "Navigation is shown as a preview.", Toast.LENGTH_SHORT).show() },
                 ),
                 ChatyNavItemData(
                     id = "updates", label = "Updates",
                     icon = Icons.Outlined.Update, activeIcon = Icons.Rounded.Update,
-                    isSelected = false, onTap = {},
+                    isSelected = false, onTap = { Toast.makeText(context, "Navigation is shown as a preview.", Toast.LENGTH_SHORT).show() },
                 ),
                 ChatyNavItemData(
                     id = "calls", label = "Calls",
