@@ -58,6 +58,10 @@ class SessionLifecycleService(
     private val notifyChanged: () -> Unit = {},
     /** Runs when the session becomes null (logout/expiry); e.g. purge decrypted media temps. Must not throw. */
     private val onSignedOut: () -> Unit = {},
+    /** Custom API account scope identity; stale refresh work must not cross account transitions. */
+    private val apiScopeIdentity: () -> Any? = { null },
+    /** Clears API-backed caches when the authenticated account changes. */
+    private val onAccountSwitch: () -> Unit = {},
 ) {
     var currentSession: AuthSessionInfo? = null
         private set
@@ -118,9 +122,13 @@ class SessionLifecycleService(
         }
 
         val previousUserId = currentSession?.userId
+        val expectedApiScope = apiScopeIdentity()
         currentSession = mapSession(session)
-        // Non-null -> different non-null account: revoke the previous account's decrypted temps/leases too.
-        if (previousUserId != null && previousUserId != session.userId) runCatching { onSignedOut() }
+        // Non-null -> different non-null account: revoke previous account state and caches.
+        if (previousUserId != null && previousUserId != session.userId) {
+            runCatching { onSignedOut() }
+            runCatching { onAccountSwitch() }
+        }
         val current = profileService.currentUser
         if (current == null || current.id != session.userId) {
             val emailOrNull = session.email.ifEmpty { null }
@@ -146,7 +154,9 @@ class SessionLifecycleService(
         // any network work, then refresh from the backend without blocking.
         hydrateCachedState(session.userId)
         notifyChanged()
-        scope.launch { refreshAuthenticatedSession(session) }
+        scope.launch {
+            if (apiScopeIdentity() === expectedApiScope) refreshAuthenticatedSession(session)
+        }
         realtime.subscribeRealtime()
     }
 
