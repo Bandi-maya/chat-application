@@ -122,7 +122,7 @@ private fun LockBadgeProofContent(initiallyLocked: Boolean, calibration: Boolean
                     )
                     Spacer(Modifier.width(4.dp))
                 }
-                Text(TARGET_TITLE, style = MaterialTheme.typography.titleMedium)
+                Text(LockBadgeProofActivity.TARGET_TITLE, style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(900.dp))
         }
