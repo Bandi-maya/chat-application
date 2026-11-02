@@ -318,7 +318,7 @@ class ParityBehaviorTest {
             storage = throwawayStorage(),
             currentUserId = { null },
             apiAuthenticated = { true },
-            apiUpload = { bytes, filename ->
+            apiUpload = { bytes, filename, _ ->
                 assertEquals("photo.jpg", filename)
                 mapOf("url" to "https://api.example.com/media/abc.jpg")
             },
@@ -342,7 +342,7 @@ class ParityBehaviorTest {
             storage = throwawayStorage(),
             currentUserId = { null },
             apiAuthenticated = { false },
-            apiUpload = { _, _ -> error("must not be called") },
+            apiUpload = { _, _, _ -> error("must not be called") },
         )
         kotlinx.coroutines.runBlocking {
             try {
