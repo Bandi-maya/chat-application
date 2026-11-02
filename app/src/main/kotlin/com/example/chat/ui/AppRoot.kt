@@ -575,9 +575,12 @@ fun AppRoot() {
                 var pushedAppIcon by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedSettingsSearch by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedNetworkUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedDataUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.NetworkUsage) {
                         pushedNetworkUsage = true
+                    } else if (dest == com.example.chat.ui.settings.SettingsDestination.DataUsage) {
+                        pushedDataUsage = true
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
                         route = AuthRoute.Security
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.SearchSettings) {
@@ -1180,8 +1183,14 @@ fun AppRoot() {
                 }
                 ChatyPushedPage(pushedNetworkUsage) {
                     androidx.activity.compose.BackHandler { pushedNetworkUsage = false }
-                    com.example.chat.ui.settings.NetworkDataUsageScreen(
+                    com.example.chat.ui.settings.NetworkStatusScreen(
                         onBack = { pushedNetworkUsage = false },
+                    )
+                }
+                ChatyPushedPage(pushedDataUsage) {
+                    androidx.activity.compose.BackHandler { pushedDataUsage = false }
+                    com.example.chat.ui.settings.DataUsageScreen(
+                        onBack = { pushedDataUsage = false },
                     )
                 }
                 ChatyPushedPage(pushedThemeStudio) {
