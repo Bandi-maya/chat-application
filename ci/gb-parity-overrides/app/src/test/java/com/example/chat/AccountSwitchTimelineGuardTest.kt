@@ -43,9 +43,10 @@ class AccountSwitchTimelineGuardTest {
         @Volatile var conversationsDelay: CompletableDeferred<Unit>? = null
         @Volatile var messagesCalls = 0
         val messagesEntered = CompletableDeferred<Unit>()
+        val secondMessagesEntered = CompletableDeferred<Unit>()
         val conversationsEntered = CompletableDeferred<Unit>()
         override suspend fun rpc(function: String, params: Map<String, Any?>): Any? = when (function) {
-            "get_conversation_messages" -> { messagesCalls++; messagesEntered.complete(Unit); messagesDelay?.await(); messagesResponse }
+            "get_conversation_messages" -> { messagesCalls++; messagesEntered.complete(Unit); if (messagesCalls >= 2) secondMessagesEntered.complete(Unit); messagesDelay?.await(); messagesResponse }
             "get_my_conversations" -> { conversationsEntered.complete(Unit); conversationsDelay?.await(); conversationsResponse }
             else -> emptyList<Any?>()
         }
@@ -151,9 +152,9 @@ class AccountSwitchTimelineGuardTest {
         // switch must never republish into wiped stores.
         val gate = CompletableDeferred<Unit>(); rpc.messagesDelay = gate
         val stale = async { repo.loadMessages("c1") } // captures scopeA
-        var spins = 0
-        while (rpc.messagesCalls < 1 && spins++ < 1000) kotlinx.coroutines.delay(2)
-        assertEquals(1, rpc.messagesCalls)
+        // Start the suspended second load before changing the owner identity.
+        rpc.secondMessagesEntered.await()
+        assertEquals(2, rpc.messagesCalls)
         // Switch: production wipe is the direct-clear pattern.
         owner.adopt(Any())
         repo.conversationsById.clear()

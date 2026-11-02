@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -320,6 +321,29 @@ fun ChatDetailScreen(
     val selectionActions = com.example.chat.ui.chats.detail.SelectionActionPolicy.available(selectedMessages)
     androidx.activity.compose.BackHandler(isSelectionMode) { selectedIds = emptySet() }
 
+    // One projection owns both rendered rows and all scroll destinations.
+    val timelineRows = com.example.chat.ui.chats.detail.mediaTimelineRows(messages,
+        expand = isSelectionMode || contextMenuMessage != null || highlightedMessageId != null)
+    val timelineZone = java.time.ZoneId.systemDefault()
+    var pendingScrollTarget by remember(conversation.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(pendingScrollTarget, timelineRows) {
+        val target = pendingScrollTarget ?: return@LaunchedEffect
+        val rowIndex = com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.rowIndex(timelineRows, target)
+        if (rowIndex >= 0) listState.animateScrollToItem(rowIndex)
+        pendingScrollTarget = null
+    }
+    var openedAtLatest by remember(conversation.id) { mutableStateOf(false) }
+    LaunchedEffect(conversation.id, messages.isNotEmpty()) {
+        if (!openedAtLatest && messages.isNotEmpty()) {
+            openedAtLatest = true
+            if (initialMessageId == null) {
+                com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.latestRowIndex(timelineRows)?.let {
+                    listState.scrollToItem(it)
+                }
+            }
+        }
+    }
+
     // Dart _isNearBottom: the list counts as pinned while the last item is
     // visible (with one item of slack for fractional last-row visibility).
     val isNearBottom by remember {
@@ -334,9 +358,9 @@ fun ChatDetailScreen(
         if (messages.isEmpty()) return
         scope.launch {
             if (animate) {
-                listState.animateScrollToItem(messages.size - 1)
+                listState.animateScrollToItem(timelineRows.lastIndex)
             } else {
-                listState.scrollToItem(messages.size - 1)
+                listState.scrollToItem(timelineRows.lastIndex)
             }
         }
     }
@@ -375,8 +399,7 @@ fun ChatDetailScreen(
 
     fun highlightAndJump(messageId: String) {
         flashHighlight(messageId)
-        val index = messages.indexOfFirst { it.id == messageId }
-        if (index >= 0) scope.launch { listState.animateScrollToItem(index) }
+        pendingScrollTarget = messageId
     }
 
     // Dart call-site lookup (chat_detail_screen.dart:2966-2984): firstWhere with a
@@ -451,10 +474,7 @@ fun ChatDetailScreen(
             return@LaunchedEffect
         }
         flashHighlight(target, durationMs = 3000L)
-        // Dart Scrollable.ensureVisible(alignment 0.35, 260ms easeOutCubic):
-        // approximated with a negative LazyList scroll offset for the same anchor.
-        val offset = -(listState.layoutInfo.viewportSize.height * 0.35f).toInt()
-        listState.animateScrollToItem(index, scrollOffset = offset)
+        pendingScrollTarget = target
     }
     LaunchedEffect(searchOpen) {
         if (searchOpen) {
@@ -726,14 +746,22 @@ fun ChatDetailScreen(
                     avatarUrl = wallpaperAvatarUrl,
                 )
                 // Expand for every per-message operation; an album is presentation, never a new message.
-                val timelineRows = com.example.chat.ui.chats.detail.mediaTimelineRows(messages,
-                    expand = isSelectionMode || contextMenuMessage != null || highlightedMessageId != null)
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
-                    items(timelineRows, key = { it.anchor.id }) { row ->
+                    itemsIndexed(timelineRows, key = { _, row -> row.anchor.id }) { rowIndex, row ->
+                        Column(Modifier.fillMaxWidth()) {
+                        if (com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.startsDay(timelineRows, rowIndex, timelineZone)) {
+                            Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                                Text(com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.dayAt(timelineRows, rowIndex, timelineZone)
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")),
+                                    color = Color(theme.secondaryTextColor), fontSize = 11.sp,
+                                    modifier = Modifier.background(Color(theme.cardColor), RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp))
+                            }
+                        }
                         val message = row.anchor
                         val isMine = message.senderId == currentUserId
                         val bubble: @Composable () -> Unit = { ChatMessageBubble(
@@ -785,7 +813,7 @@ fun ChatDetailScreen(
                                 else openMessageMenu(message, rect)
                             },
                             mediaContent = if (row.messages.size > 1) ({
-                                com.example.chat.ui.chats.detail.CompactMediaAlbum(row.messages, attachmentBinding, remoteImage, voiceUrlResolver,
+                                com.example.chat.ui.chats.detail.CompactAlbumPreview(row.messages, attachmentBinding, remoteImage, voiceUrlResolver,
                                     onOpen = { item, rect -> if (rect != null && onMediaTapWithBounds != null) onMediaTapWithBounds(item, rect) else onMediaTap(item) },
                                     onMenu = { item, rect -> openMessageMenu(item, rect) },
                                     onReply = { item -> replyTarget = item },
@@ -844,6 +872,7 @@ fun ChatDetailScreen(
                         } else {
                             bubble()
                         }
+                        }
                     }
                 }
 
@@ -868,7 +897,6 @@ fun ChatDetailScreen(
                         .alpha(fabAlpha)
                         .background(Color(theme.cardColor), CircleShape)
                         .border(1.dp, Color(theme.surfaceColor), CircleShape)
-                        .clip(CircleShape)
                         .pointerInput(fabVisible) {
                             detectTapGestures(
                                 onTap = {
@@ -890,8 +918,8 @@ fun ChatDetailScreen(
                     if (pendingBelowCount > 0) {
                         Box(
                             Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = 5.dp, y = (-4).dp)
+                                .align(Alignment.TopCenter)
+                                .offset(y = (-20).dp)
                                 .background(Color(theme.accentColor), CircleShape)
                                 .padding(horizontal = 5.dp, vertical = 1.dp),
                         ) {

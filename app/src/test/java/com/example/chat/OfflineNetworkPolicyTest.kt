@@ -58,7 +58,7 @@ class OfflineNetworkPolicyTest {
 
     private class Rig(backoff: BackoffPolicy?) {
         val s = Sched(); val f = Fac(); var token: String? = "tok"
-        val c = ApiRealtimeClient({ "ws://h/ws/u1" }, { token }, f, s, backoff)
+        val c = ApiRealtimeClient({ "wss://h/ws/u1" }, { token }, f, s, backoff)
         fun connect() = apply { c.connect(); s.drain() }
     }
 

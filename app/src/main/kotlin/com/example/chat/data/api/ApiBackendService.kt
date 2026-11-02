@@ -746,32 +746,47 @@ class ApiBackendService(
     /** ApiBackendService.loadTasks: GET /tasks into _tasks, keeping prior
      *  state on failure or when unauthenticated (Dart early return/catch). */
     suspend fun loadTasks() {
-        val result = withContext(Dispatchers.IO) { tasksClient.listTasks() } ?: return
-        synchronized(chatLock) {
-            _tasks.clear()
-            _tasks.addAll(result)
-        }
-        notifyChatListeners()
+        val expected = authSnapshot()
+        var changed = false
+        val applied = com.example.chat.data.api.publishScopedApiResult(expected, ::withAuthScope,
+            fetch = { withContext(Dispatchers.IO) { tasksClient.listTasks() } },
+            publish = { result ->
+                if (result != null) {
+                    synchronized(chatLock) {
+                        _tasks.clear()
+                        _tasks.addAll(result)
+                    }
+                    changed = true
+                }
+            })
+        if (applied && changed) notifyChatListeners()
     }
 
     suspend fun loadConversations() {
-        when (val result = withContext(Dispatchers.IO) { chat.listRooms() }) {
-            is ApiChatClient.RoomsResult.Ok -> {
-                synchronized(chatLock) {
-                    _conversations.clear()
-                    _conversations.addAll(result.conversations.filter { !it.isTask })
+        val expected = authSnapshot()
+        var changed = false
+        val applied = com.example.chat.data.api.publishScopedApiResult(expected, ::withAuthScope,
+            fetch = { withContext(Dispatchers.IO) { chat.listRooms() } },
+            publish = { result ->
+                when (result) {
+                    is ApiChatClient.RoomsResult.Ok -> {
+                        synchronized(chatLock) {
+                            _conversations.clear()
+                            _conversations.addAll(result.conversations.filter { !it.isTask })
+                        }
+                        requiresSubscription = false
+                        subscriptionErrorMessage = null
+                        changed = true
+                    }
+                    ApiChatClient.RoomsResult.SubscriptionRequired -> {
+                        requiresSubscription = true
+                        subscriptionErrorMessage = "Workspace subscription required. Please select a plan."
+                        changed = true
+                    }
+                    ApiChatClient.RoomsResult.Failed -> Unit
                 }
-                requiresSubscription = false
-                subscriptionErrorMessage = null
-                notifyChatListeners()
-            }
-            ApiChatClient.RoomsResult.SubscriptionRequired -> {
-                requiresSubscription = true
-                subscriptionErrorMessage = "Workspace subscription required. Please select a plan."
-                notifyChatListeners()
-            }
-            ApiChatClient.RoomsResult.Failed -> Unit
-        }
+            })
+        if (applied && changed) notifyChatListeners()
     }
 
     /** loadMessages with Dart merge semantics: pending (sending/temp) messages

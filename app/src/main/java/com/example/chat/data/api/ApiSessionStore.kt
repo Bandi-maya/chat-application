@@ -71,6 +71,12 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
                 if (uid.isNotEmpty()) user = user.copy(id = uid)
             } catch (_: Exception) { }
         }
+        // Mixed demo/real identities are quarantined in memory; keep persisted bytes intact.
+        if (com.example.chat.data.demo.DemoMode.isMixedRestSession(savedToken, user?.id)) {
+            state = ApiAuthSnapshot(null, null, state.generation + 1)
+            onTransition()
+            return@synchronized
+        }
         if ((!savedToken.isNullOrBlank() || !savedUser.isNullOrBlank()) &&
             (user == null || user.id.isBlank() || savedToken.isNullOrBlank())
         ) {

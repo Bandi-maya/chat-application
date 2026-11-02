@@ -79,6 +79,7 @@ class ApiMediaUploadClient(
         baseUrl: String,
         requestTenantId: String,
         onProgress: (transferred: Long, total: Long) -> Unit,
+        checkScope: () -> Unit = {},
     ): Map<String, Any> {
         if (!file.isFile || !file.canRead() || file.length() <= 0L) {
             throw UploadException("Selected media file is unavailable or empty.")
@@ -89,19 +90,24 @@ class ApiMediaUploadClient(
             ?: throw UploadException("Streaming upload is unavailable; refusing to load the full file into memory.")
         val safeFilename = safeMultipartFilename(file.name)
         val response = try {
+            checkScope()
             val primary = fileTransport.uploadFileWithProgress(
                 "$base/chat/upload", "Bearer $bearer", requestTenantId, safeFilename, file, onProgress,
             )
+            checkScope()
             if (primary.statusCode == 404) {
                 fileTransport.uploadFileWithProgress(
                     "$base/api/v1/chat/upload", "Bearer $bearer", requestTenantId, safeFilename, file, onProgress,
                 )
             } else primary
+        } catch (error: ApiScopeChangedException) {
+            throw error
         } catch (error: UploadException) {
             throw error
         } catch (error: Exception) {
             throw UploadException("Failed to stream media to custom backend: $error")
         }
+        checkScope()
         return decodeResponse(response)
     }
 
@@ -117,11 +123,13 @@ class ApiMediaUploadClient(
         file: File,
         onProgress: (transferred: Long, total: Long) -> Unit,
     ): Map<String, Any> {
-        if (!isScopeCurrent()) throw UploadException("Account changed before upload started.")
-        val bearer = expectedScope.token?.takeIf { it.isNotBlank() }
+        if (!isScopeCurrent()) throw ApiScopeChangedException()
+        val bearer = expectedScope.token?.takeIf { it.isNotBlank() && !expectedScope.userId.isNullOrBlank() }
             ?: throw UploadException("Not authenticated")
-        val result = uploadFile(file, bearer, expectedScope.baseUrl, expectedScope.tenantId, onProgress)
-        if (!isScopeCurrent()) throw UploadException("Account changed while upload was in progress.")
+        val result = uploadFile(file, bearer, expectedScope.baseUrl, expectedScope.tenantId, onProgress) {
+            if (!isScopeCurrent()) throw ApiScopeChangedException()
+        }
+        if (!isScopeCurrent()) throw ApiScopeChangedException()
         return result
     }
 
@@ -142,6 +150,7 @@ class ApiMediaUploadClient(
         baseUrl: String,
         requestTenantId: String,
         onProgress: ((transferred: Long, total: Long) -> Unit)?,
+        checkScope: () -> Unit = {},
     ): Map<String, Any> {
         if (bearer.isBlank()) throw UploadException("Not authenticated")
         if (bytes.isEmpty()) throw UploadException("Selected media file is unavailable or empty.")
@@ -154,13 +163,18 @@ class ApiMediaUploadClient(
                 } else {
                     transport.upload(url, "Bearer $bearer", requestTenantId, safeFilename, bytes)
                 }
+            checkScope()
             val primary = send("$base/chat/upload")
+            checkScope()
             if (primary.statusCode == 404) send("$base/api/v1/chat/upload") else primary
+        } catch (error: ApiScopeChangedException) {
+            throw error
         } catch (error: UploadException) {
             throw error
         } catch (error: Exception) {
             throw UploadException("Failed to connect to upload server: $error")
         }
+        checkScope()
         return decodeResponse(response)
     }
 
@@ -175,11 +189,13 @@ class ApiMediaUploadClient(
         bytes: ByteArray,
         onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
     ): Map<String, Any> {
-        if (!isScopeCurrent()) throw UploadException("Account changed before upload started.")
-        val bearer = expectedScope.token?.takeIf { it.isNotBlank() }
+        if (!isScopeCurrent()) throw ApiScopeChangedException()
+        val bearer = expectedScope.token?.takeIf { it.isNotBlank() && !expectedScope.userId.isNullOrBlank() }
             ?: throw UploadException("Not authenticated")
-        val result = uploadBytes(filename, bytes, bearer, expectedScope.baseUrl, expectedScope.tenantId, onProgress)
-        if (!isScopeCurrent()) throw UploadException("Account changed while upload was in progress.")
+        val result = uploadBytes(filename, bytes, bearer, expectedScope.baseUrl, expectedScope.tenantId, onProgress) {
+            if (!isScopeCurrent()) throw ApiScopeChangedException()
+        }
+        if (!isScopeCurrent()) throw ApiScopeChangedException()
         return result
     }
 

@@ -7,6 +7,8 @@ import com.example.chat.data.network.TransferMonitor
 import com.example.chat.data.network.TransferStatus
 import com.example.chat.domain.models.MessageAttachment
 import java.util.UUID
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.CancellationException
 
 /**
  * Exact port of lib/data/services/chat_media_service.dart's upload pipeline
@@ -66,6 +68,8 @@ class ChatMediaService(
         durationSeconds: Int = 0,
         imageQuality: Int = 85,
     ): MessageAttachment {
+        kotlin.coroutines.coroutineContext.ensureActive()
+        val scopedFlow = kotlin.coroutines.coroutineContext[com.example.chat.data.api.ApiScopeElement] != null
         var payload = bytes
         var rawName = displayName
         var effectiveMime = mimeType ?: fallbackMimeForType(type)
@@ -81,12 +85,15 @@ class ChatMediaService(
                         rawName = "${if (dot > 0) rawName.substring(0, dot) else rawName}.jpg"
                         effectiveMime = "image/jpeg"
                     }
+                } catch (error: CancellationException) {
+                    throw error
                 } catch (error: Throwable) {
                     // Chaty media: optional image compression bypassed.
                 }
             }
         }
 
+        kotlin.coroutines.coroutineContext.ensureActive()
         val size = payload.size.toLong()
         if (size <= 0) throw IllegalStateException("The selected file is empty.")
         val maxBytes = maxBytes(type)
@@ -97,6 +104,9 @@ class ChatMediaService(
 
         // Dart: ApiBackendService session takes facade precedence - upload
         // through the custom backend and carry its absolute url.
+        if (scopedFlow && (!apiAuthenticated() || apiUpload == null)) {
+            throw IllegalStateException("Account changed or custom upload is unavailable.")
+        }
         if (apiAuthenticated()) {
             val uploader = apiUpload
             if (uploader != null) {
@@ -107,6 +117,10 @@ class ChatMediaService(
                     val uploaded = uploader(payload, rawName) { sent, total ->
                         if (transferId != null) transferMonitor?.update(transferId, sent, total)
                     }
+                    kotlin.coroutines.coroutineContext.ensureActive()
+                    if (scopedFlow && !apiAuthenticated()) throw IllegalStateException("Account changed during upload.")
+                    val uploadedUrl = uploaded["url"]?.toString()?.takeIf { it.isNotBlank() }
+                        ?: throw IllegalStateException("Upload response did not contain a media URL.")
                     if (transferId != null) {
                         transferMonitor?.update(transferId, size, size)
                         transferMonitor?.finish(transferId)
@@ -116,11 +130,11 @@ class ChatMediaService(
                     type = type,
                     name = rawName,
                     size = formatBytes(size),
-                    url = uploaded["url"]?.toString() ?: "",
+                    url = uploadedUrl,
                     durationSeconds = durationSeconds,
                     )
                 } catch (error: Throwable) {
-                    if (transferId != null) transferMonitor?.finish(transferId, TransferStatus.failed)
+                    if (transferId != null) transferMonitor?.finish(transferId, if (error is CancellationException || error is com.example.chat.data.api.ApiScopeChangedException) TransferStatus.cancelled else TransferStatus.failed)
                     throw error
                 }
             }
@@ -143,7 +157,7 @@ class ChatMediaService(
                 transferMonitor?.finish(transferId)
             }
         } catch (error: Throwable) {
-            if (transferId != null) transferMonitor?.finish(transferId, TransferStatus.failed)
+            if (transferId != null) transferMonitor?.finish(transferId, if (error is CancellationException || error is com.example.chat.data.api.ApiScopeChangedException) TransferStatus.cancelled else TransferStatus.failed)
             throw error
         }
 

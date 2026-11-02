@@ -66,6 +66,7 @@ import com.example.chat.ui.core.controllers.LauncherIconVariant
 import com.example.chat.ui.core.controllers.title
 import com.example.chat.ui.core.notifications.ChatyNotificationIconPresets
 import com.example.chat.ui.settings.appicon.LauncherIconPreview
+import com.example.chat.ui.settings.rememberPreferencesVersion
 import com.example.chat.ui.settings.SettingsPage
 import com.example.chat.ui.settings.SettingsSection
 import com.example.chat.ui.theme.LocalAppColors
@@ -134,6 +135,7 @@ fun UniversalStylesScreen(
     onMessage: (String) -> Unit = {},
     pickFontFile: (suspend () -> FontFilePick?)? = null,
 ) {
+    rememberPreferencesVersion(preferences)
     val colors = LocalAppColors.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -362,11 +364,19 @@ fun UniversalStylesScreen(
 
     // Emoji variant chooser (restored): all 5 packs, applies live.
     if (sheet == 3) {
-        UniversalEmojiPackScreen(
-            preferences = preferences,
-            onBack = { sheet = 0 },
-            onMessage = onMessage,
-        )
+        androidx.compose.ui.window.Dialog(onDismissRequest = { sheet = 0 }) {
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = colors.background,
+                modifier = Modifier.fillMaxWidth().height((LocalConfiguration.current.screenHeightDp * 0.8f).dp),
+            ) {
+                UniversalEmojiPackScreen(
+                    preferences = preferences,
+                    onBack = { sheet = 0 },
+                    onMessage = onMessage,
+                )
+            }
+        }
     }
   }
 }

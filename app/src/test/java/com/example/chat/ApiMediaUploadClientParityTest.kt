@@ -10,7 +10,13 @@ import org.junit.Test
 class ApiMediaUploadClientParityTest {
 
     private class FakeTransport(vararg val responses: ApiMediaUploadClient.Response) :
-        ApiMediaUploadClient.Transport {
+        ApiMediaUploadClient.FileProgressTransport {
+        override fun uploadFileWithProgress(url: String, authorization: String, tenantId: String,
+            filename: String, file: File, onProgress: (Long, Long) -> Unit): ApiMediaUploadClient.Response {
+            calls.add("$url|$authorization|$tenantId|$filename|${file.length()}")
+            onProgress(file.length(), file.length())
+            return responses[minOf(index++, responses.size - 1)]
+        }
         val calls = mutableListOf<String>()
         var index = 0
         override fun upload(
@@ -103,11 +109,11 @@ class ApiMediaUploadClientParityTest {
             webSocketTemplate = "",
             generation = 1L,
         )
-        val error = assertThrows(ApiMediaUploadClient.UploadException::class.java) {
+        val error = assertThrows(com.example.chat.data.api.ApiScopeChangedException::class.java) {
             ApiMediaUploadClient({ "https://api-new.example" }, { "tenant-new" }, { "token-new" }, t)
                 .uploadMedia(scope, { stillCurrent }, tempFile()) { _, _ -> }
         }
-        assertEquals("Account changed while upload was in progress.", error.message)
+        assertEquals("Account changed; operation cancelled.", error.message)
         assertEquals("Bearer token-old", capturedAuthorization)
         assertEquals("tenant-old", capturedTenant)
         assertEquals("https://api-old.example/chat/upload", capturedUrl)

@@ -80,7 +80,7 @@ class ApiAccountClientParityTest {
     fun uploadFilenameCannotInjectMultipartHeaders() {
         val b = FakeBinaryTransport { call ->
             val body = String(call.body, Charsets.UTF_8)
-            assertTrue(body.contains("filename=\"avatar.jpg___X-Evil___1\""))
+            assertTrue(body.contains("filename=\"avatar.jpg___X-Evil__1\""))
             assertFalse(body.contains("\r\nX-Evil:"))
             200 to """{"data":{"avatarUrl":"https://cdn.example/safe.jpg"}}"""
         }

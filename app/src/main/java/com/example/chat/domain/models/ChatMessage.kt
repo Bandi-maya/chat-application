@@ -88,6 +88,11 @@ data class ChatMessage(
                             name = decoded.optString("name", "attachment"),
                             size = decoded.optString("size", ""),
                             url = decoded.optString("url", "").ifEmpty { null },
+                            durationSeconds = (decoded.opt("duration") as? Number)?.let { value ->
+                                val seconds = value.toDouble()
+                                if (seconds.isFinite() && seconds >= 0 && seconds <= Int.MAX_VALUE.toDouble() &&
+                                    seconds == kotlin.math.floor(seconds)) seconds.toInt() else 0
+                            } ?: 0,
                         )
                         // Only encrypted invitation material is retained; plaintext link secrets never enter message JSON.
                         listOf("p2p_invite_ciphertext", "p2p_invite_group", "p2p_invite_epoch", "p2p_transfer_version")

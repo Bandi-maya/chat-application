@@ -33,6 +33,7 @@ class SupabaseStorageClient(
         contentType: String,
         onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
     ): Unit = withContext(Dispatchers.IO) {
+        com.example.chat.data.demo.DemoMode.requireRealBackend()
         val bearer = accessToken()
         if (bytes.size >= RESUMABLE_THRESHOLD_BYTES &&
             uploadTus(bucket, path, bytes, contentType, bearer, onProgress)
@@ -194,6 +195,7 @@ class SupabaseStorageClient(
 
     /** Mirrors storage.from(bucket).remove(paths) (bulk delete). */
     suspend fun remove(bucket: String, paths: List<String>): Unit = withContext(Dispatchers.IO) {
+        com.example.chat.data.demo.DemoMode.requireRealBackend()
         val body = JSONObject().put("prefixes", JSONArray(paths)).toString()
         val request = Request.Builder()
             .url("$supabaseUrl/storage/v1/object/$bucket")
@@ -222,6 +224,7 @@ class SupabaseStorageClient(
         path: String,
         expiresInSeconds: Int,
     ): String = withContext(Dispatchers.IO) {
+        com.example.chat.data.demo.DemoMode.requireRealBackend()
         val body = JSONObject().put("expiresIn", expiresInSeconds).toString()
         val request = Request.Builder()
             .url("$supabaseUrl/storage/v1/object/sign/$bucket/$path")
