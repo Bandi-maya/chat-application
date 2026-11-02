@@ -185,12 +185,13 @@ class ChatAttachmentActionController(
         require(files.isNotEmpty()) { "Choose an attachment first." }
         val limit = if (type == "image") imageShareLimit().coerceIn(1, 100) else 1
         require(files.size <= limit) { "Your configured send limit is $limit." }
+        val albumId = if (type == "image" && !viewOnce && files.size >= 2) java.util.UUID.randomUUID().toString() else null
         for ((index, file) in files.withIndex()) {
             val attachment = backend.upload(type, file)
             backend.sendMessage(
                 if (index == 0) caption else "",
                 messageTypeFor(type), attachment,
-                if (viewOnce) mapOf("view_once" to true) else null,
+                if (viewOnce) mapOf("view_once" to true) else albumId?.let { MediaAlbumContract.stamp(it, index, files.size) },
             )
         }
     }
