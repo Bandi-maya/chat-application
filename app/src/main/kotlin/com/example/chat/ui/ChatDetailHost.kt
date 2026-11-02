@@ -617,6 +617,8 @@ fun ChatDetailHost(
         },
         onViewOnceOpen = { m -> viewerBounds = null; viewerMessage = m },
         onCameraTap = { chatCameraOpen = true },
+        attachmentReviewImages = attachments.onReviewImages,
+        attachmentDirectSendImages = attachments.onDirectSendImages,
         onGalleryTap = { attachments.onMedia("image") },
         onAudioTap = { attachments.onMedia("audio") },
         onContactTap = { attachments.onContact() },
