@@ -749,12 +749,16 @@ fun ChatDetailScreen(
                     profilePicWallpaper = wallpaperProfilePic,
                     avatarUrl = wallpaperAvatarUrl,
                 )
+                // Expand for every per-message operation; an album is presentation, never a new message.
+                val timelineRows = com.example.chat.ui.chats.detail.mediaTimelineRows(messages,
+                    expand = isSelectionMode || contextMenuMessage != null || highlightedMessageId != null)
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
-                    items(messages, key = { it.id }) { message ->
+                    items(timelineRows, key = { it.anchor.id }) { row ->
+                        val message = row.anchor
                         val isMine = message.senderId == currentUserId
                         val bubble = ChatMessageBubble(
                             message = message,
@@ -800,8 +804,15 @@ fun ChatDetailScreen(
                             remoteImage = remoteImage,
                             onLongPress = { openMessageMenu(message, null) },
                             onLongPressWithRect = { rect -> openMessageMenu(message, rect) },
-                            onSwipeReply = { replyTarget = message },
-                            onDoubleTap = if (disableDoubleTapReaction || !ReleaseFeatures.MESSAGE_REACTIONS) {
+                            mediaContent = if (row.messages.size > 1) ({
+                                com.example.chat.ui.chats.detail.CompactMediaAlbum(row.messages, attachmentBinding, remoteImage, voiceUrlResolver,
+                                    onOpen = { item, rect -> if (rect != null && onMediaTapWithBounds != null) onMediaTapWithBounds(item, rect) else onMediaTap(item) },
+                                    onMenu = { item, rect -> openMessageMenu(item, rect) },
+                                    onReply = { item -> replyTarget = item },
+                                    onReact = if (disableDoubleTapReaction) null else ({ item -> onToggleReaction(item.id, doubleTapReactionEmoji) }))
+                            }) else null,
+                            onSwipeReply = if (row.messages.size > 1) null else ({ replyTarget = message }),
+                            onDoubleTap = if (disableDoubleTapReaction || !ReleaseFeatures.MESSAGE_REACTIONS || row.messages.size > 1) {
                                 null
                             } else {
                                 { onToggleReaction(message.id, doubleTapReactionEmoji) }
