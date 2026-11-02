@@ -106,3 +106,4 @@ Candidate-overlay compatibility: restore branch-owned ChatsHomeHost, Notificatio
 2026-11-02T21:47IST timestamp-testTag compile fix + video-hold host port (attachments binding, detail screen, detail host camera entry) - combined validation build
 2026-11-02T22:38IST unit-test repair: account-switch guard test adapted to effective production guard paths (override copy), ownerStopMayProceed pure seam extraction + real-behavior assertions, override guard count 76
 2026-11-02T23:56IST voice pause/session-barrier restoration (controller+session+recorder), location + route-ID validation overrides, unit-test compile repair batch; override guard 79 - validation build
+2026-11-03T01:38IST accepted 8-file batch validation: orphan-brace P2P test repair, voice distinct-path cleanup, capability-scoped multi-message selection (e49d185a) - validation build
