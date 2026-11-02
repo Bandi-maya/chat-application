@@ -211,7 +211,7 @@ fun SecurityCenterScreen(
                             onTap = {
                                 scope.launch {
                                     val ok = lockService.authenticateBiometric("Test biometric unlock for Chaty")
-                                    if (active) toast(if (ok) "Biometric unlock works." else "Biometric failed or was cancelled.")
+                                    if (active) showToast(if (ok) "Biometric unlock works." else "Biometric failed or was cancelled.")
                                 }
                             },
                         )
@@ -224,7 +224,7 @@ fun SecurityCenterScreen(
                             onTap = {
                                 scope.launch {
                                     val ok = lockService.authenticateDeviceCredential("Test your device screen lock for Chaty")
-                                    if (active) toast(if (ok) "Device lock works." else "Device authentication failed or was cancelled.")
+                                    if (active) showToast(if (ok) "Device lock works." else "Device authentication failed or was cancelled.")
                                 }
                             },
                         )
