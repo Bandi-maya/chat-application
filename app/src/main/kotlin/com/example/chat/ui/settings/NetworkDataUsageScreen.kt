@@ -33,13 +33,8 @@ import com.example.chat.data.network.TransferItem
 import com.example.chat.data.network.TransferStatus
 
 @Composable
-fun NetworkDataUsageScreen(onBack: () -> Unit) {
-    val monitor = ServiceLocator.transferMonitor
-    val transfers by monitor.items.collectAsState()
-    val totals by monitor.totals.collectAsState()
-    val appTraffic by ServiceLocator.appTrafficMonitor.state.collectAsState()
+fun NetworkStatusScreen(onBack: () -> Unit) {
     val network by ServiceLocator.networkMonitor.state.collectAsState()
-    val active = transfers.filter { it.status == TransferStatus.active || it.status == TransferStatus.paused || it.status == TransferStatus.queued }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp),
@@ -50,8 +45,8 @@ fun NetworkDataUsageScreen(onBack: () -> Unit) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
             }
             Column(Modifier.weight(1f)) {
-                Text("Network & Data Usage", style = MaterialTheme.typography.titleLarge)
-                Text("Live connection and transfer monitor", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Network", style = MaterialTheme.typography.titleLarge)
+                Text("Live connection status", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -68,6 +63,32 @@ fun NetworkDataUsageScreen(onBack: () -> Unit) {
                     Text(if (network.upstreamKbps > 0) "${network.upstreamKbps} kbps" else "Measuring…")
                 }
                 Text("These are Android link estimates. Transfer speeds below are measured from Chaty traffic.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+fun DataUsageScreen(onBack: () -> Unit) {
+    val monitor = ServiceLocator.transferMonitor
+    val transfers by monitor.items.collectAsState()
+    val totals by monitor.totals.collectAsState()
+    val appTraffic by ServiceLocator.appTrafficMonitor.state.collectAsState()
+    val active = transfers.filter { it.status == TransferStatus.active || it.status == TransferStatus.paused || it.status == TransferStatus.queued }
+
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+            }
+            Column(Modifier.weight(1f)) {
+                Text("Data Usage", style = MaterialTheme.typography.titleLarge)
+                Text("Usage totals and transfer monitor", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -96,6 +117,7 @@ fun NetworkDataUsageScreen(onBack: () -> Unit) {
             }
         }
 
+
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Total Chaty network traffic", style = MaterialTheme.typography.titleMedium)
@@ -121,6 +143,7 @@ fun NetworkDataUsageScreen(onBack: () -> Unit) {
                 }
             }
         }
+
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Active transfers", style = MaterialTheme.typography.titleMedium)
