@@ -244,6 +244,10 @@ fun ChatDetailScreen(
     onVoiceHoldStart: () -> Unit = {},
     onVoiceMove: (Offset) -> Unit = {},
     onVoiceHoldEnd: () -> Unit = {},
+    onVideoHoldStart: ((Long) -> Unit)? = null,
+    onVideoHoldMove: (Long, Float, Float) -> Unit = { _, _, _ -> },
+    onVideoHoldEnd: (Long) -> Unit = {},
+    onVideoHoldCancel: (Long) -> Unit = {},
     onGalleryTap: (() -> Unit)? = null,
     onAudioTap: (() -> Unit)? = null,
     onLocationTap: (() -> Unit)? = null,
@@ -1010,6 +1014,10 @@ fun ChatDetailScreen(
                     onVoiceHoldStart = onVoiceHoldStart,
                     onVoiceMove = onVoiceMove,
                     onVoiceHoldEnd = onVoiceHoldEnd,
+                    onVideoHoldStart = onVideoHoldStart,
+                    onVideoHoldMove = onVideoHoldMove,
+                    onVideoHoldEnd = onVideoHoldEnd,
+                    onVideoHoldCancel = onVideoHoldCancel,
                     onSend = ::sendCurrent,
                 )
             }
