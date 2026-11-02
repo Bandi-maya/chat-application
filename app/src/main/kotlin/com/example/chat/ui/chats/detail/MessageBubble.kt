@@ -325,8 +325,8 @@ fun ChatMessageBubble(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    modifier = Modifier.testTag("message_timestamp"),
                     bubbleMetaTimeFormatter.format(message.createdAt.atZone(ZoneId.systemDefault())),
+                    modifier = Modifier.testTag("message_timestamp"),
                     color = Color(timestampColor),
                     fontSize = (10 * theme.fontScale).sp,
                 )
