@@ -136,6 +136,13 @@ fun ChatDetailHost(
     // Dart _captureAndSendPhoto (chat_detail_screen.dart:473): composer camera
     // icon opens the full-screen capture flow in chat mode.
     var chatCameraOpen by remember { mutableStateOf(false) }
+    var cameraEntryFlow by remember { mutableStateOf<com.example.chat.ui.AttachFlow?>(null) }
+    var cameraEntryAuth by remember { mutableStateOf<com.example.chat.ui.camera.ApiVideoAuthPort?>(null) }
+    var cameraEntryPreset by remember { mutableStateOf(com.example.chat.ui.camera.CameraEntryPreset.photoBack) }
+    // Composer front-video hold: one gesture = one token, created only with this open's
+    // original entry authority; a stale or duplicate gesture id never touches it.
+    var videoHoldRequest by remember { mutableStateOf<com.example.chat.ui.camera.VideoHoldRequest?>(null) }
+    var videoHoldId by remember { mutableStateOf<Long?>(null) }
     var p2pReceiveMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var p2pReceiveLink by remember { mutableStateOf<String?>(null) }
     var p2pLocalViewer by remember { mutableStateOf<File?>(null) }
@@ -360,6 +367,31 @@ fun ChatDetailHost(
     val lookup: (String) -> com.example.chat.domain.models.UserProfile? = { id -> api.users.firstOrNull { it.id == id } }
 
     val attachments = rememberChatAttachments(conversation.id) { rev++ }
+    fun closeChatCamera() {
+        videoHoldRequest?.close()
+        videoHoldRequest = null
+        videoHoldId = null
+        chatCameraOpen = false
+        cameraEntryFlow?.let(attachments.closeCaptureSession)
+        cameraEntryFlow = null
+        cameraEntryAuth = null
+    }
+    fun openChatCamera(preset: com.example.chat.ui.camera.CameraEntryPreset) {
+        closeChatCamera()
+        var openedFlow: com.example.chat.ui.AttachFlow? = null
+        val flow = attachments.openCaptureSession {
+            if (cameraEntryFlow === openedFlow) closeChatCamera()
+        } ?: return
+        openedFlow = flow
+        if (flow.isCancelled) { attachments.closeCaptureSession(flow); return }
+        cameraEntryFlow = flow
+        cameraEntryAuth = com.example.chat.ui.camera.ApiVideoAuthPort(api, flow.expectedScope)
+        cameraEntryPreset = preset
+        chatCameraOpen = true
+    }
+    DisposableEffect(api, conversation.id) {
+        onDispose { videoHoldRequest?.close(); cameraEntryFlow?.let(attachments.closeCaptureSession) }
+    }
     val voice = rememberChatVoice(
         conversation.id,
         afterSend = { rev++ },
@@ -624,7 +656,7 @@ fun ChatDetailHost(
             } else { viewerBounds = rect; viewerMessage = m }
         },
         onViewOnceOpen = { m -> viewerBounds = null; viewerMessage = m },
-        onCameraTap = { chatCameraOpen = true },
+        onCameraTap = { openChatCamera(com.example.chat.ui.camera.CameraEntryPreset.photoBack) },
         attachmentReviewImages = attachments.onReviewImages,
         attachmentDirectSendImages = attachments.onDirectSendImages,
         onGalleryTap = { attachments.onMedia("image") },
@@ -635,34 +667,85 @@ fun ChatDetailHost(
         onVoiceHoldStart = voice.onVoiceHoldStart,
         onVoiceMove = voice.onVoiceMove,
         onVoiceHoldEnd = voice.onVoiceHoldEnd,
+        onVideoHoldStart = { id ->
+            if (videoHoldId == null) {
+                openChatCamera(com.example.chat.ui.camera.CameraEntryPreset.composerFrontVideo)
+                // Pin the ORIGINAL entry flow with its auth: a same-account AttachFlow cancel
+                // landing before the queued UI cancel must not let a pending ready start.
+                val auth = cameraEntryAuth
+                val flow = cameraEntryFlow
+                if (auth != null && flow != null && !flow.isCancelled) {
+                    videoHoldRequest = com.example.chat.ui.camera.VideoHoldRequest {
+                        !flow.isCancelled && cameraEntryFlow === flow && auth.isSignedIn(auth.snapshot())
+                    }
+                    videoHoldId = id
+                    if (com.example.chat.BuildConfig.DEBUG) videoHoldRequest?.let { token ->
+                        try { ChatVideoHoldNativeProof.onEntry?.invoke(flow, token) } catch (_: Throwable) { /* Collect-only instrumentation cannot affect host. */ }
+                    }
+                }
+                // No capture session or cancelled flow: no token, no fake open; this id's End/Cancel are no-ops.
+            }
+        },
+        // Slide-to-cancel is already handled composer-side (VoiceGesturePolicy.CANCEL_DX);
+        // the up-lock threshold mirrors the voice policy (dy < LOCK_DY), and a stale id
+        // must never reach the token.
+        onVideoHoldMove = { id, _, dy ->
+            if (id == videoHoldId && dy < com.example.chat.ui.chats.detail.VoiceGesturePolicy.LOCK_DY) videoHoldRequest?.lock()
+        },
+        onVideoHoldEnd = { id -> if (id == videoHoldId) videoHoldRequest?.release() },
+        onVideoHoldCancel = { id -> if (id == videoHoldId) videoHoldRequest?.cancel() },
     )
     }
     voice.overlay()
     if (chatCameraOpen) {
-        androidx.activity.compose.BackHandler { chatCameraOpen = false }
+        androidx.activity.compose.BackHandler { closeChatCamera() }
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+            val localVideoAuth = cameraEntryAuth
+            val mountedCameraFlow = cameraEntryFlow
+            androidx.compose.runtime.key(mountedCameraFlow) {
             com.example.chat.ui.camera.ChatyCameraCaptureScreen(
                 mode = com.example.chat.ui.camera.ChatyCaptureMode.chat,
                 contactName = live.title,
                 callsAllowed = connection?.callsAllowed ?: true,
+                videoAuthPort = localVideoAuth,
+                entryPreset = cameraEntryPreset,
+                videoHoldRequest = videoHoldRequest,
                 onResult = { r ->
+                    val flow = mountedCameraFlow
+                    if (cameraEntryFlow !== flow) {
+                        r.ownedResult?.close()
+                        return@ChatyCameraCaptureScreen
+                    }
                     chatCameraOpen = false
-                    scope.launch {
+                    cameraEntryFlow = null
+                    cameraEntryAuth = null
+                    if (flow == null || flow.isCancelled) {
+                        r.ownedResult?.close()
+                        flow?.let(attachments.closeCaptureSession)
+                    } else scope.launch {
+                        try {
                         attachments.controller.sendCapturedPhoto(
                             path = r.path,
                             caption = r.caption,
                             effectId = r.effectId,
                             effectIntensity = r.effectIntensity,
                             onSent = {
+                                if (flow.isCancelled) return@sendCapturedPhoto
                                 try { rt.trackConversation(conversation.id) } catch (_: Exception) {}
                                 com.example.chat.ui.kit.ChatyHapticsPort.success(hostView)
                                 rev++
                             },
                         )
+                        } finally {
+                            // Transport has unwound. A cancelled original account cannot retry this capture.
+                            if (flow.isCancelled) r.ownedResult?.close()
+                            attachments.closeCaptureSession(flow)
+                        }
                     }
                 },
-                onDismiss = { chatCameraOpen = false },
+                onDismiss = { if (cameraEntryFlow === mountedCameraFlow) closeChatCamera() },
             )
+            }
         }
     }
     if (infoRoute != 0) {
