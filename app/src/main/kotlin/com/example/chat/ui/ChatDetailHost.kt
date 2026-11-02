@@ -69,6 +69,14 @@ import org.json.JSONObject
  *  Known deviations are listed in docs/chat-detail-host-deviations.md semantics:
  *  presence refresh is a 3s tick (richRealtime exposes no listener API);
  *  forward sends text only; task modal has no source-message link param. */
+/** Internal synthetic instrumentation observation only; never replaces capture flow/auth.
+ *  Fixture restored so the pinned candidate's RealHostVideoHoldProofTest compiles; the
+ *  hold-to-record host wiring itself is NOT ported yet, so that test fails honestly at
+ *  runtime until the video-hold flow is merged. */
+internal object ChatVideoHoldNativeProof {
+    @Volatile var onEntry: ((com.example.chat.ui.AttachFlow, com.example.chat.ui.camera.VideoHoldRequest) -> Unit)? = null
+}
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ChatDetailHost(
