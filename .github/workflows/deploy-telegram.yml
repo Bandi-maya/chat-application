@@ -12,7 +12,7 @@ jobs:
   build-and-send:
     name: Build Android APK & Send to Telegram
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout Repository
@@ -23,18 +23,58 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      - name: Setup Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            mls-native -> target
+          cache-on-failure: true
+
+      - name: Install cargo-ndk
+        run: |
+          command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
+
+      - name: Set Android NDK for cargo-ndk
+        run: |
+          NDK=$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | sort -V | tail -1)
+          if [ -z "$NDK" ] || [ ! -d "$NDK" ]; then
+            echo "Installing NDK via sdkmanager..."
+            echo y | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;25.2.9519653" || true
+            NDK=$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | sort -V | tail -1)
+          fi
+          echo "Found Android NDK: $NDK"
+          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
 
       - name: Build Debug APK
         run: |
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew :app:assembleDebug --no-daemon
+          if command -v cargo-ndk >/dev/null && [ -n "$ANDROID_NDK_HOME" ]; then
+            echo "Building with native OpenMLS (cargo-ndk)..."
+            if [ -f "./gradlew" ]; then
+              chmod +x ./gradlew
+              ./gradlew :app:assembleDebug --no-daemon
+            else
+              gradle :app:assembleDebug --no-daemon
+            fi
           else
-            gradle :app:assembleDebug --no-daemon
+            echo "cargo-ndk or NDK missing; falling back to -PskipMlsNative=true..."
+            if [ -f "./gradlew" ]; then
+              chmod +x ./gradlew
+              ./gradlew :app:assembleDebug -PskipMlsNative=true --no-daemon
+            else
+              gradle :app:assembleDebug -PskipMlsNative=true --no-daemon
+            fi
           fi
 
       - name: Locate APK & Get Metadata
