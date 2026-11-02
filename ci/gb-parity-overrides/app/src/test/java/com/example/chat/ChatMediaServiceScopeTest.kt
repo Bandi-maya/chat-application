@@ -62,7 +62,7 @@ class ChatMediaServiceScopeTest {
         var uploads = 0
         val s = svc({ true }, { _, _ -> throw cancelled }, { _, _, _ -> uploads++; mapOf("url" to "u") })
         try { withContext(ApiScopeElement(scope())) { s.uploadBytes("c", "image", ByteArray(10), "a.png") }; fail() }
-        catch (e: kotlinx.coroutines.CancellationException) { assertSame(cancelled, e) }
+        catch (e: kotlinx.coroutines.CancellationException) { assertCancellationPreserved(cancelled, e) }
         assertEquals(0, uploads); assertEquals(0, storageHits.get())
     }
     @Test fun authFlipsAfterUploadDoesNotReturnAttachment() = runBlocking {
@@ -76,7 +76,39 @@ class ChatMediaServiceScopeTest {
         val cancelled = kotlinx.coroutines.CancellationException("cancelled transfer")
         val s = svc({ true }, { _, _ -> null }, { _, _, _ -> throw cancelled })
         try { withContext(ApiScopeElement(scope())) { s.uploadBytes("c", "document", ByteArray(10), "a.pdf") }; fail() }
-        catch (e: kotlinx.coroutines.CancellationException) { assertSame(cancelled, e) }
+        catch (e: kotlinx.coroutines.CancellationException) { assertCancellationPreserved(cancelled, e) }
         assertEquals(0, storageHits.get())
+    }
+    /** Coroutine debug stacktrace recovery may copy CancellationException across withContext.
+     *  Require exact original or its recovery copy, never a new unrelated cancellation. */
+    private fun assertCancellationPreserved(original: kotlinx.coroutines.CancellationException, caught: kotlinx.coroutines.CancellationException) {
+        assertEquals(original.javaClass, caught.javaClass)
+        assertEquals(original.message, caught.message)
+        val seen = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<Throwable, Boolean>())
+        assertTrue("original cancellation must survive in the bounded cause chain", generateSequence<Throwable>(caught) { it.cause }.take(8).takeWhile { seen.add(it) }.any { it === original })
+    }
+
+    @Test fun serviceRethrowsExactCancellationBeforeCoroutineRecovery() = runBlocking {
+        for (duringCompression in listOf(true, false)) {
+            val cancelled = kotlinx.coroutines.CancellationException("service cancellation $duringCompression")
+            var uploads = 0
+            val s = svc({ true }, { _, _ -> if (duringCompression) throw cancelled else null }, { _, _, _ -> uploads++; throw cancelled })
+            try {
+                // No withContext boundary here: assert the service itself does not replace the exception.
+                s.uploadBytes("c", if (duringCompression) "image" else "document", ByteArray(10), "a.bin")
+                fail("cancelled service must not return an attachment")
+            } catch (e: kotlinx.coroutines.CancellationException) { assertSame(cancelled, e) }
+            assertEquals(if (duringCompression) 0 else 1, uploads)
+            assertEquals(0, storageHits.get())
+        }
+    }
+    @Test fun cancellationAssertionRejectsUnrelatedCopiesAndCauseCycles() {
+        val original = kotlinx.coroutines.CancellationException("same text")
+        val unrelated = kotlinx.coroutines.CancellationException("same text")
+        assertThrows(AssertionError::class.java) { assertCancellationPreserved(original, unrelated) }
+        val cyclic = kotlinx.coroutines.CancellationException("same text")
+        val other = kotlinx.coroutines.CancellationException("same text")
+        cyclic.initCause(other); other.initCause(cyclic)
+        assertThrows(AssertionError::class.java) { assertCancellationPreserved(original, cyclic) }
     }
 }
