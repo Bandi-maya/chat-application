@@ -57,4 +57,26 @@ class ChatMediaServiceScopeTest {
         val s2 = svc({ true }, { _, _ -> null }, { _, _, _ -> mapOf("url" to "u2") })
         assertEquals("u2", s2.uploadBytes("c", "document", ByteArray(10), "a.pdf").url)
     }
+    @Test fun compressionCancellationNeverDispatches() = runBlocking {
+        val cancelled = kotlinx.coroutines.CancellationException("cancelled compression")
+        var uploads = 0
+        val s = svc({ true }, { _, _ -> throw cancelled }, { _, _, _ -> uploads++; mapOf("url" to "u") })
+        try { withContext(ApiScopeElement(scope())) { s.uploadBytes("c", "image", ByteArray(10), "a.png") }; fail() }
+        catch (e: kotlinx.coroutines.CancellationException) { assertSame(cancelled, e) }
+        assertEquals(0, uploads); assertEquals(0, storageHits.get())
+    }
+    @Test fun authFlipsAfterUploadDoesNotReturnAttachment() = runBlocking {
+        var authed = true
+        val s = svc({ authed }, { _, _ -> null }, { _, _, _ -> authed = false; mapOf("url" to "u") })
+        try { withContext(ApiScopeElement(scope())) { s.uploadBytes("c", "document", ByteArray(10), "a.pdf") }; fail() }
+        catch (e: IllegalStateException) { assertTrue(e.message!!.contains("Account changed")) }
+        assertEquals(0, storageHits.get())
+    }
+    @Test fun uploadCancellationIsPreserved() = runBlocking {
+        val cancelled = kotlinx.coroutines.CancellationException("cancelled transfer")
+        val s = svc({ true }, { _, _ -> null }, { _, _, _ -> throw cancelled })
+        try { withContext(ApiScopeElement(scope())) { s.uploadBytes("c", "document", ByteArray(10), "a.pdf") }; fail() }
+        catch (e: kotlinx.coroutines.CancellationException) { assertSame(cancelled, e) }
+        assertEquals(0, storageHits.get())
+    }
 }

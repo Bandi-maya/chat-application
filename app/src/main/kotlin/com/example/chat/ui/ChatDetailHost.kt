@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -908,11 +909,28 @@ fun ChatDetailHost(
     if (vm != null && va != null) {
         androidx.activity.compose.BackHandler { viewerMessage = null }
         androidx.compose.runtime.key(attachmentBinding.session, conversation.id, vm.id) {
-            com.example.chat.ui.chats.detail.BoundAttachmentViewer(
-                theme, vm, attachmentBinding,
-                restricted = com.example.chat.data.local.AttachmentCachePolicy.viewOnceRestricted(vm.metadata),
-                bounds = viewerBounds, onBack = { viewerMessage = null },
-            )
+            val albumSequence = com.example.chat.ui.chats.detail.AlbumNavigationPolicy.sequence(
+                com.example.chat.ui.chats.detail.mediaTimelineRows(messages), vm.id)
+            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                com.example.chat.ui.chats.detail.BoundAttachmentViewer(
+                    theme, vm, attachmentBinding,
+                    restricted = com.example.chat.data.local.AttachmentCachePolicy.viewOnceRestricted(vm.metadata),
+                    bounds = viewerBounds, onBack = { viewerMessage = null },
+                )
+                if (albumSequence.size > 1) {
+                    androidx.compose.foundation.layout.Row(
+                        androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+                            .navigationBarsPadding().padding(bottom = 72.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        val previous = com.example.chat.ui.chats.detail.AlbumNavigationPolicy.adjacent(albumSequence, vm.id, -1)
+                        val next = com.example.chat.ui.chats.detail.AlbumNavigationPolicy.adjacent(albumSequence, vm.id, 1)
+                        TextButton(enabled = previous != null, onClick = { previous?.let { viewerBounds = null; viewerMessage = it } }) { Text("Previous photo") }
+                        Text("${albumSequence.indexOfFirst { it.id == vm.id } + 1} / ${albumSequence.size}")
+                        TextButton(enabled = next != null, onClick = { next?.let { viewerBounds = null; viewerMessage = it } }) { Text("Next photo") }
+                    }
+                }
+            }
         }
     }
 

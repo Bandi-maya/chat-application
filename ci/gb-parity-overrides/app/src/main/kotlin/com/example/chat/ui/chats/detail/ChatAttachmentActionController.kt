@@ -33,7 +33,8 @@ data class PollDraft(
         fun normalized(question: String, options: List<String>, allowMultiple: Boolean): PollDraft? {
             val q = question.trim()
             val opts = options.map { it.trim() }.filter { it.isNotEmpty() }
-            if (q.isEmpty() || opts.size < MIN_OPTIONS) return null
+            if (q.isEmpty() || q.length > QUESTION_MAX_LENGTH || opts.size !in MIN_OPTIONS..MAX_OPTIONS ||
+                opts.any { it.length > OPTION_MAX_LENGTH }) return null
             return PollDraft(q, opts, allowMultiple)
         }
     }

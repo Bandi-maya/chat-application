@@ -136,7 +136,12 @@ class ApiRealtimeClient(
     fun connect() = post {
         if (socket != null && (socketToken != token() || socketUrl != webSocketUrl() || socketScope !== connectionScopeIdentity())) cleanupLocked()
         if (connecting || socket != null) return@post
-        if (token() == null) return@post
+        val currentToken = token()
+        if (currentToken.isNullOrBlank() || currentToken == com.example.chat.data.demo.DemoMode.TOKEN ||
+            com.example.chat.data.demo.DemoMode.active) {
+            cleanupLocked()
+            return@post
+        }
         val configuredUrl = webSocketUrl()?.takeIf { it.isNotBlank() } ?: return@post
         val url = runCatching { validateWebSocketUrl(configuredUrl) }.getOrNull() ?: return@post
         reconnectCancel?.cancel()
@@ -523,13 +528,13 @@ class ApiRealtimeClient(
             val candidate = when {
                 !customWebSocketUrl.isNullOrEmpty() && !customWebSocketUrl.contains("/ws/school") -> {
                     val ws = customWebSocketUrl.trim()
-                    if (ws.contains("{userId}") || ws.contains("\\$userId")) {
-                        ws.replace("{userId}", cleanUserId).replace("\\$userId", cleanUserId)
+                    if (ws.contains("{userId}") || ws.contains("\$userId")) {
+                        ws.replace("{userId}", cleanUserId).replace("\$userId", cleanUserId)
                     } else "${ws.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
                 }
                 envWebSocketUrl.isNotEmpty() && !envWebSocketUrl.contains("/ws/school") -> {
-                    if (envWebSocketUrl.contains("{userId}") || envWebSocketUrl.contains("\\$userId")) {
-                        envWebSocketUrl.replace("{userId}", cleanUserId).replace("\\$userId", cleanUserId)
+                    if (envWebSocketUrl.contains("{userId}") || envWebSocketUrl.contains("\$userId")) {
+                        envWebSocketUrl.replace("{userId}", cleanUserId).replace("\$userId", cleanUserId)
                     } else "${envWebSocketUrl.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
                 }
                 else -> {

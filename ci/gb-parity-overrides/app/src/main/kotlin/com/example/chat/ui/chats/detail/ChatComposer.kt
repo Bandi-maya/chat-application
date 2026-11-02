@@ -752,12 +752,23 @@ private fun ComposerActionButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = iconColor,
-            modifier = Modifier.size(iconSize),
-        )
+        val themedId = when (icon) {
+            Icons.AutoMirrored.Rounded.Send -> com.example.chat.ui.icons.ChatyIconId.send
+            Icons.Rounded.Mic -> com.example.chat.ui.icons.ChatyIconId.microphone
+            Icons.Rounded.Videocam -> com.example.chat.ui.icons.ChatyIconId.videoCam
+            Icons.Rounded.EmojiEmotions -> com.example.chat.ui.icons.ChatyIconId.emoji
+            Icons.Rounded.Add -> com.example.chat.ui.icons.ChatyIconId.attachmentPlus
+            Icons.Rounded.AttachFile -> com.example.chat.ui.icons.ChatyIconId.attachment
+            Icons.Rounded.PhotoCamera -> com.example.chat.ui.icons.ChatyIconId.camera
+            Icons.Rounded.PhotoLibrary -> com.example.chat.ui.icons.ChatyIconId.gallery
+            Icons.Rounded.MoreHoriz -> com.example.chat.ui.icons.ChatyIconId.more
+            else -> null
+        }
+        if (themedId != null) {
+            com.example.chat.ui.icons.ChatyIcon(themedId, color = iconColor, size = iconSize)
+        } else {
+            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(iconSize))
+        }
     }
 }
 

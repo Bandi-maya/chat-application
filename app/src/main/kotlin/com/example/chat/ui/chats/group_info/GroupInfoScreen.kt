@@ -46,12 +46,8 @@ import com.example.chat.ui.theme.LocalAppColors
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.launch
 
-/** Port of group_info_screen.dart (api branch anchor 3bee780): group header,
- *  security/settings rows (static in Dart), member list with Admin badges,
- *  Add Member mock invite, and Leave Group. Dart pops twice and shows a
- *  'Left group.' snackbar via the app-level ScaffoldMessenger with no
- *  backend call, so [onLeave] must pop Group Info + the chat and surface
- *  that snackbar from the surviving destination. */
+/** Group details from the current conversation. Membership and security actions stay
+ * unavailable until their backend contracts exist; navigation is not leaving a group. */
 @Composable
 fun GroupInfoScreen(
     conversation: Conversation,
@@ -83,7 +79,7 @@ fun GroupInfoScreen(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = {
-                    scope.launch { snackbar.showSnackbar("Edit group name / avatar modal") }
+                    scope.launch { snackbar.showSnackbar("Group editing is not available in this build.") }
                 }) {
                     Icon(Icons.Outlined.Edit, contentDescription = "Edit group info", tint = colors.foreground)
                 }
@@ -126,7 +122,7 @@ fun GroupInfoScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "${conversation.participantIds.size} Members • End-to-End Encrypted",
+                    "${conversation.participantIds.size} known members",
                     color = colors.foregroundSecondary,
                     fontSize = 12.sp,
                 )
@@ -139,7 +135,7 @@ fun GroupInfoScreen(
                     icon = { Icon(Icons.Outlined.Timer, contentDescription = null, tint = colors.warning) },
                     title = "Disappearing Messages",
                     titleColor = colors.foreground,
-                    subtitle = "7 days active",
+                    subtitle = "Settings unavailable in this build",
                     trailing = { Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary) },
                     onClick = {},
                 )
@@ -147,7 +143,7 @@ fun GroupInfoScreen(
                     icon = { Icon(Icons.Outlined.VerifiedUser, contentDescription = null, tint = colors.success) },
                     title = "Encryption Verification",
                     titleColor = colors.foreground,
-                    subtitle = "Group prekeys authenticated",
+                    subtitle = "Encryption has not been verified",
                     trailing = { Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary) },
                     onClick = {},
                 )
@@ -166,9 +162,9 @@ fun GroupInfoScreen(
                     },
                     title = "Add Member",
                     titleColor = colors.primary,
-                    subtitle = "Invite via username or direct prekey share",
+                    subtitle = "Invites are not available in this build",
                     onClick = {
-                        scope.launch { snackbar.showSnackbar("Mock invite link copied to clipboard.") }
+                        scope.launch { snackbar.showSnackbar("No invite was created. Group invites are not available in this build.") }
                     },
                 )
                 participants.forEach { p ->
@@ -223,7 +219,7 @@ fun GroupInfoScreen(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clickable { onLeave() }
+                        .clickable { scope.launch { snackbar.showSnackbar("You are still a member. Leaving groups is not available in this build.") } }
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

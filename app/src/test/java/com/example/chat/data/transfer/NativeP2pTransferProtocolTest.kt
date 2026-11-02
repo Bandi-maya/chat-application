@@ -15,9 +15,10 @@ class NativeP2pTransferProtocolTest {
     fun rejectsNonCanonicalUppercaseTransferIds() {
         val invite = NativeP2pTransferProtocol.createInvite()
         try {
-            val parts = invite.toUri().split("#", limit = 2)
+            // This test isolates canonical ID validation, not the Android Base64 adapter.
+            val fragment = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(invite.secret)
             val id = invite.transferId.uppercase()
-            val forged = "chaty://transfer/$id#${parts.getOrNull(1).orEmpty()}"
+            val forged = "chaty://transfer/$id#$fragment"
             var rejected = false
             try {
                 NativeP2pTransferProtocol.parseInvite(forged)
