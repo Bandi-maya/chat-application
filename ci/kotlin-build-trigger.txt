@@ -103,3 +103,4 @@ Security recovery regression: missing enabled PIN/pattern/password now requires 
 
 Candidate-overlay compatibility: restore branch-owned ChatsHomeHost, NotificationSettingsPage and GbDesignSystem so notifications callback, separate settings title, flat previews and chevron refinements are present in the verified APK: 2026-11-01
 2026-11-02T21:17Z full batch: album restore+cap, emoji/clip, hubs removal, network/data split, bubble parity, technical IDs, video-hold fixture, layout persistence proof
+2026-11-02T21:47IST timestamp-testTag compile fix + video-hold host port (attachments binding, detail screen, detail host camera entry) - combined validation build
