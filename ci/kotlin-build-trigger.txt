@@ -109,3 +109,4 @@ Candidate-overlay compatibility: restore branch-owned ChatsHomeHost, Notificatio
 2026-11-03T01:38IST accepted 8-file batch validation: orphan-brace P2P test repair, voice distinct-path cleanup, capability-scoped multi-message selection (e49d185a) - validation build
 2026-11-03T04:07IST consolidated reviewed 36-file candidate publication (0fb14f53); override guard 81 - validation build
 2026-11-03T04:09IST AlbumNavigationPolicy empty-save repair; override guard 81 - validation build
+2026-11-03T04:45IST coroutine cancellation test recovery contract: preserve original cause identity across debug stacktrace recovery; verify full unit and runtime gates - validation build
