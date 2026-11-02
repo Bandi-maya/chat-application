@@ -34,6 +34,13 @@ class ApiChatClient(
 
     private fun base() = baseUrl().trimEnd('/')
 
+    /**
+     * Resource IDs are single untrusted path segments, never arbitrary URL
+     * fragments. Current server IDs are UUIDs/opaque ASCII keys; rejecting
+     * separators and URL control characters prevents endpoint path injection.
+     */
+    private fun safePathSegment(value: String): String? = ApiPathSegments.safe(value)
+
     private fun authHeaders(json: Boolean = false): Map<String, String> {
         val headers = mutableMapOf<String, String>()
         token()?.let { headers["Authorization"] = "Bearer $it" }
@@ -76,8 +83,9 @@ class ApiChatClient(
      *  the load failed (Dart keeps prior messages on error). */
     fun listMessages(roomId: String): List<ChatMessage>? {
         if (token() == null) return null
+        val roomPath = safePathSegment(roomId) ?: return null
         return try {
-            val response = getWithFallback("chat/rooms/$roomId/messages")
+            val response = getWithFallback("chat/rooms/$roomPath/messages")
             if (response.first != 200) return null
             val data = JSONObject(response.second).getJSONArray("data")
             val messages = mutableListOf<ChatMessage>()
@@ -108,16 +116,18 @@ class ApiChatClient(
      *  the server drop a duplicate when a retry follows a send whose response was lost. */
     fun sendMessageResult(roomId: String, content: String, clientId: String?): SendResult {
         if (token() == null) return SendResult.Offline
+        val roomPath = safePathSegment(roomId)
+            ?: return SendResult.Rejected(400, "Invalid conversation identifier.")
         return try {
             val payload = JSONObject().put("content", content)
             if (!clientId.isNullOrEmpty()) payload.put("client_id", clientId)
             val body = payload.toString()
             var response = transport.execute(
-                "POST", "${base()}/chat/rooms/$roomId/messages", authHeaders(json = true), body,
+                "POST", "${base()}/chat/rooms/$roomPath/messages", authHeaders(json = true), body,
             )
             if (response.first == 404) {
                 response = transport.execute(
-                    "POST", "${base()}/api/v1/chat/rooms/$roomId/messages", authHeaders(json = true), body,
+                    "POST", "${base()}/api/v1/chat/rooms/$roomPath/messages", authHeaders(json = true), body,
                 )
             }
             val code = response.first
@@ -140,14 +150,15 @@ class ApiChatClient(
 
     fun sendMessage(roomId: String, content: String): ChatMessage? {
         val authToken = token() ?: return null
+        val roomPath = safePathSegment(roomId) ?: return null
         return try {
             val payload = JSONObject().put("content", content).toString()
             var response = transport.execute(
-                "POST", "${base()}/chat/rooms/$roomId/messages", authHeaders(json = true), payload,
+                "POST", "${base()}/chat/rooms/$roomPath/messages", authHeaders(json = true), payload,
             )
             if (response.first == 404) {
                 response = transport.execute(
-                    "POST", "${base()}/api/v1/chat/rooms/$roomId/messages", authHeaders(json = true), payload,
+                    "POST", "${base()}/api/v1/chat/rooms/$roomPath/messages", authHeaders(json = true), payload,
                 )
             }
             if (response.first != 200) return null
@@ -198,14 +209,16 @@ class ApiChatClient(
     /** editMessage: PUT /chat/rooms/<id>/messages/<msgId> {content} (+ fallback). */
     fun editMessage(roomId: String, messageId: String, newText: String) {
         if (token() == null) return
+        val roomPath = safePathSegment(roomId) ?: return
+        val messagePath = safePathSegment(messageId) ?: return
         try {
             val payload = JSONObject().put("content", newText).toString()
             val response = transport.execute(
-                "PUT", "${base()}/chat/rooms/$roomId/messages/$messageId", authHeaders(json = true), payload,
+                "PUT", "${base()}/chat/rooms/$roomPath/messages/$messagePath", authHeaders(json = true), payload,
             )
             if (response.first == 404) {
                 transport.execute(
-                    "PUT", "${base()}/api/v1/chat/rooms/$roomId/messages/$messageId", authHeaders(json = true), payload,
+                    "PUT", "${base()}/api/v1/chat/rooms/$roomPath/messages/$messagePath", authHeaders(json = true), payload,
                 )
             }
         } catch (_: Exception) {
@@ -215,13 +228,15 @@ class ApiChatClient(
     /** deleteMessage: DELETE /chat/rooms/<id>/messages/<msgId> (+ fallback). */
     fun deleteMessage(roomId: String, messageId: String) {
         if (token() == null) return
+        val roomPath = safePathSegment(roomId) ?: return
+        val messagePath = safePathSegment(messageId) ?: return
         try {
             val response = transport.execute(
-                "DELETE", "${base()}/chat/rooms/$roomId/messages/$messageId", authHeaders(), null,
+                "DELETE", "${base()}/chat/rooms/$roomPath/messages/$messagePath", authHeaders(), null,
             )
             if (response.first == 404) {
                 transport.execute(
-                    "DELETE", "${base()}/api/v1/chat/rooms/$roomId/messages/$messageId", authHeaders(), null,
+                    "DELETE", "${base()}/api/v1/chat/rooms/$roomPath/messages/$messagePath", authHeaders(), null,
                 )
             }
         } catch (_: Exception) {
@@ -231,13 +246,14 @@ class ApiChatClient(
     /** clearConversationMessages: DELETE /chat/rooms/<id>/messages (+ fallback). */
     fun clearMessages(roomId: String) {
         if (token() == null) return
+        val roomPath = safePathSegment(roomId) ?: return
         try {
             val response = transport.execute(
-                "DELETE", "${base()}/chat/rooms/$roomId/messages", authHeaders(), null,
+                "DELETE", "${base()}/chat/rooms/$roomPath/messages", authHeaders(), null,
             )
             if (response.first == 404) {
                 transport.execute(
-                    "DELETE", "${base()}/api/v1/chat/rooms/$roomId/messages", authHeaders(), null,
+                    "DELETE", "${base()}/api/v1/chat/rooms/$roomPath/messages", authHeaders(), null,
                 )
             }
         } catch (_: Exception) {
@@ -252,10 +268,11 @@ class ApiChatClient(
      *  without the WebSocket (push). Returns true when the server accepted it. */
     fun markRoomDelivered(roomId: String): Boolean {
         if (token() == null) return false
+        val roomPath = safePathSegment(roomId) ?: return false
         return try {
-            var response = transport.execute("POST", "${base()}/chat/rooms/$roomId/delivered", authHeaders(json = true), "{}")
+            var response = transport.execute("POST", "${base()}/chat/rooms/$roomPath/delivered", authHeaders(json = true), "{}")
             if (response.first == 404) {
-                response = transport.execute("POST", "${base()}/api/v1/chat/rooms/$roomId/delivered", authHeaders(json = true), "{}")
+                response = transport.execute("POST", "${base()}/api/v1/chat/rooms/$roomPath/delivered", authHeaders(json = true), "{}")
             }
             response.first in 200..299
         } catch (_: Exception) {
@@ -265,10 +282,11 @@ class ApiChatClient(
 
     fun markRoomRead(roomId: String): List<String>? {
         if (token() == null) return null
+        val roomPath = safePathSegment(roomId) ?: return null
         return try {
-            var response = transport.execute("POST", "${base()}/chat/rooms/$roomId/read", authHeaders(json = true), "{}")
+            var response = transport.execute("POST", "${base()}/chat/rooms/$roomPath/read", authHeaders(json = true), "{}")
             if (response.first == 404) {
-                response = transport.execute("POST", "${base()}/api/v1/chat/rooms/$roomId/read", authHeaders(json = true), "{}")
+                response = transport.execute("POST", "${base()}/api/v1/chat/rooms/$roomPath/read", authHeaders(json = true), "{}")
             }
             if (response.first != 200) return null
             val data = JSONObject(response.second).optJSONObject("data") ?: return emptyList()
@@ -356,10 +374,11 @@ class ApiChatClient(
      *  rule live on the owning service. */
     fun deleteUser(userId: String) {
         if (token() == null) return
+        val userPath = safePathSegment(userId) ?: return
         try {
-            val response = transport.execute("DELETE", "${base()}/app-users/$userId", authHeaders(), null)
+            val response = transport.execute("DELETE", "${base()}/app-users/$userPath", authHeaders(), null)
             if (response.first == 404) {
-                transport.execute("DELETE", "${base()}/api/v1/app-users/$userId", authHeaders(), null)
+                transport.execute("DELETE", "${base()}/api/v1/app-users/$userPath", authHeaders(), null)
             }
         } catch (_: Exception) {
         }
@@ -369,10 +388,11 @@ class ApiChatClient(
      *  swallowed. Local-state removal lives on the owning service. */
     fun deleteRoom(roomId: String) {
         if (token() == null) return
+        val roomPath = safePathSegment(roomId) ?: return
         try {
-            val response = transport.execute("DELETE", "${base()}/chat/rooms/$roomId", authHeaders(), null)
+            val response = transport.execute("DELETE", "${base()}/chat/rooms/$roomPath", authHeaders(), null)
             if (response.first == 404) {
-                transport.execute("DELETE", "${base()}/api/v1/chat/rooms/$roomId", authHeaders(), null)
+                transport.execute("DELETE", "${base()}/api/v1/chat/rooms/$roomPath", authHeaders(), null)
             }
         } catch (_: Exception) {
         }
