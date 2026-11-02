@@ -48,6 +48,9 @@ class ChatAttachmentsBindings(
     val controller: com.example.chat.ui.chats.detail.ChatAttachmentActionController,
     val onReviewImages: (List<Uri>) -> Unit,
     val onDirectSendImages: (List<Uri>) -> Unit,
+    /** Capture sessions for voice/camera video: open at the ORIGINAL record/entry start (null if signed out). */
+    val openCaptureSession: ((onCancel: () -> Unit) -> com.example.chat.ui.AttachFlow?) = { null },
+    val closeCaptureSession: (com.example.chat.ui.AttachFlow) -> Unit = {},
 )
 
 @Composable
@@ -55,6 +58,16 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val api = ServiceLocator.apiBackend
+    // Capture-session scope guard (voice/camera video): sessions open under the current account
+    // scope and are atomically cancelled on any account transition.
+    val captureRegistry = remember { val h = android.os.Handler(android.os.Looper.getMainLooper()); com.example.chat.ui.GalleryLeaseRegistry { r -> h.post { r() } } }
+    androidx.compose.runtime.DisposableEffect(api) {
+        val l: (com.example.chat.data.api.ApiAccountScope) -> Unit = { next ->
+            captureRegistry.onTransition(next, publishEpoch = { }, cancelWaiters = { })
+        }
+        api.addAuthScopeListener(l)
+        onDispose { api.removeAuthScopeListener(l) }
+    }
     var pending by remember { mutableStateOf<CompletableDeferred<List<Uri>>?>(null) }
     var mediaReview by remember { mutableStateOf<Pair<List<com.example.chat.ui.chats.detail.MediaReviewItem>, CompletableDeferred<com.example.chat.ui.chats.detail.ReviewedMedia?>>?>(null) }
     var viewOnceAsk by remember { mutableStateOf<Pair<String, CompletableDeferred<Boolean>>?>(null) }
@@ -383,5 +396,11 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             } catch (e: Exception) { toast(e.message ?: "Unable to send") }
         }
     }
-    return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller, onReviewImages, onDirectSendImages)
+    val openCaptureSession: (() -> Unit) -> com.example.chat.ui.AttachFlow? = { onCancel ->
+        val st = api.authSnapshot()
+        if (st.userId.isNullOrBlank() || st.token.isNullOrBlank()) { toast("Sign in to send attachments."); null }
+        else captureRegistry.openSession(st, { api.authSnapshot() }, onCancel)
+    }
+    val closeCaptureSession: (com.example.chat.ui.AttachFlow) -> Unit = { captureRegistry.closeSession(it) }
+    return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller, onReviewImages, onDirectSendImages, openCaptureSession, closeCaptureSession)
 }
