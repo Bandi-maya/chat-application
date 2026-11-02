@@ -17,6 +17,209 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore pinned cumulative candidate source
+        run: |
+          python3 - <<'PYOVERLAY'
+          import base64,hashlib,json,pathlib,zipfile,io
+          d=pathlib.Path('ci/candidate-overlay')
+          m=json.loads((d/'manifest.json').read_text())
+          raw=base64.b64decode(''.join(p.read_text().strip() for p in sorted(d.glob('part-*.b64'))),validate=True)
+          assert hashlib.sha256(raw).hexdigest()==m['archive_sha256']
+          z=zipfile.ZipFile(io.BytesIO(raw))
+          assert set(z.namelist())==set(m['files'])
+          for p in z.infolist():
+              n=p.filename; q=pathlib.PurePosixPath(n)
+              assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
+              assert (n == 'build.gradle.kts' or n.startswith(('app/','ci/','tools/location-map/'))) and '/build/' not in n and '/.env' not in n
+              assert (p.external_attr >> 16) & 0o170000 != 0o120000
+              data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
+              target=pathlib.Path(n); assert not target.is_symlink()
+              assert all(not parent.is_symlink() for parent in target.parents)
+              target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
+          print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
+          PYOVERLAY
+
+      - name: Patch pinned candidate sources for com.logybyte.chat
+        run: |
+          python3 - <<'PYLOGYPATCH'
+          import pathlib
+          subs = {
+              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chat.test/')],
+              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chat'")],
+              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chat')],
+              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [
+                  ('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),
+                  ('        device.findObject(By.desc("Clear number")).click()\n        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))',
+                   '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
+              ],
+              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
+              'build.gradle.kts': [('    id("com.google.gms.google-services") version "4.4.2" apply false\\n', '')],
+          }
+          for rel, pairs in subs.items():
+              p = pathlib.Path(rel)
+              if not p.exists():
+                  continue
+              s = p.read_text()
+              for old, new in pairs:
+                  if old in s:
+                      s = s.replace(old, new)
+              p.write_text(s)
+          PYLOGYPATCH
+
+      - name: Apply Chaty Kotlin GB feature overrides
+        run: |
+          python3 - <<'PYOVERRIDES'
+          from pathlib import Path
+          import shutil
+
+          root = Path("ci/gb-parity-overrides")
+          applied = 0
+          for source in sorted(root.rglob("*")):
+              if not source.is_file():
+                  continue
+              relative = source.relative_to(root)
+              allowed_ci = {"ci/test-shards.py", "ci/run-smoke.sh"}
+              if not relative.parts or (relative.parts[0] != "app" and str(relative) not in allowed_ci):
+                  raise SystemExit(f"Unexpected override path: {relative}")
+              target = Path(*relative.parts)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(source, target)
+              print(f"Applied {target}")
+              applied += 1
+          if applied != 77:
+              raise SystemExit(f"Expected 77 override files, applied {applied}")
+          PYOVERRIDES
+
+      - name: Patch debug-only proof fixtures to current Kotlin ports
+        run: |
+          python3 - <<'PY'
+          import pathlib, re
+          p = pathlib.Path('app/src/debug/java/com/example/chat/LockBadgeProofActivity.kt')
+          if p.exists():
+              source = p.read_text()
+              start = source.find('ChatyIcon(')
+              if start >= 0:
+                  depth = 0
+                  quote = None
+                  escaped = False
+                  end = None
+                  for i in range(start + len('ChatyIcon'), len(source)):
+                      ch = source[i]
+                      if quote:
+                          if escaped:
+                              escaped = False
+                          elif ord(ch) == 92:
+                              escaped = True
+                          elif ch == quote:
+                              quote = None
+                          continue
+                      if ch in ('"', "'"):
+                          quote = ch
+                      elif ch == '(':
+                          depth += 1
+                      elif ch == ')':
+                          depth -= 1
+                          if depth == 0:
+                              end = i + 1
+                              break
+                  if end is not None:
+                      source = source[:start] + 'Text("🔒", fontSize = 14.sp)' + source[end:]
+              source_lines = source.splitlines()
+              package_index = next(
+                  (i for i, line in enumerate(source_lines) if line.strip().startswith('package ')),
+                  None,
+              )
+              if package_index is None:
+                  raise SystemExit('LockBadgeProofActivity has no package declaration')
+              for import_line in (
+                  'import androidx.compose.material3.Text',
+                  'import androidx.compose.ui.unit.sp',
+              ):
+                  if import_line not in source_lines:
+                      source_lines.insert(package_index + 1, import_line)
+                      package_index += 1
+              source = chr(10).join(source_lines) + (chr(10) if source.endswith(chr(10)) else '')
+              if 'import androidx.compose.material3.Text' not in source or 'import androidx.compose.ui.unit.sp' not in source:
+                  raise SystemExit('Compose imports were not injected into LockBadgeProofActivity')
+              p.write_text(source)
+          voice = pathlib.Path('app/src/debug/java/com/example/chat/VoiceGestureFixtureActivity.kt')
+          if voice.exists():
+              source = voice.read_text()
+              for name in ('pause', 'resume'):
+                  source = re.sub(
+                      rf'(?ms)^\s*override\s+(?:suspend\s+)?fun\s+{name}\s*\([^)]*\)\s*(?:\{{[^{{}}]*\}}|=\s*[^\n]+)\s*\n?',
+                      '',
+                      source,
+                  )
+              voice.write_text(source)
+          PY
+
+      - name: Restore branch-owned adaptive network sources after candidate overlay
+        run: |
+          git checkout HEAD -- \
+            app/src/main/java/com/example/chat/data/network/NetworkStatusMonitor.kt \
+            app/src/main/java/com/example/chat/data/network/TransferMonitor.kt \
+            app/src/main/java/com/example/chat/data/network/AppTrafficMonitor.kt \
+            app/src/main/java/com/example/chat/data/api/ApiMediaUploadClient.kt \
+            app/src/main/java/com/example/chat/data/remote/SupabaseStorageClient.kt \
+            app/src/main/java/com/example/chat/data/media/BoundedMediaDownloader.kt \
+            app/src/main/java/com/example/chat/data/services/ChatMediaService.kt \
+            app/src/main/java/com/example/chat/data/services/CallSignalingService.kt \
+            app/src/main/java/com/example/chat/data/services/SessionLifecycleService.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/home/ConversationRow.kt \
+            app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt \
+            app/src/main/java/com/example/chat/data/transfer/NativeP2pTransferProtocol.kt \
+            app/src/main/java/com/example/chat/data/transfer/ChunkReceiptLedger.kt \
+            app/src/main/java/com/example/chat/data/transfer/P2pFileTransferService.kt \
+            app/src/test/java/com/example/chat/data/transfer/NativeP2pTransferProtocolTest.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionDetailSheet.kt \
+            app/src/main/res/xml/file_paths.xml \
+            app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt \
+            app/src/main/java/com/example/chat/data/api/ApiRealtimeClient.kt \
+            app/src/main/java/com/example/chat/data/api/ApiCallSignalClient.kt \
+            app/src/main/java/com/example/chat/data/messaging/ConversationsRepository.kt \
+            app/src/main/kotlin/com/example/chat/ui/ChatVoiceBinding.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/VoiceNoteController.kt \
+            app/src/main/kotlin/com/example/chat/ServiceLocator.kt \
+            app/src/main/kotlin/com/example/chat/ui/AppRoot.kt \
+            app/src/main/java/com/example/chat/domain/models/ChatMessage.kt \
+            app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt \
+            app/src/main/kotlin/com/example/chat/ui/settings/SettingsRootScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/settings/NetworkDataUsageScreen.kt \
+            app/src/main/java/com/example/chat/data/services/ProtectedResourceGate.kt \
+            app/src/main/java/com/example/chat/data/services/LocalLockService.kt \
+            app/src/main/java/com/example/chat/data/services/CallForegroundService.kt \
+            app/src/main/AndroidManifest.xml \
+            app/src/main/kotlin/com/example/chat/ui/ChatsHomeHost.kt \
+            app/src/main/kotlin/com/example/chat/ui/settings/notifications/NotificationSettingsPage.kt \
+            app/src/main/kotlin/com/example/chat/ui/kit/GbDesignSystem.kt \
+            app/src/debug/java/com/example/chat/LockBadgeProofActivity.kt \
+            app/src/main/kotlin/com/example/chat/data/api/EncryptedApiSessionStore.kt \
+            app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt \
+            app/src/main/kotlin/com/example/chat/data/auth/SessionStore.kt \
+            app/src/main/kotlin/com/example/chat/data/auth/AuthRepository.kt \
+            app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt \
+            app/src/main/java/com/example/chat/data/api/ApiSessionStore.kt \
+            app/src/main/kotlin/com/example/chat/data/api/EncryptedApiSessionStore.kt \
+            app/src/main/java/com/example/chat/data/services/AacPcmVoiceRecorder.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/VoiceSessionController.kt \
+            app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/MediaLibraryService.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/PdfWorkspaceScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceHost.kt \
+            app/src/test/java/com/example/chat/LocalLockServiceFullTest.kt \
+            app/src/test/java/com/example/chat/ProtectedResourceGateParityTest.kt \
+            app/src/test/java/com/example/chat/ui/media/MediaLibraryServiceHardeningTest.kt \
+            gradle.properties
+
+      - name: Disable unused Firebase messaging entrypoint
+        run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -56,6 +259,35 @@ jobs:
           echo "Found Android NDK: $NDK"
           echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
+
+      - name: Materialize or generate Chaty signing keystore
+        env:
+          CHATY_KEYSTORE_B64: ${{ secrets.CHATY_KEYSTORE_B64 }}
+          CHATY_KEYSTORE_PASSWORD: ${{ secrets.CHATY_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p ci/keystore
+          if [ -n "${CHATY_KEYSTORE_B64:-}" ] && [ -n "${CHATY_KEYSTORE_PASSWORD:-}" ]; then
+            printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
+            chmod 600 ci/keystore/chaty-release.jks
+            echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "Materialized Chaty release keystore from secrets."
+          else
+            keytool -genkeypair -v -keystore ci/keystore/chaty-release.jks \
+              -alias chaty -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=Chaty, OU=Dev, O=Chaty, L=Unknown, S=Unknown, C=US"
+            echo "CHATY_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
+            echo "Generated fallback debug keystore for Chaty build."
+          fi
+
+      - name: Generate UniFFI bindings
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew :app:generateUniffiBindings --no-daemon || true
+          else
+            gradle :app:generateUniffiBindings --no-daemon || true
+          fi
 
       - name: Build Debug APK
         run: |

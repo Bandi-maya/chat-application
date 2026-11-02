@@ -254,17 +254,6 @@ class ApiRealtimeClient(
         return accepted && queued
     }
 
-    /** Delivery ack: tells the server a new message for [roomId] reached this device
-     *  (the sender's second grey tick). No-op when disconnected. */
-    fun sendDelivered(roomId: String): Boolean {
-        val s = socket ?: return false
-        return try {
-            s.send(JSONObject().put("type", "delivered").put("room_id", roomId).toString())
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     /** Dart sendCallSignal (api_backend_service.dart:807): sends
      *  {type: call_signal, target_user_id, data}; no-op when disconnected. */
     fun sendCallSignal(targetUserId: String, data: Map<String, Any?>): Boolean {
