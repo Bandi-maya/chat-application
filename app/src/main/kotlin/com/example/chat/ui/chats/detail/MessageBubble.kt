@@ -70,6 +70,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -223,6 +224,7 @@ fun ChatMessageBubble(
             contentAlignment = Alignment.Center) {
             Box(
                 Modifier
+                    .testTag("message_system_bubble")
                     .background(Color(infoBg), RoundedCornerShape(12.dp))
                     .border(1.dp, Color(theme.cardColor), RoundedCornerShape(12.dp))
                     .padding(vertical = 5.dp, horizontal = 12.dp),
@@ -307,6 +309,7 @@ fun ChatMessageBubble(
             } else {
                 Text(
                     message.text,
+                    modifier = Modifier.testTag("message_emoji_only_text"),
                     fontSize = emojiInfo.fontSize(messageTextSize * theme.fontScale).sp,
                     lineHeight = (emojiInfo.fontSize(messageTextSize * theme.fontScale) * 1.25).sp,
                 )
@@ -322,6 +325,7 @@ fun ChatMessageBubble(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
+                    modifier = Modifier.testTag("message_timestamp"),
                     bubbleMetaTimeFormatter.format(message.createdAt.atZone(ZoneId.systemDefault())),
                     color = Color(timestampColor),
                     fontSize = (10 * theme.fontScale).sp,
@@ -346,7 +350,7 @@ fun ChatMessageBubble(
         surfaceColor = Color(theme.surfaceColor),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(vertical = (3 * theme.density).dp, horizontal = 12.dp),
+            Modifier.testTag("message_bubble").fillMaxWidth().padding(vertical = (3 * theme.density).dp, horizontal = 12.dp),
             horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
             verticalAlignment = Alignment.Bottom,
         ) {
@@ -565,7 +569,7 @@ fun ChatMessageBubble(
                         ViewOnceExpiredCard(textColor = Color(textColor))
                     } else {
                         when (message.attachment?.type) {
-                            "image" -> if (mediaContent != null) mediaContent() else {
+                            "image" -> if (mediaContent != null) Box(Modifier.testTag("message_bubble_media")) { mediaContent() } else {
                                 val attachment = message.attachment!!
                                 val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
                                 if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
@@ -639,7 +643,7 @@ fun ChatMessageBubble(
                         message.type != MessageType.contact &&
                         message.text.isNotEmpty()
                     ) {
-                        Column(Modifier.padding(horizontal = if (isVisualMedia) 8.dp else 0.dp, vertical = if (isVisualMedia) 4.dp else 0.dp)) {
+                        Column(Modifier.testTag("message_bubble_text").padding(horizontal = if (isVisualMedia) 8.dp else 0.dp, vertical = if (isVisualMedia) 4.dp else 0.dp)) {
                             // Dart: convPrefs.makeTextSelectable (default true) wraps
                             // the body text in a selectable region.
                             // Dart message_bubble.dart:1103-1120: the body text
@@ -954,7 +958,7 @@ private fun MessageMetaRow(
         if (isMe) {
             Box(Modifier.width(4.dp))
             Box(
-                Modifier.pointerInput(message.id, message.deliveryState) {
+                Modifier.testTag("message_delivery_status").pointerInput(message.id, message.deliveryState) {
                     if (message.deliveryState == DeliveryState.failed &&
                         onRetry != null
                     ) {
