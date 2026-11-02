@@ -2,6 +2,7 @@ package com.example.chat.ui.chats.detail
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 /** Exact port of the voice-note drag policy in chat_detail_screen.dart
  *  (_handleVoiceDrag / _handleVoiceRelease):
@@ -32,6 +33,7 @@ data class VoiceUiState(
     val locked: Boolean = false,
     val busy: Boolean = false,
     val seconds: Int = 0,
+    val paused: Boolean = false,
 )
 
 /** Exact port of the screen-level voice orchestration in
@@ -57,11 +59,17 @@ class VoiceSessionController(
     private val describeError: (Throwable) -> String = { it.message ?: it.toString() },
     private val onState: (VoiceUiState) -> Unit = {},
 ) {
+    private var ticker: Job? = null
+    private var starting = false
+    private var releasedDuringStart = false
+    private var canceledDuringStart = false
+    private var lockedDuringStart = false
     var state = VoiceUiState()
         private set
 
     private fun update(transform: (VoiceUiState) -> VoiceUiState) {
         state = transform(state)
+        if (!state.recording) { ticker?.cancel(); ticker = null }
         onState(state)
     }
 
@@ -69,19 +77,30 @@ class VoiceSessionController(
     fun beginVoice(locked: Boolean) {
         if (state.busy || state.recording) return
         // Dart clears a published typing indicator before starting.
+        starting = true
+        releasedDuringStart = false
+        canceledDuringStart = false
+        lockedDuringStart = locked
         clearTyping()
         update { it.copy(busy = true) }
         scope.launch {
             try {
                 voice.start()
-                setRecordingIndicator(true)
-                update { it.copy(recording = true, locked = locked, seconds = 0) }
-                startSecondsTicker()
+                if (canceledDuringStart) {
+                    voice.cancel()
+                    update { VoiceUiState() }
+                } else {
+                    setRecordingIndicator(true)
+                    update { it.copy(recording = true, locked = lockedDuringStart, seconds = 0) }
+                    startSecondsTicker()
+                }
             } catch (error: Throwable) {
                 runCatching { setRecordingIndicator(false) }
                 showError(describeError(error))
             } finally {
+                starting = false
                 update { it.copy(busy = false) }
+                if (releasedDuringStart && !canceledDuringStart && !state.locked) finishVoice()
             }
         }
     }
@@ -100,6 +119,22 @@ class VoiceSessionController(
                 runCatching { setRecordingIndicator(false) }
                 update { VoiceUiState() }
             }
+        }
+    }
+
+    fun togglePause() {
+        if (!state.recording || !state.locked || state.busy) return
+        update { it.copy(busy = true) }
+        scope.launch {
+            try {
+                voice.togglePause()
+                update { it.copy(paused = voice.isPaused, seconds = (voice.elapsedMs / 1000L).toInt()) }
+            } catch (error: Throwable) {
+                showError("Could not change recording pause. ${describeError(error)}")
+                // A failed native transition cannot leave a seemingly usable recording.
+                runCatching { voice.cancel() }
+                update { VoiceUiState() }
+            } finally { update { it.copy(busy = false) } }
         }
     }
 
@@ -122,6 +157,11 @@ class VoiceSessionController(
 
     /** Dart _handleVoiceDrag. */
     fun onDrag(dx: Float, dy: Float) {
+        if (starting) {
+            if (dx < VoiceGesturePolicy.CANCEL_DX) canceledDuringStart = true
+            else if (dy < VoiceGesturePolicy.LOCK_DY) lockedDuringStart = true
+            return
+        }
         when (VoiceGesturePolicy.onDrag(dx, dy, state.recording, state.locked)) {
             VoiceGesturePolicy.DragOutcome.cancel -> cancelVoice()
             VoiceGesturePolicy.DragOutcome.lock -> update { it.copy(locked = true) }
@@ -131,14 +171,16 @@ class VoiceSessionController(
 
     /** Dart _handleVoiceRelease. */
     fun onRelease() {
+        if (starting) { releasedDuringStart = true; return }
         if (VoiceGesturePolicy.onReleaseSends(state.recording, state.locked)) finishVoice()
     }
 
     private fun startSecondsTicker() {
-        scope.launch {
+        ticker?.cancel()
+        ticker = scope.launch {
             while (state.recording) {
-                kotlinx.coroutines.delay(1000L)
-                if (state.recording) update { it.copy(seconds = it.seconds + 1) }
+                kotlinx.coroutines.delay(100L)
+                if (state.recording) update { it.copy(seconds = (voice.elapsedMs / 1000L).toInt()) }
             }
         }
     }
