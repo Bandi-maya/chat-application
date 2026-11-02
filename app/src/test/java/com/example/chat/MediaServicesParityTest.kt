@@ -181,7 +181,7 @@ class MediaServicesParityTest {
 
     @Test fun `empty library gets dart demo fallback sorted recent first`() {
         val service = MediaLibraryService(libraryDirectories = { emptyList() })
-        service.refreshLibrary()
+        kotlinx.coroutines.runBlocking { service.refreshLibrary() }
         assertEquals(4, service.files.size)
         assertEquals("Project_Architecture_Spec.pdf", service.files[0].name)
         assertEquals("Design_Review_Audio.m4a", service.files[3].name)
@@ -189,7 +189,7 @@ class MediaServicesParityTest {
 
     @Test fun `filter and search compose like dart`() {
         val service = MediaLibraryService(libraryDirectories = { emptyList() })
-        service.refreshLibrary()
+        kotlinx.coroutines.runBlocking { service.refreshLibrary() }
         service.setFilter(MediaCategory.audio)
         assertEquals(2, service.filteredFiles.size)
         service.setSearchQuery("hangova")
@@ -203,7 +203,7 @@ class MediaServicesParityTest {
 
     @Test fun `storage breakdown sums by category`() {
         val service = MediaLibraryService(libraryDirectories = { emptyList() })
-        service.refreshLibrary()
+        kotlinx.coroutines.runBlocking { service.refreshLibrary() }
         val breakdown = service.getStorageBreakdown()
         assertEquals(2569011L + 1145728L, breakdown[MediaCategory.document])
         assertEquals(5033164L + 1843200L, breakdown[MediaCategory.audio])
@@ -216,7 +216,7 @@ class MediaServicesParityTest {
             File(dir, "photo.png").writeBytes(bytes(0x89, 0x50, 0x4E, 0x47))
             File(dir, ".hidden").writeBytes(bytes(0x01))
             val service = MediaLibraryService(libraryDirectories = { listOf(dir) })
-            service.refreshLibrary()
+            kotlinx.coroutines.runBlocking { service.refreshLibrary() }
             assertEquals(1, service.files.size)
             assertEquals("photo.png", service.files[0].name)
             assertEquals(MediaCategory.image, service.files[0].category)
