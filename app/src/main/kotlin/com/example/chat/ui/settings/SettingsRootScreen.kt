@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Wifi
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -104,7 +105,7 @@ enum class SettingsDestination {
     Conversation, Effects, Universal, HomeShortcuts, Notifications, Automation,
     Calls, StorageMedia, Permissions, BackupRestore, WasteCleaning, About,
     PrivacyPolicy, ShareChaty,
-    EditProfile, SearchSettings, QrCode, NetworkUsage,
+    EditProfile, SearchSettings, QrCode, NetworkUsage, DataUsage,
 }
 
 /** Dart ProfileMediaSource. */
@@ -150,7 +151,8 @@ private val allRootGroups: List<RootGroup> = listOf(
         RootRow(SettingsDestination.Calls, Icons.Outlined.Call, { LocalAppColors.current.warning }, "Call Settings", "Call privacy, incoming call controls & call appearance"),
     )),
     RootGroup("Storage and system", listOf(
-        RootRow(SettingsDestination.NetworkUsage, Icons.Rounded.Storage, { LocalAppColors.current.info }, "Network & Data Usage", "Live upload/download progress, remaining data, speed and usage totals"),
+        RootRow(SettingsDestination.NetworkUsage, Icons.Rounded.Wifi, { LocalAppColors.current.info }, "Network", "Connection status, transport and link speed estimates"),
+        RootRow(SettingsDestination.DataUsage, Icons.Rounded.Storage, { LocalAppColors.current.info }, "Data Usage", "Upload/download totals, per-type usage and transfer history"),
         RootRow(SettingsDestination.StorageMedia, Icons.Rounded.Storage, { LocalAppColors.current.accent }, "Storage & Media", "Auto-download quality, media limits & cache retention"),
         RootRow(SettingsDestination.Permissions, Icons.Outlined.AdminPanelSettings, { LocalAppColors.current.primary }, "System Permissions & Hardware", "Camera, microphone, storage, battery & OS access"),
         RootRow(SettingsDestination.BackupRestore, Icons.Outlined.Backup, { LocalAppColors.current.info }, "Backup and restore", "Export and restore Chaty settings safely"),
