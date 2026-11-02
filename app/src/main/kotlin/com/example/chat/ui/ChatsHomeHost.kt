@@ -75,7 +75,8 @@ fun ChatsHomeHost(
         {
             com.example.chat.ui.navigation.HomeHeaderTabsBar(
                 headerTabsColors, headerTabs.ids, headerTabs.selectedIndex, headerTabs.heightDp,
-            ) { index -> headerTabs.onSelect(index) }
+                onSelect = { index -> headerTabs.onSelect(index) },
+            )
         }
     } else null
     ChatsHomeScreen(
