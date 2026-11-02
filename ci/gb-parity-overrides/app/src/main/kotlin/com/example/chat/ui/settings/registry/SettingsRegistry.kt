@@ -463,54 +463,6 @@ object SettingsRegistry {
             ),
             ),
         ),
-        SettingsCluster(
-            id = "cluster_chaty_customization_hub",
-            title = "Chaty Customization Hub",
-            description = "Original Chaty presentation of GB-style customization categories",
-            category = SettingsCategory.appearance,
-            settings = listOf(
-                SettingDefinition(
-                    id = "appearance_chaty_customization_hub",
-                    title = "Chaty Customization Hub",
-                    description = "Open the integrated settings hub for themes, privacy controls, home layout, conversation appearance, notifications, media and navigation effects",
-                    category = SettingsCategory.appearance,
-                    subcategory = "Customization",
-                    controlType = SettingControlType.navigationLink,
-                    iconName = "tune_rounded",
-                    searchKeywords = listOf(
-                        "customization hub", "advanced appearance", "gb-style settings",
-                        "home screen", "conversation screen", "universal", "media settings",
-                        "navigation effects", "privacy and security", "theme editor",
-                    ),
-                    canonicalRoute = "/settings/chaty_customization_hub",
-                    defaultValue = null,
-                ),
-            ),
-        ),
-        SettingsCluster(
-            id = "cluster_advanced_feature_center",
-            title = "Advanced Feature Center",
-            description = "Searchable Chaty controls for home, privacy, status, media and visual behavior",
-            category = SettingsCategory.appearance,
-            settings = listOf(
-                SettingDefinition(
-                    id = "appearance_advanced_feature_center",
-                    title = "Advanced Feature Center",
-                    description = "Browse the expanded compatibility controls for home header, privacy, status, notifications, bubbles, colors, calls and media limits",
-                    category = SettingsCategory.appearance,
-                    subcategory = "Advanced Controls",
-                    controlType = SettingControlType.navigationLink,
-                    iconName = "tune_rounded",
-                    searchKeywords = listOf(
-                        "advanced features", "feature center", "gb style", "home header",
-                        "privacy", "anti delete", "view once", "status", "chat bubbles",
-                        "colors", "media limits", "notifications", "calls", "presence",
-                    ),
-                    canonicalRoute = "/settings/gb_features",
-                    defaultValue = null,
-                ),
-            ),
-        ),
     )
 
     val allSettings: List<SettingDefinition> get() = clusters.flatMap { it.settings }
