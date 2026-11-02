@@ -111,8 +111,8 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 77:
-              raise SystemExit(f"Expected 77 override files, applied {applied}")
+          if applied != 75:
+              raise SystemExit(f"Expected 75 override files, applied {applied}")
           PYOVERRIDES
       - name: Patch debug-only proof fixtures to current Kotlin ports
         run: |
@@ -497,8 +497,8 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 77:
-              raise SystemExit(f"Expected 77 override files, applied {applied}")
+          if applied != 75:
+              raise SystemExit(f"Expected 75 override files, applied {applied}")
           PYOVERRIDES
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
