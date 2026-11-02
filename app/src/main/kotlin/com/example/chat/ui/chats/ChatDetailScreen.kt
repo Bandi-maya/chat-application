@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -222,6 +223,7 @@ fun ChatDetailScreen(
     onTogglePin: (messageId: String) -> Unit = {},
     onToggleReaction: (messageId: String, emoji: String) -> Unit = { _, _ -> },
     onForward: (ChatMessage) -> Unit = {},
+    onForwardSelection: ((List<ChatMessage>) -> Unit)? = null,
     onClearConversation: () -> Unit = {},
     onRetryMessage: (messageId: String) -> Unit = {},
     onOpenInfo: () -> Unit = {},
@@ -286,7 +288,7 @@ fun ChatDetailScreen(
     var sending by remember { mutableStateOf(false) }
     var replyTarget by remember { mutableStateOf<ChatMessage?>(null) }
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
-    var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var selectedIds by remember(conversation.id) { mutableStateOf<Set<String>>(emptySet()) }
     var contextMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var taskMenuTarget by remember { mutableStateOf<Pair<ChatTask, Rect>?>(null) }
     var contextMenuAnchor by remember { mutableStateOf<Rect?>(null) }
@@ -313,7 +315,10 @@ fun ChatDetailScreen(
     val searchFocusRequester = remember { FocusRequester() }
 
     val listState = rememberLazyListState()
-    val isSelectionMode = selectedIds.isNotEmpty()
+    val selectedMessages = messages.filter { it.id in selectedIds }
+    val isSelectionMode = selectedMessages.isNotEmpty()
+    val selectionActions = com.example.chat.ui.chats.detail.SelectionActionPolicy.available(selectedMessages)
+    androidx.activity.compose.BackHandler(isSelectionMode) { selectedIds = emptySet() }
 
     // Dart _isNearBottom: the list counts as pinned while the last item is
     // visible (with one item of slack for fractional last-row visibility).
@@ -649,40 +654,7 @@ fun ChatDetailScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
             if (isSelectionMode) {
-                SelectionHeader(
-                    theme = theme,
-                    count = selectedIds.size,
-                    onCancel = { selectedIds = emptySet() },
-                    onCopy = {
-                        val msgs = messages
-                            .filter { selectedIds.contains(it.id) }
-                            .joinToString("\n") { m ->
-                                if (hideDateAndName) {
-                                    m.text
-                                } else {
-                                    val timeStr = selectionCopyFormatter.format(
-                                        m.createdAt.atZone(ZoneId.systemDefault()),
-                                    )
-                                    "[$timeStr, ${resolveSenderName(m.senderId)}]: ${m.text}"
-                                }
-                            }
-                        clipboard.setText(AnnotatedString(msgs))
-                        selectedIds = emptySet()
-                        scope.launch { snackbarHostState.showSnackbar("Messages copied") }
-                    },
-                    onForward = {
-                        messages.firstOrNull { selectedIds.contains(it.id) }?.let(onForward)
-                        selectedIds = emptySet()
-                    },
-                    onStar = {
-                        selectedIds.forEach(onToggleStar)
-                        selectedIds = emptySet()
-                    },
-                    onDelete = {
-                        selectedIds.forEach { onDeleteMessage(it, false) }
-                        selectedIds = emptySet()
-                    },
-                )
+                SelectionHeader(theme, selectedMessages.size) { selectedIds = emptySet() }
             } else if (searchOpen) {
                 SearchHeader(
                     theme = theme,
@@ -764,7 +736,7 @@ fun ChatDetailScreen(
                     items(timelineRows, key = { it.anchor.id }) { row ->
                         val message = row.anchor
                         val isMine = message.senderId == currentUserId
-                        val bubble = ChatMessageBubble(
+                        val bubble: @Composable () -> Unit = { ChatMessageBubble(
                             message = message,
                             isMe = isMine,
                             theme = theme,
@@ -808,6 +780,10 @@ fun ChatDetailScreen(
                             remoteImage = remoteImage,
                             onLongPress = { openMessageMenu(message, null) },
                             onLongPressWithRect = { rect -> openMessageMenu(message, rect) },
+                            onBubbleTap = { rect ->
+                                if (isSelectionMode) selectedIds = if (message.id in selectedIds) selectedIds - message.id else selectedIds + message.id
+                                else openMessageMenu(message, rect)
+                            },
                             mediaContent = if (row.messages.size > 1) ({
                                 com.example.chat.ui.chats.detail.CompactMediaAlbum(row.messages, attachmentBinding, remoteImage, voiceUrlResolver,
                                     onOpen = { item, rect -> if (rect != null && onMediaTapWithBounds != null) onMediaTapWithBounds(item, rect) else onMediaTap(item) },
@@ -853,25 +829,20 @@ fun ChatDetailScreen(
                             onTaskMenu = { rect ->
                                 resolveTask(message)?.let { taskMenuTarget = it to rect }
                             },
-                        )
+                        ) }
                         if (isSelectionMode) {
-                            Box(
-                                Modifier.pointerInput(message.id) {
-                                    detectTapGestures(
-                                        onTap = {
-                                            selectedIds = if (selectedIds.contains(message.id)) {
-                                                selectedIds - message.id
-                                            } else {
-                                                selectedIds + message.id
-                                            }
-                                        },
-                                    )
-                                },
-                            ) {
-                                bubble
+                            Box(Modifier.fillMaxWidth().background(
+                                if (message.id in selectedIds) Color(0x447F7F7F) else Color.Transparent,
+                            )) {
+                                bubble()
+                                Box(Modifier.matchParentSize().pointerInput(message.id, selectedIds) {
+                                    detectTapGestures(onTap = {
+                                        selectedIds = if (message.id in selectedIds) selectedIds - message.id else selectedIds + message.id
+                                    })
+                                })
                             }
                         } else {
-                            bubble
+                            bubble()
                         }
                     }
                 }
@@ -981,6 +952,7 @@ fun ChatDetailScreen(
             // conv.uiEntryBackgroundColor ?: surfaceColor, top border cardColor.
             val composerBarBg = convPrefs.uiEntryBackgroundColor?.let(::Color)
                 ?: Color(theme.surfaceColor)
+            Box(Modifier.fillMaxWidth()) {
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -1020,6 +992,46 @@ fun ChatDetailScreen(
                     onVideoHoldCancel = onVideoHoldCancel,
                     onSend = ::sendCurrent,
                 )
+            }
+                if (isSelectionMode) {
+                    Box(Modifier.align(Alignment.BottomEnd).padding(start = 48.dp, end = 8.dp, bottom = 4.dp)) {
+                SelectionActions(
+                    theme = theme,
+                    actions = if (onForwardSelection != null || selectedMessages.size == 1) selectionActions
+                        else selectionActions - com.example.chat.ui.chats.detail.SelectionAction.forward,
+                    onCopy = {
+                        val msgs = messages
+                            .filter { selectedIds.contains(it.id) }
+                            .joinToString("\n") { m ->
+                                if (hideDateAndName) {
+                                    m.text
+                                } else {
+                                    val timeStr = selectionCopyFormatter.format(
+                                        m.createdAt.atZone(ZoneId.systemDefault()),
+                                    )
+                                    "[$timeStr, ${resolveSenderName(m.senderId)}]: ${m.text}"
+                                }
+                            }
+                        clipboard.setText(AnnotatedString(msgs))
+                        selectedIds = emptySet()
+                        scope.launch { snackbarHostState.showSnackbar("Messages copied") }
+                    },
+                    onForward = {
+                        onForwardSelection?.invoke(selectedMessages)
+                            ?: selectedMessages.singleOrNull()?.let(onForward)
+                        selectedIds = emptySet()
+                    },
+                    onStar = {
+                        selectedIds.forEach(onToggleStar)
+                        selectedIds = emptySet()
+                    },
+                    onDelete = {
+                        selectedIds.forEach { onDeleteMessage(it, false) }
+                        selectedIds = emptySet()
+                    },
+                )
+                    }
+                }
             }
 
             // GB-style emoji panel: docked under the message box at half height;
@@ -1540,48 +1552,48 @@ private fun ConversationHeader(
 }
 
 @Composable
-private fun SelectionHeader(
+private fun SelectionHeader(theme: ThemeConfig, count: Int, onCancel: () -> Unit) {
+    Row(Modifier.fillMaxWidth().background(Color(theme.surfaceColor)), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onCancel) {
+            Icon(Icons.Rounded.Close, "Cancel selection", tint = Color(theme.primaryTextColor))
+        }
+        Text("$count selected", color = Color(theme.primaryTextColor), fontWeight = FontWeight.W700, fontSize = 16.sp)
+    }
+}
+
+@Composable
+private fun SelectionActions(
     theme: ThemeConfig,
-    count: Int,
-    onCancel: () -> Unit,
+    actions: Set<com.example.chat.ui.chats.detail.SelectionAction>,
     onCopy: () -> Unit,
     onForward: () -> Unit,
     onStar: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(theme.surfaceColor))
-            .padding(horizontal = 4.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onCancel) {
-            Icon(Icons.Rounded.Close, contentDescription = "Cancel selection",
-                tint = Color(theme.primaryTextColor))
+    Row(Modifier.background(Color(theme.surfaceColor), RoundedCornerShape(14.dp)).navigationBarsPadding().padding(vertical = 4.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically) {
+        if (com.example.chat.ui.chats.detail.SelectionAction.forward in actions) SelectionActionButton(theme, "Forward", onForward) {
+            Icon(Icons.AutoMirrored.Rounded.Forward, null, tint = Color(theme.primaryTextColor))
         }
-        Text(
-            "$count selected",
-            color = Color(theme.primaryTextColor),
-            fontWeight = FontWeight.W700,
-            fontSize = 16.sp,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = onCopy) {
-            Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy",
-                tint = Color(theme.primaryTextColor))
+        if (com.example.chat.ui.chats.detail.SelectionAction.copy in actions) SelectionActionButton(theme, "Copy", onCopy) {
+            Icon(Icons.Rounded.ContentCopy, null, tint = Color(theme.primaryTextColor))
         }
-        IconButton(onClick = onForward) {
-            Icon(Icons.AutoMirrored.Rounded.Forward, contentDescription = "Forward",
-                tint = Color(theme.primaryTextColor))
+        if (com.example.chat.ui.chats.detail.SelectionAction.delete in actions) SelectionActionButton(theme, "Delete", onDelete) {
+            Icon(Icons.Rounded.DeleteOutline, null, tint = Color(theme.primaryTextColor))
         }
-        IconButton(onClick = onStar) {
-            Icon(Icons.Rounded.StarBorder, contentDescription = "Star",
-                tint = Color(theme.primaryTextColor))
+        if (com.example.chat.ui.chats.detail.SelectionAction.star in actions) SelectionActionButton(theme, "Star", onStar) {
+            Icon(Icons.Rounded.StarBorder, null, tint = Color(theme.primaryTextColor))
         }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete",
-                tint = Color(theme.dangerColor))
+    }
+}
+
+@Composable
+private fun SelectionActionButton(theme: ThemeConfig, label: String, onClick: () -> Unit, icon: @Composable () -> Unit) {
+    TextButton(onClick = onClick) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            icon()
+            Text(label, color = Color(theme.primaryTextColor), fontSize = 11.sp)
         }
     }
 }
