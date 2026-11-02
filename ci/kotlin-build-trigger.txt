@@ -104,3 +104,4 @@ Security recovery regression: missing enabled PIN/pattern/password now requires 
 Candidate-overlay compatibility: restore branch-owned ChatsHomeHost, NotificationSettingsPage and GbDesignSystem so notifications callback, separate settings title, flat previews and chevron refinements are present in the verified APK: 2026-11-01
 
 Fix four compile blockers (header-tabs named onSelect, lock-badge TARGET_TITLE qualification, component-preview context, security showToast) and build latest kotlin APK: 2026-11-02
+Interim batch validation: hub removal, Network/Data Usage split, emoji composer dock, attachment gallery default, bubble proof-test parity params; compile and test signal only: 2026-11-02
