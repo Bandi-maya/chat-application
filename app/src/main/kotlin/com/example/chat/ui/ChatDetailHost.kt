@@ -306,7 +306,8 @@ fun ChatDetailHost(
     }
     var gateOpen by remember { mutableStateOf(false) }
     var blockConfirm by remember { mutableStateOf(false) }
-    var forwardMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var forwardMessages by remember(conversation.id) { mutableStateOf<List<ChatMessage>>(emptyList()) }
+    var forwardScope by remember(conversation.id) { mutableStateOf<com.example.chat.data.api.ApiAccountScope?>(null) }
     var taskEditor by remember { mutableStateOf<Triple<Boolean, ChatTask?, String?>?>(null) }
     var taskDetail by remember { mutableStateOf<ChatTask?>(null) }
     // 0 none, 1 info (ContactInfo/GroupInfo), 2 contact privacy; viewer = MediaViewerScreen target.
@@ -500,7 +501,8 @@ fun ChatDetailHost(
             repo.optimisticToggleReaction(conversation.id, id, emoji)
             scope.launch { try { repo.toggleReactionAsync(conversation.id, id, emoji) } catch (_: Exception) {} }
         },
-        onForward = { forwardMessage = it },
+        onForward = { forwardScope = api.authSnapshot(); forwardMessages = listOf(it) },
+        onForwardSelection = { forwardScope = api.authSnapshot(); forwardMessages = it.toList() },
         onClearConversation = {
             scope.launch {
                 try {
@@ -1007,7 +1009,7 @@ fun ChatDetailHost(
             },
         )
     }
-    forwardMessage?.let { fm ->
+    forwardMessages.takeIf { it.isNotEmpty() }?.let { batch ->
         // Dart _openForwardSheet (chat_detail_screen.dart:2337-2519): sectioned targets
         // (ForwardTargets), 5/250 limit, and the full-envelope send - text, type and
         // attachment by reference plus {'forwarded': labelAllowed} metadata
@@ -1024,13 +1026,13 @@ fun ChatDetailHost(
             hideOtherContacts = forwardPrefs.home.hideOtherContacts,
         )
         if (forwardItems.isEmpty()) {
-            LaunchedEffect(fm) { toast("No other chats to forward to."); forwardMessage = null }
+            LaunchedEffect(batch) { toast("No other chats to forward to."); forwardMessages = emptyList() }
         } else {
             // Dart showModalBottomSheet (chat_detail_screen.dart:2402-2499): isScrollControlled,
             // surfaceColor sheet, top rounded 18, max height 0.7x screen, shortcut icon + limit
             // title, sectioned avatar rows.
             ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
-                onDismissRequest = { forwardMessage = null },
+                onDismissRequest = { forwardMessages = emptyList() },
                 containerColor = Color(theme.surfaceColor),
                 shape = com.example.chat.ui.kit.ChatyModalShape,
             ) {
@@ -1073,22 +1075,32 @@ fun ChatDetailHost(
                                 TextButton(
                                     modifier = Modifier.fillMaxWidth(),
                                     onClick = {
-                                        forwardMessage = null
+                                        val expectedForwardScope = forwardScope
+                                        forwardMessages = emptyList()
                                         scope.launch {
                                             val labelAllowed = ForwardSend.labelAllowed(
                                                 disableForwardedLabel = forwardPrefs.privacy.disableForwardedLabel,
                                                 yoDisableFwd = forwardPrefs.gbBool("yoDisableFwd"),
                                             )
-                                            val payload = ForwardSend.payload(fm, labelAllowed)
                                             try {
-                                                api.sendMessage(
-                                                    item.conversation.id,
-                                                    payload.text,
-                                                    payload.type,
-                                                    payload.attachment,
-                                                    payload.extraMetadata,
-                                                )
-                                                toast("Forwarded to ${item.conversation.title}.")
+                                                val captured = checkNotNull(expectedForwardScope) { "Forwarding account is missing." }
+                                                check(api.withAuthScope(captured) {}) { "Account changed; messages not forwarded." }
+                                                var confirmedCount = 0
+                                                for (fm in batch) {
+                                                    val payload = ForwardSend.payload(fm, labelAllowed)
+                                                    val forwarded = api.sendMessage(
+                                                        item.conversation.id,
+                                                        payload.text,
+                                                        payload.type,
+                                                        payload.attachment,
+                                                        payload.extraMetadata,
+                                                        expectedScope = captured,
+                                                    )
+                                                    if (forwarded != null && forwarded.deliveryState != com.example.chat.domain.models.DeliveryState.queued &&
+                                                        forwarded.deliveryState != com.example.chat.domain.models.DeliveryState.sending) confirmedCount++
+                                                }
+                                                if (confirmedCount == batch.size) toast("Forwarded ${batch.size} message(s) to ${item.conversation.title}.")
+                                                else toast("${batch.size - confirmedCount} message(s) queued for ${item.conversation.title}.")
                                             } catch (e: Exception) {
                                                 toast("Could not forward: ${e.message}")
                                             }

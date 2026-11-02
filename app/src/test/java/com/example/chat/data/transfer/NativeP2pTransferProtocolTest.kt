@@ -50,7 +50,6 @@ class NativeP2pTransferProtocolTest {
         }
     }
 
-    }
 
     @Test
     fun encryptsAndVerifiesChunkedFileEndToEnd() {

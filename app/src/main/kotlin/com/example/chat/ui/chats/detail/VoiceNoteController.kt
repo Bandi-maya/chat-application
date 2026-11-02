@@ -180,9 +180,11 @@ class VoiceNoteController(
             isRecording = false
             clock.reset()
             path = null
-            val cleanupPath = recordedPath ?: stagedPath
-            if (cleanupPath != null) staging.deleteQuietly(cleanupPath)
-            leaveBusy(operation)
+            try {
+                for (cleanupPath in listOfNotNull(recordedPath, stagedPath).distinct()) {
+                    staging.deleteQuietly(cleanupPath)
+                }
+            } finally { leaveBusy(operation) }
         }
     }
 
@@ -190,15 +192,19 @@ class VoiceNoteController(
         if (isBusy) return
         if (!isRecording && path == null) return
         val operation = enterBusy()
-        var target = path
+        val stagedPath = path
+        var target = stagedPath
         try {
             if (isRecording) target = recorder.stop() ?: target
         } finally {
             isRecording = false
             clock.reset()
             path = null
-            if (target != null) staging.deleteQuietly(target)
-            leaveBusy(operation)
+            try {
+                for (cleanupPath in listOfNotNull(target, stagedPath).distinct()) {
+                    staging.deleteQuietly(cleanupPath)
+                }
+            } finally { leaveBusy(operation) }
         }
     }
 
