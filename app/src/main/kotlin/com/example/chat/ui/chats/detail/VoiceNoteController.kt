@@ -24,6 +24,9 @@ interface VoiceRecorderPort {
     suspend fun stop(): String?
     /** record getAmplitude().current (dBFS, roughly -60..0). */
     suspend fun currentAmplitudeDbfs(): Double
+    /** Unsupported recorders must fail explicitly, never simulate a paused capture. */
+    suspend fun pause() { throw UnsupportedOperationException("Recorder pause is unavailable.") }
+    suspend fun resume() { throw UnsupportedOperationException("Recorder resume is unavailable.") }
     suspend fun dispose()
 }
 
@@ -50,28 +53,38 @@ class VoiceNoteController(
     private val staging: VoiceStagingPort,
     private val uploadAudio: suspend (sourcePath: String, displayName: String, durationSeconds: Int) -> MessageAttachment,
     private val sendAudioMessage: suspend (attachment: MessageAttachment) -> Unit,
-    /** Adaptive AAC-LC profile selected from the current uplink/data-saver state. */
+    /** Adaptive AAC-LC profile selected from the current uplink/data-saver state (32-96 kbps). */
     private val recordConfig: () -> VoiceRecordConfig = { VoiceRecordConfig() },
     private val now: () -> Long = System::currentTimeMillis,
+    private val validateSession: () -> Unit = {},
 ) {
     var isRecording = false
         private set
     var isBusy = false
         private set
     private var disposed = false
-    private var startedAtMs: Long? = null
+    private val invalidated = java.util.concurrent.atomic.AtomicBoolean(false)
+    /** Safe inside account transition listener: no IO or hardware call. */
+    fun invalidate() { invalidated.set(true) }
+    val isInvalidated: Boolean get() = invalidated.get()
+    private fun requireActive() {
+        check(!invalidated.get() && !disposed) { "Recording session is no longer active." }
+        validateSession()
+    }
+    private val clock = ActiveVoiceClock(now)
+    val isPaused: Boolean get() = clock.paused
     private var path: String? = null
     private var busySignal: CompletableDeferred<Unit>? = null
     private var disposeSignal: CompletableDeferred<Unit>? = null
 
     /** Dart elapsed getter (ms precision here; the UI formats mm:ss). */
     val elapsedMs: Long
-        get() = startedAtMs?.let { now() - it } ?: 0L
+        get() = clock.elapsedMs
 
     /** Dart currentLevel(): strictly read-only; -60 floor when idle or the
      *  probe fails so the meter can always render something stable. */
     suspend fun currentLevelDbfs(): Double {
-        if (!isRecording) return -60.0
+        if (!isRecording || isPaused) return -60.0
         return try {
             recorder.currentAmplitudeDbfs()
         } catch (_: Throwable) {
@@ -97,6 +110,7 @@ class VoiceNoteController(
     suspend fun start() {
         if (disposed) throw IllegalStateException("Voice-note service has been disposed.")
         if (isRecording || isBusy) return
+        requireActive()
         val operation = enterBusy()
         var stagingPath: String? = null
         try {
@@ -104,9 +118,14 @@ class VoiceNoteController(
                 throw IllegalStateException("Microphone permission is required.")
             }
             stagingPath = staging.newStagingPath(now())
+            requireActive()
             recorder.start(recordConfig(), stagingPath)
+            try { requireActive() } catch (error: Throwable) {
+                runCatching { recorder.stop() }.exceptionOrNull()?.let(error::addSuppressed)
+                throw error
+            }
             path = stagingPath
-            startedAtMs = now()
+            clock.start()
             isRecording = true
         } catch (error: Throwable) {
             if (stagingPath != null) staging.deleteQuietly(stagingPath)
@@ -116,32 +135,50 @@ class VoiceNoteController(
         }
     }
 
+    suspend fun togglePause() {
+        if (disposed || !isRecording || isBusy) return
+        requireActive()
+        val operation = enterBusy()
+        try {
+            requireActive()
+            if (isPaused) {
+                recorder.resume()
+                clock.resume()
+            } else {
+                recorder.pause()
+                clock.pause()
+            }
+        } finally { leaveBusy(operation) }
+    }
+
     /** Dart stopAndSend(): stops, enforces the 1s floor, uploads, sends.
      *  Returns false for the no-send outcomes (guards, empty path, too short)
      *  and ALWAYS releases the recording state + staged file in finally. */
     suspend fun stopAndSend(): Boolean {
         if (disposed || !isRecording || isBusy) return false
         val operation = enterBusy()
-        val started = startedAtMs
+        val activeMs = elapsedMs
         val stagedPath = path
         var recordedPath: String? = null
         try {
             recordedPath = recorder.stop() ?: stagedPath
-            if (recordedPath.isNullOrEmpty() || started == null) {
+            if (recordedPath.isNullOrEmpty()) {
                 return false
             }
-            val seconds = ((now() - started) / 1000L).toInt()
+            val seconds = (activeMs / 1000L).toInt()
             if (seconds < 1) return false
+            requireActive()
             val attachment = uploadAudio(
                 recordedPath,
                 "voice_note_${now()}.m4a",
                 seconds,
             )
+            requireActive()
             sendAudioMessage(attachment)
             return true
         } finally {
             isRecording = false
-            startedAtMs = null
+            clock.reset()
             path = null
             val cleanupPath = recordedPath ?: stagedPath
             if (cleanupPath != null) staging.deleteQuietly(cleanupPath)
@@ -158,7 +195,7 @@ class VoiceNoteController(
             if (isRecording) target = recorder.stop() ?: target
         } finally {
             isRecording = false
-            startedAtMs = null
+            clock.reset()
             path = null
             if (target != null) staging.deleteQuietly(target)
             leaveBusy(operation)
