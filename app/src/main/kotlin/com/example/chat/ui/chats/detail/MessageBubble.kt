@@ -171,10 +171,14 @@ fun ChatMessageBubble(
     remoteImage: RemoteImageSlot? = chatyRemoteImage,
     onLongPress: () -> Unit = {},
     onLongPressWithRect: ((Rect) -> Unit)? = null,
+    // GB-style: a single tap on the bubble body (any tap the bubble's own
+    // content, like media, does not consume) opens the message options.
+    onBubbleTap: ((Rect?) -> Unit)? = null,
     onSwipeReply: (() -> Unit)? = null,
     onDoubleTap: (() -> Unit)? = null,
     onReactionTap: ((String) -> Unit)? = null,
     onReactionBadgeTap: ((MessageReaction) -> Unit)? = null,
+    mediaContent: (@Composable () -> Unit)? = null,
     onMediaTap: (() -> Unit)? = null,
     onMediaTapWithBounds: ((Rect) -> Unit)? = null,
     attachmentBinding: AttachmentConsumerBinding? = null,
@@ -381,6 +385,7 @@ fun ChatMessageBubble(
                                     onLongPress()
                                 }
                             },
+                            onTap = { onBubbleTap?.invoke(bubbleRect) },
                             onDoubleTap = onDoubleTap?.let { d -> { d() } },
                         )
                     }
@@ -560,7 +565,7 @@ fun ChatMessageBubble(
                         ViewOnceExpiredCard(textColor = Color(textColor))
                     } else {
                         when (message.attachment?.type) {
-                            "image" -> {
+                            "image" -> if (mediaContent != null) mediaContent() else {
                                 val attachment = message.attachment!!
                                 val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
                                 if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
