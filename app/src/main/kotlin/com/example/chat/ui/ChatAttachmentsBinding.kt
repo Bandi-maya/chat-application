@@ -46,6 +46,8 @@ class ChatAttachmentsBindings(
     val onContact: () -> Unit,
     val onLocation: () -> Unit,
     val controller: com.example.chat.ui.chats.detail.ChatAttachmentActionController,
+    val onReviewImages: (List<Uri>) -> Unit,
+    val onDirectSendImages: (List<Uri>) -> Unit,
 )
 
 @Composable
@@ -353,5 +355,33 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             onClose = { readerDoc = null },
         )
     }
-    return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller)
+    // Gallery-sheet review flow: same staging, review and send path as onMedia("image"),
+    // fed by the sheet's own MediaStore grid instead of the system picker.
+    val onReviewImages: (List<Uri>) -> Unit = { uris ->
+        scope.launch {
+            try {
+                if (uris.isEmpty()) return@launch
+                val limit = ServiceLocator.preferencesController.gbDouble("Img_share_limit", 30.0).toInt().coerceIn(1, 100)
+                check(uris.size <= limit) { "Your configured send limit is $limit." }
+                val items = uris.map { uri -> com.example.chat.ui.chats.detail.MediaReviewItem(uri.toString(), read(uri, "image"), "image") }
+                val review = CompletableDeferred<com.example.chat.ui.chats.detail.ReviewedMedia?>()
+                mediaReview = items to review
+                val result = review.await() ?: return@launch
+                controller.sendReviewedMedia(result.items.map { it.file }, "image", result.caption, result.viewOnce)
+                afterSend()
+            } catch (e: Exception) { toast(e.message ?: "Unable to prepare attachment") }
+        }
+    }
+    // Gallery-sheet direct send: stage and send immediately, no review step.
+    val onDirectSendImages: (List<Uri>) -> Unit = { uris ->
+        scope.launch {
+            try {
+                if (uris.isEmpty()) return@launch
+                val files = uris.map { uri -> read(uri, "image") }
+                controller.sendReviewedMedia(files, "image", "", false)
+                afterSend()
+            } catch (e: Exception) { toast(e.message ?: "Unable to send") }
+        }
+    }
+    return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller, onReviewImages, onDirectSendImages)
 }
