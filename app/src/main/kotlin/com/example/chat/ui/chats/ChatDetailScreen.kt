@@ -237,6 +237,8 @@ fun ChatDetailScreen(
     // target from the starred-messages screen; jumped to once messages arrive.
     initialMessageId: String? = null,
     onAttachmentAction: (AttachmentAction) -> Unit = {},
+    attachmentReviewImages: ((List<android.net.Uri>) -> Unit)? = null,
+    attachmentDirectSendImages: ((List<android.net.Uri>) -> Unit)? = null,
     onCameraTap: () -> Unit = {},
     onVoiceTap: () -> Unit = {},
     onVoiceHoldStart: () -> Unit = {},
@@ -1000,6 +1002,24 @@ fun ChatDetailScreen(
                     onSend = ::sendCurrent,
                 )
             }
+
+            // GB-style emoji panel: docked under the message box at half height;
+            // the composer stays on top and picks append into it directly.
+            if (emojiComposerOpen) {
+                androidx.activity.compose.BackHandler { emojiComposerOpen = false }
+                ChatyEmojiPickerSheet(
+                    theme = theme,
+                    reactionMode = false,
+                    composerMode = true,
+                    headerColor = convPrefs.emojiHeaderColor?.let(::Color),
+                    headerIconsColor = convPrefs.emojiHeaderIconsColor?.let(::Color),
+                    backgroundColor = convPrefs.emojiPickerBgColor?.let(::Color),
+                    onEmojiPicked = { emoji ->
+                        if (emoji.isNotEmpty()) handleComposerChanged(composerText + emoji)
+                    },
+                    onComposerDone = { emojiComposerOpen = false },
+                )
+            }
         }
     }
 
@@ -1109,17 +1129,52 @@ fun ChatDetailScreen(
     }
 
     if (attachmentSheetOpen) {
-        ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
+        // Default model: the attachment gallery sheet (opens half height; pulling up
+        // grows it toward full height). The tile picker stays available behind the
+        // Settings "New Attachment Picker UI" option (conversation.newAttachmentPickerUi).
+        val attachmentSheetState = androidx.compose.material3.rememberModalBottomSheetState(
+            skipPartiallyExpanded = convPrefs.newAttachmentPickerUi,
+        )
+        ModalBottomSheet(
+            sheetState = attachmentSheetState,
+            tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { attachmentSheetOpen = false },
             containerColor = Color.Transparent,
         ) {
-            AttachmentSheetContent(
-                theme = theme,
-                onAction = { action ->
-                    attachmentSheetOpen = false
-                    onAttachmentAction(action)
-                },
-            )
+            if (convPrefs.newAttachmentPickerUi) {
+                AttachmentSheetContent(
+                    theme = theme,
+                    onAction = { action ->
+                        attachmentSheetOpen = false
+                        onAttachmentAction(action)
+                    },
+                )
+            } else {
+                com.example.chat.ui.chats.detail.AttachmentGallerySheet(
+                    theme = theme,
+                    heightFraction = if (attachmentSheetState.targetValue == androidx.compose.material3.SheetValue.Expanded) 0.92f else 0.5f,
+                    onAction = { action ->
+                        attachmentSheetOpen = false
+                        onAttachmentAction(action)
+                    },
+                    onCamera = {
+                        attachmentSheetOpen = false
+                        onCameraTap()
+                    },
+                    onReviewImages = attachmentReviewImages?.let { review ->
+                        { uris ->
+                            attachmentSheetOpen = false
+                            review(uris)
+                        }
+                    },
+                    onDirectSendImages = attachmentDirectSendImages?.let { send ->
+                        { uris ->
+                            attachmentSheetOpen = false
+                            send(uris)
+                        }
+                    },
+                )
+            }
         }
     }
 
@@ -1136,35 +1191,6 @@ fun ChatDetailScreen(
                     wallpaperOverride = id
                     wallpaperPickerOpen = false
                     onWallpaperSelected?.invoke(id)
-                },
-            )
-        }
-    }
-
-    // Composer emoji picker (Dart ChatyEmojiPicker.showComposer).
-    if (emojiComposerOpen) {
-        ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
-            onDismissRequest = { emojiComposerOpen = false },
-            containerColor = Color.Transparent,
-        ) {
-            ChatyEmojiPickerSheet(
-                theme = theme,
-                reactionMode = false,
-                composerMode = true,
-                initialText = composerText,
-                headerColor = convPrefs.emojiHeaderColor?.let(::Color),
-                headerIconsColor = convPrefs.emojiHeaderIconsColor?.let(::Color),
-                backgroundColor = convPrefs.emojiPickerBgColor?.let(::Color),
-                onComposerDone = { result ->
-                    emojiComposerOpen = false
-                    handleComposerChanged(result.text)
-                    when (result.action) {
-                        ChatyEmojiComposerAction.send -> {
-                            if (result.text.trim().isNotEmpty()) sendCurrent()
-                        }
-                        ChatyEmojiComposerAction.keyboard,
-                        ChatyEmojiComposerAction.close -> Unit
-                    }
                 },
             )
         }
