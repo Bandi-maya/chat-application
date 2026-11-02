@@ -92,6 +92,10 @@ class AndroidPcmVoiceRecorderPort(
     override suspend fun currentAmplitudeDbfs(): Double =
         capture?.getAmplitude() ?: DEFAULT_AMPLITUDE_DB
 
+    override suspend fun pause() { checkNotNull(capture).pauseRecording() }
+
+    override suspend fun resume() { checkNotNull(capture).resumeRecording() }
+
     override suspend fun dispose() {
         stop()
     }
@@ -111,13 +115,15 @@ class AndroidPcmVoiceRecorderPort(
     }
 }
 
-/** Port of record/recorder/RecordThread.kt (pause/resume removed; Chaty cannot reach
- *  them). Owns the capture loop thread, the start latch, and stop/cancel semantics. */
+/** Port of record/recorder/RecordThread.kt (pause/resume stop and restart AudioRecord without ending the AAC stream). Owns the capture loop thread, the start latch, and stop/cancel semantics. */
 private class CaptureThread(
     private val config: VoiceRecordConfig,
     private val path: String,
 ) {
     private val recording = AtomicBoolean(false)
+    private val transition = java.lang.Object()
+    @Volatile private var paused = false
+    private var generation = 0L
     @Volatile private var canceled = false
     @Volatile private var captureThread: Thread? = null
     @Volatile private var readerRef: PcmReader? = null
@@ -127,8 +133,31 @@ private class CaptureThread(
     fun isRecording(): Boolean = captureThread != null && recording.get()
 
     fun stopRecording() {
-        if (isRecording()) {
+        synchronized(transition) {
             recording.set(false)
+            transition.notifyAll()
+        }
+    }
+
+    fun pauseRecording() {
+        synchronized(transition) {
+            check(isRecording()) { "Recording is not active." }
+            if (!paused) {
+                paused = true
+                generation++ // Any read already in flight is discarded, even across a quick resume.
+                readerRef?.stop()
+            }
+        }
+    }
+
+    fun resumeRecording() {
+        synchronized(transition) {
+            check(isRecording()) { "Recording is not active." }
+            if (paused) {
+                checkNotNull(readerRef).start()
+                paused = false
+                transition.notifyAll()
+            }
         }
     }
 
@@ -142,7 +171,7 @@ private class CaptureThread(
     }
 
     /** RecordThread.getAmplitude: PCMReader.getAmplitude() or -160.0 when no reader. */
-    fun getAmplitude(): Double = readerRef?.getAmplitude() ?: -160.0
+    fun getAmplitude(): Double = if (paused) -160.0 else readerRef?.getAmplitude() ?: -160.0
 
     /** Blocks until the capture loop finished start-up (reader + encoder initialized)
      *  or failed, mirroring RecordThread.startRecording's start latch. The plugin
@@ -171,9 +200,20 @@ private class CaptureThread(
                 startLatch.countDown()
 
                 while (isRecording()) {
-                    val buffer = pcmReader.read()
-                    if (buffer.isNotEmpty()) {
-                        aacEncoder.encode(buffer)
+                    val readGeneration = synchronized(transition) {
+                        while (paused && isRecording()) transition.wait()
+                        generation
+                    }
+                    if (!isRecording()) break
+                    val buffer = try { pcmReader.read() } catch (error: Exception) {
+                        val interruptedByPause = synchronized(transition) { generation != readGeneration || !isRecording() }
+                        if (interruptedByPause) continue else throw error
+                    }
+                    synchronized(transition) {
+                        if (isRecording() && !paused && generation == readGeneration && buffer.isNotEmpty()) {
+                            // Encoder PTS uses input byte position, so no paused wall-clock gap enters AAC.
+                            aacEncoder.encode(buffer)
+                        }
                     }
                 }
             } catch (ex: Exception) {
