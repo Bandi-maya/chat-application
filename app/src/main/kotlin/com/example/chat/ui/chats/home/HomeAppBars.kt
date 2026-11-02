@@ -74,6 +74,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -269,7 +270,7 @@ fun StandardHomeAppBar(
             }
         }
         // Notifications is a separate destination from Settings.
-        IconButton(onClick = nav.onOpenNotifications) {
+        IconButton(onClick = nav.onOpenNotifications, modifier = Modifier.testTag("home_notifications_button")) {
             Icon(
                 Icons.Outlined.Notifications,
                 contentDescription = "Open notifications",
