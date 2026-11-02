@@ -278,11 +278,18 @@ class CallForegroundService : Service() {
         /** A stale coordinator may stop only the service instance it owns. */
         fun stop(context: Context, ownerToken: String, nextOwnerToken: String?) {
             synchronized(ownerLock) {
-                if (activeOwnerToken != ownerToken) return
+                if (!ownerStopMayProceed(activeOwnerToken, ownerToken)) return
                 activeOwnerToken = nextOwnerToken
             }
             stop(context)
         }
+
+        /** Pure owner-stop decision consulted by [stop]: a stop proceeds only
+         *  when the caller's token matches the serving owner token (an
+         *  untokened caller proceeds only when nothing is serving).
+         *  JVM-testable seam; no behavior change. */
+        fun ownerStopMayProceed(activeOwnerToken: String?, stopOwnerToken: String?): Boolean =
+            activeOwnerToken == stopOwnerToken
 
         fun stop(context: Context) {
             synchronized(ownerLock) { activeOwnerToken = null }
