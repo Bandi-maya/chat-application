@@ -292,6 +292,7 @@ private fun LivePreviewCard(
     dummyFocus: androidx.compose.ui.focus.FocusRequester,
 ) {
     val colors = LocalAppColors.current
+    val context = LocalView.current.context
     Column(
         modifier = Modifier
             .padding(start = 14.dp, top = 10.dp, end = 14.dp, bottom = 8.dp)
