@@ -6,10 +6,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ReferenceLayoutPresentationTest {
-    @Test fun layoutCornersStayDistinct() {
-        assertEquals(24, ReferenceLayoutPresentation(ReferenceLayoutStyle.Default).menuCornerDp)
-        assertEquals(4, ReferenceLayoutPresentation(ReferenceLayoutStyle.Old).menuCornerDp)
-        assertEquals(14, ReferenceLayoutPresentation(ReferenceLayoutStyle.Ios).menuCornerDp)
+    @Test fun menuCornerRadiusIsTenAcrossEveryStyle() {
+        // Contract: popup menus/dialogs use a 10dp corner radius for every
+        // layout style (was per-layout 24/4/14/10). The user asked for the
+        // radius to stay fixed at 10 ("10px", interpreted as 10dp pending his
+        // unit confirmation), not to vary per layout.
+        ReferenceLayoutStyle.entries.forEach { style ->
+            assertEquals(10, ReferenceLayoutPresentation(style).menuCornerDp)
+            assertEquals(10, ReferenceLayoutPresentation(style, true).menuCornerDp)
+        }
         assertEquals(10, ReferenceLayoutPresentation().menuCornerDp)
     }
     @Test fun reducedMotionSkipsMenuEntryAcrossEveryStyle() {
