@@ -69,9 +69,9 @@ internal fun PresetNavigationShell(
     val isBasic = mode == AppNavigationMode.basicTabStyle
     val barHeight = when {
         isInstagram -> 54f
-        isBasic -> 60f
-        isIos -> 58f
-        isBubbles -> 58f
+        isBasic -> 56f
+        isIos -> 56f
+        isBubbles -> 56f
         isOneUi -> 56f
         else -> 64f
     }
@@ -126,7 +126,7 @@ internal fun PresetNavigationShell(
                     when {
                         isOneUi -> Column(selectedModifier, horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center) {
-                            Text(label, color = tint, fontSize = 13.sp,
+                            Text(label, color = tint, fontSize = 16.sp,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Spacer(Modifier.height(4.dp))
@@ -152,7 +152,7 @@ internal fun PresetNavigationShell(
                                 tint = if (isIos) tint else if (selected) accent else secondary)
                             if (!isInstagram) {
                                 Spacer(Modifier.height(if (isIos) 4.dp else 3.dp))
-                                Text(label, color = tint, fontSize = if (isIos) 10.sp else 11.sp,
+                                Text(label, color = tint, fontSize = if (isIos) 11.sp else if (isBasic) 13.sp else 11.sp,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
                             }
