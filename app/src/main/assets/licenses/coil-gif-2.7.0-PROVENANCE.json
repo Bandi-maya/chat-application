@@ -1,0 +1,7 @@
+{
+  "version": "2.7.0",
+  "license_url": "https://raw.githubusercontent.com/coil-kt/coil/2.7.0/LICENSE.txt",
+  "source_jar": "https://repo.maven.apache.org/maven2/io/coil-kt/coil-gif/2.7.0/coil-gif-2.7.0-sources.jar",
+  "source_jar_sha256": "280b05711a82adec04a67648e7a524f072a09813be950525fa1e843e5be1c96f",
+  "scope": "ImageDecoderDecoder Factory on validated sticker IMAGE display hints only. Existing authorized source and protection/session resolver retained. Memory/diskcache disabled. Defaultloader forreducedmotion/API24-27staticfallback. No new endpoint/privatecookies/model/account."
+}
