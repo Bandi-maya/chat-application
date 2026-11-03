@@ -232,7 +232,7 @@ fun MainNavigationShell(
         val appearanceNavigationIndex = appearanceStyles.indexOf(prefs.navigationStyleName).coerceIn(0, appearanceStyles.size - 1)
         val forceRail = appearanceNavigationIndex in setOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18)
         val autoRail = maxWidth >= (if (forceRail) 720.dp else 900.dp)
-        val navMode = prefs.homeStyle?.let(HomePresetNormalizer::navigationMode) ?: navigationMode
+        val navMode = prefs.homeStyle?.let(HomePresetNormalizer::presentationNavigationMode) ?: navigationMode
 
         when {
             navMode == AppNavigationMode.topWhatsAppBar -> TopWhatsAppShell(
