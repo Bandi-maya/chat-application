@@ -71,7 +71,7 @@ fun CallsScreen(
 
     Scaffold(
         modifier = Modifier.semantics { paneTitle = "Calls" },
-        containerColor = Color(theme.backgroundColor),
+        containerColor = com.example.chat.ui.navigation.LocalReferenceContentSurface.current ?: Color(theme.backgroundColor),
         floatingActionButton = {
             if (showCallActions) {
                 ExtendedFloatingActionButton(
