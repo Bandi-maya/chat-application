@@ -271,6 +271,21 @@ internal fun CurvedRadialDrawerShell(
                     ) {
                         NavDestinationIcon(id, size = 24, tint = colors.primary)
                     }
+                    // User directive: the selected radial destination also shows its
+                    // label, under the circle.
+                    if (selected) {
+                        Text(
+                            NavigationCatalog.labelFor(id),
+                            color = colors.foreground,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.absoluteOffset(x = (point.x - half - 28).dp, y = (point.y + half + 3).dp)
+                                .width((RadialMenuGeometry.targetSize + 56).dp)
+                                .graphicsLayer { alpha = progress },
+                        )
+                    }
                     }
                 }
                 if (pageCount > 1) {
