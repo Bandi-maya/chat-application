@@ -174,7 +174,11 @@ try:
         # notification-permission prompt (Not Now); dismiss both, changelog
         # first since it masks the home window entirely (baseline 41626081675
         # died here: AssertionError UI label not found: Calls).
-        for label in ('Close','Not now','Not Now','Close','Not Now'):
+        # First-launch dialogs: changelog Close above the notification prompt.
+        # 'Wait' dismisses a system ANR dialog (e.g. "Pixel Launcher isn't
+        # responding"), an emulator/host flake that must never be misread as
+        # an app state; 'Close app' is NEVER tapped.
+        for label in ('Wait','Close','Not now','Not Now','Wait','Close','Not Now'):
             tap_label(label,optional=True)
         capture(f'{slug}-01-chats')
         # Probe the style's actually-present destinations; a label absent in this
@@ -227,6 +231,8 @@ try:
         adb('shell','am','force-stop',pkg)
         adb('shell','am','start','-n',pkg+'/com.example.chat.MainActivity')
         time.sleep(8)
+        for label in ('Wait','Close','Not now','Not Now'):
+            tap_label(label,optional=True)
         capture(f'{slug}-07-reopened')
 
     # BOUNDED MENU PIXELS - fixture presentation proof only (signed-out bare-bucket
