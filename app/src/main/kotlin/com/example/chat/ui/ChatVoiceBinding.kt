@@ -8,11 +8,28 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -46,6 +64,7 @@ import com.example.chat.ui.chats.detail.VoiceNoteController
 import com.example.chat.ui.chats.detail.VoiceRecordConfig
 import com.example.chat.ui.chats.detail.VoiceSessionController
 import com.example.chat.ui.chats.detail.VoiceUiState
+import com.example.chat.ui.kit.ChatyMotion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -171,27 +190,75 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
         onVoiceHoldEnd = { session.onRelease() },
         overlay = {
             if (ui.recording) {
-                Box(Modifier.fillMaxSize().padding(bottom = 76.dp), contentAlignment = Alignment.BottomCenter) {
-                    Row(
-                        Modifier.background(Color(0xE6202020), RoundedCornerShape(20.dp)).padding(horizontal = 14.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("● %d:%02d".format(ui.seconds / 60, ui.seconds % 60), color = Color.White)
-                        VoiceLevelMeterBar(
-                            levels = levels,
-                            accent = Color(ServiceLocator.themeController.globalTheme.accentColor),
-                            modifier = Modifier.width(140.dp),
-                        )
-                        if (ui.locked) {
-                            TextButton(onClick = { session.cancelVoice() }, enabled = !ui.busy) { Text("Cancel", color = Color(0xFFFF8A80)) }
-                            TextButton(onClick = { session.finishVoice() }, enabled = !ui.busy) { Text("Send", color = Color.White) }
-                        } else {
-                            Text("Slide left to cancel, up to lock", color = Color(0xB3FFFFFF))
-                        }
-                    }
+                // Previous card UI restored, docked over the composer and lifted
+                // clear of the system gesture bar (was a floating pill at a fixed
+                // 76.dp offset that overlapped the composer and message list).
+                Box(
+                    Modifier.fillMaxSize().navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    VoiceRecordingCard(
+                        state = ui,
+                        levels = levels,
+                        onDelete = session::cancelVoice,
+                        onPause = session::togglePause,
+                        onSend = session::finishVoice,
+                    )
                 }
             }
         },
     )
+}
+
+
+/** Restored recording card (the pre-pill UI): real sampled levels and elapsed
+ *  time, delete/pause/send controls when locked. No decorative waveform. */
+@Composable
+private fun VoiceRecordingCard(
+    state: VoiceUiState,
+    levels: List<Double>,
+    onDelete: () -> Unit,
+    onPause: () -> Unit,
+    onSend: () -> Unit,
+) {
+    val theme = ServiceLocator.themeController.globalTheme
+    val accent = Color(theme.accentColor)
+    val foreground = Color(theme.primaryTextColor)
+    val context = LocalContext.current
+    val reduced = ChatyMotion.durationMs(context, ChatyMotion.instantMs) == 0
+    Column(Modifier.fillMaxWidth().background(Color(theme.surfaceColor), RoundedCornerShape(28.dp)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (state.locked) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text((if (state.paused) "Paused · " else "Recording · ") + "%d:%02d".format(state.seconds / 60, state.seconds % 60), color = foreground)
+                VoiceLevelMeterBar(levels, accent, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onDelete, enabled = !state.busy, modifier = Modifier.size(52.dp).background(Color(theme.cardColor), CircleShape)) {
+                    Icon(Icons.Default.Delete, "Delete recording", tint = foreground)
+                }
+                Button(onClick = onPause, enabled = !state.busy, modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(26.dp)) {
+                    Icon(if (state.paused) Icons.Default.PlayArrow else Icons.Default.Pause, if (state.paused) "Resume recording" else "Pause recording")
+                    Text(if (state.paused) "Resume" else "Pause")
+                }
+                IconButton(onClick = onSend, enabled = !state.busy, modifier = Modifier.size(52.dp).background(accent, CircleShape)) {
+                    Icon(Icons.Default.Send, "Send recording", tint = Color(theme.onAccentColor))
+                }
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("●", color = Color(0xFFE65B64))
+                Text("%d:%02d".format(state.seconds / 60, state.seconds % 60), color = foreground)
+                Text("‹ Slide to cancel", color = foreground, modifier = Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Lock, "Slide up to lock recording", tint = foreground)
+                    // The scale follows real microphone samples; reduced motion removes scaling.
+                    val scale = if (reduced) 1f else 1.08f + (levels.lastOrNull() ?: 0.0).toFloat() * .14f
+                    Box(Modifier.size(58.dp).graphicsLayer { scaleX = scale; scaleY = scale }.background(accent, CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Mic, "Recording audio", tint = foreground)
+                    }
+                }
+            }
+        }
+    }
 }
