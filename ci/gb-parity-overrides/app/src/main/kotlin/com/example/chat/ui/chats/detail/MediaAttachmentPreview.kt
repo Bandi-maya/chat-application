@@ -55,6 +55,7 @@ internal fun MediaAttachmentPreview(
     var videoDurationMs by remember(attachment.url) { mutableStateOf<Long?>(null) }
     var ratio by remember(attachment.url) { mutableStateOf(1.35f) }
     val context = LocalContext.current
+    val motionDisabled = com.example.chat.ui.kit.rememberChatyReduceMotion()
     var tileBounds by remember { mutableStateOf<Rect?>(null) }
     fun open() { val bounds = tileBounds; if (bounds != null && onTapWithBounds != null) onTapWithBounds(bounds) else onTap?.invoke() }
     fun retry() { unavailableReason = null; failed = false; retryNonce++ }
@@ -104,10 +105,11 @@ internal fun MediaAttachmentPreview(
     // Initial unconsumed -> Final consumed, tile onOpen/onMenu never fired).
     // Install the detector only when the preview is actually actionable so
     // parents (album tile tap/long-press/drag) receive unconsumed events.
+    val sticker = message?.let { com.example.chat.core.stickers.StickerMessagePolicy.isSticker(it.type.name, it.metadata) } == true && !video
     val previewActionable = onTap != null || onTapWithBounds != null || (failed && retryable)
     Box(
-        Modifier.widthIn(max = 300.dp).fillMaxWidth().aspectRatio(fixedRatio ?: ratio)
-            .clip(RoundedCornerShape(9.dp)).background(Color.Black.copy(alpha = 0.12f))
+        Modifier.widthIn(max = 300.dp).fillMaxWidth().aspectRatio(if (sticker) 1f else fixedRatio ?: ratio)
+            .clip(RoundedCornerShape(9.dp)).background(if (sticker) Color.Transparent else Color.Black.copy(alpha = 0.12f))
             .onGloballyPositioned { tileBounds = it.boundsInWindow() }
             .then(if (previewActionable) Modifier.clickable {
                 if (failed && retryable) retry() else open()
@@ -145,12 +147,13 @@ internal fun MediaAttachmentPreview(
             }
             video && thumbnail != null -> Image(thumbnail!!.asImageBitmap(), attachment.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             video || (url == null && ownedSource?.consumerModel() == null) -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-            binding == null && remoteImage != null && remoteImage !== chatyRemoteImage -> remoteImage(url!!, Modifier.fillMaxSize(), attachment.name)
+            !sticker && binding == null && remoteImage != null && remoteImage !== chatyRemoteImage -> remoteImage(url!!, Modifier.fillMaxSize(), attachment.name)
             else -> SubcomposeAsyncImage(
+                imageLoader = if (sticker && !motionDisabled) StickerImageLoader.get(context) else coil.Coil.imageLoader(context),
                 model = ImageRequest.Builder(context).data(ownedSource?.consumerModel() ?: url).memoryCachePolicy(coil.request.CachePolicy.DISABLED).diskCachePolicy(coil.request.CachePolicy.DISABLED).crossfade(true).build(),
                 contentDescription = attachment.name,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
+                contentScale = if (sticker) ContentScale.Fit else ContentScale.Crop,
                 onSuccess = { state ->
                     val image = state.result.drawable
                     if (image.intrinsicWidth > 0 && image.intrinsicHeight > 0)

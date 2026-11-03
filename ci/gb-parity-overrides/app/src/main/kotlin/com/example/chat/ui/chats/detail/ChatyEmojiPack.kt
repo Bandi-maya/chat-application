@@ -26,7 +26,7 @@ import kotlinx.coroutines.withContext
  * Supplied iOS ZIP: 50 animated WebP; supplied Telegram variants: 19 animated WebP;
  * TheSub LottieFiles set: 11 Lottie animations. These are partial packs, not official
  * complete Unicode sets. Missing supplied Telegram art uses a normal glyph.
- * Animated WebP requires API 28. Drive 132 source is separate and not yet bundled.
+ * Animated WebP requires API 28. Drive MOV source is a separate pack with all 132 supplied folder animations.
  */
 object ChatyEmojiPack {
     const val CHATY = "Chaty"
@@ -35,9 +35,10 @@ object ChatyEmojiPack {
     const val OPENMOJI = "OpenMoji"
     const val TELEGRAM = "Telegram"
     const val TELEGRAM_LOTTIE = "Telegram Lottie"
+    const val DRIVE_MOV = "Drive MOV animations"
 
     /** Picker order: Chaty, iOS, Microsoft, OpenMoji, Telegram. */
-    val ORDER = listOf(CHATY, IOS, MICROSOFT, OPENMOJI, TELEGRAM, TELEGRAM_LOTTIE)
+    val ORDER = listOf(CHATY, IOS, MICROSOFT, OPENMOJI, TELEGRAM, TELEGRAM_LOTTIE, DRIVE_MOV)
 
     /**
      * Code-point named asset packs. Files are <hex>.<ext> under [dir] (lowercase
@@ -66,6 +67,148 @@ object ChatyEmojiPack {
         return "${pack.dir}/$hex.${pack.ext}"
     }
 
+    val driveKeys = setOf(
+        "1f440",
+        "1f449",
+        "1f44b",
+        "1f44c",
+        "1f44d",
+        "1f44e",
+        "1f44f",
+        "1f47f",
+        "1f494",
+        "1f495",
+        "1f49e",
+        "1f4aa",
+        "1f525",
+        "1f595",
+        "1f596",
+        "1f600",
+        "1f601",
+        "1f602",
+        "1f603",
+        "1f604",
+        "1f605",
+        "1f606",
+        "1f607",
+        "1f608",
+        "1f609",
+        "1f60a",
+        "1f60b",
+        "1f60c",
+        "1f60d",
+        "1f60e",
+        "1f60f",
+        "1f610",
+        "1f611",
+        "1f612",
+        "1f613",
+        "1f614",
+        "1f615",
+        "1f616",
+        "1f617",
+        "1f618",
+        "1f619",
+        "1f61a",
+        "1f61b",
+        "1f61c",
+        "1f61d",
+        "1f61e",
+        "1f61f",
+        "1f620",
+        "1f621",
+        "1f622",
+        "1f623",
+        "1f624",
+        "1f625",
+        "1f626",
+        "1f627",
+        "1f628",
+        "1f629",
+        "1f62a",
+        "1f62b",
+        "1f62c",
+        "1f62d",
+        "1f62e",
+        "1f62f",
+        "1f630",
+        "1f631",
+        "1f632",
+        "1f633",
+        "1f634",
+        "1f635",
+        "1f636",
+        "1f637",
+        "1f638",
+        "1f639",
+        "1f63a",
+        "1f63b",
+        "1f63c",
+        "1f63d",
+        "1f63e",
+        "1f63f",
+        "1f640",
+        "1f641",
+        "1f642",
+        "1f643",
+        "1f644",
+        "1f645-200d-2640",
+        "1f645-200d-2642",
+        "1f648",
+        "1f649",
+        "1f64a",
+        "1f64c",
+        "1f64f",
+        "1f910",
+        "1f911",
+        "1f912",
+        "1f913",
+        "1f914",
+        "1f915",
+        "1f917",
+        "1f918",
+        "1f919",
+        "1f91e",
+        "1f91f",
+        "1f920",
+        "1f921",
+        "1f922",
+        "1f923",
+        "1f924",
+        "1f925",
+        "1f926-200d-2640",
+        "1f926-200d-2642",
+        "1f927",
+        "1f928",
+        "1f929",
+        "1f92a",
+        "1f92b",
+        "1f92c",
+        "1f92d",
+        "1f92e",
+        "1f92f",
+        "1f937-200d-2640",
+        "1f937-200d-2642",
+        "1f970",
+        "1f973",
+        "1f974",
+        "1f975",
+        "1f976",
+        "1f97a",
+        "1f9d0",
+        "2639",
+        "263a",
+        "270c",
+        "2764",
+    )
+    fun driveAssetPath(unicode: String): String? {
+        val normalized = unicode.replace("\uFE0F", "").replace("\uFE0E", "")
+        val key = normalized.codePoints().toArray().joinToString("-") { Integer.toHexString(it) }
+        return if (key in driveKeys) "emoji/drive_mov132/$key.webp" else null
+    }
+    fun driveBundledCount(context: android.content.Context): Int =
+        runCatching { context.assets.list("emoji/drive_mov132")?.count { it.endsWith(".webp") && it.removeSuffix(".webp") in driveKeys } ?: 0 }.getOrDefault(0)
+
     val telegramCodePoints = setOf(0x1f60b, 0x1f973, 0x1f971, 0x1f62e, 0x1f921, 0x1f92c, 0x1f60e, 0x1f608, 0x1f611, 0x1f923, 0x1f914, 0x1f630, 0x1f61b, 0x1f61d, 0x1f641, 0x1f925, 0x1f910, 0x1f634, 0x1f62b)
     val lottieCodePoints = setOf(0x1f605, 0x1f4d6, 0x1f697, 0x1f4a1, 0x1f4f1, 0x1f4bb, 0x1f40d, 0x1f695, 0x1f321, 0x1f324, 0x274c)
     fun lottieAssetPath(unicode: String): String? {
@@ -79,6 +222,7 @@ object ChatyEmojiPack {
 
     /** Asset path for [style]'s art of [unicode], or null when that pack has none (Chaty: no bundled asset). */
     fun assetPathFor(style: String, unicode: String): String? = when (style) {
+        DRIVE_MOV -> driveAssetPath(unicode)
         IOS -> iosAssetPath(unicode)
         TELEGRAM -> unicode.replace("\uFE0F", "").let { value ->
             if (value.isNotEmpty() && value.codePointCount(0, value.length) == 1 && value.codePointAt(0) in telegramCodePoints) packAssetPath(TELEGRAM_PACK, unicode) else null
@@ -87,7 +231,7 @@ object ChatyEmojiPack {
     }
 
     /** Whether a style's art needs animated-image decoding (API 28+). */
-    fun needsAnimatedDecoder(style: String): Boolean = style == IOS || assetPack(style)?.animated == true
+    fun needsAnimatedDecoder(style: String): Boolean = style == IOS || style == DRIVE_MOV || assetPack(style)?.animated == true
 
     fun packBundledCount(context: android.content.Context, pack: AssetPack): Int =
         runCatching { context.assets.list(pack.dir)?.count { it.endsWith(".${pack.ext}") } }.getOrNull() ?: 0
@@ -215,19 +359,23 @@ internal fun IosAnimatedEmoji(
     val d = drawable ?: return
     var view by remember { mutableStateOf<ImageView?>(null) }
     DisposableEffect(d) {
-        if (d is AnimatedImageDrawable) {
-            d.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
-            d.start()
-        }
         onDispose {
             if (d is AnimatedImageDrawable) d.stop()
-            view?.setImageDrawable(null)
+            // Do not clear a replacement drawable installed by the next composition.
+            view?.takeIf { it.drawable === d }?.setImageDrawable(null)
         }
     }
     AndroidView(
         modifier = Modifier.size(size.dp),
         factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.FIT_CENTER }.also { v -> view = v } },
-        update = { it.setImageDrawable(d) },
+        update = { image ->
+            // Attach the drawable callback before starting frame invalidation.
+            if (image.drawable !== d) image.setImageDrawable(d)
+            if (d is AnimatedImageDrawable && animate) {
+                d.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
+                if (!d.isRunning) d.start()
+            }
+        },
     )
 }
 
