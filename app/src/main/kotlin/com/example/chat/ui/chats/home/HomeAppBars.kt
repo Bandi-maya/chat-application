@@ -258,8 +258,8 @@ fun StandardHomeAppBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = if (homeStyle == "Classic") Color(theme.accentColor) else Color(theme.primaryTextColor),
-                    fontSize = (titleFontSize * theme.fontScale).sp,
-                    fontWeight = FontWeight.W800,
+                    fontSize = ((if (largeDefault) 20.0 else titleFontSize) * theme.fontScale).sp,
+                    fontWeight = if (largeDefault) FontWeight.W700 else FontWeight.W800,
                     letterSpacing = if (headerStyle == HomeHeaderStyle.prominentIdentity) (-0.55).sp else (-0.2).sp,
                 )
                 if (showStatus && !largeDefault) {
