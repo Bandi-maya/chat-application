@@ -47,7 +47,7 @@ class HomeHeaderTabsResponsiveProofTest {
     /** Fails unless the tab and its label are completely visible inside the scroller. */
     private fun assertFullyShown(id: String, tag: String) {
         val d = inst.targetContext.resources.displayMetrics.density
-        val label = NavigationCatalog.labelFor(id).uppercase()
+        val label = NavigationCatalog.labelFor(id)
         // The strip scrolls the selected tab into view with an animation (and a bold label widens its tab), and
         // UiAutomator idle does not cover Compose animations: poll up to 3s for the settled state, then assert
         // exactly the same thresholds below on the last measurement.
@@ -96,7 +96,7 @@ class HomeHeaderTabsResponsiveProofTest {
                 // Small, bounded steps (<= 30 x 15% of the viewport, slow so there is little fling). Direction comes from the
                 // measured state: clipped on the left -> RIGHT, clipped on the right or off-screen to the right -> LEFT.
                 val dens = inst.targetContext.resources.displayMetrics.density
-                val label = NavigationCatalog.labelFor(id).uppercase()
+                val label = NavigationCatalog.labelFor(id)
                 var tries = 0
                 while (tries++ < 30) {
                     val sc = device.findObject(res("home-tabs-scroll"))
