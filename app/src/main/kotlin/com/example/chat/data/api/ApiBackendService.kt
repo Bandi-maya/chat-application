@@ -1209,6 +1209,12 @@ class ApiBackendService(
                     type = runCatching { MessageType.valueOf(o.optString("type", "text")) }.getOrDefault(MessageType.text),
                     text = o.optString("text"),
                     attachment = att,
+                    metadata = runCatching {
+                        val content = org.json.JSONObject(o.getString("content"))
+                        com.example.chat.core.stickers.StickerMessagePolicy.parse(content.optString("type"),
+                            listOf("chaty_sticker_version", "chaty_sticker_pack", "chaty_sticker_id")
+                                .associateWith { key -> if (content.has(key)) content.opt(key) else null })
+                    }.getOrDefault(emptyMap()),
                     createdAt = runCatching { Instant.parse(o.optString("created_at")) }.getOrDefault(Instant.now()),
                     deliveryState = DeliveryState.sending,
                 )
