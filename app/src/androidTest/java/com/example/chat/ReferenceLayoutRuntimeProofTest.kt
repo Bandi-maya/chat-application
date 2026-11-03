@@ -80,9 +80,18 @@ class ReferenceLayoutRuntimeProofTest {
                 homeStyle="Chaty Default", disableStatusUnderName=true, hideChatSortList=true))
             ServiceLocator.themeController.setGlobalTheme(ThemePresets.monochromeDark)
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                for(label in listOf("Not now","Not Now","Not Now","Not Now")) {
-                    device.wait(Until.findObject(By.text(label)),1500)?.click()
+                // Read the real modal stack through its own controls. The general host pass
+                // normally marks changelog as seen, but this test must stand alone as well.
+                repeat(6) {
+                    val close = if (device.hasObject(By.text("Chaty changelog"))) device.findObject(By.text("Close")) else null
+                    val prompt = close ?: device.findObject(By.text("Not now")) ?: device.findObject(By.text("Not Now"))
+                    if (prompt != null) { prompt.click(); device.waitForIdle(1000) }
+                    else Thread.sleep(400)
                 }
+                assertFalse("Changelog is still covering the tested UI", device.hasObject(By.text("Chaty changelog")))
+                assertFalse("System permission prompt is still covering the tested UI",
+                    device.hasObject(By.pkg("com.google.android.permissioncontroller")) ||
+                    device.hasObject(By.pkg("com.android.permissioncontroller")))
                 assertTrue("Real production Home rows missing", device.wait(Until.hasObject(By.text("Synthetic peer 1")),15000))
                 capture("default-dark-expanded")
                 val x=device.displayWidth/2; val bottom=device.displayHeight*3/4; val top=device.displayHeight*3/10
