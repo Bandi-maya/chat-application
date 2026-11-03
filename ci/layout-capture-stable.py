@@ -229,6 +229,61 @@ try:
         time.sleep(8)
         capture(f'{slug}-07-reopened')
 
+    # BOUNDED MENU PIXELS - fixture presentation proof only (signed-out bare-bucket
+    # fake session, fixture data; NOT production account state or authenticated
+    # persistence). Every step optional and recorded, never fatal to the style passes.
+    menu_notes = []
+    def long_press_label(label, ms=900):
+        root = None
+        for _ in range(5):
+            adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
+            xml = adb('shell','cat','/sdcard/window.xml',check=False)
+            if xml.strip().startswith(b'<'):
+                try:
+                    root = ET.fromstring(xml); break
+                except ET.ParseError:
+                    pass
+            time.sleep(1)
+        if root is None:
+            return None
+        for node in root.iter('node'):
+            if node.get('text') == label or node.get('content-desc') == label:
+                b = list(map(int, re.findall(r'\d+', node.get('bounds',''))))
+                if len(b) == 4:
+                    x, y = (b[0]+b[2])//2, (b[1]+b[3])//2
+                    adb('shell','input','swipe',str(x),str(y),str(x),str(y),str(ms))
+                    return True
+        return False
+    try:
+        if tap_label('More options', optional=True, settle=1):
+            capture('menu-01-home-overflow')
+            adb('shell','input','keyevent','KEYCODE_BACK')
+        else:
+            menu_notes.append('HOME_OVERFLOW_NOT_FOUND_OR_DUMP_FLAKE')
+    except Exception as e:
+        menu_notes.append('HOME_OVERFLOW_ERROR:' + type(e).__name__)
+    try:
+        adb('shell','am','start','-n',pkg+'/com.example.chat.ChatFixtureActivity','--es','screen','detail',check=False)
+        time.sleep(3)
+        reach = tap_label('See you at 6!', optional=True, settle=0)
+        if reach is not True:
+            menu_notes.append('FIXTURE_DETAIL_NOT_REACHED')
+        else:
+            lp = long_press_label('See you at 6!')
+            if lp is not True:
+                menu_notes.append('BUBBLE_LONGPRESS_FAILED')
+            else:
+                time.sleep(1)
+                capture('menu-02-bubble-selection')
+                if tap_label('More options', optional=True, settle=1):
+                    capture('menu-03-selection-sheet')
+                    adb('shell','input','keyevent','KEYCODE_BACK')
+                else:
+                    menu_notes.append('SELECTION_OVERFLOW_ABSENT')
+    except Exception as e:
+        menu_notes.append('BUBBLE_MENU_ERROR:' + type(e).__name__)
+    (out/'menu-notes.txt').write_text('SCOPE:fixture-presentation-proof-not-production-account-state\n' + ('\n'.join(menu_notes) if menu_notes else 'MENU_CAPTURE_OK'))
+
 finally:
     capture('final-state')
     (out/'logcat.txt').write_bytes(adb('logcat','-d','-v','threadtime',check=False))
