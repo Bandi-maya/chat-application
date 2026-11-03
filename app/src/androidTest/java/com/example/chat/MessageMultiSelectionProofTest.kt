@@ -41,7 +41,7 @@ class MessageMultiSelectionProofTest {
         ActivityScenario.launch<ChatFixtureActivity>(intent).use { scenario ->
             scenario.onActivity { activity -> activity.setContent {
                 ChatyTheme(ThemePresets.getSystemDefaultTheme(false)) {
-                    ChatDetailScreen(conversation, messages, "me", {}, {},
+                    ChatDetailScreen(conversation, messages, "me", onBack = {}, onSend = { _ -> },
                         onForwardSelection = { batch -> forwarded.set(batch.map { it.id }) })
                 }
             } }
