@@ -144,7 +144,10 @@ try:
     adb('install','-r','-t','runtime-apks/app-debug-androidTest.apk')
     adb('shell','am','force-stop',pkg)
     write_prefs('chaty_api_backend', {'api_hub_token':'synthetic-test-token','api_hub_user':json.dumps({'id':'synthetic-layout-user','username':'fixture','displayName':'Synthetic Layout','avatarInitials':'SL','about':'Isolated capture','email':'','phone':'','avatarUrl':None})})
+    # SIGNED-OUT PRESENTATION PROOF: prefs auth is SessionAuthSource(sessionManager) (Supabase
+    # plane); the fake REST session is signed-out for prefs, so seed the BARE bucket.
     write_prefs('chaty_local_preferences', {
+        'chaty_preferences_v1': json.dumps({'home': {'homeStyle': 'Chaty Default'}}),
         'chaty_preferences_v1.synthetic-layout-user': json.dumps({'home': {'homeStyle': 'Chaty Default'}}),
         'chaty_theme_v1': json.dumps({'schemaVersion':2,'globalTheme':{
             'id':'capture_custom','name':'Capture theme','brightness':'dark',

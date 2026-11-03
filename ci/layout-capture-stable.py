@@ -156,7 +156,13 @@ try:
             'navigationMode': 'bottomNav', 'layoutMode': 'classic',
             'fontScale': 1.0, 'density': 1.0, 'animationLevel': 1.0},
             'perChatThemes': {}, 'useReducedMotion': False, 'followSystem': False}
+        # SIGNED-OUT PRESENTATION PROOF: the fixture's fake session is REST-plane only
+        # (api_hub_user); ChatyPreferencesController auth is SessionAuthSource(sessionManager)
+        # (Supabase plane), so the fixture is correctly signed-out for prefs and the shell
+        # reads the BARE bucket. Seed bare for isolated presentation proof - this evidences
+        # signed-out presentation persistence, NOT authenticated account persistence.
         write_prefs('chaty_local_preferences', {
+            'chaty_preferences_v1': json.dumps({'home': {'homeStyle': style}}),
             'chaty_preferences_v1.synthetic-layout-user': json.dumps({'home': {'homeStyle': style}}),
             'chaty_theme_v1': json.dumps(theme)})
         slug=style.lower().replace(' ','-') + ('' if brightness == 'dark' else '-light')
@@ -215,7 +221,7 @@ try:
             # destination only; dark passes probe every present destination.
             if brightness == 'dark' or not present[:-1]:
                 swipe_probe(slug, f'{i:02}-{label.lower()}')
-        (out/f'{slug}-destinations.txt').write_text(menu_note + '\nPRESENT:' + ','.join(present) + '\n' + '\n'.join(hidden))
+        (out/f'{slug}-destinations.txt').write_text('SCOPE:signed-out-bare-bucket-presentation-proof-not-authenticated-account-persistence\n' + menu_note + '\nPRESENT:' + ','.join(present) + '\n' + '\n'.join(hidden))
         adb('shell','input','keyevent','KEYCODE_BACK')
         tap_label('Chats', optional=True)
         adb('shell','am','force-stop',pkg)
