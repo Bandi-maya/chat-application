@@ -59,6 +59,8 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.AppNavigationMode
 import com.example.chat.ui.core.theme.ChatyColors
 
+val LocalReferenceDefaultPresentation = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 val LocalReferenceContentSurface = androidx.compose.runtime.staticCompositionLocalOf<Color?> { null }
 
 /** Reusable preset content surface. Callers provide real content, never screen-specific copies.
@@ -94,6 +96,7 @@ internal fun PresetNavigationShell(
     content: @Composable () -> Unit,
     animationsDisabled: Boolean = false,
     rootHeaderActions: @Composable () -> Unit = {},
+    referenceDefaultPresentation: Boolean = false,
 ) {
     val accent = colors.primary
     val foreground = colors.foreground
@@ -137,7 +140,7 @@ internal fun PresetNavigationShell(
             }
         }
     }
-    androidx.compose.runtime.CompositionLocalProvider(LocalReferenceHeaderCollapse provides headerCollapse) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalReferenceHeaderCollapse provides headerCollapse, LocalReferenceDefaultPresentation provides (isOneUi && referenceDefaultPresentation)) {
     Box(Modifier.fillMaxSize().background(exterior).nestedScroll(headerScroll)) {
         // Only adapters that already honor the title hand-off may suppress their title.
         // Other enabled destinations retain their existing functional header.

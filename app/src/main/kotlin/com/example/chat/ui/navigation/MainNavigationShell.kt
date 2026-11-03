@@ -318,6 +318,7 @@ fun MainNavigationShell(
                 AppNavigationMode.basicTabStyle,
                 AppNavigationMode.gestureTabs,
             ) -> PresetNavigationShell(
+                referenceDefaultPresentation = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(prefs.homeStyle),
                 rootHeaderActions = rootHeaderActions,
                 animationsDisabled = prefs.animationsDisabled,
                 mode = navMode,
