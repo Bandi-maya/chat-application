@@ -8,13 +8,10 @@ data class ReferenceLayoutPresentation(
     val style: ReferenceLayoutStyle = ReferenceLayoutStyle.Other,
     val animationsDisabled: Boolean = false,
 ) {
-    val menuCornerDp: Int get() = when (style) {
-        ReferenceLayoutStyle.Default -> 24
-        ReferenceLayoutStyle.Old -> 4
-        ReferenceLayoutStyle.Ios -> 14
-        ReferenceLayoutStyle.Other -> 10
-    }
+    /** User asked for the popup/dialog border radius kept at 10 (their wording "10px";
+     *  implemented as 10dp pending unit confirmation - GB reference menus measure ~10dp).
+     *  Constant across reference layouts so menus stop changing shape on layout switch. */
+    val menuCornerDp: Int get() = 10
     val menuEnterMs: Int get() = if (animationsDisabled) 0 else 140
     val menuExitMs: Int get() = if (animationsDisabled) 0 else 90
 }
-
