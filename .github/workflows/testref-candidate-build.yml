@@ -206,6 +206,10 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/chats/detail/VoiceNoteController.kt \
             app/src/main/kotlin/com/example/chat/ServiceLocator.kt \
             app/src/main/kotlin/com/example/chat/ui/AppRoot.kt \
+            app/src/debug/AndroidManifest.xml \
+            app/src/main/kotlin/com/example/chat/ui/GlobalLayersHost.kt \
+            app/src/main/kotlin/com/example/chat/ui/kit/ReferenceLayoutPresentation.kt \
+            app/src/main/kotlin/com/example/chat/ui/theme/ChatyTheme.kt \
             app/src/main/java/com/example/chat/domain/models/ChatMessage.kt \
             app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt \
