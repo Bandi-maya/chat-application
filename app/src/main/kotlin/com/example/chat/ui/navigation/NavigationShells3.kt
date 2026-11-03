@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -97,6 +98,8 @@ internal fun PresetNavigationShell(
     animationsDisabled: Boolean = false,
     rootHeaderActions: @Composable () -> Unit = {},
     referenceDefaultPresentation: Boolean = false,
+    /** OneUI center-button dock: the raised circle in the dock middle. */
+    onCenterAction: () -> Unit = {},
 ) {
     val accent = colors.primary
     val foreground = colors.foreground
@@ -184,11 +187,14 @@ internal fun PresetNavigationShell(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(horizontal = horizontalPadding.dp)
+                // User directive (Telegram dock reference): the Telegram dock floats
+                // as a rounded pill above the system bar instead of a full-width bar.
+                .then(if (isTelegram) Modifier.padding(horizontal = 12.dp) else Modifier.padding(horizontal = horizontalPadding.dp))
                 .fillMaxWidth()
+                .padding(bottom = if (isTelegram) 10.dp else 0.dp)
                 .height(barHeight.dp)
                 .then(
-                    if (isTelegram) Modifier.shadow(6.dp) else Modifier,
+                    if (isTelegram) Modifier.shadow(6.dp, RoundedCornerShape(24.dp)).clip(RoundedCornerShape(24.dp)) else Modifier,
                 )
                 .background(dockBackground),
         ) {
@@ -211,7 +217,7 @@ internal fun PresetNavigationShell(
             }
             // Shared by applied Home and read-only preview: preserve every configured destination.
             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                navItemIds.forEachIndexed { index, id ->
+                val renderDockItem: @Composable androidx.compose.foundation.layout.RowScope.(Int, String) -> Unit = { index, id ->
                     val selected = index == selectedIndex
                     val label = NavigationCatalog.labelFor(id)
                     val targetTint = if (selected) foreground else secondary
@@ -246,23 +252,58 @@ internal fun PresetNavigationShell(
                                     overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                             }
                         }
-                        else -> Column(selectedModifier, horizontalAlignment = Alignment.CenterHorizontally,
+                        else -> Column(
+                            // Telegram reference: selection is a rounded pill behind the
+                            // icon+label; tint stays foreground for every item, no underline.
+                            if (isTelegram) selectedModifier
+                                .padding(horizontal = 2.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (selected) colors.primary.copy(alpha = if (isDark) 0.22f else 0.12f) else Color.Transparent)
+                            else selectedModifier,
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center) {
                             if (isInstagram) Box(Modifier.width(26.dp).height(2.dp)
                                 .background(if (selected) accent else Color.Transparent))
                             NavDestinationIcon(id, size = if (isBasic) 23 else 24,
                                 selected = isIos && selected,
-                                tint = if (isIos) tint else if (selected) accent else secondary)
+                                tint = if (isTelegram) foreground else if (isIos) tint else if (selected) accent else secondary)
                             if (!isInstagram) {
                                 Spacer(Modifier.height(if (isIos) 4.dp else 3.dp))
-                                Text(label, color = tint, fontSize = if (isIos) 11.sp else if (isBasic) 13.sp else 11.sp,
+                                Text(label, color = if (isTelegram) foreground else tint, fontSize = if (isIos) 11.sp else if (isBasic) 13.sp else 11.sp,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                                    fontWeight = if (!isTelegram && selected) FontWeight.Bold else FontWeight.Medium)
                             }
-                            if (isTelegram) Box(Modifier.width(16.dp).height(2.dp)
-                                .background(if (selected) accent else Color.Transparent))
                         }
                     }
+                }
+                // OneUI center-button dock: left half / fixed center gap for the
+                // raised circle / right half. Both halves are weight(1f), so the gap
+                // sits exactly at the bar's center for odd and even item counts.
+                if (isOneUi) {
+                    val half = navItemIds.size / 2
+                    Row(Modifier.weight(1f).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+                        navItemIds.subList(0, half).forEachIndexed { i, id -> renderDockItem(i, id) }
+                    }
+                    Spacer(Modifier.width(56.dp))
+                    Row(Modifier.weight(1f).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+                        navItemIds.subList(half, navItemIds.size).forEachIndexed { i, id -> renderDockItem(half + i, id) }
+                    }
+                } else {
+                    navItemIds.forEachIndexed { index, id -> renderDockItem(index, id) }
+                }
+            }
+            // User directive (center-button dock reference): the OneUI dock carries a
+            // raised circular center action button overlapping the bar top.
+            if (isOneUi) {
+                Box(
+                    Modifier.align(Alignment.TopCenter).offset(y = (-14).dp)
+                        .size(52.dp).shadow(6.dp, CircleShape).clip(CircleShape)
+                        .background(accent)
+                        .clickable { onCenterAction() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.CameraAlt, contentDescription = "Quick action", tint = colors.onPrimary,
+                        modifier = Modifier.size(24.dp))
                 }
             }
         }
