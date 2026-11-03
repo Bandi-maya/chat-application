@@ -16,9 +16,8 @@ enum class ChatyIconThemeId(val title: String, val description: String) {
     sculptedVolume("Sculpted Volume", "Multi-planar dimensional facets implying depth via overlapping planes."),
     expressiveInk("Expressive Ink", "Dynamic brush-pen calligraphy with high-contrast pressure stroke rhythm."),
     signalLanguage("Signal Language", "Telecommunication radar motifs with concentric broadcast pulse waves."),
-    // ASSET-PACK CANDIDATE (icon-candidate task, 2026-11-03): vector asset themes.
-    // All five are gated UNAVAILABLE by ChatyIconPackCatalog until per-icon assets are
-    // verified and the painter routes them (writer owns that hook). No fallback art.
+    // Bundled vector families use ChatyAssetIcons, never procedural substitute art.
+    // ChatyIconPackCatalog owns availability and visible adaptation provenance.
     hugeiconsFree("Hugeicons Free", "Free open-source Hugeicons rounded stroke set (MIT)."),
     majesticonsLine("Majesticons Line", "Free open-source Majesticons line set (MIT)."),
     majesticonsSolid("Majesticons Solid", "Free open-source Majesticons solid set (MIT)."),
