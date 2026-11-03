@@ -55,7 +55,7 @@ def tap_label(label, optional=False, settle=0):
                 pass
         time.sleep(1)
     if root is None:
-        if optional: return False
+        if optional: return None  # dump failure is NOT evidence of absence
         raise AssertionError(f'UI dump unavailable while seeking: {label}')
     nodes=[]
     for node in root.iter('node'):
@@ -67,6 +67,69 @@ def tap_label(label, optional=False, settle=0):
         raise AssertionError(f'UI label not found: {label}')
     l,t,r,b=max(nodes,key=lambda b:b[1]); adb('shell','input','tap',str((l+r)//2),str((t+b)//2));time.sleep(settle)
     return True
+
+def find_label(label):
+    """Presence-only probe (no tap): True/False, None on dump flake (never
+    evidence of absence)."""
+    root = None
+    for _ in range(5):
+        adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
+        xml = adb('shell','cat','/sdcard/window.xml',check=False)
+        if xml.strip().startswith(b'<'):
+            try:
+                root = ET.fromstring(xml); break
+            except ET.ParseError:
+                pass
+        time.sleep(1)
+    if root is None:
+        return None
+    for node in root.iter('node'):
+        if node.get('text') == label or node.get('content-desc') == label:
+            return True
+    return False
+
+def dismiss_until_ready(identity='Chats', attempts=8):
+    """Bounded readiness guard: dismiss known non-destructive modals - system
+    ANR 'Wait' (NEVER 'Close app'), changelog 'Close', notification
+    'Not now'/'Not Now' - then require BOTH no known modal present AND the
+    expected screen identity label before any capture is treated as proof.
+    Returns True only when identity is verified modal-free."""
+    for _ in range(attempts):
+        tapped = False
+        for label in ('Wait','Close','Not now','Not Now'):
+            if tap_label(label, optional=True, settle=1):
+                tapped = True
+        if not tapped:
+            r = find_label(identity)
+            if r is True:
+                return True
+        time.sleep(2)
+    return False
+
+def record_layout_walkthrough(slug):
+    """Actual emulator walkthrough, isolated signed-out presentation only.
+    Record enabled root destinations plus supported home popup. No sends.
+    This is not an all-app or authenticated-persistence proof."""
+    remote = '/sdcard/' + slug + '-walkthrough.mp4'
+    notes=[]
+    rec=subprocess.Popen(['adb','shell','screenrecord','--bit-rate','1800000','--time-limit','75',remote],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    try:
+        time.sleep(2)
+        for label in ('Calls','Tasks','Settings','Chats'):
+            reached=tap_label(label,optional=True,settle=3)
+            notes.append(label+':'+str(reached))
+            capture(slug+'-walkthrough-'+label.lower(),settle=2)
+        if tap_label('More options',optional=True,settle=2):
+            capture(slug+'-walkthrough-menu',settle=2)
+            adb('shell','input','keyevent','KEYCODE_BACK')
+        time.sleep(2)
+    finally:
+        adb('shell','pkill','-2','screenrecord',check=False)
+        try: rec.wait(timeout=10)
+        except subprocess.TimeoutExpired: rec.terminate()
+        time.sleep(1)
+        adb('pull',remote,str(out/(slug+'-walkthrough.mp4')),check=False)
+        (out/(slug+'-walkthrough-notes.txt')).write_text('SCOPE:isolated-signed-out-presentation-not-all-app\n'+'\n'.join(notes))
 
 def viewport():
     """Resolve swipe geometry from the actual display instead of fixed pixels."""
@@ -156,7 +219,13 @@ try:
             'navigationMode': 'bottomNav', 'layoutMode': 'classic',
             'fontScale': 1.0, 'density': 1.0, 'animationLevel': 1.0},
             'perChatThemes': {}, 'useReducedMotion': False, 'followSystem': False}
+        # SIGNED-OUT PRESENTATION PROOF: the fixture's fake session is REST-plane only
+        # (api_hub_user); ChatyPreferencesController auth is SessionAuthSource(sessionManager)
+        # (Supabase plane), so the fixture is correctly signed-out for prefs and the shell
+        # reads the BARE bucket. Seed bare for isolated presentation proof - this evidences
+        # signed-out presentation persistence, NOT authenticated account persistence.
         write_prefs('chaty_local_preferences', {
+            'chaty_preferences_v1': json.dumps({'home': {'homeStyle': style}}),
             'chaty_preferences_v1.synthetic-layout-user': json.dumps({'home': {'homeStyle': style}}),
             'chaty_theme_v1': json.dumps(theme)})
         slug=style.lower().replace(' ','-') + ('' if brightness == 'dark' else '-light')
@@ -168,29 +237,46 @@ try:
         # notification-permission prompt (Not Now); dismiss both, changelog
         # first since it masks the home window entirely (baseline 41626081675
         # died here: AssertionError UI label not found: Calls).
-        for label in ('Close','Not now','Not Now','Close','Not Now'):
-            tap_label(label,optional=True)
+        # Readiness before proof: bounded modal dismissal (ANR 'Wait', never
+        # 'Close app'; changelog 'Close'; notification 'Not now') AND verified
+        # screen identity. Failure is recorded, never relabeled a pass.
+        ready = dismiss_until_ready()
+        if not ready:
+            (out/f'{slug}-readiness.txt').write_text('READINESS_NOT_VERIFIED: modal-free Chats identity not reached')
         capture(f'{slug}-01-chats')
+        if ready and style in ('Chaty Default', 'WhatsApp OLD UI') and brightness == 'dark':
+            record_layout_walkthrough(slug)
         # Probe the style's actually-present destinations; a label absent in this
         # style's dock/drawer is recorded, never a hard failure (no fixed inventory).
         # Drawer/menu styles keep destinations behind an affordance: open the actual
         # menu once before probing, so a closed drawer cannot mask a real destination.
         menu_note = 'MENU_NONE'
-        for mlabel in ('Open navigation drawer', 'Open navigation menu', 'Menu', 'Open menu', 'More options'):
+        for mlabel in ('Open navigation drawer', 'Open navigation menu'):
             if tap_label(mlabel, optional=True, settle=1):
                 menu_note = 'MENU_OPENED:' + mlabel
                 break
         present, hidden = [], []
+        dump_dead = False
         for i,label in enumerate(('Calls','Chats','Tasks','Settings','Communities','Updates','Groups'),2):
-            if not tap_label(label, optional=True, settle=0):
+            r = tap_label(label, optional=True, settle=0)
+            if r is None:
+                # UI_DUMP_UNAVAILABLE: dump flake, NOT a missing destination.
+                hidden.append('UI_DUMP_UNAVAILABLE:' + label)
+                dump_dead = True
+                continue
+            if not r:
                 # Drawer closes on every select: reopen the actual menu and retry once
                 # before recording anything, so a closed drawer is never misread.
                 reopened = False
-                for mlabel in ('Open navigation drawer', 'Open navigation menu', 'Menu', 'Open menu', 'More options'):
+                for mlabel in ('Open navigation drawer', 'Open navigation menu'):
                     if tap_label(mlabel, optional=True, settle=1):
                         reopened = True
                         break
-                if reopened and tap_label(label, optional=True, settle=0):
+                r2 = tap_label(label, optional=True, settle=0) if reopened else False
+                if r2 is None:
+                    hidden.append('UI_DUMP_UNAVAILABLE:' + label)
+                    continue
+                if reopened and r2:
                     pass  # fell through to a real destination below
                 else:
                     # UNREACHABLE: no menu affordance found, label may sit behind it.
@@ -204,16 +290,85 @@ try:
             # destination only; dark passes probe every present destination.
             if brightness == 'dark' or not present[:-1]:
                 swipe_probe(slug, f'{i:02}-{label.lower()}')
-        (out/f'{slug}-destinations.txt').write_text(menu_note + '\nPRESENT:' + ','.join(present) + '\n' + '\n'.join(hidden))
+        (out/f'{slug}-destinations.txt').write_text('SCOPE:signed-out-bare-bucket-presentation-proof-not-authenticated-account-persistence\n' + menu_note + '\nPRESENT:' + ','.join(present) + '\n' + '\n'.join(hidden))
         adb('shell','input','keyevent','KEYCODE_BACK')
         tap_label('Chats', optional=True)
         adb('shell','am','force-stop',pkg)
         adb('shell','am','start','-n',pkg+'/com.example.chat.MainActivity')
         time.sleep(8)
+        ready2 = dismiss_until_ready()
+        if not ready2:
+            (out/f'{slug}-reopen-readiness.txt').write_text('REOPEN_READINESS_NOT_VERIFIED')
         capture(f'{slug}-07-reopened')
-        if style == 'Chaty Default' and brightness == 'dark':
-            animation_pass(slug)
-    fixture_pass()
+
+    # BOUNDED MENU PIXELS - fixture presentation proof only (signed-out bare-bucket
+    # fake session, fixture data; NOT production account state or authenticated
+    # persistence). Every step optional and recorded, never fatal to the style passes.
+    menu_notes = []
+    def long_press_label(label, ms=900):
+        root = None
+        for _ in range(5):
+            adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
+            xml = adb('shell','cat','/sdcard/window.xml',check=False)
+            if xml.strip().startswith(b'<'):
+                try:
+                    root = ET.fromstring(xml); break
+                except ET.ParseError:
+                    pass
+            time.sleep(1)
+        if root is None:
+            return None
+        for node in root.iter('node'):
+            if node.get('text') == label or node.get('content-desc') == label:
+                b = list(map(int, re.findall(r'\d+', node.get('bounds',''))))
+                if len(b) == 4:
+                    x, y = (b[0]+b[2])//2, (b[1]+b[3])//2
+                    adb('shell','input','swipe',str(x),str(y),str(x),str(y),str(ms))
+                    return True
+        return False
+    try:
+        if tap_label('More options', optional=True, settle=1):
+            capture('menu-01-home-overflow')
+            adb('shell','input','keyevent','KEYCODE_BACK')
+        else:
+            menu_notes.append('HOME_OVERFLOW_NOT_FOUND_OR_DUMP_FLAKE')
+    except Exception as e:
+        menu_notes.append('HOME_OVERFLOW_ERROR:' + type(e).__name__)
+    try:
+        adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen','menu',check=False)
+        time.sleep(3)
+        capture('menu-02-chat-header-open',settle=2)
+        time.sleep(3)
+        reach = tap_label('See you at 6!', optional=True, settle=0)
+        if reach is not True:
+            menu_notes.append('FIXTURE_DETAIL_NOT_REACHED')
+        else:
+            lp = long_press_label('See you at 6!')
+            if lp is not True:
+                menu_notes.append('BUBBLE_LONGPRESS_FAILED')
+            else:
+                time.sleep(1)
+                capture('menu-02-bubble-selection')
+                if tap_label('More options', optional=True, settle=1):
+                    capture('menu-03-selection-sheet')
+                    adb('shell','input','keyevent','KEYCODE_BACK')
+                else:
+                    menu_notes.append('SELECTION_OVERFLOW_ABSENT')
+    except Exception as e:
+        menu_notes.append('BUBBLE_MENU_ERROR:' + type(e).__name__)
+    # Separate >4 album fixture proof; no sends or backend.
+    adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen','album',check=False)
+    time.sleep(3)
+    capture('menu-04-six-image-album',settle=2)
+    for proof_screen in ('contactinfo','allmedia','profile'):
+        adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen',proof_screen,check=False)
+        time.sleep(3)
+        capture('proof-'+proof_screen+'-top',settle=2)
+        x,y1,y2=viewport()
+        adb('shell','input','swipe',str(x),str(y1),str(x),str(y2),'350')
+        capture('proof-'+proof_screen+'-scrolled',settle=2)
+    (out/'menu-notes.txt').write_text('SCOPE:fixture-presentation-proof-not-production-account-state\n' + ('\n'.join(menu_notes) if menu_notes else 'MENU_CAPTURE_OK'))
+
 finally:
     capture('final-state')
     (out/'logcat.txt').write_bytes(adb('logcat','-d','-v','threadtime',check=False))
