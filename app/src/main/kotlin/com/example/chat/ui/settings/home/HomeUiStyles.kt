@@ -8,7 +8,7 @@ import com.example.chat.core.theme.AppNavigationMode
  */
 object HomeUiStyles {
     val homeUiStyles = listOf(
-        "ONE UI", "WhatsApp UI Stock", "IOS STYLE", "BUBBLES TAB STYLE", "BASIC TAB STYLE",
+        "Chaty Default", "ONE UI", "WhatsApp UI Stock", "IOS STYLE", "BUBBLES TAB STYLE", "BASIC TAB STYLE",
         "WhatsApp OLD UI", "Floating Rail", "3D Perspective Drawer", "Modern Side Menu",
         "Curved Radial Menu", "Instagram Style", "Telegram Style",
     )
@@ -27,7 +27,7 @@ object HomeUiStyles {
 
     /** [current] = ThemeController.navigationMode, returned by Dart's default branch. */
     fun navigationModeForHomeUiStyle(style: String, current: AppNavigationMode): AppNavigationMode =
-        when (style.trim().lowercase()) {
+        when (com.example.chat.core.preferences.HomePresentationPolicy.navigationStyle(style).trim().lowercase()) {
             "one ui" -> AppNavigationMode.oneUi
             "whatsapp ui stock" -> AppNavigationMode.bottomNav
             "ios style" -> AppNavigationMode.iosStyle
@@ -45,10 +45,10 @@ object HomeUiStyles {
 
     fun selectedHomeUiStyle(homeStyle: String, current: AppNavigationMode): String {
         val saved = homeStyle.trim()
-        if (saved in homeUiStyles) return saved
+        homeUiStyles.firstOrNull { it.equals(saved, ignoreCase = true) }?.let { return it }
         when (saved.lowercase()) {
             "classic" -> return "WhatsApp OLD UI"
-            "chaty default" -> return "WhatsApp UI Stock"
+            "chaty", "default", "chaty default" -> return "Chaty Default"
             "cards" -> return "ONE UI"
             "stories first" -> return "IOS STYLE"
             "compact" -> return "BUBBLES TAB STYLE"
@@ -72,7 +72,8 @@ object HomeUiStyles {
     }
 
     fun description(style: String): String = when (style) {
-        "ONE UI" -> "Large title, spacious rows, and One UI bottom navigation"
+        "Chaty Default" -> "Large title, rounded conversation rows, and One UI navigation"
+        "ONE UI" -> "The previous Chaty default layout with classic rows and bottom navigation"
         "WhatsApp UI Stock" -> "Classic conversation rows with a standard bottom bar"
         "IOS STYLE" -> "Minimal iOS-inspired icon dock and airy stories header"
         "BUBBLES TAB STYLE" -> "Swipe-first pages with circular bubble destinations"

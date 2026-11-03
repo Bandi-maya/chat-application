@@ -74,6 +74,8 @@ class WebRtcCallMediaController(
     private var screenSurfaceTextureHelper: SurfaceTextureHelper? = null
     private var screenVideoSource: VideoSource? = null
     private var screenVideoTrack: VideoTrack? = null
+    private var localAudioSource: AudioSource? = null
+    private var localVideoSource: VideoSource? = null
     private var localAudioTrack: AudioTrack? = null
     private var localVideoTrack: VideoTrack? = null
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
@@ -202,7 +204,10 @@ class WebRtcCallMediaController(
         peerConnection = peer
         trafficSessionPrepared = true
 
-        openLocalMedia(isVideo, lowData, factory, peer)
+        LocalMediaPreparation.run(
+            initialize = { openLocalMedia(isVideo, lowData, factory, peer) },
+            rollback = { disposeInternal() },
+        )
     }
 
     /** _openLocalMedia: audio/video constraints mirror the Dart getUserMedia
@@ -216,6 +221,7 @@ class WebRtcCallMediaController(
         if (localStream != null) return
 
         val stream = factory.createLocalMediaStream("chaty_local_stream")
+        localStream = stream // provisional ownership; failed preparation rolls back every field
 
         // Keep voice processing enabled in every network profile; low bandwidth must
         // not mean degraded intelligibility. The adaptive sender bitrate handles load.
@@ -226,6 +232,7 @@ class WebRtcCallMediaController(
             optional.add(MediaConstraints.KeyValuePair("channelCount", "1"))
         }
         val audioSource: AudioSource = factory.createAudioSource(audioConstraints)
+        localAudioSource = audioSource
         localAudioTrack = factory.createAudioTrack("chaty_audio", audioSource)
         stream.addTrack(localAudioTrack)
 
@@ -236,6 +243,7 @@ class WebRtcCallMediaController(
             val helper = SurfaceTextureHelper.create("chaty_capture", eglContext)
             surfaceTextureHelper = helper
             val videoSource: VideoSource = factory.createVideoSource(capturer.isScreencast)
+            localVideoSource = videoSource
             capturer.initialize(helper, appContext, videoSource.capturerObserver)
             val width = if (lowData) 640 else 1280
             val height = if (lowData) 360 else 720
@@ -251,7 +259,6 @@ class WebRtcCallMediaController(
         for (track in stream.videoTracks) {
             peer.addTrack(track, listOf(stream.id))
         }
-        localStream = stream
         hasLocalMedia = true
     }
 
@@ -493,8 +500,12 @@ class WebRtcCallMediaController(
         } catch (_: Exception) {
             try { capturer?.stopCapture() } catch (_: Exception) {}
             try { capturer?.dispose() } catch (_: Exception) {}
-            try { stream?.dispose() } catch (_: Exception) {}
-            try { track?.dispose() } catch (_: Exception) {}
+            // MediaStream owns and disposes tracks added to it.
+            if (stream != null) {
+                val owned = stream.videoTracks.any { it === track }
+                try { stream.dispose() } catch (_: Exception) {}
+                if (!owned) try { track?.dispose() } catch (_: Exception) {}
+            } else try { track?.dispose() } catch (_: Exception) {}
             try { source?.dispose() } catch (_: Exception) {}
             try { helper?.dispose() } catch (_: Exception) {}
             screenCapturePermission = null
@@ -506,6 +517,7 @@ class WebRtcCallMediaController(
         stopScreenShareInternal()
     }
 
+    @Synchronized
     private fun stopScreenShareInternal() {
         val wasActive = screenCapturer != null || screenStream != null
         val capturer = screenCapturer
@@ -521,10 +533,13 @@ class WebRtcCallMediaController(
         if (videoSender != null && cameraTrack != null) {
             videoSender.setTrack(cameraTrack, false)
         }
-        screenStream?.dispose()
-        screenStream = null
-        screenVideoTrack?.dispose()
-        screenVideoTrack = null
+        val oldScreenStream = screenStream.also { screenStream = null }
+        val oldScreenTrack = screenVideoTrack.also { screenVideoTrack = null }
+        val screenTrackOwned = oldScreenStream?.videoTracks?.any { it === oldScreenTrack } == true
+        StreamTrackCleanup.dispose(
+            stream = oldScreenStream?.let { { it.dispose() } },
+            tracks = listOf(screenTrackOwned to { oldScreenTrack?.dispose(); Unit }),
+        )
         screenVideoSource?.dispose()
         screenVideoSource = null
         screenSurfaceTextureHelper?.dispose()
@@ -557,8 +572,10 @@ class WebRtcCallMediaController(
         disposeInternal()
     }
 
+    @Synchronized
     private fun disposeInternal() {
         stopTrafficStats()
+        trafficSessionPrepared = false
         hasLocalMedia = false
         hasRemoteMedia = false
         val screen = screenCapturer
@@ -568,10 +585,13 @@ class WebRtcCallMediaController(
         } catch (_: Exception) {
         }
         screen?.dispose()
-        screenStream?.dispose()
-        screenStream = null
-        screenVideoTrack?.dispose()
-        screenVideoTrack = null
+        val oldScreenStream = screenStream.also { screenStream = null }
+        val oldScreenTrack = screenVideoTrack.also { screenVideoTrack = null }
+        val screenTrackOwned = oldScreenStream?.videoTracks?.any { it === oldScreenTrack } == true
+        StreamTrackCleanup.dispose(
+            stream = oldScreenStream?.let { { it.dispose() } },
+            tracks = listOf(screenTrackOwned to { oldScreenTrack?.dispose(); Unit }),
+        )
         screenVideoSource?.dispose()
         screenVideoSource = null
         screenSurfaceTextureHelper?.dispose()
@@ -585,12 +605,20 @@ class WebRtcCallMediaController(
         videoCapturer = null
         surfaceTextureHelper?.dispose()
         surfaceTextureHelper = null
-        localAudioTrack?.dispose()
-        localAudioTrack = null
-        localVideoTrack?.dispose()
-        localVideoTrack = null
-        localStream?.dispose()
-        localStream = null
+        // A MediaStream disposes all tracks added to it. Do not dispose those wrappers twice.
+        val oldLocalStream = localStream.also { localStream = null }
+        val oldAudioTrack = localAudioTrack.also { localAudioTrack = null }
+        val oldVideoTrack = localVideoTrack.also { localVideoTrack = null }
+        val audioOwned = oldLocalStream?.audioTracks?.any { it === oldAudioTrack } == true
+        val videoOwned = oldLocalStream?.videoTracks?.any { it === oldVideoTrack } == true
+        StreamTrackCleanup.dispose(
+            stream = oldLocalStream?.let { { it.dispose() } },
+            tracks = listOf(audioOwned to { oldAudioTrack?.dispose(); Unit }, videoOwned to { oldVideoTrack?.dispose(); Unit }),
+        )
+        localAudioSource?.dispose()
+        localAudioSource = null
+        localVideoSource?.dispose()
+        localVideoSource = null
         remoteStream?.dispose()
         remoteStream = null
         peerConnection?.dispose()

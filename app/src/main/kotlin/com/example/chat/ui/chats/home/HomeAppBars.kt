@@ -208,6 +208,16 @@ fun StandardHomeAppBar(
     val userAbout = if (identity.about.isNotEmpty()) identity.about else "Available"
     val showStatus = !homePrefs.disableStatusUnderName && userAbout.isNotEmpty()
 
+    val largeDefault = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)
+    Column(Modifier.fillMaxWidth()) {
+    if (largeDefault) {
+        Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 20.dp)) {
+            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = Color(theme.primaryTextColor), fontSize = (32 * theme.fontScale).sp,
+                fontWeight = FontWeight.W700)
+            if (showStatus) Text(userAbout, color = Color(theme.secondaryTextColor), fontSize = (12 * theme.fontScale).sp)
+        }
+    }
     Row(
         modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 4.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -220,7 +230,7 @@ fun StandardHomeAppBar(
                     .padding(horizontal = 4.dp, vertical = 2.dp),
             ) {
                 Text(
-                    title,
+                    if (largeDefault) "Chats" else title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = if (homeStyle == "Classic") Color(theme.accentColor) else Color(theme.primaryTextColor),
@@ -228,7 +238,7 @@ fun StandardHomeAppBar(
                     fontWeight = FontWeight.W800,
                     letterSpacing = if (headerStyle == HomeHeaderStyle.prominentIdentity) (-0.55).sp else (-0.2).sp,
                 )
-                if (showStatus) {
+                if (showStatus && !largeDefault) {
                     Text(
                         userAbout,
                         maxLines = 1,
@@ -316,6 +326,7 @@ fun StandardHomeAppBar(
             Icon(Icons.Rounded.MoreVert, contentDescription = "More options", tint = Color(theme.primaryTextColor))
         }
     }
+    } // shared large/default header container
 }
 
 /** _openHomeThreeDotMenu: anchored dropdown with the Dart item set and

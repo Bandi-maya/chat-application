@@ -115,3 +115,4 @@ Candidate-overlay compatibility: restore branch-owned ChatsHomeHost, Notificatio
 2026-11-03T07:13IST R8 override to 8.11.18 via official pluginManagement buildscript mechanism (D8 8.10.21 emits invalid ChatDetailScreen debug DEX) - validation build
 2026-11-03T07:57IST combined reviewed 8-file batch: V2 fixed-allowlist envelope parser + unsupported-marker, gallery Review(count), composer first-swap failure diagnostic, strengthened Android unknown-hint override; override guard 82 - validation build
 2026-11-03T08:20IST override guard condition fix 81->82 at 3 sites (db29 guard defect); emulator tier disabled per user directive - validation build
+2026-11-03T08:49IST combined reviewed 24-file batch (v2, iOS line withheld): home layout swap + live header preview (ChatsHome override 83), call track-ownership rollback cleanup, release-history codec + notes, gesture fixture centering; override guard 83 - validation build

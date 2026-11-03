@@ -100,11 +100,10 @@ class CallContactPickerProofTest {
 
     private fun swipeFrom(desc: String, dx: Int, dy: Int) {
         val obj = dev.findObject(By.desc(desc)) ?: fail("control '$desc' not found")
-        // Start from the center of the display; the accessibility description
-        // has already identified the gesture target and this avoids relying on
-        // UiAutomator versions that do not expose UiObject2.visibleBounds.
-        val x = dev.displayWidth / 2
-        val y = dev.displayHeight / 2
+        // Gesture must start on the actual target, not the unrelated display center.
+        val bounds = obj.visibleBounds
+        val x = bounds.centerX()
+        val y = bounds.centerY()
         dev.swipe(x, y, x + dx, y + dy, 60)
     }
 

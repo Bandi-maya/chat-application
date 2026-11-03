@@ -511,7 +511,7 @@ class ChatyPreferencesController(
             }
             "yo_want_airplanemode" -> home = home.copy(airplaneModeSimulator = flag)
             "yo_want_toolbar_cam" -> home = home.copy(showCameraIcon = flag)
-            "ui_home_styleV3" -> home = home.copy(homeStyle = HomePresetNormalizer.homeStyle(text))
+            "ui_home_styleV3" -> home = home.copy(homeStyle = HomePresentationPolicy.storedStyle(text))
             "bubble_style" -> conversation = conversation.copy(bubbleStyle = text)
             "tick_style" -> conversation = conversation.copy(tickStyle = text)
             "abu_saleh_quickcontact" -> conversation = conversation.copy(
