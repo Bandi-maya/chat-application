@@ -89,7 +89,7 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 81:
+          if applied != 82:
               raise SystemExit(f"Expected 82 override files, applied {applied}")
           PYOVERRIDES
 
