@@ -99,6 +99,9 @@ data class ChatMessage(
                         // remains conservative without persisting their payload.
                         val structuralKeys = setOf("id", "uid", "room_id", "conversation_id", "sender_id", "sender_name",
                             "type", "url", "name", "size", "text", "duration", "created_at")
+                        val stickerKeys = setOf("chaty_sticker_version", "chaty_sticker_pack", "chaty_sticker_id")
+                        val stickerHint = com.example.chat.core.stickers.StickerMessagePolicy.parse(t,
+                            stickerKeys.associateWith { key -> if (decoded.has(key)) decoded.opt(key) else null })
                         var unsupported = false
                         decoded.keys().forEach { key ->
                             val value = decoded.opt(key)
@@ -135,6 +138,10 @@ data class ChatMessage(
                                         (if (key == "p2p_transfer_version") n == 1.0 else n >= 0 && n <= Int.MAX_VALUE.toDouble())) attachmentMetadata[key] = n.toInt()
                                     else unsupported = true
                                 }
+                                key in stickerKeys -> {
+                                    // A complete validated display hint is allowed, never protection authority.
+                                    if (stickerHint.isEmpty()) unsupported = true
+                                }
                                 key in structuralKeys -> Unit
                                 else -> unsupported = true
                             }
@@ -142,6 +149,7 @@ data class ChatMessage(
                         if (decoded.keys().asSequence().any { it != "view_once" && it.equals("view_once", ignoreCase = true) }) {
                             attachmentMetadata["view_once"] = true
                         }
+                        attachmentMetadata.putAll(stickerHint)
                         if (unsupported) attachmentMetadata["unsupported_envelope_metadata"] = true
 
                     }
