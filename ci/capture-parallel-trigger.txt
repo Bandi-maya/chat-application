@@ -1,1 +1,1 @@
-41648909210 corrected stable harness on verified rows-v2 pair, signed-out presentation, 2026-11-03T20:06+05:30
+41687554672 drawer-aware readiness capture after6fab88e build; harness3b4db1e1
