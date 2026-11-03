@@ -113,3 +113,4 @@ Candidate-overlay compatibility: restore branch-owned ChatsHomeHost, Notificatio
 2026-11-03T05:40IST menu Composable extraction register-pressure workaround candidate for VerifyError at 0x318E (ChatDetailScreen): validate new DEX plus API34 conversation/menu/selection/album runtime - validation build
 2026-11-03T06:20IST temporary diagnostic capture: ChatDetailScreenKt preDEX classes + exact D8 identity (kotlin-only insertion, revert after evidence) - diagnostic build
 2026-11-03T07:13IST R8 override to 8.11.18 via official pluginManagement buildscript mechanism (D8 8.10.21 emits invalid ChatDetailScreen debug DEX) - validation build
+2026-11-03T07:57IST combined reviewed 8-file batch: V2 fixed-allowlist envelope parser + unsupported-marker, gallery Review(count), composer first-swap failure diagnostic, strengthened Android unknown-hint override; override guard 82 - validation build

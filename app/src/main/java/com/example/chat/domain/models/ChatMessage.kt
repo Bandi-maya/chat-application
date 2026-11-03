@@ -94,9 +94,56 @@ data class ChatMessage(
                                     seconds == kotlin.math.floor(seconds)) seconds.toInt() else 0
                             } ?: 0,
                         )
-                        // Only encrypted invitation material is retained; plaintext link secrets never enter message JSON.
-                        listOf("p2p_invite_ciphertext", "p2p_invite_group", "p2p_invite_epoch", "p2p_transfer_version")
-                            .forEach { key -> if (decoded.has(key)) attachmentMetadata[key] = decoded.opt(key) }
+                        // Only the explicit envelope contract is retained. Unknown names and
+                        // values may contain secrets; record only their presence so projection
+                        // remains conservative without persisting their payload.
+                        val structuralKeys = setOf("id", "uid", "room_id", "conversation_id", "sender_id", "sender_name",
+                            "type", "url", "name", "size", "text", "duration", "created_at")
+                        var unsupported = false
+                        decoded.keys().forEach { key ->
+                            val value = decoded.opt(key)
+                            when {
+                                key == "view_once" -> attachmentMetadata[key] = when (value) {
+                                    null, JSONObject.NULL -> null
+                                    is Boolean -> value
+                                    is String -> when (value.trim().lowercase(java.util.Locale.ROOT)) {
+                                        "true" -> true
+                                        "false" -> false
+                                        else -> true
+                                    }
+                                    else -> true
+                                }
+                                key.equals("view_once", ignoreCase = true) -> {
+                                    // An ambiguous protection spelling must never become unrestricted.
+                                    unsupported = true
+                                }
+                                key == "forwarded" && value is Boolean -> attachmentMetadata[key] = value
+                                key == "chaty_album_id" && value is String && value.isNotBlank() && value.length <= 128 -> attachmentMetadata[key] = value
+                                key in setOf("chaty_album_v", "chaty_album_index", "chaty_album_count") && value is Number -> {
+                                    val n = value.toDouble()
+                                    if (n.isFinite() && n == kotlin.math.floor(n) && when (key) {
+                                        "chaty_album_v" -> n == 1.0
+                                        "chaty_album_index" -> n >= 0 && n < 100
+                                        else -> n >= 2 && n <= 100
+                                    }) attachmentMetadata[key] = n.toInt()
+                                    else unsupported = true
+                                }
+                                key in setOf("p2p_invite_ciphertext", "p2p_invite_group") && value is String && value.isNotBlank() -> attachmentMetadata[key] = value
+                                key in setOf("p2p_invite_epoch", "p2p_transfer_version") && value is Number -> {
+                                    val n = value.toDouble()
+                                    if (n.isFinite() && n == kotlin.math.floor(n) &&
+                                        (if (key == "p2p_transfer_version") n == 1.0 else n >= 0 && n <= Int.MAX_VALUE.toDouble())) attachmentMetadata[key] = n.toInt()
+                                    else unsupported = true
+                                }
+                                key in structuralKeys -> Unit
+                                else -> unsupported = true
+                            }
+                        }
+                        if (decoded.keys().asSequence().any { it != "view_once" && it.equals("view_once", ignoreCase = true) }) {
+                            attachmentMetadata["view_once"] = true
+                        }
+                        if (unsupported) attachmentMetadata["unsupported_envelope_metadata"] = true
+
                     }
                 } catch (_: Exception) {
                 }

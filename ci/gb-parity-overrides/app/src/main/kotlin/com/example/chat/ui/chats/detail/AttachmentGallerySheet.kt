@@ -94,7 +94,7 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
             Text("Gallery", color = foreground, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
             TextButton(onClick = { onAction(AttachmentAction.image) }) { Text("Browse") }
             if (selected.isNotEmpty()) {
-                if (onReviewImages != null) OutlinedButton(onClick = { onReviewImages(selected.toList()) }) { Text("Review") }
+                if (onReviewImages != null) OutlinedButton(onClick = { onReviewImages(selected.toList()) }) { Text("Review (${selected.size})") }
                 if (onDirectSendImages != null) Button(onClick = { onDirectSendImages(selected.toList()) }) { Text("Send (${selected.size})") }
             }
         }
