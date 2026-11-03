@@ -51,10 +51,12 @@ fun ChatsHomeHost(
     var rev by remember { mutableIntStateOf(0) }
     var connectionSheetOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
     var connectionTesting by remember { androidx.compose.runtime.mutableStateOf(false) }
-    DisposableEffect(prefs) {
+    val templateController = ServiceLocator.templateController
+    DisposableEffect(prefs, templateController) {
         val l: () -> Unit = { rev++ }
         prefs.addListener(l)
-        onDispose { prefs.removeListener(l) }
+        templateController.addListener(l)
+        onDispose { prefs.removeListener(l); templateController.removeListener(l) }
     }
     @Suppress("UNUSED_EXPRESSION") rev
     val me = api.currentUser
@@ -81,6 +83,7 @@ fun ChatsHomeHost(
     } else null
     ChatsHomeScreen(
         headerBottom = headerBottom,
+        templates = com.example.chat.ui.chats.home.resolveHomeTemplates(templateController.config, com.example.chat.core.preferences.HomePresentationPolicy.isDefault(prefs.home.homeStyle), templateController.chatList),
         conversations = conversations,
         requiresSubscription = api.requiresSubscription,
         subscriptionMessage = api.subscriptionErrorMessage,
