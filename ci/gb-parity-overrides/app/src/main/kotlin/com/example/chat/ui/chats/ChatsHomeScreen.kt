@@ -409,8 +409,7 @@ fun ChatsHomeScreen(
         )
     }
 
-    val darkDefault = theme.isDark && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)
-    Scaffold(containerColor = if (darkDefault) Color.Black else Color(theme.backgroundColor)) { padding ->
+    Scaffold(containerColor = Color(theme.backgroundColor)) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             effectiveConnectionBanner?.invoke()
             if (requiresSubscription) {
@@ -470,7 +469,7 @@ fun ChatsHomeScreen(
                             homePrefs = homePrefs,
                             headerStyle = headerStyle,
                             homeStyle = homeStyle,
-                            title = barTitle,
+                            title = if (forcedType != null) pageTitle ?: barTitle else barTitle,
                             identity = identity,
                             isSearchOpen = isSearchOpen,
                             forcedTypeIsSet = forcedType != null,
@@ -535,8 +534,11 @@ fun ChatsHomeScreen(
                     focusRequester = searchFocus,
                 )
             }
-            // P4: iOS collapsing LARGE title.
-            if (!isSelectionMode && pageTitle != null) {
+            // The supplied Default / OLD / iOS headers already own their single title.
+            // Preserve the large-title treatment only for other Home presentations.
+            if (!isSelectionMode && pageTitle != null &&
+                !com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle) &&
+                rawHomeUiStyle !in setOf("ios style", "whatsapp old ui")) {
                 Box(
                     modifier = Modifier
                         .height(((1 - effectiveTitleCollapse) * 44).dp)
@@ -816,7 +818,8 @@ private fun HomeConversationList(
                     }
                     HomeSwipeActions(
                         enabled = !isSelectionMode,
-                        backgroundColor = Color(theme.backgroundColor),
+                        backgroundColor = com.example.chat.ui.navigation.LocalReferenceContentSurface.current
+                            ?: Color(theme.backgroundColor),
                         leadingActions = if (conversation.type == ConversationType.direct) {
                             listOf(
                                 HomeSwipeAction(
