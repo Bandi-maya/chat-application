@@ -1,0 +1,6 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="pikaiconsSolid_messageClock"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M12 4 a8 8 0 1 1 0 16 a8 8 0 1 1 0-16 Z M12 7 a1 1 0 0 1 1 1 V11.4 L14.6 13.4 a1 1 0 0 1-1.2 1.6 L11 12.8 V8 a1 1 0 0 1 1-1 Z" android:fillColor="#FF000000" android:fillType="evenOdd" />
+</vector>
