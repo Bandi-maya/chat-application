@@ -821,7 +821,7 @@ private fun SendMicMorph(
     }
 }
 
-/** Dart composer TextField port: hint 'Messageâ¦  /task or #reply', dense
+/** Dart composer TextField port: hint 'Message\u2026  /task or #reply', dense
  *  padding (default h12/v11), 14sp * fontScale, min 1 / max 5 lines. */
 @Composable
 private fun ComposerTextField(
@@ -858,7 +858,7 @@ private fun ComposerTextField(
         Box(Modifier.weight(1f)) {
             if (text.isEmpty()) {
                 Text(
-                    "Messageâ¦  /task or #reply",
+                    "Message\u2026  /task or #reply",
                     color = Color(theme.secondaryTextColor),
                     fontSize = fontSize,
                     maxLines = 1,
