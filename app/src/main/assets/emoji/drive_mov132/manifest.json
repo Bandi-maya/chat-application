@@ -1,0 +1,1085 @@
+{
+  "pack": "drive_mov132",
+  "source": "User-supplied third-party shared Drive MOV folder 1PGn6PDk6hcy2niWc1dzz_ETKz9LUoKMW",
+  "format": "240x240 animated WebP with alpha, 25fps loop; first50 converted from retained actual MOV, not copied iOS ZIP",
+  "items": [
+    {
+      "number": 1,
+      "file": "1_grinning_face.webp",
+      "codepoint": "U+1F600",
+      "sha256": "26eea52a26bdcd43f007b0f070a4ab3560160a9a196ddfd112d321208aa69ad7",
+      "bytes": 345264,
+      "source_file": "1_Grinning Face.mov",
+      "source_sha256": "6b5a5b305826cf1d25d56277cf8f4c393f389da6700491491353d36ddc79714c",
+      "frames": 52
+    },
+    {
+      "number": 2,
+      "file": "2_beaming_face.webp",
+      "codepoint": "U+1F601",
+      "sha256": "2afd849d78a4bcbc2e140337fe53d3dc5a83f934c065a1ebb1fbcaa6886336d6",
+      "bytes": 343772,
+      "source_file": "2_Beaming Face.mov",
+      "source_sha256": "6c0f161f1c165c96fd083db87a6e022e161f8485a9459e41dc3528c710b80cbe",
+      "frames": 47
+    },
+    {
+      "number": 3,
+      "file": "3_face_with_tears.webp",
+      "codepoint": "U+1F602",
+      "sha256": "835164e84900487cb9353220fb756af97c7ca4aa5a2c51658095c7236b4c88f1",
+      "bytes": 171330,
+      "source_file": "3_Face With Tears.mov",
+      "source_sha256": "9632297ee6ac70598b1f38f1bac5c795af1f1d8d3a8d4c6a66236e8f5aa8d744",
+      "frames": 20
+    },
+    {
+      "number": 4,
+      "file": "4_rolling_on_the_floor.webp",
+      "codepoint": "U+1F923",
+      "sha256": "a5c87419c4337bf963a267fd4fa6e59363a3292788628e02df4508879c957f49",
+      "bytes": 286722,
+      "source_file": "4_Rolling on the Floor.mov",
+      "source_sha256": "8c4de14547be3cc4e90e090c74431f001db09c1d56de949c702651135ac7d5ef",
+      "frames": 39
+    },
+    {
+      "number": 5,
+      "file": "5_grinning_face_with_big_eyes.webp",
+      "codepoint": "U+1F603",
+      "sha256": "19540b297102e6136d168b30c83d5705c2597fd5abff09b7b6b4950460c011a3",
+      "bytes": 359486,
+      "source_file": "5_Grinning Face With Big Eyes.mov",
+      "source_sha256": "1e498fd9bdddfbfda4f26faa42b83f4e7da2c07d82f098ecb5f93818eae95bf9",
+      "frames": 53
+    },
+    {
+      "number": 6,
+      "file": "6_grinning_face_with_smiling_eyes.webp",
+      "codepoint": "U+1F604",
+      "sha256": "397e744635fcc2da6c6b64054645d19ebc487abf354c0bbe3939efb6d484500a",
+      "bytes": 333074,
+      "source_file": "6_Grinning Face With Smiling Eyes.mov",
+      "source_sha256": "32527cb3d182d97f1d2a2b40452faf415349247d8f9124d0bacfc1182f9cd67e",
+      "frames": 47
+    },
+    {
+      "number": 7,
+      "file": "7_grinning_face_with_sweat.webp",
+      "codepoint": "U+1F605",
+      "sha256": "c3e43080616ddd0771ffc7434a27095acc00886cc431f89bf089c27af1519584",
+      "bytes": 355016,
+      "source_file": "7_Grinning Face With Sweat.mov",
+      "source_sha256": "98d198c22d27be96866d234337ab15c9ca7799d1c89fe21605b309cfbed49a01",
+      "frames": 47
+    },
+    {
+      "number": 8,
+      "file": "8_grinning_squinting_face.webp",
+      "codepoint": "U+1F606",
+      "sha256": "018b065d6271ab08cc7ddc378842eea953ea69c82cd5b841657f0a8e9caf4301",
+      "bytes": 133210,
+      "source_file": "8_Grinning Squinting Face.mov",
+      "source_sha256": "3efb8e79f4cd331b3a9f7938519557d4bb4a61f4b96215018888e289c4c9051f",
+      "frames": 18
+    },
+    {
+      "number": 9,
+      "file": "9_winking_face.webp",
+      "codepoint": "U+1F609",
+      "sha256": "b49484b457908cada4701bb99c9dc5f4e1e4a2fc37f52a71941bded5ddcb8cdb",
+      "bytes": 171612,
+      "source_file": "9_Winking Face.mov",
+      "source_sha256": "69d38ef1bdb337a6e212cc726c5540a540fff83beebafd3ba54380646330f3ae",
+      "frames": 25
+    },
+    {
+      "number": 10,
+      "file": "10_smiling_face_blushing.webp",
+      "codepoint": "U+1F60A",
+      "sha256": "4bd3c5d7d973b726a835c08261003bed8d87bb6ff7d86b074875988800fb4f83",
+      "bytes": 768424,
+      "source_file": "10_Smiling Face Blushing.mov",
+      "source_sha256": "2bbdc3f845bb6766ca2c8bb2bcaaa386b7d96a00ffe7666b9d4ec242e248337d",
+      "frames": 115
+    },
+    {
+      "number": 11,
+      "file": "11_face_savoring_food.webp",
+      "codepoint": "U+1F60B",
+      "sha256": "be92703fbe79ee749c62f044ff69d8977a9ef4c614b794d5bdcfa16f2a5854ea",
+      "bytes": 656800,
+      "source_file": "11_Face Savoring Food.mov",
+      "source_sha256": "00cbf6610665609e0f0dc0a7c621f927785366fca275ff03c4d5b0dae7856090",
+      "frames": 100
+    },
+    {
+      "number": 12,
+      "file": "12_smiling_face_with_sunglasses.webp",
+      "codepoint": "U+1F60E",
+      "sha256": "ee2487b7a55907a32cf7d762d950e183b8d37a2afbf52b46cdc7c09125a8652b",
+      "bytes": 136080,
+      "source_file": "12_Smiling Face With Sunglasses.mov",
+      "source_sha256": "b54e47f2e3a17b25231a4e33fe1355c6be52240008825ba25d8cf1e98bb68503",
+      "frames": 23
+    },
+    {
+      "number": 13,
+      "file": "13_smiling_face_with_heart_eyes.webp",
+      "codepoint": "U+1F60D",
+      "sha256": "2ef1271cbaca8a886281ea7d74d4e2346542a2b4ba396b28066ef9aadc1e661d",
+      "bytes": 272496,
+      "source_file": "13_Smiling Face With Heart-Eyes.mov",
+      "source_sha256": "f09fd1f9e487ac0742068b3a5a7d93fe37d40b10f1a1cf0f022489553689ab50",
+      "frames": 36
+    },
+    {
+      "number": 14,
+      "file": "14_face_blowing_a_kiss.webp",
+      "codepoint": "U+1F618",
+      "sha256": "f1df72b99ea84336b8b9e661957e648efee55a3d66b9d601fdea7103435a0ec1",
+      "bytes": 199480,
+      "source_file": "14_Face Blowing a Kiss.mov",
+      "source_sha256": "da0a69df0680f449cf8c326ab15ff31beb80fbbc4d1d2279fb15766a7e522511",
+      "frames": 30
+    },
+    {
+      "number": 15,
+      "file": "15_kissing_face.webp",
+      "codepoint": "U+1F617",
+      "sha256": "93fed74d0645101b6d837af6791dd98ec54892f644630a290c5e0324a7f3bb22",
+      "bytes": 195582,
+      "source_file": "15_Kissing Face.mov",
+      "source_sha256": "3f0c309bf5af3a40934eca822bf7d7cf0994c5e938f411a0dcf3b2667376e047",
+      "frames": 31
+    },
+    {
+      "number": 16,
+      "file": "16_kissing_face_with_smiling_eyes.webp",
+      "codepoint": "U+1F619",
+      "sha256": "b53da05b2f68acdc3d70c3abad4f1f654ef385aab5695c965b145ec2b465e860",
+      "bytes": 203842,
+      "source_file": "16_Kissing Face With Smiling Eyes.mov",
+      "source_sha256": "decbaf877c0f4b3a04f249e91cfae7b93a2d0bae875118a6b00a84808d1323cb",
+      "frames": 31
+    },
+    {
+      "number": 17,
+      "file": "17_kissing_face_with_closed_eyes.webp",
+      "codepoint": "U+1F61A",
+      "sha256": "1aa0480144c15ca2336b397a3a59fc671997bdf4cf2df6b81d386043c86295a8",
+      "bytes": 212934,
+      "source_file": "17_Kissing Face With Closed Eyes.mov",
+      "source_sha256": "64c3f2805dc3e5f92534911788958d9088946fa748fda839aee9fc9ab38c6b67",
+      "frames": 31
+    },
+    {
+      "number": 18,
+      "file": "18_blushing_closed_eyes.webp",
+      "codepoint": "U+263A",
+      "sha256": "3e24f25c38b8713bcdab22f10feda31b9f1f90e6d3efa61ae5fcd43607d08e9e",
+      "bytes": 746254,
+      "source_file": "18_Blushing Closed eyes.mov",
+      "source_sha256": "d0412acc2a78d17320427a0ed7dd257fd16e5a7f0c1e22ee9fe1c5c33a7a20f7",
+      "frames": 109
+    },
+    {
+      "number": 19,
+      "file": "19_slightly_smiling_face.webp",
+      "codepoint": "U+1F642",
+      "sha256": "953e2a702f398429a465dd0957ce7291ec0edf8ae2baf899eb96b3913e13cfde",
+      "bytes": 308632,
+      "source_file": "19_Slightly Smiling Face.mov",
+      "source_sha256": "93978e9683d5bf95c9524f4c6813ff5cdea3dce7e7836a43cbe35d158f2fc923",
+      "frames": 52
+    },
+    {
+      "number": 20,
+      "file": "20_hugging_face.webp",
+      "codepoint": "U+1F917",
+      "sha256": "afbbf9033a47fb84ece3684ae898f93c19fc16ac7614c4d026cec10ad6a76714",
+      "bytes": 222890,
+      "source_file": "20_Hugging Face.mov",
+      "source_sha256": "d8c579188aec3704572135867d5547ed654f0cdba22df15a5c7c540ef5bae7b6",
+      "frames": 28
+    },
+    {
+      "number": 21,
+      "file": "21_star_struck.webp",
+      "codepoint": "U+1F929",
+      "sha256": "16dcc6f717ac1a1a584f95f2bdd7e58321fd5bb5b4824acef7a484151c1a93c9",
+      "bytes": 361558,
+      "source_file": "21_Star-Struck.mov",
+      "source_sha256": "7a8e8735cc8a4e0cc88f94bbb21928c8f75b62225a79662636fb14952cb73d70",
+      "frames": 45
+    },
+    {
+      "number": 22,
+      "file": "22_thinking_face.webp",
+      "codepoint": "U+1F914",
+      "sha256": "4d0203874262352d3b0484d905702c008f8533eb54fb8040d765e35e3f1fa747",
+      "bytes": 132834,
+      "source_file": "22_Thinking Face.mov",
+      "source_sha256": "314d0067587bd00912a8e60f117d74291071fe32f5f86f5531e73d4054b43679",
+      "frames": 40
+    },
+    {
+      "number": 23,
+      "file": "23_face_with_raised_eyebrow.webp",
+      "codepoint": "U+1F928",
+      "sha256": "9a7d0f48eaa3d5dd56f90f23bf968d7cb812f3f9048009d01b280ac1d933f464",
+      "bytes": 50124,
+      "source_file": "23_Face With Raised Eyebrow.mov",
+      "source_sha256": "e974779c228fef85618614e7979a9c2d039052ce1d8720f2d1a672dc654c9a51",
+      "frames": 26
+    },
+    {
+      "number": 24,
+      "file": "24_neutral_face.webp",
+      "codepoint": "U+1F610",
+      "sha256": "daec0ec96d10479eea703e8625893b262958ecc919840394ffb5a123203b6b5e",
+      "bytes": 196832,
+      "source_file": "24_Neutral Face.mov",
+      "source_sha256": "c771323c8cf8e4d00b58558d174c5d8eae7cf6c2ee6dc33ab94d8c6ac25001b4",
+      "frames": 32
+    },
+    {
+      "number": 25,
+      "file": "25_expressionless_face.webp",
+      "codepoint": "U+1F611",
+      "sha256": "8037b8dd322da0dc7cc0db504195bc7e0fae7efa73e3e99abfc7e9a2b2aad9cc",
+      "bytes": 193420,
+      "source_file": "25_Expressionless Face.mov",
+      "source_sha256": "75ff70091201450ba985cf06f28117b07ddfc644441467b56508e9164f486a02",
+      "frames": 32
+    },
+    {
+      "number": 26,
+      "file": "26_face_without_mouth.webp",
+      "codepoint": "U+1F636",
+      "sha256": "dcb374b7c67752beb6b2ab055aca5e70dc4dcd8d8072b84500c9fa753e88b6d6",
+      "bytes": 153102,
+      "source_file": "26_Face Without Mouth.mov",
+      "source_sha256": "8cd42a1a32b6a9d641c2e9f5ad56efbc61b97ffe312aa934aa5e2994a2fc3155",
+      "frames": 37
+    },
+    {
+      "number": 27,
+      "file": "27_face_with_rolling_eyes.webp",
+      "codepoint": "U+1F644",
+      "sha256": "856d2df2848d539b53fc7188ca0031916a787153399faa6fe3f534b3d279890e",
+      "bytes": 214916,
+      "source_file": "27_Face With Rolling Eyes.mov",
+      "source_sha256": "a04a21e790a33c8fd37c5158e9240ea7db7be3a80c941073a7163dc01f85e503",
+      "frames": 30
+    },
+    {
+      "number": 28,
+      "file": "28_smirking_face.webp",
+      "codepoint": "U+1F60F",
+      "sha256": "ef03d7eead610fb5ee830a2b34f8c8f6efdba63622a88c5d0190ec4073736d92",
+      "bytes": 323780,
+      "source_file": "28_Smirking Face.mov",
+      "source_sha256": "3f2e3c11a6aab7e09b6b782670cf6d736534b7ab5239aa520b520fde0afdd963",
+      "frames": 53
+    },
+    {
+      "number": 29,
+      "file": "29_persevering_face.webp",
+      "codepoint": "U+1F623",
+      "sha256": "e3290460322dc61171339f3b4df6021497ffd46f58b8f0d0b6ffe201b3a8a0dd",
+      "bytes": 210118,
+      "source_file": "29_Persevering Face.mov",
+      "source_sha256": "d9d12e8e1290c078314c050e474dfd63ab05f3a7dee4ad6c7f887709f31038d4",
+      "frames": 34
+    },
+    {
+      "number": 30,
+      "file": "30_sad_but_relieved_face.webp",
+      "codepoint": "U+1F625",
+      "sha256": "1b806e95bd251bb2681f09e81d0df8b6a945b23f03dc1319fc6eabe937150413",
+      "bytes": 373610,
+      "source_file": "30_Sad but Relieved Face.mov",
+      "source_sha256": "9983d48e23ad4a1ef9f6b715fee2801285a9dcaf43fa67b33c9defdd9bed3db8",
+      "frames": 52
+    },
+    {
+      "number": 31,
+      "file": "31_face_with_open_mouth.webp",
+      "codepoint": "U+1F62E",
+      "sha256": "8666136839fc8e0f23f624a572fc923cf4405fd23d72bc28a887c02b579da91c",
+      "bytes": 322768,
+      "source_file": "31_Face With Open Mouth.mov",
+      "source_sha256": "f900965a1b94abe0dea041d5e8c095ad44d49a88a0b191d7ea64ca4e55e0d287",
+      "frames": 51
+    },
+    {
+      "number": 32,
+      "file": "32_zipper_mouth_face.webp",
+      "codepoint": "U+1F910",
+      "sha256": "55dfb29500302f5522ee5df5a3663b44dca574fb37e7a5da267595d6047b27de",
+      "bytes": 168310,
+      "source_file": "32_Zipper-Mouth Face.mov",
+      "source_sha256": "1bab529b719741edfd3d99bfca0751285a0ea51c6e62ee490efd3543654dc722",
+      "frames": 45
+    },
+    {
+      "number": 33,
+      "file": "33_hushed_face.webp",
+      "codepoint": "U+1F62F",
+      "sha256": "528b35a96bcbb7682813d8b126df44655860ed9f8dbf2a03f32a5c4e0cbd47a2",
+      "bytes": 308882,
+      "source_file": "33_Hushed Face.mov",
+      "source_sha256": "05ad59328a8261dd5445cfe9c8c6aa1f78fbd6d1e706af6c1096233825d4c3b4",
+      "frames": 47
+    },
+    {
+      "number": 34,
+      "file": "34_sleepy_face.webp",
+      "codepoint": "U+1F62A",
+      "sha256": "5d48b1a0b8d3e01ff2c5265f9826f2db76dc1a3f2d1a27200389740defd98c02",
+      "bytes": 376152,
+      "source_file": "34_Sleepy Face.mov",
+      "source_sha256": "0fee13abb4a6c852214a116a7808502da106610c36b821facce26e650225c868",
+      "frames": 50
+    },
+    {
+      "number": 35,
+      "file": "35_tired_face.webp",
+      "codepoint": "U+1F62B",
+      "sha256": "02a70c66b8a89c7a048fb703b7f95333c00d52420f215536f073ea9c51399d5b",
+      "bytes": 320966,
+      "source_file": "35_Tired Face.mov",
+      "source_sha256": "c2011a20471ad7ebacc9e9c0fe06a2564beaefa3bcd88fecb7210047866bd672",
+      "frames": 43
+    },
+    {
+      "number": 36,
+      "file": "36_sleeping_face.webp",
+      "codepoint": "U+1F634",
+      "sha256": "2e3852de3ee549a5df559da3f156332b816faf824a7682896d78463e5de9fe63",
+      "bytes": 540424,
+      "source_file": "36_Sleeping Face.mov",
+      "source_sha256": "f826b2ea9eaed8410016b90806e8d4b1af9d78909cdc16f9ef1a208f7dcefe4d",
+      "frames": 150
+    },
+    {
+      "number": 37,
+      "file": "37_relieved_face.webp",
+      "codepoint": "U+1F60C",
+      "sha256": "8772020d4000443f2fa92e0daae11312d33ff73a8ed4d98b6903bf3ef5e47e44",
+      "bytes": 274040,
+      "source_file": "37_Relieved Face.mov",
+      "source_sha256": "ea179713fa238aeaaa4b9804a8f7a1ef938fc8b14e89430f3233ac5a8145a5c2",
+      "frames": 40
+    },
+    {
+      "number": 38,
+      "file": "38_face_with_tongue.webp",
+      "codepoint": "U+1F61B",
+      "sha256": "a84ef73edf3879b13122d9b21dbd80036f68f16bf56e8181295832a8f3fbfafc",
+      "bytes": 446572,
+      "source_file": "38_Face With Tongue.mov",
+      "source_sha256": "b52ddba7ae96adc0dbdb47eea7eae982dbe81ced99ba958ba345bd70d017cfa0",
+      "frames": 69
+    },
+    {
+      "number": 39,
+      "file": "39_winking_face_with_tongue.webp",
+      "codepoint": "U+1F61C",
+      "sha256": "5e68ada86ec2e41fef14210bf73f90b25c37a58521094a2a11ea0421ae6ad6f7",
+      "bytes": 477400,
+      "source_file": "39_Winking Face With Tongue.mov",
+      "source_sha256": "2cc699c12a0209ecd9ea1057c13af8175b73a4be125485e87ba474d39cb24d97",
+      "frames": 69
+    },
+    {
+      "number": 40,
+      "file": "40_squinting_face_with_tongue.webp",
+      "codepoint": "U+1F61D",
+      "sha256": "d483bd6497be40eeeaf0b554d73858bb89a48c5f775e215a31c768165ebc6bc8",
+      "bytes": 465988,
+      "source_file": "40_Squinting Face With Tongue.mov",
+      "source_sha256": "5a1adbe9f55ba0c63a8476887194a535a8bbc4ce027c034d0e0194225b142da1",
+      "frames": 69
+    },
+    {
+      "number": 41,
+      "file": "41_drooling_face.webp",
+      "codepoint": "U+1F924",
+      "sha256": "2b225c4a2f8633506ac5b25fe7d2ed2ececba2ded11c081e77a67eac19ddd12e",
+      "bytes": 399810,
+      "source_file": "41_Drooling Face.mov",
+      "source_sha256": "1aa4983194a8cb32b50e74ea034a1880fd2ad7bd10ac51b4068c82e3b82ef2bb",
+      "frames": 55
+    },
+    {
+      "number": 42,
+      "file": "42_unamused_face.webp",
+      "codepoint": "U+1F612",
+      "sha256": "7e6b0c02b0284cfea510291f34c3ec1cadc42883817de869ac7601836066d580",
+      "bytes": 203316,
+      "source_file": "42_Unamused Face.mov",
+      "source_sha256": "c23a19aa5f95811e35d7c19e57cc2d12d50e731bca160c36e0c9e7102fb4392f",
+      "frames": 49
+    },
+    {
+      "number": 43,
+      "file": "43_downcast_face.webp",
+      "codepoint": "U+1F613",
+      "sha256": "dfd15a204d6288c3a9d82538522f772f14418227a6a1bc65ed1e33a5aed06949",
+      "bytes": 368826,
+      "source_file": "43_Downcast Face.mov",
+      "source_sha256": "eb0c83918b5c6d19937e34d1899663df19fc5af9c4b39eea8602eff773b8fd8e",
+      "frames": 52
+    },
+    {
+      "number": 44,
+      "file": "44_pensive_face.webp",
+      "codepoint": "U+1F614",
+      "sha256": "678e181ba0cf13e1600a70fa6c71a12d0e62ae2a87950375ea02a46d45f48c61",
+      "bytes": 350268,
+      "source_file": "44_Pensive Face.mov",
+      "source_sha256": "7a237a8337925d512a37656b29e7fe3f70585b4ba9383a4df7a2245ab4036ab0",
+      "frames": 52
+    },
+    {
+      "number": 45,
+      "file": "45_confused_face.webp",
+      "codepoint": "U+1F615",
+      "sha256": "c11e6ddfd1cfe3150693959e14ce32bcb4e520eaedb83f36cba40d8d3e16f9e5",
+      "bytes": 308756,
+      "source_file": "45_Confused Face.mov",
+      "source_sha256": "21f4aac8b094c82cebf86a6eaf102c430deeb970d0d0de130eb6b856819d29c5",
+      "frames": 52
+    },
+    {
+      "number": 46,
+      "file": "46_upside_down_face.webp",
+      "codepoint": "U+1F643",
+      "sha256": "f00729878d617720e4770567f94aa18ab8a6e080f4b591d61180e51de4ec5fb1",
+      "bytes": 242390,
+      "source_file": "46_Upside-Down Face.mov",
+      "source_sha256": "423566b4d42d1b21b8f84122dc7d2f4bbe0c8412fda0f6c0e3460ecb45c3682b",
+      "frames": 61
+    },
+    {
+      "number": 47,
+      "file": "47_money_mouth_face.webp",
+      "codepoint": "U+1F911",
+      "sha256": "15a936840ae65c56e831202a256f998c3a6d326763f6d752f5e744568b3f20d1",
+      "bytes": 517336,
+      "source_file": "47_Money-Mouth Face.mov",
+      "source_sha256": "95407566db3355c95902dcd7269433145a950b2aecbdd749b5deeea5ed33937f",
+      "frames": 69
+    },
+    {
+      "number": 48,
+      "file": "48_astonished_face.webp",
+      "codepoint": "U+1F632",
+      "sha256": "f09e007ab88513c55581cb7bf8fd275d2e8a6ab422a74ec6b0442c96ec721b1a",
+      "bytes": 375594,
+      "source_file": "48_Astonished Face.mov",
+      "source_sha256": "66095c30219f29db94030a6baf0d4268b288fe8a1813f27d0b40006050383f92",
+      "frames": 56
+    },
+    {
+      "number": 49,
+      "file": "49_frowning_face.webp",
+      "codepoint": "U+2639",
+      "sha256": "e798b427f5e5271a86568d5eb7848180ce6582869065af2a9723a1e186dfb340",
+      "bytes": 318912,
+      "source_file": "49_Frowning Face.mov",
+      "source_sha256": "4f20e9a603581c9cf22b27d83d0d40a2b252793a16627d5819f53aa3bd97d032",
+      "frames": 52
+    },
+    {
+      "number": 50,
+      "file": "50_slightly_frowning_face.webp",
+      "codepoint": "U+1F641",
+      "sha256": "1a032da0d581cb6f7f7949379648e3ebbed4a17dfe7c83bf4255b57b8492ce16",
+      "bytes": 314964,
+      "source_file": "50_Slightly Frowning Face.mov",
+      "source_sha256": "a3e563d8e459fe14461f0238aef73f108e88e512f2dbee202699dd8d4bba6cd1",
+      "frames": 52
+    },
+    {
+      "file": "51_confounded_face.webp",
+      "number": 51,
+      "codepoint": "U+1F616",
+      "sha256": "63c6bd7d2c6f754e42288efd514efc41b64912752693e3487216b97838fb3157",
+      "bytes": 346834
+    },
+    {
+      "file": "52_disappointed_face.webp",
+      "number": 52,
+      "codepoint": "U+1F61E",
+      "sha256": "fa574f4867098dc4435a2c1fd44d28fb91954ab8edc4e1a6a1a2b3e8b3f51f1e",
+      "bytes": 328236
+    },
+    {
+      "file": "53_worried_face.webp",
+      "number": 53,
+      "codepoint": "U+1F61F",
+      "sha256": "44771b6c2f93f25073c80f09942d169f25b72ba2c627695a3851aae4a1a27bfa",
+      "bytes": 305796
+    },
+    {
+      "file": "54_face_with_steam_from_nose.webp",
+      "number": 54,
+      "codepoint": "U+1F624",
+      "sha256": "6152afbc3503b54114667405d145f9d868f40c47ab39a67ba19532c0c64b2e66",
+      "bytes": 597100
+    },
+    {
+      "file": "55_crying_face.webp",
+      "number": 55,
+      "codepoint": "U+1F622",
+      "sha256": "d8044e8f47339a38d715dd7f4edbb5efcb98e1718cde64be6858ff6d5cfb576e",
+      "bytes": 369714
+    },
+    {
+      "file": "56_loudly_crying_face.webp",
+      "number": 56,
+      "codepoint": "U+1F62D",
+      "sha256": "e6a8278a79e73f59131baf28dc96a11b976c967c8e3cd7f4b6cf26ca777d3a20",
+      "bytes": 681428
+    },
+    {
+      "file": "57_frowning_face_with_open_mouth.webp",
+      "number": 57,
+      "codepoint": "U+1F626",
+      "sha256": "c1970e1c7b4fa504a871db6ce8dc9f4e03ccebea1dc3926aa3a50d9e813dbaa7",
+      "bytes": 289024
+    },
+    {
+      "file": "58_anguished_face.webp",
+      "number": 58,
+      "codepoint": "U+1F627",
+      "sha256": "89bddb1d30511b62b7f477dc57909ed4db086b7b800ca7fdfe82b3aff1a22e1d",
+      "bytes": 312100
+    },
+    {
+      "file": "59_fearful_face.webp",
+      "number": 59,
+      "codepoint": "U+1F628",
+      "sha256": "d9ecc02c79d17efd19496e37db67685cc7b7dc025a3c7a8352f6e35865968565",
+      "bytes": 310708
+    },
+    {
+      "file": "60_weary_face.webp",
+      "number": 60,
+      "codepoint": "U+1F629",
+      "sha256": "d8cfc6220bd2e7178f9c0c8be6531fdb0157fcdcb15c4b61a8c28f79c9269f74",
+      "bytes": 345144
+    },
+    {
+      "file": "61_exploding_head.webp",
+      "number": 61,
+      "codepoint": "U+1F92F",
+      "sha256": "ab200b94a32ff3916a662e5ca402f785072db21188521e5a0f207fa0cf243a00",
+      "bytes": 1002206
+    },
+    {
+      "file": "62_grimacing_face.webp",
+      "number": 62,
+      "codepoint": "U+1F62C",
+      "sha256": "ebe8e1ed4fdf3b78d7df592e743ff470975cbcd11deaeb4057254ee4fe7d7c8a",
+      "bytes": 311614
+    },
+    {
+      "file": "63_anxious_face.webp",
+      "number": 63,
+      "codepoint": "U+1F630",
+      "sha256": "6af090a872242e807991b038698bafa327c1374425d356f8e087b9eabd67ccac",
+      "bytes": 362174
+    },
+    {
+      "file": "64_face_screaming_in_fear.webp",
+      "number": 64,
+      "codepoint": "U+1F631",
+      "sha256": "468864c5c2a5f869801a7b4a99c68844ba3d296a07e14ca4e12b2a91f536f311",
+      "bytes": 539258
+    },
+    {
+      "file": "65_flushed_face.webp",
+      "number": 65,
+      "codepoint": "U+1F633",
+      "sha256": "721dca9f18fc2e905b612a14056f436b668f51909f3f63dad81d5540ffd9da57",
+      "bytes": 380602
+    },
+    {
+      "file": "66_zany_face.webp",
+      "number": 66,
+      "codepoint": "U+1F92A",
+      "sha256": "8a73fa8b30f92a9fb67536100917d58bc42ae14fb1aa8a2c88f72909197f564c",
+      "bytes": 392568
+    },
+    {
+      "file": "67_dizzy_face.webp",
+      "number": 67,
+      "codepoint": "U+1F635",
+      "sha256": "978fc2b1125b96204fd2c2428f834084611411ad424c3406a44671f837d3c6a5",
+      "bytes": 357718
+    },
+    {
+      "file": "68_pouting_face.webp",
+      "number": 68,
+      "codepoint": "U+1F621",
+      "sha256": "c843ed638b55ee144f6eca8860f8f200d6ef7d2429b77ee80d41ce07070f9b66",
+      "bytes": 400580
+    },
+    {
+      "file": "69_angry_face.webp",
+      "number": 69,
+      "codepoint": "U+1F620",
+      "sha256": "7eaa21223e474c0eba9898ca9165df9dc466c3aa72fe524aeaac07efad641d57",
+      "bytes": 411618
+    },
+    {
+      "file": "70_face_with_symbols_on_mouth.webp",
+      "number": 70,
+      "codepoint": "U+1F92C",
+      "sha256": "dcc149c93fde6281e0d0505560866b4f64f80e728761483d8c2a5f4e113473e5",
+      "bytes": 518086
+    },
+    {
+      "file": "71_face_with_medical_mask.webp",
+      "number": 71,
+      "codepoint": "U+1F637",
+      "sha256": "cd9717fe879a70c988a137017873ebb5240ed19dbc1f37ae6035fc1b99ef1c42",
+      "bytes": 167856
+    },
+    {
+      "file": "72_face_with_thermometer.webp",
+      "number": 72,
+      "codepoint": "U+1F912",
+      "sha256": "4b19713df3068a4b993b72b02aca70bd4991edfe23413aeb3a5b58633ae3dcd9",
+      "bytes": 299576
+    },
+    {
+      "file": "73_face_with_head-bandage.webp",
+      "number": 73,
+      "codepoint": "U+1F915",
+      "sha256": "be078a3f3b46d6712d39968212a8763ec91f5a83a93a0ca5e476c716f82ebfca",
+      "bytes": 718182
+    },
+    {
+      "file": "74_nauseated_face.webp",
+      "number": 74,
+      "codepoint": "U+1F922",
+      "sha256": "4661d22c32de9db0c8948e453dd630f1cc527f4f1f2327d659600da249534413",
+      "bytes": 373686
+    },
+    {
+      "file": "75_face_vomiting.webp",
+      "number": 75,
+      "codepoint": "U+1F92E",
+      "sha256": "880fb9d51799da50e15d9b54dca06edb227baad8c2374123f7c27726dcad2433",
+      "bytes": 775194
+    },
+    {
+      "file": "76_sneezing_face.webp",
+      "number": 76,
+      "codepoint": "U+1F927",
+      "sha256": "7c0fd03f575b230482004427f3b0fc868fc59403884d0cb2328dd35520919dc5",
+      "bytes": 459390
+    },
+    {
+      "file": "77_smiling_face_with_halo.webp",
+      "number": 77,
+      "codepoint": "U+1F607",
+      "sha256": "517ac7582409e3aabbb007d9a8966ceeeaf0b0d7610c49b14b4a36c5618d4540",
+      "bytes": 295418
+    },
+    {
+      "file": "78_cowboy_hat.webp",
+      "number": 78,
+      "codepoint": "U+1F920",
+      "sha256": "949b9be0b354b3a3278b1201126731839bff3fa4deca895005a06dc8002260f2",
+      "bytes": 480580
+    },
+    {
+      "file": "79_clown_face.webp",
+      "number": 79,
+      "codepoint": "U+1F921",
+      "sha256": "1d470cd1fb11b5bfbd9dd2af638a4ad4764feda8b2fa2187b65165ab981112e5",
+      "bytes": 728368
+    },
+    {
+      "file": "80_lying_face.webp",
+      "number": 80,
+      "codepoint": "U+1F925",
+      "sha256": "db3a0dee9e837fffa4b3b605f6e0dd140aa95819785601937e2b4aa158773690",
+      "bytes": 237560
+    },
+    {
+      "file": "81_shushing_face.webp",
+      "number": 81,
+      "codepoint": "U+1F92B",
+      "sha256": "072bf45b5eb67758f7d4d2ff5037c6579a02ee992fabf43516cd0da6227ce2e7",
+      "bytes": 465170
+    },
+    {
+      "file": "82_face_with_hand_over_mouth.webp",
+      "number": 82,
+      "codepoint": "U+1F92D",
+      "sha256": "3d0e8a870c038651dfdf489cb4bcaab484f2d7119f0a76bebbb6ce6f6bd0ff45",
+      "bytes": 264194
+    },
+    {
+      "file": "83_face_with_monocle.webp",
+      "number": 83,
+      "codepoint": "U+1F9D0",
+      "sha256": "76e51c682b17b9e71b6df73b73b90dc63d991a7e28b9ff4603458452b84244a7",
+      "bytes": 399628
+    },
+    {
+      "file": "84_nerd_face.webp",
+      "number": 84,
+      "codepoint": "U+1F913",
+      "sha256": "ba786295c9697c2a6993924cfd69977eeb8e05f05f8e782119b572e9527ace10",
+      "bytes": 378482
+    },
+    {
+      "file": "85_hot_face.webp",
+      "number": 85,
+      "codepoint": "U+1F975",
+      "sha256": "3cac0a7882f1367e512b4e3fc8c5f99b56435289fada943a93184cd521a6104e",
+      "bytes": 153386
+    },
+    {
+      "file": "86_partying_face.webp",
+      "number": 86,
+      "codepoint": "U+1F973",
+      "sha256": "cbaf5448eec22af2de02ca19949676a0bb3fa6031ff9709336f79f9789fd5acb",
+      "bytes": 544008
+    },
+    {
+      "file": "87_pleading_face.webp",
+      "number": 87,
+      "codepoint": "U+1F97A",
+      "sha256": "8088198299bffbcbb7c1a5b4e30b1ca746295593a62448ce8934cbbe29376361",
+      "bytes": 422294
+    },
+    {
+      "file": "88_woozy_face.webp",
+      "number": 88,
+      "codepoint": "U+1F974",
+      "sha256": "75041a4d60170b32150bb315970e3502b3cb716d8ae43da1b805b7e8615cae91",
+      "bytes": 586728
+    },
+    {
+      "file": "89_cold_face.webp",
+      "number": 89,
+      "codepoint": "U+1F976",
+      "sha256": "2b2ccc1e68aec2f50f580b084f0117845c8f6546d4d46001ffcbcf8453ea403e",
+      "bytes": 593828
+    },
+    {
+      "file": "90_smiling_face_with_hearts.webp",
+      "number": 90,
+      "codepoint": "U+1F970",
+      "sha256": "cf4fd76e7252cb0d06552721ea39b6e3adefe849cb7571b3d6b045ae9bad5230",
+      "bytes": 934762
+    },
+    {
+      "file": "91_smiling_face_with_horns.webp",
+      "number": 91,
+      "codepoint": "U+1F608",
+      "sha256": "e2f770937c59ad3fe997d63899cfbcfc7f5fbc767d91ca52343b48e74dceda6b",
+      "bytes": 298846
+    },
+    {
+      "file": "92_angry_face_with_horns.webp",
+      "number": 92,
+      "codepoint": "U+1F47F",
+      "sha256": "9cffb9c1aceeddb63f7a4ef71d52dd1dc8890db6351b2e6322a5a675ef480bbd",
+      "bytes": 290020
+    },
+    {
+      "file": "93_grinning_cat_face.webp",
+      "number": 93,
+      "codepoint": "U+1F63A",
+      "sha256": "0d49b737c3b3c9a9f814ffb11721ad1818f943ae68b4b529bbc5d423023cf1e1",
+      "bytes": 331336
+    },
+    {
+      "file": "94_grinning_cat_face_with_smiling_eyes.webp",
+      "number": 94,
+      "codepoint": "U+1F638",
+      "sha256": "2d8992bb3aa4c7d1c56143a54aaf426d35649567acb93de906407fb06367395b",
+      "bytes": 358646
+    },
+    {
+      "file": "95_cat_face_with_tears_of_joy.webp",
+      "number": 95,
+      "codepoint": "U+1F639",
+      "sha256": "cad30d5d8ba2842931bf46ee38e86ecf34d2c5f4d04d2278d2a482de458b5f1f",
+      "bytes": 200006
+    },
+    {
+      "file": "96_smiling_cat_face_with_heart-eyes.webp",
+      "number": 96,
+      "codepoint": "U+1F63B",
+      "sha256": "c5c8918c6806813ad5b478b3b00ddec8d757bc3de5adbabe694e7efcfc19731f",
+      "bytes": 293320
+    },
+    {
+      "file": "97_cat_face_with_wry_smile.webp",
+      "number": 97,
+      "codepoint": "U+1F63C",
+      "sha256": "6965069106e1bd536c37dff3be0dc56612962f90df3c341324f6e0a309b2b540",
+      "bytes": 317344
+    },
+    {
+      "file": "98_kissing_cat_face.webp",
+      "number": 98,
+      "codepoint": "U+1F63D",
+      "sha256": "d26b3a9f4d878b59bd1d241cd4f5ebcab41e534f76c97aa5141af9cf54c6c206",
+      "bytes": 243862
+    },
+    {
+      "file": "99_weary_cat_face.webp",
+      "number": 99,
+      "codepoint": "U+1F640",
+      "sha256": "b1319112b831c770763b0e520dca8de9364d5a2255bda3c49d39ad9dfe35554d",
+      "bytes": 616958
+    },
+    {
+      "file": "100_crying_cat_face.webp",
+      "number": 100,
+      "codepoint": "U+1F63F",
+      "sha256": "556483508680ec88e55790c71343752fd051614b65a769e729200440a406a9cf",
+      "bytes": 422276
+    },
+    {
+      "file": "101_pouting_cat_face.webp",
+      "number": 101,
+      "codepoint": "U+1F63E",
+      "sha256": "06849ec0482ebcda3b50cc36de77c314118655ab3a99a339079fe44a9ffd2b6d",
+      "bytes": 607674
+    },
+    {
+      "file": "102_see-no-evil_monkey.webp",
+      "number": 102,
+      "codepoint": "U+1F648",
+      "sha256": "45de3283905df655dd660176c5ffa342ac0d9b0ffff1f7b808f955029fd47ca7",
+      "bytes": 744448
+    },
+    {
+      "file": "103_hear-no-evil_monkey.webp",
+      "number": 103,
+      "codepoint": "U+1F649",
+      "sha256": "619500d8e3eec293c31d9f2cda3bd32b4443d72a5aeec637df25047457f1e1de",
+      "bytes": 950008
+    },
+    {
+      "file": "104_speak-no-evil_monkey.webp",
+      "number": 104,
+      "codepoint": "U+1F64A",
+      "sha256": "74468362ebd7d6632b34f1011fd2bc68c82f9eb03973e5d44badd15967c353e4",
+      "bytes": 565938
+    },
+    {
+      "file": "105_red_heart.webp",
+      "number": 105,
+      "codepoint": "U+2764",
+      "sha256": "c984652edc60a69f08a6c5d458159baeacfa0b07bd0a0b40ef91c31d5e3c1b39",
+      "bytes": 115808
+    },
+    {
+      "file": "106_broken_heart.webp",
+      "number": 106,
+      "codepoint": "U+1F494",
+      "sha256": "00b103027af770de3c9ed2199806a933953d23386ffaf2137bef4596c617ca19",
+      "bytes": 257540
+    },
+    {
+      "file": "107_revolving_hearts.webp",
+      "number": 107,
+      "codepoint": "U+1F49E",
+      "sha256": "7764c177c25acef05d45887de87b26c616cfbe31ebc2fd44456d45723054bf07",
+      "bytes": 304938
+    },
+    {
+      "file": "108_two_hearts.webp",
+      "number": 108,
+      "codepoint": "U+1F495",
+      "sha256": "89166224abc66a2952cf997343e22cf1576a85c536b83a094a61d9a418c3da64",
+      "bytes": 126032
+    },
+    {
+      "file": "109_flexed_biceps.webp",
+      "number": 109,
+      "codepoint": "U+1F4AA",
+      "sha256": "772842ab78af9dcd8d6ac04fd228906c269571c5d83e53ecbcb1ad66d57f35b6",
+      "bytes": 288106
+    },
+    {
+      "file": "110_shaka_hand.webp",
+      "number": 110,
+      "codepoint": "U+1F919",
+      "sha256": "e151acbfa7559d2140344184c18bdf9a787d805609fc2e41f60e99e93c5d14d1",
+      "bytes": 260468
+    },
+    {
+      "file": "111_waving_hand.webp",
+      "number": 111,
+      "codepoint": "U+1F44B",
+      "sha256": "264b9821bf79c151ca8eab7b4f3dff88a7c0982620909f4eba953effc32e4363",
+      "bytes": 386490
+    },
+    {
+      "file": "112_ok_hand.webp",
+      "number": 112,
+      "codepoint": "U+1F44C",
+      "sha256": "a54d22ac3dbda9061c2293b5af131caff2964e019846a3b69b809ee5ab7e28c1",
+      "bytes": 219356
+    },
+    {
+      "file": "113_victory_hand.webp",
+      "number": 113,
+      "codepoint": "U+270C",
+      "sha256": "629fe035ad28448fb5475a1843cb404ddc4294c006e258905338d1a1fe375e36",
+      "bytes": 248112
+    },
+    {
+      "file": "114_crossed_fingers.webp",
+      "number": 114,
+      "codepoint": "U+1F91E",
+      "sha256": "0d9df7520a7fa6b59c015031bd90b98760a44900e2c9cdc8ecb9dacbe3e5ecc4",
+      "bytes": 98592
+    },
+    {
+      "file": "115_sign_of_the_horns.webp",
+      "number": 115,
+      "codepoint": "U+1F918",
+      "sha256": "dfafc68320617213dcdcda70b895f7ed1427fb20003fe6f67a8c88578ab52f29",
+      "bytes": 75062
+    },
+    {
+      "file": "116_love-you_gesture.webp",
+      "number": 116,
+      "codepoint": "U+1F91F",
+      "sha256": "1f3de7e8a814aa7f92876e1798cd4e63f2b85563f9a90ca769294dd537bc4a08",
+      "bytes": 354094
+    },
+    {
+      "file": "117_thumbs_up.webp",
+      "number": 117,
+      "codepoint": "U+1F44D",
+      "sha256": "fab084a746639616d6d32a7389179d0ffc7626dd1ccfa460001e9d8b0c06bd72",
+      "bytes": 125868
+    },
+    {
+      "file": "118_thumbs_down.webp",
+      "number": 118,
+      "codepoint": "U+1F44E",
+      "sha256": "9646cf7bcc0363dd9c6236902bc2b6ac5b52d4a759f23420d5acc3e67d227578",
+      "bytes": 124070
+    },
+    {
+      "file": "119_vulcan_salute.webp",
+      "number": 119,
+      "codepoint": "U+1F596",
+      "sha256": "c581070cc46c196b1d5f8a89a5566ea96c10386aa2476307f887ce4d3d66a5a3",
+      "bytes": 218546
+    },
+    {
+      "file": "120_clapping_hands.webp",
+      "number": 120,
+      "codepoint": "U+1F44F",
+      "sha256": "42af50eeb658baac34d0289c9e5f73a8979e25e33a54741848c9f7732b7ffc24",
+      "bytes": 111650
+    },
+    {
+      "file": "121_folded_hands.webp",
+      "number": 121,
+      "codepoint": "U+1F64F",
+      "sha256": "399a7dab2081f1e876103107b762a99a194a15e90f8f4df7fb1e4e45857826a8",
+      "bytes": 128266
+    },
+    {
+      "file": "122_middle_finger.webp",
+      "number": 122,
+      "codepoint": "U+1F595",
+      "sha256": "08150ba43b0e83d1db39c6e9f989c71211e8a699407e54ccb0d312ad090846d7",
+      "bytes": 116520
+    },
+    {
+      "file": "123_backhand_index_pointing_right.webp",
+      "number": 123,
+      "codepoint": "U+1F449",
+      "sha256": "7a82c00f3e6784070393586139cb0a3a89be87e1634ebdc4f19f424e070c85ec",
+      "bytes": 134354
+    },
+    {
+      "file": "124_raising_hands.webp",
+      "number": 124,
+      "codepoint": "U+1F64C",
+      "sha256": "eb905fcf07021075af21e583e736f8f5139a5b3a51e6ea13ed725b4773b548e9",
+      "bytes": 367886
+    },
+    {
+      "file": "125_eyes.webp",
+      "number": 125,
+      "codepoint": "U+1F440",
+      "sha256": "2031dc264a37828507607311956efa282189d0405bea089b4922ad02b4f42b3d",
+      "bytes": 246684
+    },
+    {
+      "file": "126_man_shrugging.webp",
+      "number": 126,
+      "codepoint": "U+1F937-200D-2642-FE0F",
+      "sha256": "35c9341d250d59b6050a47f250ee286f1ad862931e870264348a4a0930f23d79",
+      "bytes": 286472
+    },
+    {
+      "file": "127_woman_shrugging.webp",
+      "number": 127,
+      "codepoint": "U+1F937-200D-2640-FE0F",
+      "sha256": "4137871fe21300320662213b0681d8143c7bc4075e05149427607b1122d4adcd",
+      "bytes": 285820
+    },
+    {
+      "file": "128_man_facepalming.webp",
+      "number": 128,
+      "codepoint": "U+1F926-200D-2642-FE0F",
+      "sha256": "5f3a69c6955396710dc1b7284e3adce3c684695dfd648fbddd12d4e51ad8068b",
+      "bytes": 364542
+    },
+    {
+      "file": "129_woman_facepalming.webp",
+      "number": 129,
+      "codepoint": "U+1F926-200D-2640-FE0F",
+      "sha256": "314ed3f04503190a2c9a49a5d8cdbcde957f38e8abedd88f8f53d5af8bbb5b99",
+      "bytes": 287812
+    },
+    {
+      "file": "130_man_gesturing_no.webp",
+      "number": 130,
+      "codepoint": "U+1F645-200D-2642-FE0F",
+      "sha256": "71fa409a2edbb0bc7a3368fc87f567996477d35914b6e155d556dab75011f66d",
+      "bytes": 724820
+    },
+    {
+      "file": "131_woman_gesturing_no.webp",
+      "number": 131,
+      "codepoint": "U+1F645-200D-2640-FE0F",
+      "sha256": "7d0670c0fc1ae32094abb56e3d0537ee482d835b6718b0008c908afb5027ffcf",
+      "bytes": 692450
+    },
+    {
+      "file": "132_fire.webp",
+      "number": 132,
+      "codepoint": "U+1F525",
+      "sha256": "0fa8b35b5d2e22fe5fd3c8622c10ad829ae4cb7188eff5de44c8f89ec8bcb1c0",
+      "bytes": 411578
+    }
+  ],
+  "missing": [],
+  "bundled": 132,
+  "complete": true,
+  "overlap": "First50 overlap designs/indices with separate supplied iOS ZIP, but this pack uses MOV conversions."
+}
