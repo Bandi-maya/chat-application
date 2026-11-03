@@ -99,7 +99,7 @@ class CallContactPickerProofTest {
     )
 
     private fun swipeFrom(desc: String, dx: Int, dy: Int) {
-        val obj = dev.findObject(By.desc(desc)) ?: fail("control '$desc' not found")
+        val obj = dev.findObject(By.desc(desc)) ?: throw AssertionError("control '$desc' not found")
         // Gesture must start on the actual target, not the unrelated display center.
         val bounds = obj.visibleBounds
         val x = bounds.centerX()
