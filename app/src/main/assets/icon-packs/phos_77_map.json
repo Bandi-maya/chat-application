@@ -1,0 +1,382 @@
+{
+ "chats": [
+  "chat",
+  "regular",
+  ""
+ ],
+ "updates": [
+  "radio-button",
+  "regular",
+  "EXACT per base outline: ring + filled center dot (status ring), replaces bell which was wrong semantic"
+ ],
+ "calls": [
+  "phone",
+  "regular",
+  ""
+ ],
+ "profile": [
+  "user",
+  "regular",
+  ""
+ ],
+ "tasks": [
+  "clipboard-text",
+  "regular",
+  ""
+ ],
+ "groups": [
+  "users",
+  "regular",
+  ""
+ ],
+ "desktop": [
+  "monitor",
+  "regular",
+  ""
+ ],
+ "more": [
+  "dots-three",
+  "regular",
+  ""
+ ],
+ "moreOptions": [
+  "dots-three-vertical",
+  "regular",
+  ""
+ ],
+ "search": [
+  "magnifying-glass",
+  "regular",
+  ""
+ ],
+ "settings": [
+  "gear",
+  "regular",
+  ""
+ ],
+ "close": [
+  "x",
+  "regular",
+  ""
+ ],
+ "check": [
+  "check",
+  "regular",
+  ""
+ ],
+ "tune": [
+  "sliders-horizontal",
+  "regular",
+  ""
+ ],
+ "chevronRight": [
+  "caret-right",
+  "regular",
+  ""
+ ],
+ "back": [
+  "arrow-left",
+  "regular",
+  ""
+ ],
+ "send": [
+  "paper-plane-tilt",
+  "regular",
+  ""
+ ],
+ "emoji": [
+  "smiley",
+  "regular",
+  ""
+ ],
+ "attachment": [
+  "paperclip",
+  "regular",
+  ""
+ ],
+ "attachmentPlus": [
+  "plus-circle",
+  "regular",
+  "EXACT per base outline (plus in circle)"
+ ],
+ "microphone": [
+  "microphone",
+  "regular",
+  ""
+ ],
+ "microphoneOff": [
+  "microphone-slash",
+  "regular",
+  ""
+ ],
+ "pin": [
+  "push-pin",
+  "regular",
+  ""
+ ],
+ "unpin": [
+  "push-pin-slash",
+  "regular",
+  ""
+ ],
+ "archive": [
+  "archive",
+  "regular",
+  ""
+ ],
+ "lock": [
+  "lock",
+  "regular",
+  ""
+ ],
+ "unlock": [
+  "lock-open",
+  "regular",
+  ""
+ ],
+ "mute": [
+  "speaker-slash",
+  "regular",
+  ""
+ ],
+ "unmute": [
+  "speaker-high",
+  "regular",
+  ""
+ ],
+ "favourite": [
+  "heart",
+  "regular",
+  ""
+ ],
+ "favouriteFilled": [
+  "heart-fill",
+  "fill",
+  "fill weight of same family"
+ ],
+ "delete": [
+  "trash",
+  "regular",
+  ""
+ ],
+ "deleteOutline": [
+  "trash",
+  "regular",
+  "same glyph as delete"
+ ],
+ "reply": [
+  "arrow-bend-up-left",
+  "regular",
+  ""
+ ],
+ "forward": [
+  "arrow-bend-up-right",
+  "regular",
+  ""
+ ],
+ "edit": [
+  "pencil",
+  "regular",
+  ""
+ ],
+ "editOutline": [
+  "pencil",
+  "regular",
+  "same glyph as edit"
+ ],
+ "copy": [
+  "copy",
+  "regular",
+  ""
+ ],
+ "share": [
+  "share-network",
+  "regular",
+  ""
+ ],
+ "camera": [
+  "camera",
+  "regular",
+  ""
+ ],
+ "cameraFlip": [
+  "camera-rotate",
+  "regular",
+  ""
+ ],
+ "cameraShutter": [
+  "aperture",
+  "regular",
+  ""
+ ],
+ "cameraFlashOn": [
+  "lightning",
+  "regular",
+  ""
+ ],
+ "cameraFlashOff": [
+  "lightning-slash",
+  "regular",
+  ""
+ ],
+ "gallery": [
+  "image",
+  "regular",
+  ""
+ ],
+ "callAudio": [
+  "phone",
+  "regular",
+  "same glyph as calls"
+ ],
+ "callVideo": [
+  "video-camera",
+  "regular",
+  ""
+ ],
+ "callVideoOff": [
+  "video-camera-slash",
+  "regular",
+  ""
+ ],
+ "callEnd": [
+  "phone-disconnect",
+  "regular",
+  ""
+ ],
+ "cameraSwitch": [
+  "camera-rotate",
+  "regular",
+  "same glyph as cameraFlip"
+ ],
+ "screenShare": [
+  "screencast",
+  "regular",
+  ""
+ ],
+ "screenShareStop": [
+  "monitor+x-composite",
+  "regular",
+  "EXPLICIT COMPOSITION of two genuine family glyphs (monitor + x centered in screen), matches base outline monitor-with-X. Not a native glyph."
+ ],
+ "speaker": [
+  "speaker-high",
+  "regular",
+  "same glyph as unmute"
+ ],
+ "earpiece": [
+  "device-mobile",
+  "regular",
+  "APPROXIMATION: base art is upright receiver rect with top earpiece slit + mic dot; device-mobile is the family upright receiver glyph (slit position differs). Not handset."
+ ],
+ "signal": [
+  "cell-signal-full",
+  "regular",
+  ""
+ ],
+ "messageCheckSingle": [
+  "check",
+  "regular",
+  "same glyph as check"
+ ],
+ "messageCheckDouble": [
+  "checks",
+  "regular",
+  ""
+ ],
+ "messageClock": [
+  "clock",
+  "regular",
+  ""
+ ],
+ "pictureInPicture": [
+  "picture-in-picture",
+  "regular",
+  ""
+ ],
+ "autoAwesome": [
+  "sparkle",
+  "regular",
+  ""
+ ],
+ "fullscreen": [
+  "arrows-out",
+  "regular",
+  ""
+ ],
+ "fullscreenExit": [
+  "arrows-in",
+  "regular",
+  ""
+ ],
+ "openInNew": [
+  "arrow-square-out",
+  "regular",
+  ""
+ ],
+ "clear": [
+  "x",
+  "regular",
+  "same glyph as close"
+ ],
+ "addTask": [
+  "list-plus",
+  "regular",
+  ""
+ ],
+ "logout": [
+  "sign-out",
+  "regular",
+  ""
+ ],
+ "schedule": [
+  "clock",
+  "regular",
+  "same glyph as messageClock"
+ ],
+ "sync": [
+  "arrows-clockwise",
+  "regular",
+  ""
+ ],
+ "checkSingle": [
+  "check",
+  "regular",
+  "same glyph as check"
+ ],
+ "checkDouble": [
+  "checks",
+  "regular",
+  ""
+ ],
+ "errorOutline": [
+  "warning-circle",
+  "regular",
+  ""
+ ],
+ "pause": [
+  "pause",
+  "regular",
+  ""
+ ],
+ "playArrow": [
+  "play",
+  "regular",
+  ""
+ ],
+ "musicNote": [
+  "music-note",
+  "regular",
+  ""
+ ],
+ "videoCam": [
+  "video-camera",
+  "regular",
+  "same glyph as callVideo"
+ ],
+ "voiceCall": [
+  "phone",
+  "regular",
+  "same glyph as calls"
+ ]
+}
