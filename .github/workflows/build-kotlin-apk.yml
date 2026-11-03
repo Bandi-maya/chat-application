@@ -111,8 +111,8 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 86:
-              raise SystemExit(f"Expected 86 override files, applied {applied}")
+          if applied != 114:
+              raise SystemExit(f"Expected 114 override files, applied {applied}")
           PYOVERRIDES
       - name: Patch debug-only proof fixtures to current Kotlin ports
         run: |
@@ -210,6 +210,12 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt \
+            app/src/main/kotlin/com/example/chat/ui/updates/ReleaseNotesPolicy.kt \
+            app/src/main/kotlin/com/example/chat/ui/navigation/NavigationShells3.kt \
+            app/src/main/kotlin/com/example/chat/ui/navigation/MainNavigationShell.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/home/HomeAppBars.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/AlbumSelectionPolicy.kt \
+            app/src/test/java/com/example/chat/AlbumSelectionPolicyTest.kt \
             app/src/main/kotlin/com/example/chat/ui/settings/SettingsRootScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/settings/NetworkDataUsageScreen.kt \
             app/src/main/java/com/example/chat/data/services/ProtectedResourceGate.kt \
@@ -224,9 +230,7 @@ jobs:
             app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt \
             app/src/main/kotlin/com/example/chat/data/auth/SessionStore.kt \
             app/src/main/kotlin/com/example/chat/data/auth/AuthRepository.kt \
-            app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt \
             app/src/main/java/com/example/chat/data/api/ApiSessionStore.kt \
-            app/src/main/kotlin/com/example/chat/data/api/EncryptedApiSessionStore.kt \
             app/src/main/java/com/example/chat/data/services/AacPcmVoiceRecorder.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/VoiceSessionController.kt \
             app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt \
@@ -498,8 +502,8 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 86:
-              raise SystemExit(f"Expected 86 override files, applied {applied}")
+          if applied != 114:
+              raise SystemExit(f"Expected 114 override files, applied {applied}")
           PYOVERRIDES
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
