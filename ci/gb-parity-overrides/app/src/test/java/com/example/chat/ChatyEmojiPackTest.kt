@@ -44,8 +44,8 @@ class ChatyEmojiPackTest {
         assertTrue(ChatyEmojiPack.iosSupported(28))
     }
 
-    @Test fun sixActuallyBundledPackIdentitiesInPickerOrder() {
-        assertEquals(listOf("Chaty", "iOS", "Microsoft", "OpenMoji", "Telegram", "Telegram Lottie"), ChatyEmojiPack.ORDER)
+    @Test fun sevenActuallyBundledPackIdentitiesInPickerOrder() {
+        assertEquals(listOf("Chaty", "iOS", "Microsoft", "OpenMoji", "Telegram", "Telegram Lottie", "Drive MOV animations"), ChatyEmojiPack.ORDER)
         assertEquals("Microsoft", ChatyEmojiPack.normalize("microsoft"))
         assertEquals("OpenMoji", ChatyEmojiPack.normalize("OPENMOJI"))
         assertEquals("Telegram", ChatyEmojiPack.normalize("Telegram"))
@@ -81,6 +81,19 @@ class ChatyEmojiPackTest {
         assertNull(ChatyEmojiPack.lottieAssetPath("😅😅"))
         assertEquals("Telegram Lottie", ChatyEmojiPack.normalize("telegram lottie"))
         assertEquals(ChatyEmojiPack.lottieAssetPath("🌤"), ChatyEmojiPack.lottieAssetPath("🌤️"))
+    }
+    @Test fun drivePackSupportsActualGenderedZwjSequencesWithoutChangingOtherStyles() {
+        assertEquals(132, ChatyEmojiPack.driveKeys.size)
+        assertEquals("emoji/drive_mov132/1f937-200d-2642.webp", ChatyEmojiPack.driveAssetPath("🤷‍♂️"))
+        assertEquals(ChatyEmojiPack.driveAssetPath("🤷‍♂"), ChatyEmojiPack.driveAssetPath("🤷‍♂️"))
+        assertEquals("emoji/drive_mov132/1f926-200d-2640.webp", ChatyEmojiPack.driveAssetPath("🤦‍♀️"))
+        assertEquals("emoji/drive_mov132/1f92f.webp", ChatyEmojiPack.driveAssetPath("🤯"))
+        assertEquals("emoji/drive_mov132/1f645-200d-2642.webp", ChatyEmojiPack.driveAssetPath("🙅‍♂️"))
+        assertEquals("emoji/drive_mov132/1f645-200d-2640.webp", ChatyEmojiPack.driveAssetPath("🙅‍♀️"))
+        assertNull(ChatyEmojiPack.driveAssetPath("🦀")) // not part of the source folder
+        assertNull(ChatyEmojiPack.driveAssetPath("🤷‍♂️🔥"))
+        assertNull(ChatyEmojiPack.iosAssetPath("🤷‍♂️"))
+        assertTrue(ChatyEmojiPack.needsAnimatedDecoder(ChatyEmojiPack.DRIVE_MOV))
     }
     @Test fun onlyOpenMojiIsStatic() {
         assertTrue(ChatyEmojiPack.needsAnimatedDecoder("Telegram"))
