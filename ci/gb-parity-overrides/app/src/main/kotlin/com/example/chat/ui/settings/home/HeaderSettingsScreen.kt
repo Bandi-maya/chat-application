@@ -223,6 +223,13 @@ fun HeaderSettingsScreen(
                     onToggleSearch = {}, onToggleGhost = {}, onIdentityTap = {}, onIdentityLongPress = {},
                     onOpenOverflowMenu = { showOverflowMenu(onBack) }, onSnack = {},
                 )
+                // Use the shell's published tab data, as the real Home content does.
+                com.example.chat.ui.navigation.LocalHomeHeaderTabs.current?.let { tabs ->
+                    if (tabs.active) com.example.chat.ui.navigation.HomeHeaderTabsBar(
+                        com.example.chat.ui.core.theme.ChatyColors(config), tabs.ids,
+                        tabs.selectedIndex, tabs.heightDp, onSelect = {},
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp, 4.dp, 14.dp, 24.dp)) {
             Column(
