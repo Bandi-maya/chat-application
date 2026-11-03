@@ -1,6 +1,7 @@
 package com.example.chat.ui.kit
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -55,11 +57,17 @@ val LocalReferenceLayoutPresentation = androidx.compose.runtime.staticCompositio
  * Intrinsic width prevents weighted menu labels from expanding to the full popup constraint.
  * Foundation handles scrolling and Popup handles Back/outside dismissal.
  */
+/** Session-scoped scroll memory for menus that opt in via rememberKey: reopening
+ *  lands on the same option area instead of the top (user directive: reopen from
+ *  the last used option, not from the start). */
+private val chatyMenuScrollMemory = HashMap<String, Int>()
+
 @Composable
 fun ChatyDropdownMenu(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    rememberKey: String? = null,
     shape: Shape = ChatyModalShape,
     containerColor: Color = LocalAppColors.current.surfaceElevated,
     border: BorderStroke? = null,
@@ -79,6 +87,10 @@ fun ChatyDropdownMenu(
     val maxMenuHeight = (configuration.screenHeightDp.dp * 0.8f).coerceAtLeast(1.dp)
     val margin = with(LocalDensity.current) { 8.dp.roundToPx() }
     val position = remember(margin) { ChatyMenuPositionProvider(margin) }
+    val menuScrollState = remember(rememberKey) { ScrollState(rememberKey?.let { chatyMenuScrollMemory[it] } ?: 0) }
+    if (rememberKey != null) {
+        LaunchedEffect(menuScrollState.value) { chatyMenuScrollMemory[rememberKey] = menuScrollState.value }
+    }
     Popup(
         popupPositionProvider = position,
         onDismissRequest = onDismissRequest,
@@ -98,7 +110,7 @@ fun ChatyDropdownMenu(
                 .widthIn(max = maxMenuWidth)
                 .width(IntrinsicSize.Max)
                 .heightIn(max = maxMenuHeight)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(menuScrollState)
                 .padding(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) { content() }
