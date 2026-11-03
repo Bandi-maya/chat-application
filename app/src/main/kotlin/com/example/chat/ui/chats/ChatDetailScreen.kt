@@ -290,7 +290,8 @@ fun ChatDetailScreen(
     var replyTarget by remember { mutableStateOf<ChatMessage?>(null) }
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var selectedIds by remember(conversation.id) { mutableStateOf<Set<String>>(emptySet()) }
-    var contextMenuMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    val contextMenuMessageState = remember { mutableStateOf<ChatMessage?>(null) }
+    var contextMenuMessage by contextMenuMessageState
     var taskMenuTarget by remember { mutableStateOf<Pair<ChatTask, Rect>?>(null) }
     var contextMenuAnchor by remember { mutableStateOf<Rect?>(null) }
     var attachmentSheetOpen by remember { mutableStateOf(false) }
@@ -305,7 +306,8 @@ fun ChatDetailScreen(
     var wallpaperPickerOpen by remember { mutableStateOf(false) }
     var clearConfirmOpen by remember { mutableStateOf(false) }
     var emojiComposerOpen by remember { mutableStateOf(false) }
-    var emojiReactionTarget by remember { mutableStateOf<ChatMessage?>(null) }
+    val emojiReactionTargetState = remember { mutableStateOf<ChatMessage?>(null) }
+    var emojiReactionTarget by emojiReactionTargetState
     var connectionSheetOpen by remember { mutableStateOf(false) }
     var connectionTesting by remember { mutableStateOf(false) }
     val menuView = LocalView.current
@@ -508,9 +510,6 @@ fun ChatDetailScreen(
             }
         }
     }
-
-    // Dart _quickReactionEmojis.
-    val quickReactionEmojis = listOf("❤️", "👍", "😂", "😮", "😢", "🙏")
 
     // Dart _onMessageLongPress: a rect-less long press synthesizes a 100x40
     // anchor at screen center (logical px -> window px here).
@@ -1082,46 +1081,16 @@ fun ChatDetailScreen(
         }
     }
 
-    // Anchored context menu (Dart AppContextMenu.showWithReactionRail,
-    // anchorType left at its generic default like the Dart call site; the
-    // kit dismisses before invoking rail/item callbacks, like Dart's pop).
-    val menuMessage = contextMenuMessage
-    if (menuMessage != null) {
-        val actions = MessageActionRegistry.getAvailableActions(
-            message = menuMessage,
-            isMe = menuMessage.senderId == currentUserId,
-        )
-        AppContextMenu(
-            onDismiss = { contextMenuMessage = null },
-            sections = listOf(
-                ContextMenuSection(
-                    items = actions.map { act ->
-                        ContextMenuItem(
-                            icon = actionIcon(act, menuMessage),
-                            label = act.label,
-                            isDestructive = act.isDestructive,
-                            onTap = { runAction(menuMessage, act.type) },
-                        )
-                    },
-                ),
-            ),
-            backgroundColor = Color(theme.surfaceColor),
-            primaryTextColor = Color(theme.primaryTextColor),
-            secondaryTextColor = Color(theme.secondaryTextColor),
-            destructiveColor = Color(theme.dangerColor),
-            anchorRect = contextMenuAnchor,
-            // Reactions are deferred to the next release (see ReleaseFeatures).
-            reactionRail = if (ReleaseFeatures.MESSAGE_REACTIONS) {
-                ReactionRail(
-                    emojis = quickReactionEmojis,
-                    onReact = { emoji -> onToggleReaction(menuMessage.id, emoji) },
-                    onAdd = { emojiReactionTarget = menuMessage },
-                )
-            } else {
-                null
-            },
-        )
-    }
+    // Keep the anchored menu's generated Compose code out of the large conversation method.
+    AnchoredMessageContextMenu(
+        messageState = contextMenuMessageState,
+        anchorRect = contextMenuAnchor,
+        currentUserId = currentUserId,
+        theme = theme,
+        onAction = ::runAction,
+        onToggleReaction = onToggleReaction,
+        reactionTargetState = emojiReactionTargetState,
+    )
 
     // Dart _showTaskContextMenu (chat_detail_screen.dart:1208-1254): section titled
     // with the task title, anchored at the chip rect, no reaction rail.
@@ -1577,6 +1546,58 @@ private fun ConversationHeader(
             }
         }
     }
+}
+
+/** The production message menu, split out to bound generated Compose register pressure.
+ *  State stays owned by ChatDetailScreen; actions and appearance are unchanged. */
+@Composable
+private fun AnchoredMessageContextMenu(
+    messageState: androidx.compose.runtime.MutableState<ChatMessage?>,
+    anchorRect: Rect?,
+    currentUserId: String,
+    theme: ThemeConfig,
+    onAction: (ChatMessage, MessageActionType) -> Unit,
+    onToggleReaction: (String, String) -> Unit,
+    reactionTargetState: androidx.compose.runtime.MutableState<ChatMessage?>,
+) {
+    val menuMessage = messageState.value
+    if (menuMessage != null) {
+        val actions = MessageActionRegistry.getAvailableActions(
+            message = menuMessage,
+            isMe = menuMessage.senderId == currentUserId,
+        )
+        AppContextMenu(
+            onDismiss = { messageState.value = null },
+            sections = listOf(
+                ContextMenuSection(
+                    items = actions.map { act ->
+                        ContextMenuItem(
+                            icon = actionIcon(act, menuMessage),
+                            label = act.label,
+                            isDestructive = act.isDestructive,
+                            onTap = { onAction(menuMessage, act.type) },
+                        )
+                    },
+                ),
+            ),
+            backgroundColor = Color(theme.surfaceColor),
+            primaryTextColor = Color(theme.primaryTextColor),
+            secondaryTextColor = Color(theme.secondaryTextColor),
+            destructiveColor = Color(theme.dangerColor),
+            anchorRect = anchorRect,
+            // Reactions are deferred to the next release (see ReleaseFeatures).
+            reactionRail = if (ReleaseFeatures.MESSAGE_REACTIONS) {
+                ReactionRail(
+                    emojis = listOf("❤️", "👍", "😂", "😮", "😢", "🙏"),
+                    onReact = { emoji -> onToggleReaction(menuMessage.id, emoji) },
+                    onAdd = { reactionTargetState.value = menuMessage },
+                )
+            } else {
+                null
+            },
+        )
+    }
+
 }
 
 @Composable
