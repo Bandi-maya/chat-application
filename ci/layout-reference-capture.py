@@ -31,16 +31,34 @@ def capture(name, settle=2):
     (out/f'{name}.png').write_bytes(adb('exec-out','screencap','-p'))
     adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
     xml=adb('shell','cat','/sdcard/window.xml',check=False)
+    if not xml.strip().startswith(b'<'):
+        time.sleep(1)
+        adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
+        xml=adb('shell','cat','/sdcard/window.xml',check=False)
     (out/f'{name}.xml').write_bytes(xml)
     for prefs in ('chaty_local_preferences',):
         (out/f'{name}-{prefs}.xml').write_bytes(adb('shell','run-as',pkg,'cat',f'shared_prefs/{prefs}.xml',check=False))
     return xml
 
 def tap_label(label, optional=False, settle=0):
-    adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
-    xml=adb('shell','cat','/sdcard/window.xml',check=False)
+    # uiautomator dump intermittently returns empty/unparseable output right
+    # after activity start or while windows transition (run 41630769482 died
+    # on ParseError here). Retry briefly; only then treat as absent/fail.
+    root=None
+    for _ in range(5):
+        adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
+        xml=adb('shell','cat','/sdcard/window.xml',check=False)
+        if xml.strip().startswith(b'<'):
+            try:
+                root=ET.fromstring(xml); break
+            except ET.ParseError:
+                pass
+        time.sleep(1)
+    if root is None:
+        if optional: return False
+        raise AssertionError(f'UI dump unavailable while seeking: {label}')
     nodes=[]
-    for node in ET.fromstring(xml).iter('node'):
+    for node in root.iter('node'):
         if node.get('text')==label or node.get('content-desc')==label:
             b=list(map(int,re.findall(r'\d+',node.get('bounds',''))))
             if len(b)==4: nodes.append(b)
