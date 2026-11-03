@@ -94,10 +94,12 @@ data class GbHeaderOverflowActions(
 @Composable
 fun GbHeaderOverflowMenuDialog(t: ThemeConfig, actions: GbHeaderOverflowActions, onDismiss: () -> Unit) {
     val colors = LocalAppColors.current
+    val presentation = com.example.chat.ui.kit.LocalReferenceLayoutPresentation.current
+    val layoutShape = androidx.compose.foundation.shape.RoundedCornerShape(presentation.menuCornerDp.dp)
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val p by animateFloatAsState(
-        if (shown) 1f else 0f, tween(180, easing = CubicBezierEasing(0.215f, 0.61f, 0.355f, 1f)), label = "overflow",
+        if (shown) 1f else 0f, tween(presentation.menuEnterMs, easing = CubicBezierEasing(0.215f, 0.61f, 0.355f, 1f)), label = "overflow",
     )
     fun pick(f: (() -> Unit)?): () -> Unit = { onDismiss(); f?.invoke() }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
@@ -118,10 +120,10 @@ fun GbHeaderOverflowMenuDialog(t: ThemeConfig, actions: GbHeaderOverflowActions,
                     .widthIn(max = (LocalConfiguration.current.screenWidthDp.dp - 24.dp).coerceAtLeast(1.dp))
                     .width(IntrinsicSize.Max)
                     .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.8f).dp)
-                    .shadow(12.dp, com.example.chat.ui.kit.ChatyModalShape, ambientColor = Color(t.backgroundColor).copy(alpha = 0.55f), spotColor = Color(t.backgroundColor).copy(alpha = 0.55f))
-                    .background(Color(t.surfaceColor), com.example.chat.ui.kit.ChatyModalShape)
-                    .border(1.dp, Color(t.cardColor), com.example.chat.ui.kit.ChatyModalShape)
-                    .clip(com.example.chat.ui.kit.ChatyModalShape)
+                    .shadow(12.dp, layoutShape, ambientColor = Color(t.backgroundColor).copy(alpha = 0.55f), spotColor = Color(t.backgroundColor).copy(alpha = 0.55f))
+                    .background(Color(t.surfaceColor), layoutShape)
+                    .border(1.dp, Color(t.cardColor), layoutShape)
+                    .clip(layoutShape)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
                     .verticalScroll(rememberScrollState())
                     .padding(vertical = 8.dp),
