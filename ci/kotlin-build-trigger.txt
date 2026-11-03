@@ -1,1 +1,1 @@
-same combined d9fede4c + missing layout.offset import only; reviewed ea1fb5ac; 2026-11-03T22:34+05:30
+combined batch6 corrected BottomShell-only +6a overlay +6b scope +7 anchor origin; Default protected; Updates gate unchanged; 2026-11-03T23:16+05:30
