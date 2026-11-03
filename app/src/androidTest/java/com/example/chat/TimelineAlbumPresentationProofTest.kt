@@ -41,7 +41,7 @@ class TimelineAlbumPresentationProofTest {
         ActivityScenario.launch(ChatFixtureActivity::class.java).use { scenario ->
             scenario.onActivity { activity -> activity.setContent {
                 ChatyTheme(ThemePresets.getSystemDefaultTheme(false)) {
-                    ChatDetailScreen(conversation, messages, "me", {}, {})
+                    ChatDetailScreen(conversation, messages, "me", onBack = {}, onSend = { _ -> })
                 }
             } }
             assertTrue(device.wait(Until.hasObject(By.text("History fixture 60")), 10000))
