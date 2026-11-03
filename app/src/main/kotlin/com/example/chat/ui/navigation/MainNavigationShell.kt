@@ -196,6 +196,16 @@ fun MainNavigationShell(
     }
     val activeDestinationId = allDestinationIds.getOrElse(effectiveIndex) { ChatyNavigationDestinationIds.chats }
 
+    // Swipe-driven chrome: while the pager moves, the shell presentation
+    // (header ownership, rounded content surface, dock highlight, FAB) follows
+    // the page the gesture is landing on, not the last settled selection.
+    // Before this, the destination page painted flat mid-swipe (shellOwnsHeading
+    // false, rounded surface off) and the dock/FAB snapped only when the
+    // settledPage effect ran. Selection state itself still updates on
+    // settledPage below; history/back semantics are unchanged.
+    val presentationIndex = if (previewOnly) effectiveIndex else pagerState.targetPage
+    val presentationDestinationId = allDestinationIds.getOrElse(presentationIndex) { activeDestinationId }
+
     @Composable
     fun pageContent() {
         if (previewOnly) {
@@ -231,7 +241,7 @@ fun MainNavigationShell(
         }
     }
 
-    val selectedPrimaryIndex = primaryIds.indexOf(activeDestinationId)
+    val selectedPrimaryIndex = primaryIds.indexOf(presentationDestinationId)
     val bottomNavSelectedIndex = if (selectedPrimaryIndex >= 0) selectedPrimaryIndex else primaryIds.size
 
     val homeHeaderTabsState = androidx.compose.runtime.remember { HomeHeaderTabsState() }
@@ -254,14 +264,14 @@ fun MainNavigationShell(
                 colors = colors,
                 template = template,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
-                activeDestinationId = activeDestinationId,
+                selectedIndex = presentationIndex,
+                activeDestinationId = presentationDestinationId,
                 rootHeaderActions = rootHeaderActions,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
                 homeHeaderTabsSlot = homeHeaderTabsSlot,
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = {
-                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides activeDestinationId) {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides presentationDestinationId) {
                         pageContent()
                     }
                 },
@@ -269,33 +279,33 @@ fun MainNavigationShell(
             navMode == AppNavigationMode.floatingIslandRail -> FloatingIslandRailShell(
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 userInitials = currentUser?.avatarInitials?.ifEmpty { "CU" } ?: "CU",
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = { pageContent() },
             )
             navMode == AppNavigationMode.perspective3DDrawer -> PerspectiveDrawerShell(
                 initialOpen = previewOnly && previewMenusOpen,
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 animationsDisabled = prefs.animationsDisabled,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = { pageContent() },
             )
             navMode == AppNavigationMode.modernSideMenu -> ModernSideMenuShell(
                 initialOpen = previewOnly && previewMenusOpen,
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 currentUser = currentUser,
                 myNameOverride = myNameOverride,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = {
-                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides activeDestinationId) {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides presentationDestinationId) {
                         pageContent()
                     }
                 },
@@ -304,10 +314,10 @@ fun MainNavigationShell(
                 initialOpen = previewOnly && previewMenusOpen,
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 animationsDisabled = prefs.animationsDisabled,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = { pageContent() },
             )
             navMode in setOf(
@@ -324,9 +334,9 @@ fun MainNavigationShell(
                 mode = navMode,
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = { pageContent() },
             )
             else -> {
@@ -339,11 +349,11 @@ fun MainNavigationShell(
                     RailShell(
                         colors = colors,
                         navItemIds = allDestinationIds,
-                        selectedIndex = effectiveIndex,
+                        selectedIndex = presentationIndex,
                         appearanceNavigationIndex = appearanceNavigationIndex,
                         maxWidth = maxWidth,
                         onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                        fab = { fab(activeDestinationId) },
+                        fab = { fab(presentationDestinationId) },
                         content = { pageContent() },
                     )
                 } else {
@@ -370,7 +380,7 @@ fun MainNavigationShell(
                             }
                         },
                         onCenterAction = onCenterAction,
-                        fab = { fab(activeDestinationId) },
+                        fab = { fab(presentationDestinationId) },
                         content = { pageContent() },
                     )
                 }
