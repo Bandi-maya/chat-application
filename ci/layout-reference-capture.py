@@ -1,6 +1,12 @@
 """Isolated fake session, installed pair only. No live server or real user data.
-Captures actual saved selection before/after startup, tab navigation and process death.
-No code/fixture APK rebuild. UI failures preserve evidence and fail the job.
+Testref extension: tab-transition frames (0.4s post-tap, zero tap-settle),
+scroll-linked collapse/expand step frames per present destination, drawer/menu
+affordance opened before destination probes, and one bounded animation-enabled
+screenrecord pass for Chaty Default. Animator scales are 0 outside the
+animation pass, so stills evidence scroll-linked states and post-tap states,
+not timed physics; the mp4 evidences motion while gestures run, not after.
+Empty fixture lists may not scroll: frames then document the fixture
+limitation instead of a collapse defect.
 """
 import json, pathlib, subprocess, time, xml.etree.ElementTree as ET, re
 out = pathlib.Path('screenshots'); out.mkdir(exist_ok=True)
@@ -20,8 +26,8 @@ def write_prefs(name, values):
     adb('shell','run-as',pkg,'cp','/data/local/tmp/layout-seed.xml',f'shared_prefs/{name}.xml')
     local.unlink()
 
-def capture(name):
-    time.sleep(2)
+def capture(name, settle=2):
+    time.sleep(settle)
     (out/f'{name}.png').write_bytes(adb('exec-out','screencap','-p'))
     adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
     xml=adb('shell','cat','/sdcard/window.xml',check=False)
@@ -30,7 +36,7 @@ def capture(name):
         (out/f'{name}-{prefs}.xml').write_bytes(adb('shell','run-as',pkg,'cat',f'shared_prefs/{prefs}.xml',check=False))
     return xml
 
-def tap_label(label, optional=False):
+def tap_label(label, optional=False, settle=0):
     adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
     xml=adb('shell','cat','/sdcard/window.xml',check=False)
     nodes=[]
@@ -41,16 +47,73 @@ def tap_label(label, optional=False):
     if not nodes:
         if optional: return False
         raise AssertionError(f'UI label not found: {label}')
-    l,t,r,b=max(nodes,key=lambda b:b[1]); adb('shell','input','tap',str((l+r)//2),str((t+b)//2));time.sleep(2)
+    l,t,r,b=max(nodes,key=lambda b:b[1]); adb('shell','input','tap',str((l+r)//2),str((t+b)//2));time.sleep(settle)
     return True
+
+def viewport():
+    """Resolve swipe geometry from the actual display instead of fixed pixels."""
+    m = re.search(r'(\d+)x(\d+)', adb('shell', 'wm', 'size').decode(errors='replace'))
+    w, h = (int(m.group(1)), int(m.group(2))) if m else (1080, 2400)
+    return w // 2, int(h * 0.75), int(h * 0.3)
+
+def swipe_probe(slug, dest):
+    """Scroll-linked header evidence: swipe up in steps (collapse), then down (expand).
+    Intermediate frames after each step. Empty fixture lists may not scroll:
+    frames then document that limitation instead of a collapse defect."""
+    x, y1, y2 = viewport()
+    for i in range(1, 4):
+        adb('shell', 'input', 'swipe', str(x), str(y1), str(x), str(y2), '350')
+        capture(f'{slug}-{dest}-collapse-{i}', settle=1)
+    for i in range(1, 4):
+        adb('shell', 'input', 'swipe', str(x), str(y2), str(x), str(y1), '350')
+        capture(f'{slug}-{dest}-expand-{i}', settle=1)
+
+def animation_pass(style_slug):
+    """Bounded ANIMATION-ENABLED evidence for the Chaty Default style only:
+    system animator scales set to 1 for this pass, one 12s screenrecord covering
+    collapse swipe, expand swipe, a tab switch and back, with every gesture run
+    WHILE recording. Evidence is a recording, not frame-perfect physics; the
+    app-level reduced-motion pref keeps its seeded value (default off)."""
+    for scale in ('window_animation_scale', 'transition_animation_scale', 'animator_duration_scale'):
+        adb('shell', 'settings', 'put', 'global', scale, '1.0')
+    adb('shell', 'am', 'force-stop', pkg)
+    adb('shell', 'am', 'start', '-n', pkg + '/com.example.chat.MainActivity')
+    time.sleep(8)
+    rec = subprocess.Popen(['adb', 'shell', 'screenrecord', '--time-limit', '12', '/sdcard/collapse-pass.mp4'],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    x, y1, y2 = viewport()
+    adb('shell', 'input', 'swipe', str(x), str(y1), str(x), str(y2), '600')  # collapse, while recording
+    time.sleep(2)
+    adb('shell', 'input', 'swipe', str(x), str(y2), str(x), str(y1), '600')  # expand, while recording
+    time.sleep(2)
+    tap_label('Calls', optional=True, settle=0)  # destination transition, while recording
+    time.sleep(2)
+    tap_label('Chats', optional=True, settle=0)
+    rec.wait(timeout=30)
+    adb('pull', '/sdcard/collapse-pass.mp4', str(out / f'{style_slug}-animation-pass.mp4'))
+    for scale in ('window_animation_scale', 'transition_animation_scale', 'animator_duration_scale'):
+        adb('shell', 'settings', 'put', 'global', scale, '0.0')
 
 try:
     adb('install','-r','-t','runtime-apks/app-debug.apk')
-    for style in ('Chaty Default','WhatsApp OLD UI','IOS STYLE','Curved Radial Menu'):
+    passes = [('Chaty Default', 'dark'), ('WhatsApp OLD UI', 'dark'), ('IOS STYLE', 'dark'),
+              ('Curved Radial Menu', 'dark'), ('Chaty Default', 'light')]
+    for style, brightness in passes:
         adb('shell','am','force-stop',pkg)
         write_prefs('chaty_api_backend', {'api_hub_token':'synthetic-test-token','api_hub_user':json.dumps({'id':'synthetic-layout-user','username':'fixture','displayName':'Synthetic Layout','avatarInitials':'SL','about':'Isolated capture','email':'','phone':'','avatarUrl':None})})
-        write_prefs('chaty_local_preferences', {'chaty_preferences_v1.synthetic-layout-user':json.dumps({'home':{'homeStyle':style}})})
-        slug=style.lower().replace(' ','-')
+        # ONE write for the shared file: layout prefs + capture theme seed (writer-grounded
+        # chaty_theme_v1 key). A second write_prefs call would replace the file and erase the first.
+        theme = {'schemaVersion': 2, 'globalTheme': {
+            'id': 'capture_custom', 'name': 'Capture theme', 'brightness': brightness,
+            'accentColor': 4288423856, 'backgroundColor': 4279374354, 'surfaceColor': 4280163883,
+            'cardColor': 4280624421, 'primaryTextColor': 4294967295, 'secondaryTextColor': 4289374890,
+            'navigationMode': 'bottomNav', 'layoutMode': 'classic',
+            'fontScale': 1.0, 'density': 1.0, 'animationLevel': 1.0},
+            'perChatThemes': {}, 'useReducedMotion': False, 'followSystem': False}
+        write_prefs('chaty_local_preferences', {
+            'chaty_preferences_v1.synthetic-layout-user': json.dumps({'home': {'homeStyle': style}}),
+            'chaty_theme_v1': json.dumps(theme)})
+        slug=style.lower().replace(' ','-') + ('' if brightness == 'dark' else '-light')
         # Preserve input before a potentially destructive bootstrap write.
         (out/f'{slug}-seed.txt').write_text(style)
         adb('shell','am','start','-n',pkg+'/com.example.chat.MainActivity')
@@ -58,13 +121,38 @@ try:
         for label in ('Not now','Not Now','Not Now','Not Now'):
             tap_label(label,optional=True)
         capture(f'{slug}-01-chats')
-        for i,label in enumerate(('Calls','Chats','Tasks','Settings','Chats'),2):
-            tap_label(label)
+        # Probe the style's actually-present destinations; a label absent in this
+        # style's dock/drawer is recorded, never a hard failure (no fixed inventory).
+        # Drawer/menu styles keep destinations behind an affordance: open the actual
+        # menu once before probing, so a closed drawer cannot mask a real destination.
+        menu_note = 'MENU_NONE'
+        for mlabel in ('Open navigation drawer', 'Open navigation menu', 'Menu', 'Open menu', 'More options'):
+            if tap_label(mlabel, optional=True, settle=1):
+                menu_note = 'MENU_OPENED:' + mlabel
+                break
+        present, hidden = [], []
+        for i,label in enumerate(('Calls','Chats','Tasks','Settings','Communities','Updates','Groups'),2):
+            if not tap_label(label, optional=True, settle=0):
+                # UNREACHABLE: no menu affordance found, label may sit behind it.
+                # HIDDEN: menu opened (or dock visible) and the label still was not found.
+                hidden.append(('UNREACHABLE:' if menu_note == 'MENU_NONE' else 'HIDDEN:') + label)
+                continue
+            present.append(label)
+            capture(f'{slug}-{i:02}-{label.lower()}-transition', settle=0.4)
             capture(f'{slug}-{i:02}-{label.lower()}')
+            # Job bound: the light-variant pass probes collapse on the first present
+            # destination only; dark passes probe every present destination.
+            if brightness == 'dark' or not present[:-1]:
+                swipe_probe(slug, f'{i:02}-{label.lower()}')
+        (out/f'{slug}-destinations.txt').write_text(menu_note + '\nPRESENT:' + ','.join(present) + '\n' + '\n'.join(hidden))
+        adb('shell','input','keyevent','KEYCODE_BACK')
+        tap_label('Chats', optional=True)
         adb('shell','am','force-stop',pkg)
         adb('shell','am','start','-n',pkg+'/com.example.chat.MainActivity')
         time.sleep(8)
         capture(f'{slug}-07-reopened')
+        if style == 'Chaty Default' and brightness == 'dark':
+            animation_pass(slug)
 finally:
     capture('final-state')
     (out/'logcat.txt').write_bytes(adb('logcat','-d','-v','threadtime',check=False))
