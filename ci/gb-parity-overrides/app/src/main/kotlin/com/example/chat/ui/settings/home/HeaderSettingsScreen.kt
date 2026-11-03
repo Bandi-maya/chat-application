@@ -82,6 +82,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
@@ -173,7 +174,7 @@ fun HeaderSettingsScreen(
 
     @Composable
     fun divider() = HorizontalDivider(
-        Modifier.padding(start = 68.dp, end = 16.dp), thickness = 0.8.dp, color = Color(config.cardColor),
+        Modifier.padding(start = 24.dp, end = 24.dp), thickness = 0.5.dp, color = colors.borderSubtle.copy(alpha = 0.55f),
     )
 
     Column(Modifier.fillMaxSize().background(colors.background)) {
@@ -185,12 +186,49 @@ fun HeaderSettingsScreen(
             Box(Modifier.padding(8.dp)) { ChatyBackButton(onPressed = onBack) }
             Text("Header", color = colors.foreground, fontSize = 19.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.2).sp)
         }
-        // Do not compose a hidden full Home underneath the style chooser.
-        if (!showStyleSheet) HomeUiPreview(selectedStyle, LocalThemeConfig.current, navigationMode, large = true)
-        Spacer(Modifier.height(8.dp))
+        // The settings panel is the live layout's content, not a second full Home screenshot.
+        // MainNavigationShell owns bottom system insets and reserves its dock footprint.
+        com.example.chat.ui.navigation.MainNavigationShell(
+            modifier = Modifier.weight(1f), colors = com.example.chat.ui.core.theme.ChatyColors(config), navigationMode = navigationMode,
+            template = com.example.chat.ServiceLocator.templateController.navigation,
+            previewOnly = true,
+            prefs = com.example.chat.ui.navigation.NavigationShellPrefs(
+                homeStyle = home.homeStyle, separateChatsAndGroups = home.separateChatsAndGroups,
+                pagerTransition3d = home.pagerTransition3d, animationsDisabled = true,
+                hasCustomNavigationDestinations = com.example.chat.ServiceLocator.templateController.hasCustomNavigationDestinations,
+                hideTasks = preferences.gbBool("nav_hide_tasks"),
+                hideUpdates = preferences.gbBool("nav_hide_updates") || !com.example.chat.ReleaseFeatures.STATUS_UPDATES,
+                bottomBarStyle = com.example.chat.ServiceLocator.appearanceVariantController.bottomBarStyle,
+                navigationStyleName = com.example.chat.ServiceLocator.appearanceVariantController.navigationStyle,
+            ),
+            screenContent = {
+            Column(Modifier.fillMaxSize()) {
+                val listStyle = com.example.chat.core.preferences.HomePresentationPolicy.listStyle(home.homeStyle)
+                val headerStyle = com.example.chat.ui.chats.home.effectiveHomeHeaderStyle(
+                    home.homeStyle.trim().lowercase(), listStyle,
+                    com.example.chat.ui.chats.home.defaultHomeTemplates.headerStyle,
+                )
+                com.example.chat.ui.chats.home.StandardHomeAppBar(
+                    theme = config, homePrefs = home, headerStyle = headerStyle, homeStyle = listStyle,
+                    title = com.example.chat.ui.chats.home.compactBarTitle(
+                        listStyle, headerStyle, null, home.setMyName, home.myNameOverride,
+                        currentUserDisplayName.orEmpty(), currentUserUsername.orEmpty(), true,
+                    ),
+                    identity = com.example.chat.ui.chats.home.HomeIdentity(
+                        displayName = currentUserDisplayName.orEmpty(), username = currentUserUsername.orEmpty(),
+                        about = currentUserAbout.orEmpty(),
+                    ),
+                    isSearchOpen = false, forcedTypeIsSet = false,
+                    nav = com.example.chat.ui.chats.home.ChatsHomeNav(),
+                    onToggleSearch = {}, onToggleGhost = {}, onIdentityTap = {}, onIdentityLongPress = {},
+                    onOpenOverflowMenu = { showOverflowMenu(onBack) }, onSnack = {},
+                )
+                Spacer(Modifier.height(8.dp))
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp, 4.dp, 14.dp, 24.dp)) {
             Column(
-                Modifier.fillMaxWidth().background(colors.surface).border(1.1.dp, colors.borderSubtle),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+                    .background(colors.surface).border(0.8.dp, colors.borderSubtle, RoundedCornerShape(24.dp))
+                    .padding(vertical = 10.dp),
             ) {
                 GbSettingRow(
                     iconContent = rowIcon(Icons.Outlined.Layers), title = "Home UI Style", subtitle = selectedStyle,
@@ -329,6 +367,9 @@ fun HeaderSettingsScreen(
                 )
             }
         }
+            }
+            },
+        )
     }
 
     if (showStyleSheet) {
