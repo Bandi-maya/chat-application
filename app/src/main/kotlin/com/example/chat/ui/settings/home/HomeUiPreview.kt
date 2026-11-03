@@ -35,8 +35,9 @@ fun HomeUiPreview(style: String, theme: ThemeConfig, current: AppNavigationMode,
                 while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
             }
         }) {
+        androidx.compose.runtime.key(style) {
         MainNavigationShell(
-            colors = ChatyColors(theme), modifier = Modifier.fillMaxSize(), navigationMode = current, previewOnly = true,
+            colors = ChatyColors(theme), modifier = Modifier.fillMaxSize(), navigationMode = current, previewOnly = true, previewMenusOpen = true,
             template = ServiceLocator.templateController.navigation,
             prefs = NavigationShellPrefs(homeStyle = style, separateChatsAndGroups = home.separateChatsAndGroups,
                 pagerTransition3d = home.pagerTransition3d, animationsDisabled = true,
@@ -62,5 +63,6 @@ fun HomeUiPreview(style: String, theme: ThemeConfig, current: AppNavigationMode,
                 )
             },
         )
+        }
     }
 }
