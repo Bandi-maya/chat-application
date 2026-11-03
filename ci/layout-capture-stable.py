@@ -106,6 +106,31 @@ def dismiss_until_ready(identity='Chats', attempts=8):
         time.sleep(2)
     return False
 
+def record_layout_walkthrough(slug):
+    """Actual emulator walkthrough, isolated signed-out presentation only.
+    Record enabled root destinations plus supported home popup. No sends.
+    This is not an all-app or authenticated-persistence proof."""
+    remote = '/sdcard/' + slug + '-walkthrough.mp4'
+    notes=[]
+    rec=subprocess.Popen(['adb','shell','screenrecord','--bit-rate','1800000','--time-limit','75',remote],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    try:
+        time.sleep(2)
+        for label in ('Calls','Tasks','Settings','Chats'):
+            reached=tap_label(label,optional=True,settle=3)
+            notes.append(label+':'+str(reached))
+            capture(slug+'-walkthrough-'+label.lower(),settle=2)
+        if tap_label('More options',optional=True,settle=2):
+            capture(slug+'-walkthrough-menu',settle=2)
+            adb('shell','input','keyevent','KEYCODE_BACK')
+        time.sleep(2)
+    finally:
+        adb('shell','pkill','-2','screenrecord',check=False)
+        try: rec.wait(timeout=10)
+        except subprocess.TimeoutExpired: rec.terminate()
+        time.sleep(1)
+        adb('pull',remote,str(out/(slug+'-walkthrough.mp4')),check=False)
+        (out/(slug+'-walkthrough-notes.txt')).write_text('SCOPE:isolated-signed-out-presentation-not-all-app\n'+'\n'.join(notes))
+
 def viewport():
     """Resolve swipe geometry from the actual display instead of fixed pixels."""
     m = re.search(r'(\d+)x(\d+)', adb('shell', 'wm', 'size').decode(errors='replace'))
@@ -219,6 +244,8 @@ try:
         if not ready:
             (out/f'{slug}-readiness.txt').write_text('READINESS_NOT_VERIFIED: modal-free Chats identity not reached')
         capture(f'{slug}-01-chats')
+        if ready and style in ('Chaty Default', 'WhatsApp OLD UI') and brightness == 'dark':
+            record_layout_walkthrough(slug)
         # Probe the style's actually-present destinations; a label absent in this
         # style's dock/drawer is recorded, never a hard failure (no fixed inventory).
         # Drawer/menu styles keep destinations behind an affordance: open the actual
@@ -308,7 +335,9 @@ try:
     except Exception as e:
         menu_notes.append('HOME_OVERFLOW_ERROR:' + type(e).__name__)
     try:
-        adb('shell','am','start','-n',pkg+'/com.example.chat.ChatFixtureActivity','--es','screen','detail',check=False)
+        adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen','menu',check=False)
+        time.sleep(3)
+        capture('menu-02-chat-header-open',settle=2)
         time.sleep(3)
         reach = tap_label('See you at 6!', optional=True, settle=0)
         if reach is not True:
@@ -327,6 +356,10 @@ try:
                     menu_notes.append('SELECTION_OVERFLOW_ABSENT')
     except Exception as e:
         menu_notes.append('BUBBLE_MENU_ERROR:' + type(e).__name__)
+    # Separate >4 album fixture proof; no sends or backend.
+    adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen','album',check=False)
+    time.sleep(3)
+    capture('menu-04-six-image-album',settle=2)
     (out/'menu-notes.txt').write_text('SCOPE:fixture-presentation-proof-not-production-account-state\n' + ('\n'.join(menu_notes) if menu_notes else 'MENU_CAPTURE_OK'))
 
 finally:
