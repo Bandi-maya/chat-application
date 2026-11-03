@@ -1,0 +1,7 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="majesticonsLine_autoAwesome"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M10 4 Q10.6 9.4 16 10 Q10.6 10.6 10 16 Q9.4 10.6 4 10 Q9.4 9.4 10 4 Z" android:strokeColor="#FF000000" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M17 14 Q17.35 15.65 19 16 Q17.35 16.35 17 18 Q16.65 16.35 15 16 Q16.65 15.65 17 14 Z" android:strokeColor="#FF000000" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>
