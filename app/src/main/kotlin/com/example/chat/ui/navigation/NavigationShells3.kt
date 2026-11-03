@@ -3,6 +3,11 @@ package com.example.chat.ui.navigation
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.chat.core.templates.NavigationTemplate
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,6 +49,27 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.AppNavigationMode
 import com.example.chat.ui.core.theme.ChatyColors
 
+val LocalReferenceContentSurface = androidx.compose.runtime.staticCompositionLocalOf<Color?> { null }
+
+/** Reusable preset content surface. Callers provide real content, never screen-specific copies.
+ * A null override uses reference dark contrast or the caller's light-theme surface. */
+@Composable
+fun ReferenceLayoutContentSurface(
+    rounded: Boolean,
+    isDark: Boolean,
+    lightSurface: Color,
+    modifier: Modifier = Modifier,
+    surfaceOverride: Color? = null,
+    content: @Composable () -> Unit,
+) {
+    val surface = surfaceOverride ?: if (isDark) Color(0xFF1A2127) else lightSurface
+    Box(modifier.then(if (rounded) Modifier.clip(RoundedCornerShape(24.dp)).background(surface) else Modifier)) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            LocalReferenceContentSurface provides if (rounded) surface else null,
+        ) { content() }
+    }
+}
+
 /** Port of _buildPresetNavigationShell: oneUi / iosStyle / instagramStyle /
  *  telegramStyle / basicTabStyle / gestureTabs bottom docks with the exact
  *  per-mode metrics tables. */
@@ -56,6 +82,7 @@ internal fun PresetNavigationShell(
     onSelect: (Int) -> Unit,
     fab: @Composable () -> Unit,
     content: @Composable () -> Unit,
+    animationsDisabled: Boolean = false,
 ) {
     val accent = colors.primary
     val foreground = colors.foreground
@@ -76,14 +103,41 @@ internal fun PresetNavigationShell(
         else -> 64f
     }
     val horizontalPadding = 0f
+    val referenceDarkChrome = isDark && (isOneUi || isIos)
+    val exterior = if (referenceDarkChrome) Color.Black else colors.background
     val dockBackground = when {
+        referenceDarkChrome -> Color.Black
         isIos -> colors.surface.copy(alpha = if (isDark) 0.96f else 0.93f)
         isTelegram -> colors.surfaceElevated
         else -> colors.surface
     }
 
-    Box(Modifier.fillMaxSize().background(colors.background)) {
-        Box(Modifier.fillMaxSize().padding(bottom = barHeight.dp)) { content() }
+    Box(Modifier.fillMaxSize().background(exterior)) {
+        val activeId = navItemIds.getOrNull(selectedIndex)
+        // Only adapters that already honor the title hand-off may suppress their title.
+        // Other enabled destinations retain their existing functional header.
+        val shellOwnsHeading = (isOneUi || isIos) && activeId in setOf("calls", "updates", "settings")
+        Column(Modifier.fillMaxSize().padding(bottom = barHeight.dp)) {
+            if (shellOwnsHeading) {
+                Row(Modifier.fillMaxWidth().height(if (isOneUi) 164.dp else 56.dp)
+                    .padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = if (isOneUi) Arrangement.Center else Arrangement.Start) {
+                    if (isOneUi) {
+                        NavDestinationIcon(activeId!!, size = 32, tint = foreground)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(NavigationCatalog.labelFor(activeId!!), color = foreground,
+                        fontSize = if (isOneUi) 32.sp else 20.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            ReferenceLayoutContentSurface(rounded = isOneUi && activeId != null && activeId !in setOf("chats", "groups"), isDark = isDark,
+                lightSurface = colors.surface, modifier = Modifier.weight(1f).fillMaxWidth()) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalDestinationTitlePresentation provides if (shellOwnsHeading) activeId else null,
+                ) { content() }
+            }
+        }
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -117,11 +171,13 @@ internal fun PresetNavigationShell(
                 navItemIds.forEachIndexed { index, id ->
                     val selected = index == selectedIndex
                     val label = NavigationCatalog.labelFor(id)
-                    val tint = if (selected) foreground else secondary
+                    val targetTint = if (referenceDarkChrome) Color.White else if (selected) foreground else secondary
+                    val tint by animateColorAsState(targetValue = targetTint,
+                        animationSpec = tween(if (animationsDisabled) 0 else 140), label = "navigation-item-tint")
                     val selectedModifier = Modifier
                         .weight(if (isBubbles && selected) 1.6f else 1f)
                         .fillMaxSize()
-                        .clickable(onClick = { onSelect(index) })
+                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(index) })
                         .padding(horizontal = 4.dp, vertical = 6.dp)
                     when {
                         isOneUi -> Column(selectedModifier, horizontalAlignment = Alignment.CenterHorizontally,
@@ -130,8 +186,11 @@ internal fun PresetNavigationShell(
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Spacer(Modifier.height(4.dp))
-                            Box(Modifier.width(22.dp).height(2.dp)
-                                .background(if (selected) accent else Color.Transparent, RoundedCornerShape(1.dp)))
+                            // Fixed geometry keeps selection from shifting the label.
+                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                repeat(5) { Box(Modifier.size(2.dp).background(
+                                    if (selected) tint else Color.Transparent, CircleShape)) }
+                            }
                         }
                         isBubbles -> Row(selectedModifier
                             .clip(RoundedCornerShape(999.dp))
@@ -149,6 +208,7 @@ internal fun PresetNavigationShell(
                             if (isInstagram) Box(Modifier.width(26.dp).height(2.dp)
                                 .background(if (selected) accent else Color.Transparent))
                             NavDestinationIcon(id, size = if (isBasic) 23 else 24,
+                                selected = isIos && selected,
                                 tint = if (isIos) tint else if (selected) accent else secondary)
                             if (!isInstagram) {
                                 Spacer(Modifier.height(if (isIos) 4.dp else 3.dp))
@@ -563,13 +623,15 @@ internal fun MoreDestinationsSheet(
     onSelect: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape, onDismissRequest = onDismiss, containerColor = Color.Transparent) {
+    val presentation = com.example.chat.ui.kit.LocalReferenceLayoutPresentation.current
+    val layoutShape = RoundedCornerShape(presentation.menuCornerDp.dp)
+    ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null, shape = layoutShape, onDismissRequest = onDismiss, containerColor = Color.Transparent) {
         Column(
             modifier = Modifier
                 .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
-                .clip(com.example.chat.ui.kit.ChatyModalShape)
+                .clip(layoutShape)
                 .background(colors.surfaceElevated)
-                .border(0.8.dp, colors.borderSubtle, com.example.chat.ui.kit.ChatyModalShape),
+                .border(0.8.dp, colors.borderSubtle, layoutShape),
         ) {
             Box(
                 modifier = Modifier

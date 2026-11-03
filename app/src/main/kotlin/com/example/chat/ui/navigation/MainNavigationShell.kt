@@ -110,6 +110,8 @@ fun MainNavigationShell(
     onExitApp: () -> Unit = {},
     onNotify: (String) -> Unit = {},
     previewOnly: Boolean = false,
+    /** Read-only picker thumbnails reveal the selected drawer; normal app previews stay closed. */
+    previewMenusOpen: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
 
@@ -232,6 +234,12 @@ fun MainNavigationShell(
     val bottomNavSelectedIndex = if (selectedPrimaryIndex >= 0) selectedPrimaryIndex else primaryIds.size
 
     val homeHeaderTabsState = androidx.compose.runtime.remember { HomeHeaderTabsState() }
+    val activeLayoutMode = prefs.homeStyle?.let(HomePresetNormalizer::presentationNavigationMode) ?: navigationMode
+    val referenceStyle = com.example.chat.ui.kit.referenceLayoutStyleFor(activeLayoutMode)
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.example.chat.ui.kit.LocalReferenceLayoutPresentation provides
+            com.example.chat.ui.kit.ReferenceLayoutPresentation(referenceStyle, prefs.animationsDisabled),
+    ) {
     androidx.compose.runtime.CompositionLocalProvider(LocalHomeHeaderTabs provides homeHeaderTabsState) {
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize().navigationBarsPadding()) {
         val appearanceStyles = com.example.chat.core.templates.AppearanceVariantController.navigationStyles
@@ -266,6 +274,7 @@ fun MainNavigationShell(
                 content = { pageContent() },
             )
             navMode == AppNavigationMode.perspective3DDrawer -> PerspectiveDrawerShell(
+                initialOpen = previewOnly && previewMenusOpen,
                 colors = colors,
                 navItemIds = allDestinationIds,
                 selectedIndex = effectiveIndex,
@@ -275,6 +284,7 @@ fun MainNavigationShell(
                 content = { pageContent() },
             )
             navMode == AppNavigationMode.modernSideMenu -> ModernSideMenuShell(
+                initialOpen = previewOnly && previewMenusOpen,
                 colors = colors,
                 navItemIds = allDestinationIds,
                 selectedIndex = effectiveIndex,
@@ -289,6 +299,7 @@ fun MainNavigationShell(
                 },
             )
             navMode == AppNavigationMode.curvedRadialDrawer -> CurvedRadialDrawerShell(
+                initialOpen = previewOnly && previewMenusOpen,
                 colors = colors,
                 navItemIds = allDestinationIds,
                 selectedIndex = effectiveIndex,
@@ -305,6 +316,7 @@ fun MainNavigationShell(
                 AppNavigationMode.basicTabStyle,
                 AppNavigationMode.gestureTabs,
             ) -> PresetNavigationShell(
+                animationsDisabled = prefs.animationsDisabled,
                 mode = navMode,
                 colors = colors,
                 navItemIds = allDestinationIds,
@@ -377,6 +389,7 @@ fun MainNavigationShell(
             onDismiss = { moreMenuOpen = false },
         )
     }
+}
 }
 
 /** Dart _buildTransitionPage: the five named 3D pager transitions, plus the thirteen
@@ -501,11 +514,13 @@ fun NavDestinationIcon(
     modifier: Modifier = Modifier,
     size: Int = 22,
     tint: Color = Color.Unspecified,
+    selected: Boolean = false,
 ) {
     val registryId = com.example.chat.ui.icons.chatyIconIdForNavDestination(id)
     if (registryId != null) {
         com.example.chat.ui.icons.ChatyIcon(
             registryId,
+            selected = selected,
             semanticLabel = NavigationCatalog.labelFor(id),
             modifier = modifier,
             size = size.dp,
