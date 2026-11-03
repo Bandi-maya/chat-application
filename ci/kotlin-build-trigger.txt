@@ -8,3 +8,4 @@ kotlin-build 2026-11-03T15:21+05:30 v7-publish 660-files tree-verified a4b3b998
 kotlin-build 2026-11-03T15:51+05:30 handart-boundary-repair 4-files tree-verified 68cc51b0
 kotlin-build 2026-11-03T17:06+05:30 testref candidate-668eac-4b894 combined staging
 kotlin-build 2026-11-03T17:20+05:30 testref capture-script fix Close-dialog + fixture_pass restore
+kotlin-build 2026-11-03T17:58+05:30 testref capture-harness dump-retry + fixture modal-dismiss v2
