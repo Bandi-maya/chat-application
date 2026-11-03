@@ -224,11 +224,15 @@ fun ChatsHomeScreen(
     val spec = HomeStyleSpec.resolve(homeStyle, rawHomeUiStyle)
     val searchPlacement = resolveSearchPlacement(homePrefs.searchPlacement, homePrefs.disableSearchBar)
     val searchEnabled = homePrefs.showSearchBar
-    val storiesStyle = homePrefs.storiesStyle
+    val storiesStyle = com.example.chat.core.preferences.HomePresentationPolicy.effectiveStoriesStyle(
+        homePrefs.separateChatsAndGroups, homePrefs.storiesStyle,
+    )
     val storyLook = chatyStoryLookFor(storiesStyle)
     val storyShowOnlineRing = storiesStyle != "Minimal"
     val storyCardWrap = storiesStyle == "Card" || storiesStyle == "Card View" || homePrefs.carouselView
-    val showStoriesStrip = homePrefs.enableStoriesStrip || spec.storiesFirst
+    val showStoriesStrip = com.example.chat.core.preferences.HomePresentationPolicy.showStoriesStrip(
+        homePrefs.separateChatsAndGroups, homePrefs.enableStoriesStrip, spec.storiesFirst,
+    )
     val storyCompact = storiesStyle == "Compact"
     val storyTileWidth = if (storyCardWrap) 74.0 else if (storyCompact) 48.0 else 58.0
     val storyNameFontSize = if (storyCompact) 9.0 else 10.5
@@ -580,7 +584,7 @@ fun ChatsHomeScreen(
                         focusRequester = searchFocus,
                     )
                 }
-                if (showStoriesStrip && !spec.storiesHidden && forcedType != ConversationType.group) {
+                if (showStoriesStrip && (!spec.storiesHidden || homePrefs.separateChatsAndGroups) && forcedType != ConversationType.group) {
                     StoryStrip(
                         contacts = contacts,
                         theme = theme,
