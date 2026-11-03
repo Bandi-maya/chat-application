@@ -1050,6 +1050,8 @@ private fun VoiceNoteCard(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val audioContext = androidx.compose.ui.platform.LocalContext.current
     val player = remember(attachment.id, binding?.session) { android.media.MediaPlayer() }
+    var waveform by remember(attachment.id, binding?.session) { mutableStateOf<List<Float>?>(null) }
+    var waveformJob by remember(attachment.id, binding?.session) { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var loading by remember(attachment.id) { mutableStateOf(false) }
     var playing by remember(attachment.id) { mutableStateOf(false) }
     var prepared by remember(attachment.id) { mutableStateOf(false) }
@@ -1058,10 +1060,15 @@ private fun VoiceNoteCard(
     var positionMs by remember(attachment.id) { mutableStateOf(0) }
     var playbackSource by remember(attachment.id, binding?.session) { mutableStateOf<com.example.chat.data.media.ResolvedSource?>(null) }
     var playbackError by remember(attachment.id, binding?.session) { mutableStateOf<String?>(null) }
+    fun releasePlaybackLeaseAfterReader() {
+        val source = playbackSource; playbackSource = null
+        val reader = waveformJob; waveformJob = null
+        com.example.chat.core.audio.releaseAfterReader(reader) { releaseConsumerSource(source) }
+    }
     androidx.compose.runtime.DisposableEffect(attachment.id, binding?.session) {
         onDispose {
-            // The row owns this MediaPlayer, not the app-wide coordinator. Stop reader BEFORE deleting lease.
-            try { player.release() } finally { releaseConsumerSource(playbackSource); playbackSource = null }
+            // Stop player immediately; asynchronous reader completion releases its own lease afterwards.
+            try { player.release() } finally { releasePlaybackLeaseAfterReader() }
         }
     }
     androidx.compose.runtime.LaunchedEffect(playing, playbackSpeed) {
@@ -1114,10 +1121,19 @@ private fun VoiceNoteCard(
                     }
                     totalMs = player.duration
                     prepared = true
+                    val localSource = playbackSource
+                    if (waveform == null && localSource is com.example.chat.data.media.ResolvedSource.Leased) {
+                        waveformJob?.cancel()
+                        waveformJob = scope.launch {
+                            val peaks = decodeVoiceWaveform(localSource.lease.file)
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            binding?.deliverIfCurrent { waveform = peaks }
+                        }
+                    }
                     player.setOnCompletionListener {
                         playing = false; completed = false; positionMs = totalMs ?: 0
                         runCatching { player.reset() }; prepared = false
-                        releaseConsumerSource(playbackSource); playbackSource = null
+                        releasePlaybackLeaseAfterReader()
                     }
                 }
                 if (completed) { player.seekTo(0); completed = false; positionMs = 0 }
@@ -1129,14 +1145,14 @@ private fun VoiceNoteCard(
             catch (e: Exception) {
                 playing = false; playbackError = e.message ?: "Audio unavailable"
                 runCatching { player.reset() }; prepared = false
-                releaseConsumerSource(playbackSource); playbackSource = null
+                releasePlaybackLeaseAfterReader()
             } finally {
                 loading = false
             }
         }
     }
-    val fallbackMs = attachment.durationSeconds * 1000
-    val total = totalMs ?: fallbackMs
+    val fallbackMs = (attachment.durationSeconds.toLong() * 1000).coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
+    val total = totalMs?.takeIf { it > 0 } ?: fallbackMs
     val progress = if (total <= 0) 0f else (positionMs.toFloat() / total).coerceIn(0f, 1f)
     Row(
         Modifier
@@ -1170,7 +1186,17 @@ private fun VoiceNoteCard(
         }
         Box(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            androidx.compose.material3.LinearProgressIndicator(
+            val peaks = waveform
+            if (peaks != null) androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(25.dp)) {
+                val step = size.width / peaks.size
+                peaks.forEachIndexed { index, amplitude ->
+                    val height = (amplitude * size.height).coerceAtLeast(1f)
+                    val x = step * index + step / 2
+                    drawLine((playingBarColor ?: accentColor).copy(alpha = if (index.toFloat() / peaks.size <= progress) 1f else 0.35f),
+                        androidx.compose.ui.geometry.Offset(x, (size.height - height) / 2),
+                        androidx.compose.ui.geometry.Offset(x, (size.height + height) / 2), strokeWidth = (step * 0.55f).coerceAtLeast(1f))
+                }
+            } else androidx.compose.material3.LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(3.dp)),
                 color = playingBarColor ?: MaterialTheme.colorScheme.primary,
@@ -1178,7 +1204,7 @@ private fun VoiceNoteCard(
             )
             Box(Modifier.height(5.dp))
             playbackError?.let { Text(it, color = textColor, fontSize = 10.sp) }
-            Text("${fmt(positionMs)} / ${fmt(total)}", color = textColor.copy(alpha = 0.75f), fontSize = 10.5.sp)
+            Text("${fmt(positionMs)} / ${if (total > 0) fmt(total) else "--:--"}", color = textColor.copy(alpha = 0.75f), fontSize = 10.5.sp)
         }
     }
 }
