@@ -38,7 +38,16 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Forward
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -136,6 +145,7 @@ import com.example.chat.ui.chats.detail.GlobalConnectionBanner
 import com.example.chat.ui.chats.detail.MessageActionRegistry
 import com.example.chat.ui.chats.detail.MessageActionType
 import com.example.chat.ui.chats.detail.actionIcon
+import androidx.compose.material3.HorizontalDivider
 import com.example.chat.ui.chats.detail.RemoteImageSlot
 import com.example.chat.ui.chats.detail.chatyRemoteImage
 import com.example.chat.ui.theme.LocalThemeConfig
@@ -286,6 +296,9 @@ fun ChatDetailScreen(
     loadingMessages: Boolean = false,
     loadError: String? = null,
     onRetryLoad: () -> Unit = {},
+    // Test-only hook for debug fixtures (MenuAlbumProofActivity): opens the header
+    // overflow menu on first composition. Default keeps product behavior unchanged.
+    initialChatMenuOpen: Boolean = false,
 ) {
     androidx.compose.runtime.CompositionLocalProvider(
         com.example.chat.ui.chats.detail.LocalEmojiPack provides
@@ -321,7 +334,7 @@ fun ChatDetailScreen(
     var taskMenuTarget by remember { mutableStateOf<Pair<ChatTask, Rect>?>(null) }
     var contextMenuAnchor by remember { mutableStateOf<Rect?>(null) }
     var attachmentSheetOpen by remember { mutableStateOf(false) }
-    var chatMenuOpen by remember { mutableStateOf(false) }
+    var chatMenuOpen by remember { mutableStateOf(initialChatMenuOpen) }
     var openedViewOnceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pendingBelowCount by remember { mutableIntStateOf(0) }
     var localPinMenu by remember(conversation.id, messageSessionIdentity) { mutableStateOf(false) }
@@ -1655,64 +1668,88 @@ private fun ConversationHeader(
                     tint = Color(theme.primaryTextColor),
                 )
             }
+            var moreMenuPage by remember(menuOpen) { mutableStateOf(false) }
             DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (conversation.isGroup) "View group info" else "View contact info",
-                        )
-                    },
-                    onClick = {
-                        onMenuOpenChange(false)
-                        onOpenInfo()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("Search conversation") },
-                    onClick = onSearch,
-                )
-                DropdownMenuItem(
-                    text = { Text("Chat wallpaper") },
-                    onClick = onOpenWallpaperPicker,
-                )
-                if (onOpenAppearance != null) {
+                val menuIconTint = Color(theme.secondaryTextColor)
+                if (!moreMenuPage) {
                     DropdownMenuItem(
-                        text = { Text("Chat appearance") },
-                        onClick = {
-                            onMenuOpenChange(false)
-                            onOpenAppearance()
-                        },
-                    )
-                }
-                if (onToggleMute != null) {
-                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Outlined.Person, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
                         text = {
                             Text(
-                                if (conversation.isMuted) {
-                                    "Unmute notifications"
-                                } else {
-                                    "Mute notifications"
-                                },
+                                if (conversation.isGroup) "View group info" else "View contact info",
                             )
                         },
                         onClick = {
                             onMenuOpenChange(false)
-                            onToggleMute()
+                            onOpenInfo()
                         },
                     )
-                }
-                DropdownMenuItem(
-                    text = { Text("Clear conversation", color = Color(theme.dangerColor)) },
-                    onClick = onClearConversation,
-                )
-                if (conversation.isDirect && onBlockContact != null) {
                     DropdownMenuItem(
-                        text = { Text("Block contact", color = Color(theme.dangerColor)) },
-                        onClick = {
-                            onMenuOpenChange(false)
-                            onBlockContact()
-                        },
+                        leadingIcon = { Icon(Icons.Outlined.Search, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                        text = { Text("Search") },
+                        onClick = onSearch,
                     )
+                    if (onToggleMute != null) {
+                        DropdownMenuItem(
+                            leadingIcon = { Icon(if (conversation.isMuted) Icons.Outlined.Notifications else Icons.Outlined.NotificationsOff, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                            text = {
+                                Text(
+                                    if (conversation.isMuted) {
+                                        "Unmute notifications"
+                                    } else {
+                                        "Mute notifications"
+                                    },
+                                )
+                            },
+                            onClick = {
+                                onMenuOpenChange(false)
+                                onToggleMute()
+                            },
+                        )
+                    }
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Outlined.Image, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                        text = { Text("Chat wallpaper") },
+                        onClick = onOpenWallpaperPicker,
+                    )
+                    if (onOpenAppearance != null) {
+                        DropdownMenuItem(
+                            leadingIcon = { Icon(Icons.Outlined.Palette, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                            text = { Text("Chat theme") },
+                            onClick = {
+                                onMenuOpenChange(false)
+                                onOpenAppearance()
+                            },
+                        )
+                    }
+                    HorizontalDivider(thickness = 0.8.dp, color = menuIconTint.copy(alpha = 0.15f))
+                    DropdownMenuItem(
+                        text = { Text("More") },
+                        trailingIcon = { Icon(Icons.Rounded.ChevronRight, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                        onClick = { moreMenuPage = true },
+                    )
+                } else {
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                        text = { Text("Back") },
+                        onClick = { moreMenuPage = false },
+                    )
+                    HorizontalDivider(thickness = 0.8.dp, color = menuIconTint.copy(alpha = 0.15f))
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, tint = Color(theme.dangerColor), modifier = Modifier.size(20.dp)) },
+                        text = { Text("Clear conversation", color = Color(theme.dangerColor)) },
+                        onClick = onClearConversation,
+                    )
+                    if (conversation.isDirect && onBlockContact != null) {
+                        DropdownMenuItem(
+                            leadingIcon = { Icon(Icons.Outlined.Block, null, tint = Color(theme.dangerColor), modifier = Modifier.size(20.dp)) },
+                            text = { Text("Block contact", color = Color(theme.dangerColor)) },
+                            onClick = {
+                                onMenuOpenChange(false)
+                                onBlockContact()
+                            },
+                        )
+                    }
                 }
             }
         }
