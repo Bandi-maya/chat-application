@@ -1,0 +1,6 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="CheckTickCircle"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M1.85 12C1.85 6.394 6.394 1.85 12 1.85S22.15 6.394 22.15 12 17.606 22.15 12 22.15 1.85 17.606 1.85 12Zm14.214-1.328a1 1 0 1 0-1.128-1.652l-.101.07a16 16 0 0 0-4.174 4.168l-1.454-1.453a1 1 0 0 0-1.414 1.415l2.341 2.339a1 1 0 0 0 1.575-.211 14 14 0 0 1 4.254-4.607z" android:fillColor="#FF000000" android:fillType="evenOdd" />
+</vector>

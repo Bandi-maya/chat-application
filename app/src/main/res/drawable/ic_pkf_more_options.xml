@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="pikaiconsSolid_moreOptions"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M10.2 5.5 a1.8 1.8 0 1 0 3.6 0 a1.8 1.8 0 1 0-3.6 0 Z" android:fillColor="#FF000000" android:fillType="evenOdd" />
+    <path android:pathData="M10.2 12 a1.8 1.8 0 1 0 3.6 0 a1.8 1.8 0 1 0-3.6 0 Z" android:fillColor="#FF000000" android:fillType="evenOdd" />
+    <path android:pathData="M10.2 18.5 a1.8 1.8 0 1 0 3.6 0 a1.8 1.8 0 1 0-3.6 0 Z" android:fillColor="#FF000000" android:fillType="evenOdd" />
+</vector>
