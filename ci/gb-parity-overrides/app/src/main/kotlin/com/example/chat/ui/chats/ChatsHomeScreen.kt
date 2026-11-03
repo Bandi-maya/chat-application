@@ -233,9 +233,9 @@ fun ChatsHomeScreen(
     val storyLook = chatyStoryLookFor(storiesStyle)
     val storyShowOnlineRing = storiesStyle != "Minimal"
     val storyCardWrap = storiesStyle == "Card" || storiesStyle == "Card View" || homePrefs.carouselView
-    val showStoriesStrip = com.example.chat.core.preferences.HomePresentationPolicy.showStoriesStrip(
-        homePrefs.separateChatsAndGroups, homePrefs.enableStoriesStrip, spec.storiesFirst,
-    )
+    // User directive: no stories strip on the home screen unless he explicitly
+    // enables it - separation/template no longer force it on.
+    val showStoriesStrip = homePrefs.enableStoriesStrip
     val storyCompact = storiesStyle == "Compact"
     val storyTileWidth = if (storyCardWrap) 74.0 else if (storyCompact) 48.0 else 58.0
     val storyNameFontSize = if (storyCompact) 9.0 else 10.5
