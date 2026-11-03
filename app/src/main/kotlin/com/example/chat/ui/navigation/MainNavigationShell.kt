@@ -62,6 +62,8 @@ data class NavigationShellPrefs(
     val pagerTransition3d: String = "Default",
     /** appearance.bottomBarStyle (default 'Floating Pill'). */
     val bottomBarStyle: String = "Floating Pill",
+    /** Explicit One UI pick renders the raised-centre scrolling dock in the bottom shell. */
+    val oneUiRaisedCenterDock: Boolean = false,
     /** appearance.navigation style name; the rail index derives through
      *  the canonical AppearanceVariantController.navigationStyles
      *  indexOf clamp, exactly like the Dart controller. */
@@ -391,6 +393,7 @@ fun MainNavigationShell(
                             }
                         },
                         onCenterAction = onCenterAction,
+                        raisedCenterScrollDock = prefs.oneUiRaisedCenterDock,
                         fab = { fab(presentationDestinationId) },
                         content = { pageContent() },
                     )
