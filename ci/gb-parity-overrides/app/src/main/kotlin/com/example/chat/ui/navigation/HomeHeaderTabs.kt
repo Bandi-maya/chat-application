@@ -104,7 +104,7 @@ fun HomeHeaderTabsBar(
     // Content-space left/right of each tab, filled by layout. Scrolling the selected tab in uses these numbers
     // directly (no relocation request), so a selection change from outside the strip scrolls it too.
     val tabSpan = remember(ids) { mutableStateMapOf<Int, IntRange>() }
-    BoxWithConstraints(Modifier.fillMaxWidth().background(colors.surface)) {
+    BoxWithConstraints(Modifier.fillMaxWidth().background(colors.background)) {
         val viewportPx by rememberUpdatedState(constraints.maxWidth)
         // Diagnostics only (no-op with the default callback): every change of the strip position, so a later reset to 0
         // after a completed animateScrollTo shows up with its max value.
