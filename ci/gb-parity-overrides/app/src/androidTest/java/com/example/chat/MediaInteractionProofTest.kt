@@ -386,7 +386,9 @@ class MediaInteractionProofTest {
                         "micVisible=${device.hasObject(By.desc(mic))}; videoVisible=${device.hasObject(By.desc(video))}; sendVisible=${device.hasObject(By.desc("Send message"))}")
             }
             clickDesc(mic)
-            assertTrue(device.wait(Until.hasObject(By.desc(video)), 5000))
+            val initialVideoVisible = device.wait(Until.hasObject(By.desc(video)), 5000)
+            if (!initialVideoVisible) diagnose("34c-stock-first-mode-swap-failure")
+            assertTrue("Video-mode accessibility description must appear within 5s after tap", initialVideoVisible)
             assertEquals(0, camera.get()); assertEquals(0, sends.get()); assertEquals(0, recordingStarts.get())
             clickDesc(video)
             // Measured wait (run-132: mic icon not re-served within 5s after the video
