@@ -275,7 +275,7 @@ fun AnimatedEmojiView(
         } else if (packPath != null && !packUnavailable && !packAnimated) {
             // Static pack (OpenMoji): shown in every mode; never animated.
             StaticAssetEmoji(packPath, size) { packUnavailable = true }
-        } else if (notoId != null && pack != ChatyEmojiPack.TELEGRAM && pack != ChatyEmojiPack.TELEGRAM_LOTTIE) {
+        } else if (notoId != null && pack != ChatyEmojiPack.TELEGRAM && pack != ChatyEmojiPack.TELEGRAM_LOTTIE && pack != ChatyEmojiPack.DRIVE_MOV) {
             ChatyAnimatedEmojiAsset(
                 notoId = notoId,
                 unicode = unicode,
