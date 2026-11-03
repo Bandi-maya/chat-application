@@ -51,6 +51,7 @@ import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.GroupAdd
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.RestartAlt
@@ -374,17 +375,18 @@ fun HomeOverflowMenu(
 ) {
     // Linked Devices / Scheduler / Auto Reply are deferred to the next release (ReleaseFeatures).
     val items: List<Triple<ImageVector, String, () -> Unit>> = listOfNotNull(
+        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.ScheduleSend, "Message Scheduler") { nav.onOpenMessageManagement() } else null,
+        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.Reply, "Auto Reply") { nav.onOpenMessageManagement() } else null,
+        Triple(Icons.Rounded.RestartAlt, "Restart Chaty") { nav.onRestartApp() },
+        Triple(Icons.Outlined.Dialpad, "Message a Number") { onMessageANumber() },
+        Triple(Icons.Outlined.Campaign, "Mass Message") { nav.onOpenNewChat(false, true) },
         Triple(Icons.Rounded.GroupAdd, "New Group") { nav.onOpenNewChat(true, false) },
         if (ReleaseFeatures.LINKED_DEVICES) Triple(Icons.Outlined.Devices, "Linked Devices") { nav.onOpenLinkedDevices() } else null,
         Triple(Icons.Rounded.Star, "Starred Messages") { nav.onOpenStarredMessages() },
-        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.ScheduleSend, "Message Scheduler") { nav.onOpenMessageManagement() } else null,
-        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.Reply, "Auto Reply") { nav.onOpenMessageManagement() } else null,
-        Triple(Icons.Outlined.Dialpad, "Message a Number") { onMessageANumber() },
-        Triple(Icons.Outlined.Campaign, "Mass Message") { nav.onOpenNewChat(false, true) },
-        Triple(Icons.Outlined.Call, "Who can call me?") { nav.onWhoCanCallMe() },
         Triple(Icons.Rounded.DoneAll, "Mark All as Read") { onMarkAllAsRead() },
+        Triple(Icons.Outlined.Call, "Who can call me?") { nav.onWhoCanCallMe() },
         Triple(Icons.Outlined.Share, "Share Chaty") { nav.onShareApp() },
-        Triple(Icons.Rounded.RestartAlt, "Restart Chaty") { nav.onRestartApp() },
+        Triple(Icons.Rounded.Settings, "Settings") { nav.onOpenSettings() },
     )
     DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
         expanded = expanded,
