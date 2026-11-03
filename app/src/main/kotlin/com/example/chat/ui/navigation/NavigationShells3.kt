@@ -160,7 +160,7 @@ internal fun PresetNavigationShell(
                         fontSize = if (isOneUi) ReferenceLayoutMetrics.identityTextSizeSp.sp else 20.sp, fontWeight = FontWeight.Bold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = if (isOneUi) Modifier else Modifier.weight(1f))
-                    if (!isOneUi) rootHeaderActions()
+                    if (!isOneUi && activeId != "settings") rootHeaderActions() // Settings hosts its own edit/search/QR row; the avatar already opens Settings.
                 }
             }
             if (shellOwnsHeading && isOneUi) Row(
@@ -171,7 +171,8 @@ internal fun PresetNavigationShell(
                     fontSize = 20.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f).padding(start = 16.dp).alpha(headerCollapse),
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
-                rootHeaderActions()
+                // Settings hosts its own edit/search/QR row; the avatar already opens Settings.
+                if (activeId != "settings") rootHeaderActions()
             }
             ReferenceLayoutContentSurface(rounded = isOneUi && activeId != null && activeId !in setOf("chats", "groups"), isDark = isDark,
                 lightSurface = colors.surface, modifier = Modifier.weight(1f).fillMaxWidth()) {
