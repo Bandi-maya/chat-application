@@ -228,7 +228,9 @@ fun SettingsRootScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().semantics { paneTitle = "Settings" }.background(colors.background)) {
+    Box(Modifier.fillMaxSize().semantics { paneTitle = "Settings" }.background(
+        com.example.chat.ui.navigation.LocalReferenceContentSurface.current ?: colors.background,
+    )) {
         Column(Modifier.fillMaxSize()) {
             Row(
                 Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).height(56.dp),
