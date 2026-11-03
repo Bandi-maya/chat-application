@@ -109,6 +109,7 @@ fun MainNavigationShell(
     onCenterAction: () -> Unit = {},
     onExitApp: () -> Unit = {},
     onNotify: (String) -> Unit = {},
+    previewOnly: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
 
@@ -177,7 +178,7 @@ fun MainNavigationShell(
         onExitApp()
     }
 
-    BackHandler(onBack = ::handleRootBack)
+    BackHandler(enabled = !previewOnly, onBack = ::handleRootBack)
 
     var moreMenuOpen by remember { mutableStateOf(false) }
 

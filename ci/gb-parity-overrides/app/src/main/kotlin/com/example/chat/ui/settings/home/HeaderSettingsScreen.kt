@@ -185,14 +185,8 @@ fun HeaderSettingsScreen(
             Box(Modifier.padding(8.dp)) { ChatyBackButton(onPressed = onBack) }
             Text("Header", color = colors.foreground, fontSize = 19.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.2).sp)
         }
-        headerPreview(
-            HeaderPreviewArgs(
-                displayName, statusText, home.setMyName, home.disableStatusUnderName, home.disableSearchBar,
-                home.showSearchBar, home.showCameraIcon, home.showDesktopIcon, home.showIconAddAccount,
-                effectiveSearchPlacement, home.separateChatsAndGroups, selectedStyle,
-                home.tabBubbleStyle, home.pagerTransition3d,
-            ) { showOverflowMenu(onBack) },
-        )
+        // Do not compose a hidden full Home underneath the style chooser.
+        if (!showStyleSheet) HomeUiPreview(selectedStyle, LocalThemeConfig.current, navigationMode, large = true)
         Spacer(Modifier.height(8.dp))
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp, 4.dp, 14.dp, 24.dp)) {
             Column(
@@ -373,11 +367,23 @@ private fun HomeUiStyleSheet(
     onApply: (String) -> Unit,
 ) {
     val config = LocalThemeConfig.current
-    com.example.chat.ui.kit.ChatySingleChoiceModal(
-        title = "Select Home UI style", value = selected, options = HomeUiStyles.homeUiStyles,
-        labelBuilder = { it }, descriptionBuilder = { HomeUiStyles.description(it) },
-        onDismiss = onDismiss, onApply = onApply,
-        description = "Select a layout to preview it, then apply it.",
-        previewBuilder = { draft -> HomeUiPreview(draft, config, navigationMode, large = false) },
-    )
+    var draft by remember(selected) { mutableStateOf(selected) }
+    com.example.chat.ui.kit.ChatySelectionModal(
+        title = "Select Home UI style", onDismiss = onDismiss,
+        onApply = { onApply(draft) }, applyEnabled = draft != selected,
+    ) {
+        LazyColumn(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { Text("Select a layout to preview it, then apply it.", color = LocalAppColors.current.foregroundSecondary) }
+            item { HomeUiPreview(draft, config, navigationMode, large = false) }
+            itemsIndexed(HomeUiStyles.homeUiStyles) { _, option ->
+                com.example.chat.ui.kit.ChatyPreviewRadioRow(
+                    label = option, selected = option == draft, onSelect = { draft = option },
+                    description = HomeUiStyles.description(option),
+                )
+            }
+        }
+    }
 }
