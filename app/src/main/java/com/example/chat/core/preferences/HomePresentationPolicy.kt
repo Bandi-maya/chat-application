@@ -22,4 +22,12 @@ object HomePresentationPolicy {
         isOneUi(value) -> "WhatsApp UI Stock"
         else -> value
     }
+
+    /** Separation forces Instagram stories without overwriting the user's stored story choice. */
+    fun effectiveStoriesStyle(separateChatsAndGroups: Boolean, storedStyle: String): String =
+        if (separateChatsAndGroups) "Instagram" else storedStyle
+
+    fun showStoriesStrip(separateChatsAndGroups: Boolean, enabled: Boolean, styleStoriesFirst: Boolean): Boolean =
+        separateChatsAndGroups || enabled || styleStoriesFirst
+
 }
