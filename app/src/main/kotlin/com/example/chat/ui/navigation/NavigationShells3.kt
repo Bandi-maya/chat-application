@@ -69,12 +69,13 @@ internal fun PresetNavigationShell(
     val isBasic = mode == AppNavigationMode.basicTabStyle
     val barHeight = when {
         isInstagram -> 54f
-        isBasic -> 52f
-        isIos -> 70f
-        isBubbles -> 68f
-        else -> 72f
+        isBasic -> 60f
+        isIos -> 58f
+        isBubbles -> 58f
+        isOneUi -> 56f
+        else -> 64f
     }
-    val horizontalPadding = if (isIos) 10f else 0f
+    val horizontalPadding = 0f
     val dockBackground = when {
         isIos -> colors.surface.copy(alpha = if (isDark) 0.96f else 0.93f)
         isTelegram -> colors.surfaceElevated
@@ -82,7 +83,7 @@ internal fun PresetNavigationShell(
     }
 
     Box(Modifier.fillMaxSize().background(colors.background)) {
-        content()
+        Box(Modifier.fillMaxSize().padding(bottom = barHeight.dp)) { content() }
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -90,7 +91,7 @@ internal fun PresetNavigationShell(
                 .fillMaxWidth()
                 .height(barHeight.dp)
                 .then(
-                    if (isIos) Modifier.shadow(14.dp) else Modifier,
+                    if (isTelegram) Modifier.shadow(6.dp) else Modifier,
                 )
                 .background(dockBackground),
         ) {
@@ -111,109 +112,52 @@ internal fun PresetNavigationShell(
                         .align(Alignment.BottomCenter),
                 )
             }
-            // Every destination stays visible and equally wide (no horizontal scroll,
-            // no fixed per-style width that pushes items off narrow screens).
-            Row(
-                modifier = Modifier.fillMaxSize(),
-            ) {
+            // Shared by applied Home and read-only preview: preserve every configured destination.
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                 navItemIds.forEachIndexed { index, id ->
                     val selected = index == selectedIndex
-                    val useCircle = isIos || isBubbles
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(barHeight.dp)
-                            .clickable { onSelect(index) }
-                            .padding(horizontal = if (isBasic) 2.dp else 4.dp, vertical = if (isInstagram) 0.dp else 4.dp),
-                    ) {
-                        when {
-                            isInstagram -> Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(vertical = 5.dp),
-                            ) {
-                                Box(
-                                    Modifier
-                                        .width(28.dp)
-                                        .height(2.dp)
-                                        .background(if (selected) accent else Color.Transparent),
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                NavDestinationIcon(id, size = 23, tint = if (selected) foreground else secondary)
+                    val label = NavigationCatalog.labelFor(id)
+                    val tint = if (selected) foreground else secondary
+                    val selectedModifier = Modifier
+                        .weight(if (isBubbles && selected) 1.6f else 1f)
+                        .fillMaxSize()
+                        .clickable(onClick = { onSelect(index) })
+                        .padding(horizontal = 4.dp, vertical = 6.dp)
+                    when {
+                        isOneUi -> Column(selectedModifier, horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center) {
+                            Text(label, color = tint, fontSize = 13.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(Modifier.height(4.dp))
+                            Box(Modifier.width(22.dp).height(2.dp)
+                                .background(if (selected) accent else Color.Transparent, RoundedCornerShape(1.dp)))
+                        }
+                        isBubbles -> Row(selectedModifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (selected) colors.surfaceElevated else Color.Transparent),
+                            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                            NavDestinationIcon(id, size = 23, tint = tint)
+                            if (selected) {
+                                Spacer(Modifier.width(7.dp))
+                                Text(label, color = tint, fontSize = 12.sp, maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                             }
-                            isBasic -> {
-                                NavDestinationIcon(id, size = 18, tint = if (selected) accent else secondary)
-                                Spacer(Modifier.height(3.dp))
-                                Text(
-                                    NavigationCatalog.labelFor(id),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = if (selected) foreground else secondary,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
-                                )
+                        }
+                        else -> Column(selectedModifier, horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center) {
+                            if (isInstagram) Box(Modifier.width(26.dp).height(2.dp)
+                                .background(if (selected) accent else Color.Transparent))
+                            NavDestinationIcon(id, size = if (isBasic) 23 else 24,
+                                tint = if (isIos) tint else if (selected) accent else secondary)
+                            if (!isInstagram) {
+                                Spacer(Modifier.height(if (isIos) 4.dp else 3.dp))
+                                Text(label, color = tint, fontSize = if (isIos) 10.sp else 11.sp,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
                             }
-                            else -> {
-                                if (isOneUi) {
-                                    Box(
-                                        Modifier
-                                            .width(if (selected) 22.dp else 0.dp)
-                                            .height(2.dp)
-                                            .background(if (selected) accent else Color.Transparent),
-                                    )
-                                }
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .size(if (isBubbles) 34.dp else 32.dp)
-                                        .then(
-                                            when {
-                                                useCircle -> Modifier
-                                                    .clip(CircleShape)
-                                                    .background(
-                                                        if (selected) accent.copy(alpha = if (isIos) 0.18f else 0.22f)
-                                                        else Color.Transparent,
-                                                    )
-                                                    .border(
-                                                        width = if (selected) 1.3.dp else 0.7.dp,
-                                                        color = if (selected) accent else colors.borderSubtle,
-                                                        shape = CircleShape,
-                                                    )
-                                                isOneUi || isTelegram -> Modifier
-                                                    .clip(RoundedCornerShape(12.dp))
-                                                    .background(
-                                                        if (selected) accent.copy(alpha = 0.13f)
-                                                        else Color.Transparent,
-                                                    )
-                                                else -> Modifier
-                                            },
-                                        ),
-                                ) {
-                                    NavDestinationIcon(
-                                        id,
-                                        size = if (isInstagram) 23 else if (isBasic) 19 else 21,
-                                        tint = if (selected) accent else secondary,
-                                    )
-                                }
-                                Spacer(Modifier.height(3.dp))
-                                Text(
-                                    NavigationCatalog.labelFor(id),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = if (selected) foreground else secondary,
-                                    fontSize = if (isBubbles) 9.sp else 10.sp,
-                                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
-                                )
-                                if (isTelegram) {
-                                    Box(
-                                        Modifier
-                                            .width(if (selected) 16.dp else 0.dp)
-                                            .height(2.dp)
-                                            .background(if (selected) accent else Color.Transparent),
-                                    )
-                                }
-                            }
+                            if (isTelegram) Box(Modifier.width(16.dp).height(2.dp)
+                                .background(if (selected) accent else Color.Transparent))
                         }
                     }
                 }

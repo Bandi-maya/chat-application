@@ -134,6 +134,7 @@ fun MainNavigationShell(
     val pagerState = rememberPagerState(initialPage = currentIndex, pageCount = { allDestinationIds.size })
 
     fun selectRootDestination(next: Int, destinationId: String? = null) {
+        if (previewOnly) return
         if (next == currentIndex && (destinationId == null || destinationId == currentDestinationId)) return
         val nextId = destinationId ?: allDestinationIds.getOrNull(next) ?: return
         rootHistory = rootHistory + currentDestinationId
@@ -194,8 +195,13 @@ fun MainNavigationShell(
 
     @Composable
     fun pageContent() {
+        if (previewOnly) {
+            screenContent(activeDestinationId)
+            return
+        }
         HorizontalPager(
             state = pagerState,
+            userScrollEnabled = !previewOnly,
             modifier = Modifier.fillMaxSize(),
         ) { index ->
             val destinationId = allDestinationIds.getOrElse(index) { "destination-$index" }
