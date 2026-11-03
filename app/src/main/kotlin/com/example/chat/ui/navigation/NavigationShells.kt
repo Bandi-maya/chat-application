@@ -115,7 +115,10 @@ internal fun TopWhatsAppShell(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             if (!underHeaderPublished) {
-                OldUiDestinationTitleHeader(colors, NavigationCatalog.labelFor(activeDestinationId), rootHeaderActions)
+                OldUiDestinationTitleHeader(colors, NavigationCatalog.labelFor(activeDestinationId)) {
+                    // Settings already owns its search/QR actions; keep the title and tabs.
+                    if (activeDestinationId != "settings") rootHeaderActions()
+                }
                 HomeHeaderTabsBar(colors, navItemIds, selectedIndex, heightDp, onSelect)
             }
             Box(Modifier.weight(1f)) { content() }
