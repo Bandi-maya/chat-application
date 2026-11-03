@@ -3,6 +3,7 @@ package com.example.chat.ui.chats
 import com.example.chat.ReleaseFeatures
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.Orientation
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -233,6 +234,7 @@ fun ChatDetailScreen(
     onClearConversation: () -> Unit = {},
     onRetryMessage: (messageId: String) -> Unit = {},
     onOpenInfo: () -> Unit = {},
+    externalSearchRequest: Int = 0,
     onCreateTaskFromMessage: (ChatMessage) -> Unit = {},
     // Dart dataStore.tasks slice + task callbacks (chat_detail_screen.dart:2966-3058);
     // integration wires these to the tasks controller/detail/modal surfaces.
@@ -247,6 +249,7 @@ fun ChatDetailScreen(
     onAttachmentAction: (AttachmentAction) -> Unit = {},
     attachmentReviewImages: ((List<android.net.Uri>) -> Unit)? = null,
     attachmentDirectSendImages: ((List<android.net.Uri>) -> Unit)? = null,
+    onStickerSend: ((com.example.chat.core.stickers.StickerAsset) -> Unit)? = null,
     onCameraTap: () -> Unit = {},
     onVoiceTap: () -> Unit = {},
     onVoiceHoldStart: () -> Unit = {},
@@ -284,6 +287,10 @@ fun ChatDetailScreen(
     loadError: String? = null,
     onRetryLoad: () -> Unit = {},
 ) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.example.chat.ui.chats.detail.LocalEmojiPack provides
+            com.example.chat.ui.chats.detail.ChatyEmojiPack.normalize(universalEmojiStyle),
+    ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
@@ -317,6 +324,7 @@ fun ChatDetailScreen(
     var chatMenuOpen by remember { mutableStateOf(false) }
     var openedViewOnceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pendingBelowCount by remember { mutableIntStateOf(0) }
+    var localPinMenu by remember(conversation.id, messageSessionIdentity) { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchMatchIndex by remember { mutableIntStateOf(0) }
@@ -343,8 +351,14 @@ fun ChatDetailScreen(
     androidx.activity.compose.BackHandler(isSelectionMode) { selectedIds = emptySet() }
 
     // One projection owns both rendered rows and all scroll destinations.
-    val timelineRows = com.example.chat.ui.chats.detail.mediaTimelineRows(messages,
-        expand = isSelectionMode || contextMenuMessage != null || highlightedMessageId != null)
+    // Selection and menus do not change projection or tile geometry. Group identity comes from
+    // the validated album envelope, never adjacency or timestamps.
+    val timelineRows = com.example.chat.ui.chats.detail.mediaTimelineRows(messages)
+    fun selectionUnit(messageId: String): Set<String> =
+        com.example.chat.ui.chats.detail.AlbumSelectionPolicy.unit(timelineRows, messageId)
+    fun toggleSelectionUnit(messageId: String) {
+        selectedIds = com.example.chat.ui.chats.detail.AlbumSelectionPolicy.toggle(timelineRows, selectedIds, messageId)
+    }
     val timelineZone = java.time.ZoneId.systemDefault()
     var pendingScrollTarget by remember(conversation.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(pendingScrollTarget, timelineRows) {
@@ -497,6 +511,14 @@ fun ChatDetailScreen(
         flashHighlight(target, durationMs = 3000L)
         pendingScrollTarget = target
     }
+    LaunchedEffect(conversation.id, messageSessionIdentity, externalSearchRequest) {
+        if (externalSearchRequest > 0 && isMessageSessionCurrent()) {
+            searchOpen = true
+            searchQuery = ""
+            searchMatchIndex = 0
+        }
+    }
+
     LaunchedEffect(searchOpen) {
         if (searchOpen) {
             androidx.compose.runtime.withFrameNanos { }
@@ -550,7 +572,7 @@ fun ChatDetailScreen(
     // screen has no bottom-sheet branch).
     fun openMessageMenu(message: ChatMessage, rect: Rect?) {
         ChatyHapticsPort.selection(menuView)
-        selectedIds = selectedIds + message.id
+        selectedIds = selectedIds + selectionUnit(message.id)
         contextMenuMessage = message
         contextMenuAnchor = rect ?: syntheticCenterRect()
     }
@@ -579,8 +601,16 @@ fun ChatDetailScreen(
             }
             MessageActionType.star -> onToggleStar(message.id)
             MessageActionType.pin -> onTogglePin(message.id)
-            MessageActionType.forward -> onForward(message)
-            MessageActionType.select -> selectedIds = selectedIds + message.id
+            MessageActionType.forward -> {
+                val ids = selectionUnit(message.id)
+                val batch = messages.filter { it.id in ids }
+                if (batch.size > 1) {
+                    if (onForwardSelection != null && com.example.chat.ui.chats.detail.SelectionAction.forward in
+                        com.example.chat.ui.chats.detail.SelectionActionPolicy.available(batch)) onForwardSelection(batch)
+                    else scope.launch { snackbarHostState.showSnackbar("Forwarding this group is not available here.") }
+                } else onForward(message)
+            }
+            MessageActionType.select -> selectedIds = selectedIds + selectionUnit(message.id)
             // Dart emits MessageActionType.info but _executeMessageAction has
             // no info case (default: break) - the row is a source no-op.
             MessageActionType.info -> infoMessage = message
@@ -701,7 +731,8 @@ fun ChatDetailScreen(
         containerColor = Color(theme.backgroundColor),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
+        Box(Modifier.fillMaxSize().padding(padding).imePadding()) {
+        Column(Modifier.fillMaxSize()) {
             if (isSelectionMode) {
                 SelectionHeader(theme, selectedMessages.size) { selectedIds = emptySet() }
             } else if (searchOpen) {
@@ -762,6 +793,35 @@ fun ChatDetailScreen(
                 )
             }
 
+            val localPinned = com.example.chat.core.messages.LocalPinnedMessagePolicy.latest(messages)
+            if (localPinned != null) {
+                Box(Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth().background(Color(theme.cardColor))
+                        .clickable { localPinMenu = true }.padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Pinned on this device", color = Color(theme.accentColor), fontSize = 11.sp)
+                            Text(localPinned.text.ifBlank { localPinned.attachment?.name ?: "Message" },
+                                color = Color(theme.primaryTextColor), maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        }
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = localPinMenu,
+                        onDismissRequest = { localPinMenu = false }) {
+                        androidx.compose.material3.DropdownMenuItem(text = { Text("Go to message") }, onClick = {
+                            localPinMenu = false
+                            if (isMessageSessionCurrent() && messages.any { it.id == localPinned.id }) {
+                                flashHighlight(localPinned.id, durationMs = 2500L); pendingScrollTarget = localPinned.id
+                            }
+                        })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text("Unpin on this device") }, onClick = {
+                            localPinMenu = false
+                            if (isMessageSessionCurrent() && messages.any { it.id == localPinned.id && it.isPinned }) onTogglePin(localPinned.id)
+                        })
+                    }
+                }
+            }
+
             // No strip banner in chats: the header signal icon is the only Connection Health tap target.
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -774,7 +834,7 @@ fun ChatDetailScreen(
                     profilePicWallpaper = wallpaperProfilePic,
                     avatarUrl = wallpaperAvatarUrl,
                 )
-                // Expand for every per-message operation; an album is presentation, never a new message.
+                // Compact album geometry stays stable while selecting; effects still use each real message ID.
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
@@ -840,12 +900,12 @@ fun ChatDetailScreen(
                             onLongPress = { openMessageMenu(message, null) },
                             onLongPressWithRect = { rect -> openMessageMenu(message, rect) },
                             onBubbleTap = { rect ->
-                                if (isSelectionMode) selectedIds = if (message.id in selectedIds) selectedIds - message.id else selectedIds + message.id
+                                if (isSelectionMode) toggleSelectionUnit(message.id)
                                 else if (!convPrefs.disableMoreOptionsFromBubble) singleTapMessage = message
                             },
                             mediaContent = if (row.messages.size > 1) ({
                                 com.example.chat.ui.chats.detail.CompactAlbumPreview(row.messages, attachmentBinding, remoteImage, voiceUrlResolver,
-                                    onOpen = { item, rect -> if (rect != null && onMediaTapWithBounds != null) onMediaTapWithBounds(item, rect) else onMediaTap(item) },
+                                    onOpen = { item, rect -> if (isSelectionMode) toggleSelectionUnit(item.id) else if (rect != null && onMediaTapWithBounds != null) onMediaTapWithBounds(item, rect) else onMediaTap(item) },
                                     onMenu = { item, rect -> openMessageMenu(item, rect) },
                                     onReply = { item -> replyTarget = item },
                                     onReact = if (disableDoubleTapReaction || !ReleaseFeatures.MESSAGE_REACTIONS) null else ({ item ->
@@ -898,7 +958,7 @@ fun ChatDetailScreen(
                                 bubble()
                                 Box(Modifier.matchParentSize().pointerInput(message.id, selectedIds) {
                                     detectTapGestures(onTap = {
-                                        selectedIds = if (message.id in selectedIds) selectedIds - message.id else selectedIds + message.id
+                                        toggleSelectionUnit(message.id)
                                     })
                                 })
                             }
@@ -1054,8 +1114,31 @@ fun ChatDetailScreen(
                     onSend = ::sendCurrent,
                 )
             }
+
+            }
+
+            // GB-style emoji panel: docked under the message box at half height;
+            // the composer stays on top and picks append into it directly.
+            if (emojiComposerOpen) {
+                androidx.activity.compose.BackHandler { emojiComposerOpen = false }
+                ChatyEmojiPickerSheet(
+                    theme = theme,
+                    reactionMode = false,
+                    composerMode = true,
+                    onStickerSend = onStickerSend?.let { send -> { sticker -> if (isMessageSessionCurrent()) send(sticker) } },
+                    stickerSessionKey = messageSessionIdentity,
+                    headerColor = convPrefs.emojiHeaderColor?.let(::Color),
+                    headerIconsColor = convPrefs.emojiHeaderIconsColor?.let(::Color),
+                    backgroundColor = convPrefs.emojiPickerBgColor?.let(::Color),
+                    onEmojiPicked = { emoji ->
+                        if (emoji.isNotEmpty()) handleComposerChanged(composerText + emoji)
+                    },
+                    onComposerDone = { emojiComposerOpen = false },
+                )
+            }
+        }
                 if (isSelectionMode) {
-                    Box(Modifier.align(Alignment.BottomEnd).padding(start = 48.dp, end = 8.dp, bottom = 4.dp)) {
+                    Box(Modifier.align(Alignment.Center).padding(horizontal = 8.dp)) {
                 SelectionActions(
                     theme = theme,
                     actions = if (onForwardSelection != null || selectedMessages.size == 1) selectionActions
@@ -1093,25 +1176,6 @@ fun ChatDetailScreen(
                 )
                     }
                 }
-            }
-
-            // GB-style emoji panel: docked under the message box at half height;
-            // the composer stays on top and picks append into it directly.
-            if (emojiComposerOpen) {
-                androidx.activity.compose.BackHandler { emojiComposerOpen = false }
-                ChatyEmojiPickerSheet(
-                    theme = theme,
-                    reactionMode = false,
-                    composerMode = true,
-                    headerColor = convPrefs.emojiHeaderColor?.let(::Color),
-                    headerIconsColor = convPrefs.emojiHeaderIconsColor?.let(::Color),
-                    backgroundColor = convPrefs.emojiPickerBgColor?.let(::Color),
-                    onEmojiPicked = { emoji ->
-                        if (emoji.isNotEmpty()) handleComposerChanged(composerText + emoji)
-                    },
-                    onComposerDone = { emojiComposerOpen = false },
-                )
-            }
         }
     }
 
@@ -1421,6 +1485,7 @@ fun ChatDetailScreen(
             )
         }
     } // Row(quick rail + chat)
+    } // Selected emoji pack applies to picker, reactions and the message subtree.
 }
 
 private val selectionCopyFormatter: DateTimeFormatter =
@@ -1667,25 +1732,33 @@ private fun AnchoredMessageContextMenu(
     reactionTargetState: androidx.compose.runtime.MutableState<ChatMessage?>,
 ) {
     val menuMessage = messageState.value
+    var extraActions by remember(menuMessage?.id) { mutableStateOf(false) }
     if (menuMessage != null) {
-        val actions = MessageActionRegistry.getAvailableActions(
-            message = menuMessage,
-            isMe = menuMessage.senderId == currentUserId,
+        val available = MessageActionRegistry.getAvailableActions(
+            message = menuMessage, isMe = menuMessage.senderId == currentUserId,
         )
+        val order = listOf(MessageActionType.reply, MessageActionType.forward, MessageActionType.copy,
+            MessageActionType.edit, MessageActionType.deleteForMe, MessageActionType.info)
+        val primary = order.mapNotNull { type -> available.firstOrNull { it.type == type } }
+        val secondary = available.filter { it.type !in order }
+        val actions = if (extraActions) secondary else primary
         AppContextMenu(
             onDismiss = { messageState.value = null },
-            sections = listOf(
-                ContextMenuSection(
-                    items = actions.map { act ->
-                        ContextMenuItem(
-                            icon = actionIcon(act, menuMessage),
-                            label = act.label,
-                            isDestructive = act.isDestructive,
-                            onTap = { onAction(menuMessage, act.type) },
-                        )
-                    },
-                ),
-            ),
+            sections = listOf(ContextMenuSection(items = buildList {
+                if (extraActions) add(ContextMenuItem(label = "Back", onTap = {
+                    messageState.value = menuMessage; extraActions = false
+                }))
+                actions.forEach { act -> add(ContextMenuItem(
+                    icon = actionIcon(act, menuMessage),
+                    label = if (act.type == MessageActionType.deleteForMe) "Delete for me" else act.label,
+                    isDestructive = act.isDestructive,
+                    onTap = { onAction(menuMessage, act.type) },
+                )) }
+                if (!extraActions && secondary.isNotEmpty()) add(ContextMenuItem(label = "More", onTap = {
+                    // AppContextMenu dismisses before its callback; reopen the SAME anchored selection menu.
+                    messageState.value = menuMessage; extraActions = true
+                }, trailing = { Icon(Icons.Rounded.ChevronRight, null) }))
+            })),
             backgroundColor = Color(theme.surfaceColor),
             primaryTextColor = Color(theme.primaryTextColor),
             secondaryTextColor = Color(theme.secondaryTextColor),
@@ -1725,7 +1798,7 @@ private fun SelectionActions(
     onStar: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Row(Modifier.background(Color(theme.surfaceColor), RoundedCornerShape(14.dp)).navigationBarsPadding().padding(vertical = 4.dp),
+    Row(Modifier.background(Color(theme.surfaceColor), RoundedCornerShape(14.dp)).padding(vertical = 4.dp),
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically) {
         if (com.example.chat.ui.chats.detail.SelectionAction.forward in actions) SelectionActionButton(theme, "Forward", onForward) {
