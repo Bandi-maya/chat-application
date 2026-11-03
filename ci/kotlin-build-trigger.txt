@@ -1,1 +1,1 @@
-combined batch6 corrected BottomShell-only +6a overlay +6b scope +7 anchor origin; Default protected; Updates gate unchanged; 2026-11-03T23:16+05:30
+testref combined OLD-settings-only header suppression + album count pill + composer ellipsis; prior6fab88e preserved; 2026-11-04T01:00 IST
