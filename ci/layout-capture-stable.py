@@ -68,6 +68,44 @@ def tap_label(label, optional=False, settle=0):
     l,t,r,b=max(nodes,key=lambda b:b[1]); adb('shell','input','tap',str((l+r)//2),str((t+b)//2));time.sleep(settle)
     return True
 
+def find_label(label):
+    """Presence-only probe (no tap): True/False, None on dump flake (never
+    evidence of absence)."""
+    root = None
+    for _ in range(5):
+        adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
+        xml = adb('shell','cat','/sdcard/window.xml',check=False)
+        if xml.strip().startswith(b'<'):
+            try:
+                root = ET.fromstring(xml); break
+            except ET.ParseError:
+                pass
+        time.sleep(1)
+    if root is None:
+        return None
+    for node in root.iter('node'):
+        if node.get('text') == label or node.get('content-desc') == label:
+            return True
+    return False
+
+def dismiss_until_ready(identity='Chats', attempts=8):
+    """Bounded readiness guard: dismiss known non-destructive modals - system
+    ANR 'Wait' (NEVER 'Close app'), changelog 'Close', notification
+    'Not now'/'Not Now' - then require BOTH no known modal present AND the
+    expected screen identity label before any capture is treated as proof.
+    Returns True only when identity is verified modal-free."""
+    for _ in range(attempts):
+        tapped = False
+        for label in ('Wait','Close','Not now','Not Now'):
+            if tap_label(label, optional=True, settle=1):
+                tapped = True
+        if not tapped:
+            r = find_label(identity)
+            if r is True:
+                return True
+        time.sleep(2)
+    return False
+
 def viewport():
     """Resolve swipe geometry from the actual display instead of fixed pixels."""
     m = re.search(r'(\d+)x(\d+)', adb('shell', 'wm', 'size').decode(errors='replace'))
@@ -174,12 +212,12 @@ try:
         # notification-permission prompt (Not Now); dismiss both, changelog
         # first since it masks the home window entirely (baseline 41626081675
         # died here: AssertionError UI label not found: Calls).
-        # First-launch dialogs: changelog Close above the notification prompt.
-        # 'Wait' dismisses a system ANR dialog (e.g. "Pixel Launcher isn't
-        # responding"), an emulator/host flake that must never be misread as
-        # an app state; 'Close app' is NEVER tapped.
-        for label in ('Wait','Close','Not now','Not Now','Wait','Close','Not Now'):
-            tap_label(label,optional=True)
+        # Readiness before proof: bounded modal dismissal (ANR 'Wait', never
+        # 'Close app'; changelog 'Close'; notification 'Not now') AND verified
+        # screen identity. Failure is recorded, never relabeled a pass.
+        ready = dismiss_until_ready()
+        if not ready:
+            (out/f'{slug}-readiness.txt').write_text('READINESS_NOT_VERIFIED: modal-free Chats identity not reached')
         capture(f'{slug}-01-chats')
         # Probe the style's actually-present destinations; a label absent in this
         # style's dock/drawer is recorded, never a hard failure (no fixed inventory).
@@ -231,8 +269,9 @@ try:
         adb('shell','am','force-stop',pkg)
         adb('shell','am','start','-n',pkg+'/com.example.chat.MainActivity')
         time.sleep(8)
-        for label in ('Wait','Close','Not now','Not Now'):
-            tap_label(label,optional=True)
+        ready2 = dismiss_until_ready()
+        if not ready2:
+            (out/f'{slug}-reopen-readiness.txt').write_text('REOPEN_READINESS_NOT_VERIFIED')
         capture(f'{slug}-07-reopened')
 
     # BOUNDED MENU PIXELS - fixture presentation proof only (signed-out bare-bucket
