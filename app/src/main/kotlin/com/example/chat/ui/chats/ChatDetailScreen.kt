@@ -174,11 +174,15 @@ fun ChatDetailScreen(
     conversation: Conversation,
     messages: List<ChatMessage>,
     currentUserId: String,
+    localOverrideAccountKey: String = "",
+    messageSessionIdentity: Any = currentUserId,
+    isMessageSessionCurrent: () -> Boolean = { false },
     onBack: () -> Unit,
     onSend: suspend (String) -> Unit,
     resolveSenderName: (String) -> String = { senderId ->
         if (senderId == currentUserId) "You" else "Team Member"
     },
+    resolveQuoteSender: (String) -> com.example.chat.domain.models.UserProfile? = { null },
     presenceText: String? = null,
     presenceIsOnline: Boolean = false,
     showHeaderAvatar: Boolean = true,
@@ -214,6 +218,7 @@ fun ChatDetailScreen(
     retainViewOnce: Boolean = false,
     disableDoubleTapReaction: Boolean = false,
     doubleTapReactionEmoji: String = "❤️",
+    onDoubleTapReactionEmojiChanged: ((String) -> Unit)? = null,
     showGroupAvatar: Boolean = true,
     colorOverrides: BubbleColorOverrides? = null,
     remoteImage: RemoteImageSlot? = chatyRemoteImage,
@@ -292,6 +297,20 @@ fun ChatDetailScreen(
     var selectedIds by remember(conversation.id) { mutableStateOf<Set<String>>(emptySet()) }
     val contextMenuMessageState = remember { mutableStateOf<ChatMessage?>(null) }
     var contextMenuMessage by contextMenuMessageState
+    var singleTapMessage by remember(conversation.id) { mutableStateOf<ChatMessage?>(null) }
+    var infoMessage by remember(conversation.id) { mutableStateOf<ChatMessage?>(null) }
+    var showStarredInChat by remember(conversation.id) { mutableStateOf(false) }
+    val shareContext = androidx.compose.ui.platform.LocalContext.current
+    val localMessageStore = remember(localOverrideAccountKey, conversation.id) {
+        com.example.chat.core.messages.LocalMessageOverrideStore(shareContext.applicationContext, localOverrideAccountKey, conversation.id)
+    }
+    var localMessageRevision by remember(currentUserId, conversation.id, messageSessionIdentity) { mutableIntStateOf(0) }
+    var localEditMessageId by remember(currentUserId, conversation.id, messageSessionIdentity) { mutableStateOf<String?>(null) }
+    var localEditText by remember(currentUserId, conversation.id, messageSessionIdentity) { mutableStateOf("") }
+    var choosingDoubleTapEmoji by remember(currentUserId, conversation.id, messageSessionIdentity) { mutableStateOf(false) }
+    var quoteMessageId by remember(currentUserId, conversation.id, messageSessionIdentity) { mutableStateOf<String?>(null) }
+
+    var copySelectionMessage by remember(conversation.id) { mutableStateOf<ChatMessage?>(null) }
     var taskMenuTarget by remember { mutableStateOf<Pair<ChatTask, Rect>?>(null) }
     var contextMenuAnchor by remember { mutableStateOf<Rect?>(null) }
     var attachmentSheetOpen by remember { mutableStateOf(false) }
@@ -531,11 +550,22 @@ fun ChatDetailScreen(
     // screen has no bottom-sheet branch).
     fun openMessageMenu(message: ChatMessage, rect: Rect?) {
         ChatyHapticsPort.selection(menuView)
+        selectedIds = selectedIds + message.id
         contextMenuMessage = message
         contextMenuAnchor = rect ?: syntheticCenterRect()
     }
 
-    fun runAction(message: ChatMessage, type: MessageActionType) {
+    fun runAction(selected: ChatMessage, type: MessageActionType) {
+        val message = messages.firstOrNull { it.id == selected.id } ?: return
+        // Anchored menus and the single-tap dialog share the same protected-content rules.
+        val capabilities = com.example.chat.ui.chats.detail.SelectionActionPolicy.available(listOf(message))
+        val required = when (type) {
+            MessageActionType.copy -> com.example.chat.ui.chats.detail.SelectionAction.copy
+            MessageActionType.forward -> com.example.chat.ui.chats.detail.SelectionAction.forward
+            MessageActionType.star -> com.example.chat.ui.chats.detail.SelectionAction.star
+            else -> null
+        }
+        if (required != null && required !in capabilities) return
         when (type) {
             MessageActionType.reply -> replyTarget = message
             MessageActionType.copy -> {
@@ -553,7 +583,7 @@ fun ChatDetailScreen(
             MessageActionType.select -> selectedIds = selectedIds + message.id
             // Dart emits MessageActionType.info but _executeMessageAction has
             // no info case (default: break) - the row is a source no-op.
-            MessageActionType.info -> Unit
+            MessageActionType.info -> infoMessage = message
             MessageActionType.task -> onCreateTaskFromMessage(message)
             MessageActionType.deleteForMe -> onDeleteMessage(message.id, false)
             MessageActionType.deleteForEveryone -> onDeleteMessage(message.id, true)
@@ -561,7 +591,7 @@ fun ChatDetailScreen(
                 // Dart _executeMessageAction translate: informational snackbar only.
                 scope.launch {
                     snackbarHostState.showSnackbar(
-                        "Translation ($translationLanguage via $translateOption): ${message.text}",
+                        "Translation is not configured. Choose a supported translation provider in Settings.",
                     )
                 }
             }
@@ -763,8 +793,10 @@ fun ChatDetailScreen(
                         }
                         val message = row.anchor
                         val isMine = message.senderId == currentUserId
+                        val localText = remember(message, localOverrideAccountKey, conversation.id, localMessageRevision) { localMessageStore.text(message) }
+                        if (localText != null) Text("Modified locally - only on this device", color = Color(theme.secondaryTextColor), fontSize = 10.sp, modifier = Modifier.padding(horizontal = 16.dp))
                         val bubble: @Composable () -> Unit = { ChatMessageBubble(
-                            message = message,
+                            message = if (localText != null) message.copy(text = localText) else message,
                             isMe = isMine,
                             theme = theme,
                             // Dart: poll messages ([POLL] prefix) open the poll sheet on bubble tap.
@@ -809,22 +841,24 @@ fun ChatDetailScreen(
                             onLongPressWithRect = { rect -> openMessageMenu(message, rect) },
                             onBubbleTap = { rect ->
                                 if (isSelectionMode) selectedIds = if (message.id in selectedIds) selectedIds - message.id else selectedIds + message.id
-                                else openMessageMenu(message, rect)
+                                else if (!convPrefs.disableMoreOptionsFromBubble) singleTapMessage = message
                             },
                             mediaContent = if (row.messages.size > 1) ({
                                 com.example.chat.ui.chats.detail.CompactAlbumPreview(row.messages, attachmentBinding, remoteImage, voiceUrlResolver,
                                     onOpen = { item, rect -> if (rect != null && onMediaTapWithBounds != null) onMediaTapWithBounds(item, rect) else onMediaTap(item) },
                                     onMenu = { item, rect -> openMessageMenu(item, rect) },
                                     onReply = { item -> replyTarget = item },
-                                    onReact = if (disableDoubleTapReaction) null else ({ item -> onToggleReaction(item.id, doubleTapReactionEmoji) }))
+                                    onReact = if (disableDoubleTapReaction || !ReleaseFeatures.MESSAGE_REACTIONS) null else ({ item ->
+                                        if (com.example.chat.ui.chats.detail.SelectionAction.star in com.example.chat.ui.chats.detail.SelectionActionPolicy.available(listOf(item))) onToggleReaction(item.id, doubleTapReactionEmoji)
+                                    }))
                             }) else null,
                             onSwipeReply = if (row.messages.size > 1) null else ({ replyTarget = message }),
-                            onDoubleTap = if (disableDoubleTapReaction || !ReleaseFeatures.MESSAGE_REACTIONS || row.messages.size > 1) {
+                            onDoubleTap = if (disableDoubleTapReaction || !ReleaseFeatures.MESSAGE_REACTIONS || row.messages.size > 1 || com.example.chat.ui.chats.detail.SelectionAction.star !in com.example.chat.ui.chats.detail.SelectionActionPolicy.available(listOf(message))) {
                                 null
                             } else {
                                 { onToggleReaction(message.id, doubleTapReactionEmoji) }
                             },
-                            onReactionTap = { emoji -> if (ReleaseFeatures.MESSAGE_REACTIONS) onToggleReaction(message.id, emoji) },
+                            onReactionTap = { emoji -> if (ReleaseFeatures.MESSAGE_REACTIONS && com.example.chat.ui.chats.detail.SelectionAction.star in com.example.chat.ui.chats.detail.SelectionActionPolicy.available(listOf(message))) onToggleReaction(message.id, emoji) },
                             onMediaTapWithBounds = { rect -> onMediaTapWithBounds?.invoke(message, rect) ?: onMediaTap(message) },
                             onMediaTap = if (message.attachment == null) {
                                 null
@@ -1081,6 +1115,63 @@ fun ChatDetailScreen(
         }
     }
 
+    singleTapMessage?.let { selected -> messages.firstOrNull { it.id == selected.id } }?.let { tapped ->
+        val available = com.example.chat.ui.chats.detail.SelectionActionPolicy.available(listOf(tapped))
+        val standard = com.example.chat.ui.chats.detail.SelectionAction.star in available
+        val textAllowed = com.example.chat.ui.chats.detail.SelectionAction.copy in available
+        com.example.chat.ui.chats.detail.MessageMoreOptionsDialog(
+            options = listOf(
+                com.example.chat.ui.chats.detail.MessageMoreOption("Modify Chat", localOverrideAccountKey.isNotBlank() && isMessageSessionCurrent() && com.example.chat.core.messages.LocalMessageOverridePolicy.editable(tapped)) {
+                    localEditMessageId = tapped.id
+                    localEditText = localMessageStore.text(tapped) ?: tapped.text
+                },
+                com.example.chat.ui.chats.detail.MessageMoreOption("Copy", textAllowed) { runAction(tapped, MessageActionType.copy) },
+                com.example.chat.ui.chats.detail.MessageMoreOption("Copy Selection", textAllowed) { copySelectionMessage = tapped },
+                com.example.chat.ui.chats.detail.MessageMoreOption("Translate", false) {},
+                com.example.chat.ui.chats.detail.MessageMoreOption("Change Translator Language", false) {},
+                com.example.chat.ui.chats.detail.MessageMoreOption("interaction", ReleaseFeatures.MESSAGE_REACTIONS && standard) { emojiReactionTarget = tapped },
+                com.example.chat.ui.chats.detail.MessageMoreOption("Double Tap Reaction", ReleaseFeatures.MESSAGE_REACTIONS && onDoubleTapReactionEmojiChanged != null) { choosingDoubleTapEmoji = true },
+                com.example.chat.ui.chats.detail.MessageMoreOption("Image quote", textAllowed) { quoteMessageId = tapped.id },
+                com.example.chat.ui.chats.detail.MessageMoreOption("Share", textAllowed) {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(android.content.Intent.EXTRA_TEXT, tapped.text)
+                    }
+                    try { shareContext.startActivity(android.content.Intent.createChooser(intent, "Share message")) }
+                    catch (_: android.content.ActivityNotFoundException) {
+                        scope.launch { snackbarHostState.showSnackbar("No app is available to share this message.") }
+                    }
+                },
+                com.example.chat.ui.chats.detail.MessageMoreOption(if (tapped.isStarred) "Unstar" else "Star", standard) { onToggleStar(tapped.id) },
+                com.example.chat.ui.chats.detail.MessageMoreOption("Starred messages", true) { showStarredInChat = true },
+                com.example.chat.ui.chats.detail.MessageMoreOption("Notify When Message Read", false) {},
+                com.example.chat.ui.chats.detail.MessageMoreOption("Message info", true) { infoMessage = tapped },
+            ),
+            onDismiss = { singleTapMessage = null },
+        )
+    }
+    quoteMessageId?.let { id -> messages.firstOrNull { it.id == id } }
+        ?.takeIf { com.example.chat.ui.chats.detail.SelectionAction.copy in com.example.chat.ui.chats.detail.SelectionActionPolicy.available(listOf(it)) }?.let { target ->
+        com.example.chat.ui.chats.detail.MessageQuoteDialog(target, resolveQuoteSender(target.senderId), resolveSenderName(target.senderId),
+            currentMessage = { if (isMessageSessionCurrent()) messages.firstOrNull { it.id == target.id } else null }, onClose = { quoteMessageId = null })
+    }
+    localEditMessageId?.let { id -> messages.firstOrNull { it.id == id } }
+        ?.takeIf { com.example.chat.core.messages.LocalMessageOverridePolicy.editable(it) }?.let { target ->
+        com.example.chat.ui.chats.detail.LocalMessageEditDialog(
+            value = localEditText, onValueChanged = { if (it.length <= 12000) localEditText = it },
+            onDismiss = { localEditMessageId = null },
+            onRestore = { if (isMessageSessionCurrent()) { localMessageStore.reset(target.id); localMessageRevision++ }; localEditMessageId = null },
+            onSave = { if (isMessageSessionCurrent() && localMessageStore.save(target, localEditText)) localMessageRevision++; localEditMessageId = null },
+        )
+    }
+    com.example.chat.ui.chats.detail.MessageDetailDialogs(
+        messages = messages, showStarred = showStarredInChat,
+        copyMessageId = copySelectionMessage?.id, infoMessageId = infoMessage?.id,
+        onCloseStarred = { showStarredInChat = false },
+        onCloseCopy = { copySelectionMessage = null }, onCloseInfo = { infoMessage = null },
+        onJumpToMessage = { id -> highlightedMessageId = id; pendingScrollTarget = id; showStarredInChat = false },
+    )
+
     // Keep the anchored menu's generated Compose code out of the large conversation method.
     AnchoredMessageContextMenu(
         messageState = contextMenuMessageState,
@@ -1224,8 +1315,23 @@ fun ChatDetailScreen(
         }
     }
 
+    if (choosingDoubleTapEmoji && ReleaseFeatures.MESSAGE_REACTIONS && onDoubleTapReactionEmojiChanged != null) {
+        ModalBottomSheet(onDismissRequest = { choosingDoubleTapEmoji = false }, containerColor = Color.Transparent) {
+            Column {
+                Text("Choose the default double-tap reaction for conversations")
+                if (disableDoubleTapReaction) Text("Double-tap reactions are disabled in Conversation settings. Choosing an emoji does not turn them on.")
+                ChatyEmojiPickerSheet(theme = theme, reactionMode = true, composerMode = false,
+                    onEmojiPicked = { emoji ->
+                        if (emoji.isNotEmpty()) onDoubleTapReactionEmojiChanged(emoji)
+                        choosingDoubleTapEmoji = false
+                    })
+            }
+        }
+    }
+
     // Reaction emoji picker (Dart ChatyEmojiPicker.show reactionMode).
-    emojiReactionTarget?.let { target ->
+    emojiReactionTarget?.let { selected -> messages.firstOrNull { it.id == selected.id } }
+        ?.takeIf { ReleaseFeatures.MESSAGE_REACTIONS && com.example.chat.ui.chats.detail.SelectionAction.star in com.example.chat.ui.chats.detail.SelectionActionPolicy.available(listOf(it)) }?.let { target ->
         ModalBottomSheet(tonalElevation = 0.dp, dragHandle = null, shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { emojiReactionTarget = null },
             containerColor = Color.Transparent,
@@ -1238,7 +1344,7 @@ fun ChatDetailScreen(
                 headerIconsColor = convPrefs.emojiHeaderIconsColor?.let(::Color),
                 backgroundColor = convPrefs.emojiPickerBgColor?.let(::Color),
                 onEmojiPicked = { emoji ->
-                    if (emoji.isNotEmpty()) onToggleReaction(target.id, emoji)
+                    if (emoji.isNotEmpty() && ReleaseFeatures.MESSAGE_REACTIONS) onToggleReaction(target.id, emoji)
                     emojiReactionTarget = null
                 },
             )

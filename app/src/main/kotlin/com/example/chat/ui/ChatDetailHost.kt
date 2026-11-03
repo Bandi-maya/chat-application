@@ -150,6 +150,10 @@ fun ChatDetailHost(
     val hostView = androidx.compose.ui.platform.LocalView.current
     val me = api.currentUser
     val myId = me?.id ?: ""
+    val messageAccountScope = api.authSnapshot()
+    val localOverrideAccountKey = com.example.chat.core.messages.LocalMessageOverridePolicy.accountKey(
+        messageAccountScope.tenantId, messageAccountScope.baseUrl, myId) ?: ""
+
     val live = api.conversations.firstOrNull { it.id == conversation.id } ?: conversation
     val messages = api.getMessages(conversation.id)
     // Refresh epoch outside the auth lock, then confirm the SAME captured account and pure epoch together.
@@ -406,6 +410,9 @@ fun ChatDetailHost(
         messages = messages,
         initialMessageId = initialMessageId,
         currentUserId = myId,
+        localOverrideAccountKey = localOverrideAccountKey,
+        messageSessionIdentity = messageAccountScope,
+        isMessageSessionCurrent = { com.example.chat.core.messages.LocalMessageOverridePolicy.sessionCurrent(messageAccountScope, api.authSnapshot()) },
         onBack = onBack,
         onSend = { text ->
             api.sendMessage(conversation.id, text)
@@ -414,6 +421,7 @@ fun ChatDetailHost(
         resolveSenderName = { id ->
             if (id == myId) "You" else (api.users.firstOrNull { it.id == id }?.displayName ?: "Team Member")
         },
+        resolveQuoteSender = { id -> api.users.firstOrNull { it.id == id } },
         presenceText = presenceText,
         presenceIsOnline = presenceOnline,
         showHeaderAvatar = !conv.hideProfilePicture && gbB("PicProf", true),
@@ -480,6 +488,10 @@ fun ChatDetailHost(
         retainViewOnce = privacy.antiViewOnce || gbB("anti_vw_once", false),
         disableDoubleTapReaction = conv.disableDoubleTapReaction,
         doubleTapReactionEmoji = conv.doubleTapReactionEmoji,
+        onDoubleTapReactionEmojiChanged = { emoji ->
+            prefs.updateConversation(prefs.conversation.copy(doubleTapReactionEmoji = emoji),
+                logTitle = "Double tap reaction", prevVal = prefs.conversation.doubleTapReactionEmoji, newVal = emoji)
+        },
         showGroupAvatar = ServiceLocator.templateController.conversation.showAvatarInGroup,
         colorOverrides = colorOverrides,
         onEditMessage = { id, newText ->
