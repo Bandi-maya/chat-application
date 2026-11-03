@@ -94,8 +94,36 @@ def animation_pass(style_slug):
     for scale in ('window_animation_scale', 'transition_animation_scale', 'animator_duration_scale'):
         adb('shell', 'settings', 'put', 'global', scale, '0.0')
 
+
+def fixture_pass():
+    """One bounded instrumentation run of the writer-reviewed ReferenceLayoutRuntimeProofTest
+    (real MainActivity, fake REST session, 20 labelled in-memory rows). screenrecord runs
+    WHILE the instrumentation executes; rows are in-memory only, no force-stop inside the
+    test. Evidence pulled as fixture-* files plus the recording."""
+    adb('shell', 'settings', 'put', 'global', 'window_animation_scale', '1.0')
+    adb('shell', 'settings', 'put', 'global', 'transition_animation_scale', '1.0')
+    adb('shell', 'settings', 'put', 'global', 'animator_duration_scale', '1.0')
+    rec = subprocess.Popen(['adb', 'shell', 'screenrecord', '/sdcard/fixture-pass.mp4'],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    time.sleep(2)
+    subprocess.run(['adb', 'shell', 'am', 'instrument', '-w', '-e', 'class',
+                    'com.example.chat.ReferenceLayoutRuntimeProofTest#configuredRealRootShowsRowsScrollAndPreservesSelectedPresentation',
+                    'com.logybyte.chat.test/androidx.test.runner.AndroidJUnitRunner'],
+                   stdout=open(out / 'fixture-instrument-output.txt', 'wb'), stderr=subprocess.STDOUT,
+                   timeout=300, check=False)
+    subprocess.run(['adb', 'shell', 'pkill', '-2', 'screenrecord'], timeout=15, check=False,
+                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    time.sleep(2)
+    subprocess.run(['adb', 'pull', '/sdcard/fixture-pass.mp4', str(out / 'fixture-pass.mp4')],
+                   timeout=60, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(['adb', 'pull', '/sdcard/Android/data/com.logybyte.chat/files/screenshots/', str(out / 'fixture')],
+                   timeout=60, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    for scale in ('window_animation_scale', 'transition_animation_scale', 'animator_duration_scale'):
+        adb('shell', 'settings', 'put', 'global', scale, '0.0')
+
 try:
     adb('install','-r','-t','runtime-apks/app-debug.apk')
+    adb('install','-r','-t','runtime-apks/app-debug-androidTest.apk')
     passes = [('Chaty Default', 'dark'), ('WhatsApp OLD UI', 'dark'), ('IOS STYLE', 'dark'),
               ('Curved Radial Menu', 'dark'), ('Chaty Default', 'light')]
     for style, brightness in passes:
@@ -118,7 +146,11 @@ try:
         (out/f'{slug}-seed.txt').write_text(style)
         adb('shell','am','start','-n',pkg+'/com.example.chat.MainActivity')
         time.sleep(10)
-        for label in ('Not now','Not Now','Not Now','Not Now'):
+        # First-launch dialogs: version changelog (Close) sits above the
+        # notification-permission prompt (Not Now); dismiss both, changelog
+        # first since it masks the home window entirely (baseline 41626081675
+        # died here: AssertionError UI label not found: Calls).
+        for label in ('Close','Not now','Not Now','Close','Not Now'):
             tap_label(label,optional=True)
         capture(f'{slug}-01-chats')
         # Probe the style's actually-present destinations; a label absent in this
@@ -133,10 +165,20 @@ try:
         present, hidden = [], []
         for i,label in enumerate(('Calls','Chats','Tasks','Settings','Communities','Updates','Groups'),2):
             if not tap_label(label, optional=True, settle=0):
-                # UNREACHABLE: no menu affordance found, label may sit behind it.
-                # HIDDEN: menu opened (or dock visible) and the label still was not found.
-                hidden.append(('UNREACHABLE:' if menu_note == 'MENU_NONE' else 'HIDDEN:') + label)
-                continue
+                # Drawer closes on every select: reopen the actual menu and retry once
+                # before recording anything, so a closed drawer is never misread.
+                reopened = False
+                for mlabel in ('Open navigation drawer', 'Open navigation menu', 'Menu', 'Open menu', 'More options'):
+                    if tap_label(mlabel, optional=True, settle=1):
+                        reopened = True
+                        break
+                if reopened and tap_label(label, optional=True, settle=0):
+                    pass  # fell through to a real destination below
+                else:
+                    # UNREACHABLE: no menu affordance found, label may sit behind it.
+                    # HIDDEN: menu opened (or dock visible) and the label still was not found.
+                    hidden.append(('UNREACHABLE:' if not reopened else 'HIDDEN:') + label)
+                    continue
             present.append(label)
             capture(f'{slug}-{i:02}-{label.lower()}-transition', settle=0.4)
             capture(f'{slug}-{i:02}-{label.lower()}')
@@ -153,6 +195,7 @@ try:
         capture(f'{slug}-07-reopened')
         if style == 'Chaty Default' and brightness == 'dark':
             animation_pass(slug)
+    fixture_pass()
 finally:
     capture('final-state')
     (out/'logcat.txt').write_bytes(adb('logcat','-d','-v','threadtime',check=False))
