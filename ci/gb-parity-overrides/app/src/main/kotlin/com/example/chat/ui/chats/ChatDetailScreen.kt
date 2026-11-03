@@ -1348,7 +1348,9 @@ fun ChatDetailScreen(
             } else {
                 com.example.chat.ui.chats.detail.AttachmentGallerySheet(
                     theme = theme,
-                    heightFraction = if (attachmentSheetState.targetValue == androidx.compose.material3.SheetValue.Expanded) 0.92f else 0.5f,
+                    // User directive: the clip/attachment panel opens taller and expands
+                    // to full height when pulled up.
+                    heightFraction = if (attachmentSheetState.targetValue == androidx.compose.material3.SheetValue.Expanded) 1.0f else 0.72f,
                     onAction = { action ->
                         attachmentSheetOpen = false
                         onAttachmentAction(action)
@@ -1669,7 +1671,7 @@ private fun ConversationHeader(
                 )
             }
             var moreMenuPage by remember(menuOpen) { mutableStateOf(false) }
-            DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
+            DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }, rememberKey = "chat-header-menu") {
                 val menuIconTint = Color(theme.secondaryTextColor)
                 if (!moreMenuPage) {
                     DropdownMenuItem(
@@ -1800,7 +1802,9 @@ private fun AnchoredMessageContextMenu(
             primaryTextColor = Color(theme.primaryTextColor),
             secondaryTextColor = Color(theme.secondaryTextColor),
             destructiveColor = Color(theme.dangerColor),
-            anchorRect = anchorRect,
+            // User directive: the single-message selection menu presents
+            // bottom-center (sheet), not anchored mid-screen at the bubble.
+            anchorRect = null,
             // Reactions are deferred to the next release (see ReleaseFeatures).
             reactionRail = if (ReleaseFeatures.MESSAGE_REACTIONS) {
                 ReactionRail(
