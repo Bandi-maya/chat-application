@@ -65,6 +65,23 @@ import com.example.chat.ui.tasks.TaskAvatar
  *  with onPrimary indicator (weight 3.5), bold 14sp labels, scrollable
  *  when more than 4 destinations. On Chats/Groups the tab bar is handed to
  *  the home header slot instead of rendering at the top. */
+/** WhatsApp-old destination title header: compact left-aligned bold title on the
+ *  shell background, drawn once by the shell so every enabled destination gets the
+ *  same header. Action slots are added only where a destination has real actions. */
+@Composable
+internal fun OldUiDestinationTitleHeader(colors: ChatyColors, title: String) {
+    Box(Modifier.fillMaxWidth().background(colors.surface).padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(
+            title,
+            color = colors.foreground,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 @Composable
 internal fun TopWhatsAppShell(
     colors: ChatyColors,
@@ -93,7 +110,10 @@ internal fun TopWhatsAppShell(
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            if (!underHeaderPublished) HomeHeaderTabsBar(colors, navItemIds, selectedIndex, heightDp, onSelect)
+            if (!underHeaderPublished) {
+                OldUiDestinationTitleHeader(colors, NavigationCatalog.labelFor(activeDestinationId))
+                HomeHeaderTabsBar(colors, navItemIds, selectedIndex, heightDp, onSelect)
+            }
             Box(Modifier.weight(1f)) { content() }
         }
         Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) { fab() }
@@ -190,8 +210,9 @@ internal fun ModernSideMenuShell(
     onSelect: (Int) -> Unit,
     fab: @Composable () -> Unit,
     content: @Composable () -> Unit,
+    initialOpen: Boolean = false,
 ) {
-    var drawerOpen by remember { mutableStateOf(false) }
+    var drawerOpen by remember { mutableStateOf(initialOpen) }
 
     // Dart display-name resolution.
     val override = myNameOverride().trim()
