@@ -211,7 +211,8 @@ fun StandardHomeAppBar(
     val largeDefault = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)
     Column(Modifier.fillMaxWidth()) {
     if (largeDefault) {
-        Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 20.dp)) {
+        Column(Modifier.fillMaxWidth().height(164.dp).padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = Color(theme.primaryTextColor), fontSize = (32 * theme.fontScale).sp,
                 fontWeight = FontWeight.W700)
@@ -229,8 +230,8 @@ fun StandardHomeAppBar(
                     .combinedClickable(onClick = { if (homePrefs.nameTapOpensLocked) onIdentityTap() }, onLongClick = onIdentityLongPress)
                     .padding(horizontal = 4.dp, vertical = 2.dp),
             ) {
-                Text(
-                    if (largeDefault) "Chats" else title,
+                if (!largeDefault) Text(
+                    title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = if (homeStyle == "Classic") Color(theme.accentColor) else Color(theme.primaryTextColor),

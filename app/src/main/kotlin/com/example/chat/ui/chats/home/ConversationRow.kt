@@ -136,7 +136,7 @@ fun ConversationRow(
         selected -> Color(argbWithAlpha(theme.accentColor, if (isDark) 0.16 else 0.10))
         cardRows -> Color(theme.cardColor)
         isTelegramRows -> Color(argbWithAlpha(theme.cardColor, if (isDark) 0.68 else 0.58))
-        conversation.isPinned -> Color(theme.cardColor)
+        conversation.isPinned && !com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle) -> Color(theme.cardColor)
         else -> Color.Transparent
     }
 
