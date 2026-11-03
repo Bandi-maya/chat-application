@@ -42,6 +42,8 @@ import androidx.compose.material.icons.outlined.PushPin as OutlinedPushPin
 import androidx.compose.material.icons.outlined.Reply
 import androidx.compose.material.icons.outlined.ScheduleSend
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material.icons.outlined.VolumeOff
 import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material.icons.rounded.Check
@@ -126,6 +128,13 @@ data class ChatsHomeNav(
     val onRestartApp: () -> Unit = {},
     val onToggleBrightness: () -> Unit = {},
     val onSelectPlan: () -> Unit = {},
+    /** Rail-hidden Tasks/Updates surface as header overflow entries (user
+     *  directive); the flags say the entries show, the callbacks open the real
+     *  destination screens. */
+    val showTasksEntry: Boolean = false,
+    val showUpdatesEntry: Boolean = false,
+    val onOpenTasks: () -> Unit = {},
+    val onOpenUpdates: () -> Unit = {},
 )
 
 /** _ghostModePill: toggles ghost mode with the exact Dart snackbar copy. */
@@ -372,6 +381,8 @@ fun HomeOverflowMenu(
         Triple(Icons.Outlined.Dialpad, "Message a Number") { onMessageANumber() },
         Triple(Icons.Outlined.Campaign, "Mass Message") { nav.onOpenNewChat(false, true) },
         Triple(Icons.Outlined.GroupAdd, "New Group") { nav.onOpenNewChat(true, false) },
+        if (nav.showUpdatesEntry) Triple(Icons.Outlined.Update, "Updates") { nav.onOpenUpdates() } else null,
+        if (nav.showTasksEntry) Triple(Icons.Outlined.TaskAlt, "Tasks") { nav.onOpenTasks() } else null,
         if (ReleaseFeatures.LINKED_DEVICES) Triple(Icons.Outlined.Devices, "Linked Devices") { nav.onOpenLinkedDevices() } else null,
         Triple(Icons.Outlined.Star, "Starred Messages") { nav.onOpenStarredMessages() },
         Triple(Icons.Outlined.DoneAll, "Mark All as Read") { onMarkAllAsRead() },
@@ -382,6 +393,7 @@ fun HomeOverflowMenu(
     DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
         expanded = expanded,
         onDismissRequest = onDismiss,
+        rememberKey = "home-overflow-menu",
         containerColor = Color(theme.cardColor),
         border = androidx.compose.foundation.BorderStroke(1.1.dp, Color(argbWithAlpha(theme.secondaryTextColor, 0.2))),
     ) {
