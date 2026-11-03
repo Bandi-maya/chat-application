@@ -11,6 +11,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -280,7 +282,9 @@ internal fun PresetNavigationShell(
                 // OneUI center-button dock: left half / fixed center gap for the
                 // raised circle / right half. Both halves are weight(1f), so the gap
                 // sits exactly at the bar's center for odd and even item counts.
-                if (isOneUi) {
+                // Explicit One UI pick only - the Chaty Default presentation, which
+                // also renders through the oneUi mode, keeps the plain weight row.
+                if (isOneUi && !referenceDefaultPresentation) {
                     val half = navItemIds.size / 2
                     Row(Modifier.weight(1f).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
                         navItemIds.subList(0, half).forEachIndexed { i, id -> renderDockItem(i, id) }
@@ -293,9 +297,9 @@ internal fun PresetNavigationShell(
                     navItemIds.forEachIndexed { index, id -> renderDockItem(index, id) }
                 }
             }
-            // User directive (center-button dock reference): the OneUI dock carries a
-            // raised circular center action button overlapping the bar top.
-            if (isOneUi) {
+            // The OneUI dock carries a raised circular center action button
+            // overlapping the bar top (explicit One UI pick only).
+            if (isOneUi && !referenceDefaultPresentation) {
                 Box(
                     Modifier.align(Alignment.TopCenter).offset(y = (-14).dp)
                         .size(52.dp).shadow(6.dp, CircleShape).clip(CircleShape)
@@ -327,6 +331,9 @@ internal fun BottomShell(
     animationsDisabled: Boolean,
     onDestinationTap: (Int) -> Unit,
     onCenterAction: () -> Unit,
+    /** Explicit One UI pick only: render the raised-centre horizontally
+     *  scrolling dock instead of the configured named dock style. */
+    raisedCenterScrollDock: Boolean = false,
     fab: @Composable () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -382,6 +389,8 @@ internal fun BottomShell(
         "Classic Label Bar", "Soft Square Tile",
     )
 
+    val dockVariant = HomePresetNormalizer.resolvedBottomDockVariant(styleName, raisedCenterScrollDock)
+
     Box(Modifier.fillMaxSize().background(colors.background)) {
         // Reserve the complete dock footprint for every destination. Page-owned
         // Scaffold FABs (Calls) and last rows must not be drawn underneath it.
@@ -410,6 +419,49 @@ internal fun BottomShell(
             if (topBorderOnly) {
                 Box(Modifier.fillMaxWidth().height(1.dp).background(colors.borderSubtle).align(Alignment.TopCenter))
             }
+            if (dockVariant == HomePresetNormalizer.RAISED_CENTER_SCROLL_DOCK) {
+                // Fixed 64dp items scroll horizontally in two independent
+                // halves; the 56dp centre gap is a FIXED sibling (never scrolled)
+                // so it stays centred under the raised button. With few items the
+                // halves hug the gap and need no scrolling.
+                Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                    val half = navItemIds.size / 2
+                    val left = navItemIds.subList(0, half)
+                    val right = navItemIds.subList(half, navItemIds.size)
+                    Row(
+                        Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.End),
+                    ) {
+                        left.forEachIndexed { i, id ->
+                            Box(Modifier.width(64.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                                CustomNavItem(
+                                    id = id, isSelected = selectedIndex == i, isCenter = false,
+                                    styleName = styleName, colors = colors, accent = accent,
+                                    onTap = { onDestinationTap(i) },
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.width(56.dp))
+                    Row(
+                        Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.Start),
+                    ) {
+                        right.forEachIndexed { i, id ->
+                            val index = half + i
+                            Box(Modifier.width(64.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                                CustomNavItem(
+                                    id = id, isSelected = selectedIndex == index, isCenter = false,
+                                    styleName = styleName, colors = colors, accent = accent,
+                                    onTap = { onDestinationTap(index) },
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
             Row(
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.SpaceAround,
@@ -464,6 +516,25 @@ internal fun BottomShell(
                         }
                     }
                 }
+            }
+            }
+        }
+        if (dockVariant == HomePresetNormalizer.RAISED_CENTER_SCROLL_DOCK) {
+            // Raised circular centre action overlapping the dock top. Sibling of
+            // the (clipped) dock container in the outer unclipped Box so the
+            // raised 14dp is not cut off: the circle's bottom sits 38dp below the
+            // dock's top edge, i.e. (bottomMargin + barHeight - 38) above the
+            // outer bottom, horizontally centred like the dock.
+            Box(
+                Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = (bottomMargin + barHeight - 38).dp)
+                    .size(52.dp).shadow(6.dp, CircleShape).clip(CircleShape)
+                    .background(accent)
+                    .clickable(onClick = onCenterAction),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.CameraAlt, contentDescription = "Quick action", tint = colors.onPrimary,
+                    modifier = Modifier.size(24.dp))
             }
         }
         Box(Modifier.align(Alignment.BottomEnd).padding(bottom = (barHeight + bottomMargin + 16).dp, end = 16.dp)) { fab() }
