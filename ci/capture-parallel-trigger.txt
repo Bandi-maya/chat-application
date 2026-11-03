@@ -1,1 +1,1 @@
-41636125363 parallel capture 2026-11-03T18:44+05:30 motion+stable against verified pair
+41636125363 corrected bare-seed OLD+menu capture, pre-rows-v2 signed-out-presentation labels, 2026-11-03T19:25+05:30
