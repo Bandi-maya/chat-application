@@ -235,7 +235,7 @@ def fixture_pass():
 try:
     adb('install','-r','-t','runtime-apks/app-debug.apk')
     adb('install','-r','-t','runtime-apks/app-debug-androidTest.apk')
-    passes = [('Chaty Default', 'dark'), ('WhatsApp OLD UI', 'dark'), ('IOS STYLE', 'dark'),
+    passes = [('One UI', 'dark'), ('Chaty Default', 'dark'), ('WhatsApp OLD UI', 'dark'), ('IOS STYLE', 'dark'),
               ('Curved Radial Menu', 'dark'), ('Chaty Default', 'light')]
     for style, brightness in passes:
         adb('shell','am','force-stop',pkg)
@@ -273,6 +273,15 @@ try:
         require_ready(slug)
         ready = True
         capture(f'{slug}-01-chats')
+        if style == 'One UI':
+            # Dock scroll evidence only: geometry follows the actual viewport.
+            size=re.search(r'(\d+)x(\d+)',adb('shell','wm','size').decode())
+            w,h=map(int,size.groups())
+            for side,x1,x2 in [('left',.08,.40),('right',.60,.92)]:
+                for direction,a,b in [('forward',x2,x1),('back',x1,x2)]:
+                    adb('shell','input','swipe',str(int(w*a)),str(int(h*.94)),str(int(w*b)),str(int(h*.94)),'500')
+                    capture(f'{slug}-dock-{side}-{direction}',settle=1)
+
         if ready and style in ('Chaty Default', 'WhatsApp OLD UI') and brightness == 'dark':
             record_layout_walkthrough(slug)
         # Probe the style's actually-present destinations; a label absent in this
@@ -317,7 +326,7 @@ try:
             capture(f'{slug}-{i:02}-{label.lower()}')
             # Job bound: the light-variant pass probes collapse on the first present
             # destination only; dark passes probe every present destination.
-            if brightness == 'dark' or not present[:-1]:
+            if style != 'One UI' and (brightness == 'dark' or not present[:-1]):
                 swipe_probe(slug, f'{i:02}-{label.lower()}')
         (out/f'{slug}-destinations.txt').write_text('SCOPE:signed-out-bare-bucket-presentation-proof-not-authenticated-account-persistence\n' + menu_note + '\nPRESENT:' + ','.join(present) + '\n' + '\n'.join(hidden))
         adb('shell','input','keyevent','KEYCODE_BACK')
@@ -364,8 +373,12 @@ try:
     try:
         adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen','menu',check=False)
         time.sleep(3)
-        require_ready('debug-menu','Alice Rao')
+        # This fixture intentionally opens its overflow at launch; modal semantics
+        # hide the underlying chat title from UIAutomator until dismissed.
+        require_ready('debug-menu','View contact info')
         capture('menu-02-chat-header-open',settle=2)
+        adb('shell','input','keyevent','KEYCODE_BACK')
+        require_ready('debug-menu-closed','Alice Rao')
         time.sleep(3)
         reach = tap_label('See you at 6!', optional=True, settle=0)
         if reach is not True:
