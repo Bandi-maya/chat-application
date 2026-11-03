@@ -33,7 +33,7 @@ object HomePresetNormalizer {
     }
 
     /** Resolves the selected Home UI label to the runtime shell mode. */
-    fun navigationMode(value: String): AppNavigationMode? = when (com.example.chat.core.preferences.HomePresentationPolicy.navigationStyle(value).trim().lowercase()) {
+    fun navigationMode(value: String): AppNavigationMode? = when (value.trim().lowercase()) {
         "classic", "whatsapp old ui", "whatsapp-style top bar", "whatsapp style top bar" ->
             AppNavigationMode.topWhatsAppBar
         "cards", "one ui" -> AppNavigationMode.oneUi
@@ -49,4 +49,9 @@ object HomePresetNormalizer {
         "curved radial menu" -> AppNavigationMode.curvedRadialDrawer
         else -> null
     }
+
+    /** App presentation mapping is separate from the legacy Dart resolver contract. */
+    fun presentationNavigationMode(value: String): AppNavigationMode? =
+        navigationMode(com.example.chat.core.preferences.HomePresentationPolicy.navigationStyle(value))
+
 }
