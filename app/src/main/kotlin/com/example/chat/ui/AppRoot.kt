@@ -622,6 +622,19 @@ fun AppRoot() {
                 val shellPrefsCtl = ServiceLocator.preferencesController
                 val shellPrivacy = shellPrefsCtl.privacy
                 com.example.chat.ui.navigation.MainNavigationShell(
+                    rootHeaderActions = {
+                        com.example.chat.ui.navigation.ReferenceRootActions(
+                            colors = shellColors, user = ServiceLocator.apiBackend.currentUser?.let { u ->
+                                com.example.chat.domain.models.UserProfile(
+                                    id = u.id, displayName = u.displayName, username = u.username,
+                                    avatarInitials = u.avatarInitials, avatarColorHex = u.avatarColorHex, avatarUrl = u.avatarUrl,
+                                    about = u.about, lastSeenAt = java.time.Instant.now(),
+                                )
+                            },
+                            onSearch = { route = AuthRoute.GlobalSearch },
+                            onSettings = { pushedSettings = true },
+                        )
+                    },
                     colors = shellColors,
                     template = ServiceLocator.templateController.navigation,
                     navigationMode = themeController.navigationMode,
