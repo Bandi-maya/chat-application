@@ -790,6 +790,7 @@ fun AppRoot() {
                         bottomBarStyle = ServiceLocator.appearanceVariantController.bottomBarStyle,
                         navigationStyleName = ServiceLocator.appearanceVariantController.navigationStyle,
                         homeStyle = shellHome.homeStyle,
+                        oneUiRaisedCenterDock = com.example.chat.ui.navigation.HomePresetNormalizer.oneUiRaisedCenterDockEnabled(shellHome.homeStyle),
                         animationsDisabled = com.example.chat.ui.kit.rememberChatyReduceMotion(),
                     ),
                     myNameOverride = { shellHome.myNameOverride },
