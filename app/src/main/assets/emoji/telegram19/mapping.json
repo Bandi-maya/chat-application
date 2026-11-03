@@ -1,0 +1,159 @@
+{
+  "pack": "telegram19_clear",
+  "rule": "Bindings follow the visible artwork identity, not original GIF filenames. Corrected tired face U+1F62B, expressionless U+1F611, zipper-mouth U+1F910 and smiling horns U+1F608.",
+  "zip_sha256": "385f4e888817ff6589b5ae9164b4307df3ee437d382f7ff3bd3e60cb642ae09a",
+  "items": [
+    {
+      "file": "yum_1F60B.webp",
+      "bind_codepoint": "U+1F60B",
+      "art_identity": "face savoring food",
+      "source": "ios_zip:11_face_savoring_food.webp (verified U+1F60B)",
+      "sha256": "41f0788907632170fe263204028fef641900de663d84efa3663e520fbc69f31e",
+      "variant_notes": "same design; newer revision art"
+    },
+    {
+      "file": "party_1F973.webp",
+      "bind_codepoint": "U+1F973",
+      "art_identity": "partying face",
+      "source": "mov:86_Partying Face.mov",
+      "sha256": "cbaf5448eec22af2de02ca19949676a0bb3fa6031ff9709336f79f9789fd5acb",
+      "variant_notes": "same design; phase timing differs slightly"
+    },
+    {
+      "file": "yawn_1F971.webp",
+      "bind_codepoint": "U+1F971",
+      "art_identity": "yawning face",
+      "source": "gif_enhanced:17320-yawn.gif",
+      "sha256": "f7c340b116564b884a19bf3394c5d2962ae7857cec9fa661094e785a65c5a641",
+      "variant_notes": "UPSCALED from 72px GIF - softer than the other 18; no better source in user files"
+    },
+    {
+      "file": "gasp_1F62E.webp",
+      "bind_codepoint": "U+1F62E",
+      "art_identity": "face with open mouth",
+      "source": "ios_zip:31_face_with_open_mouth.webp (verified U+1F62E)",
+      "sha256": "37445bbef693279dba4a9dd919156c0c2642b19fb8ddde27e87fb2703b8b5875",
+      "variant_notes": "same design"
+    },
+    {
+      "file": "clown_1F921.webp",
+      "bind_codepoint": "U+1F921",
+      "art_identity": "clown face",
+      "source": "mov:79_Clown Face.mov",
+      "sha256": "1d470cd1fb11b5bfbd9dd2af638a4ad4764feda8b2fa2187b65165ab981112e5",
+      "variant_notes": "same design"
+    },
+    {
+      "file": "swear_1F92C.webp",
+      "bind_codepoint": "U+1F92C",
+      "art_identity": "face with symbols on mouth",
+      "source": "mov:70_Face With Symbols on Mouth.mov",
+      "sha256": "dcc149c93fde6281e0d0505560866b4f64f80e728761483d8c2a5f4e113473e5",
+      "variant_notes": "same design; symbol-stamp phase differs"
+    },
+    {
+      "file": "cool_1F60E.webp",
+      "bind_codepoint": "U+1F60E",
+      "art_identity": "smiling face with sunglasses",
+      "source": "ios_zip:12_smiling_face_with_sunglasses.webp (verified U+1F60E)",
+      "sha256": "0a3d0cb4a5de3f360bba77b48430fbe87ce0d145795214148cec6f54159a48fd",
+      "variant_notes": "VARIANT: old GIF has teeth grin, new has closed smile - user approved new art in grid preview 09:07"
+    },
+    {
+      "file": "demon_1F608.webp",
+      "bind_codepoint": "U+1F608",
+      "art_identity": "smiling face with horns",
+      "source": "mov:91_Smiling Face With Horns.mov",
+      "sha256": "e2f770937c59ad3fe997d63899cfbcfc7f5fbc767d91ca52343b48e74dceda6b",
+      "variant_notes": "pixel-verified 1F608, NOT 1F47F angry horns"
+    },
+    {
+      "file": "bored_1F611.webp",
+      "bind_codepoint": "U+1F611",
+      "art_identity": "expressionless face",
+      "source": "ios_zip:25_expressionless_face.webp (verified U+1F611)",
+      "sha256": "1c2b0f6398239c08868878acc3a97eddcdf6d4c289a0a36a2b445cbbe3c293c9",
+      "variant_notes": "pixel-verified expressionless, not unamused 1F612"
+    },
+    {
+      "file": "laugh_1F923.webp",
+      "bind_codepoint": "U+1F923",
+      "art_identity": "rolling on the floor laughing",
+      "source": "ios_zip:4_rolling_on_the_floor.webp (verified U+1F923)",
+      "sha256": "ae3935bb613d0817a44382c230d777a66ff048d6f3ba98b1a42b415f9a948267",
+      "variant_notes": "same design"
+    },
+    {
+      "file": "think_1F914.webp",
+      "bind_codepoint": "U+1F914",
+      "art_identity": "thinking face",
+      "source": "ios_zip:22_thinking_face.webp (verified U+1F914)",
+      "sha256": "0960e5384e45ef221efdefe5bfd8f63eeaf438e1932180d19ef2791db675b996",
+      "variant_notes": "same design; eyebrow/mouth pose phases differ slightly"
+    },
+    {
+      "file": "anxious_1F630.webp",
+      "bind_codepoint": "U+1F630",
+      "art_identity": "anxious face with sweat",
+      "source": "mov:63_Anxious Face.mov",
+      "sha256": "6af090a872242e807991b038698bafa327c1374425d356f8e087b9eabd67ccac",
+      "variant_notes": "same design (blue forehead, sweat drop)"
+    },
+    {
+      "file": "freaky1_1F61B.webp",
+      "bind_codepoint": "U+1F61B",
+      "art_identity": "face with tongue",
+      "source": "mov:38_Face With Tongue.mov",
+      "sha256": "2f0b4938f8919555d1723429991ed41199bf6b7db1abf5a3b0d34f5ef084bbcc",
+      "variant_notes": "REVISION VARIANT: old GIF is an older revision with happy-smile interlude; new is plain tongue-out cycle; user approved in grid preview"
+    },
+    {
+      "file": "freaky2_1F61D.webp",
+      "bind_codepoint": "U+1F61D",
+      "art_identity": "squinting face with tongue",
+      "source": "ios_zip:40_squinting_face_with_tongue.webp (verified U+1F61D)",
+      "sha256": "c78134c2361ed6ebcd999d5da3b3e9e5c268b4e496bf3b98495b2c7970fc1b25",
+      "variant_notes": "same design"
+    },
+    {
+      "file": "sad_1F641.webp",
+      "bind_codepoint": "U+1F641",
+      "art_identity": "slightly frowning face",
+      "source": "ios_zip:50_slightly_frowning_face.webp (verified U+1F641)",
+      "sha256": "ecf371cfb14d3b957a0d51ca791d3bd3029c2c3f11010c6caa991f1bfd149198",
+      "variant_notes": "same design"
+    },
+    {
+      "file": "liar_1F925.webp",
+      "bind_codepoint": "U+1F925",
+      "art_identity": "lying face",
+      "source": "mov:80_Lying Face.mov",
+      "sha256": "db3a0dee9e837fffa4b3b605f6e0dd140aa95819785601937e2b4aa158773690",
+      "variant_notes": "same design"
+    },
+    {
+      "file": "silent_1F910.webp",
+      "bind_codepoint": "U+1F910",
+      "art_identity": "zipper-mouth face",
+      "source": "ios_zip:32_zipper_mouth_face.webp (verified U+1F910)",
+      "sha256": "6c1d9d5d5aeb42cdf69f601b1529d08d553640a91ca63b8ca4183ec22b6bdb9c",
+      "variant_notes": "pixel-verified zipper-mouth, NOT shushing 1F92B despite 'silent' label"
+    },
+    {
+      "file": "sleep_1F634.webp",
+      "bind_codepoint": "U+1F634",
+      "art_identity": "sleeping face",
+      "source": "ios_zip:36_sleeping_face.webp (verified U+1F634)",
+      "sha256": "05bf35e9b8719f4fe81217f83ecdb5cf3f93cd03b87b5ec24447701d1f6d79e5",
+      "variant_notes": "same design"
+    },
+    {
+      "file": "scream_1F62B.webp",
+      "bind_codepoint": "U+1F62B",
+      "art_identity": "tired face",
+      "source": "ios_zip:35_tired_face.webp (verified U+1F62B)",
+      "sha256": "22409f9c354ada6e0cd9884656c6278b2414adb16e68d47d89c2cc5082610de7",
+      "variant_notes": "ART IS TIRED FACE - bind to U+1F62B, NOT 1F631 scream-in-fear. Original GIF art was also tired-face-like (no hands-on-cheeks). User approved the shown asset."
+    }
+  ]
+}

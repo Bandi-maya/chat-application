@@ -10,7 +10,7 @@ object SelectionActionPolicy {
     fun available(messages: List<ChatMessage>): Set<SelectionAction> {
         if (messages.isEmpty()) return emptySet()
         val actions = linkedSetOf(SelectionAction.delete)
-        val standard = messages.all { it.type != MessageType.system && !it.isDeletedForEveryone && !it.isDeletedForMe && it.metadata["view_once"] != true }
+        val standard = messages.all { it.type != MessageType.system && !it.isDeletedForEveryone && !it.isDeletedForMe && !it.isRevokedBySender && it.metadata["view_once"] != true }
         if (standard) {
             actions += SelectionAction.forward
             actions += SelectionAction.star

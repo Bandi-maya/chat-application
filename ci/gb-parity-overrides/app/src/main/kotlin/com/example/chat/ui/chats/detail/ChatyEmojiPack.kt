@@ -22,18 +22,11 @@ import com.example.chat.ServiceLocator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * The selectable emoji packs (Chaty, iOS, Microsoft, OpenMoji, Telegram). The choice is stored in the
- * existing universal.emojiStyle preference (no new key): "iOS" selects the iOS
- * pack, anything else, including the legacy default "Chaty Motion", is the
- * Chaty pack (animated Noto, unchanged).
- *
- * iOS pack artwork: 50 animated WebP files expected at
- * assets/emoji/ios_animated/<n>_<name>.webp. The files are NOT part of this
- * source patch; provenance and reuse terms are unresolved (see
- * IOS_PACK_PROVENANCE). A missing file, an unsupported OS (animated WebP needs
- * ImageDecoder, API 28+) or an emoji outside the 50 falls back to Chaty (Noto)
- * for that emoji; [coverage] and [iosSupported] let the UI say so.
+/** Separate source identities stored in the existing universal.emojiStyle preference.
+ * Supplied iOS ZIP: 50 animated WebP; supplied Telegram variants: 19 animated WebP;
+ * TheSub LottieFiles set: 11 Lottie animations. These are partial packs, not official
+ * complete Unicode sets. Missing supplied Telegram art uses a normal glyph.
+ * Animated WebP requires API 28. Drive 132 source is separate and not yet bundled.
  */
 object ChatyEmojiPack {
     const val CHATY = "Chaty"
@@ -41,9 +34,10 @@ object ChatyEmojiPack {
     const val MICROSOFT = "Microsoft"
     const val OPENMOJI = "OpenMoji"
     const val TELEGRAM = "Telegram"
+    const val TELEGRAM_LOTTIE = "Telegram Lottie"
 
     /** Picker order: Chaty, iOS, Microsoft, OpenMoji, Telegram. */
-    val ORDER = listOf(CHATY, IOS, MICROSOFT, OPENMOJI, TELEGRAM)
+    val ORDER = listOf(CHATY, IOS, MICROSOFT, OPENMOJI, TELEGRAM, TELEGRAM_LOTTIE)
 
     /**
      * Code-point named asset packs. Files are <hex>.<ext> under [dir] (lowercase
@@ -53,10 +47,12 @@ object ChatyEmojiPack {
      */
     data class AssetPack(val id: String, val dir: String, val ext: String, val animated: Boolean, val upperHex: Boolean)
 
+    val TELEGRAM_PACK = AssetPack(TELEGRAM, "emoji/telegram19", "webp", animated = true, upperHex = false)
     val MICROSOFT_PACK = AssetPack(MICROSOFT, "emoji/fluent_animated", "webp", animated = true, upperHex = false)
     val OPENMOJI_PACK = AssetPack(OPENMOJI, "emoji/openmoji", "png", animated = false, upperHex = true)
 
     fun assetPack(style: String): AssetPack? = when (style) {
+        TELEGRAM -> TELEGRAM_PACK
         MICROSOFT -> MICROSOFT_PACK
         OPENMOJI -> OPENMOJI_PACK
         else -> null
@@ -70,9 +66,23 @@ object ChatyEmojiPack {
         return "${pack.dir}/$hex.${pack.ext}"
     }
 
-    /** Asset path for [style]'s art of [unicode], or null when that pack has none (Chaty/Telegram: always null). */
+    val telegramCodePoints = setOf(0x1f60b, 0x1f973, 0x1f971, 0x1f62e, 0x1f921, 0x1f92c, 0x1f60e, 0x1f608, 0x1f611, 0x1f923, 0x1f914, 0x1f630, 0x1f61b, 0x1f61d, 0x1f641, 0x1f925, 0x1f910, 0x1f634, 0x1f62b)
+    val lottieCodePoints = setOf(0x1f605, 0x1f4d6, 0x1f697, 0x1f4a1, 0x1f4f1, 0x1f4bb, 0x1f40d, 0x1f695, 0x1f321, 0x1f324, 0x274c)
+    fun lottieAssetPath(unicode: String): String? {
+        val normalized = unicode.replace("\uFE0F", "")
+        if (normalized.isEmpty() || normalized.codePointCount(0, normalized.length) != 1) return null
+        val cp = normalized.codePointAt(0)
+        return if (cp in lottieCodePoints) "emoji/telegram_lottie/${Integer.toHexString(cp)}.json" else null
+    }
+    fun lottieBundledCount(context: android.content.Context): Int =
+        runCatching { context.assets.list("emoji/telegram_lottie")?.count { it.endsWith(".json") && it != "manifest.json" } ?: 0 }.getOrDefault(0)
+
+    /** Asset path for [style]'s art of [unicode], or null when that pack has none (Chaty: no bundled asset). */
     fun assetPathFor(style: String, unicode: String): String? = when (style) {
         IOS -> iosAssetPath(unicode)
+        TELEGRAM -> unicode.replace("\uFE0F", "").let { value ->
+            if (value.isNotEmpty() && value.codePointCount(0, value.length) == 1 && value.codePointAt(0) in telegramCodePoints) packAssetPath(TELEGRAM_PACK, unicode) else null
+        }
         else -> assetPack(style)?.let { packAssetPath(it, unicode) }
     }
 
@@ -82,14 +92,12 @@ object ChatyEmojiPack {
     fun packBundledCount(context: android.content.Context, pack: AssetPack): Int =
         runCatching { context.assets.list(pack.dir)?.count { it.endsWith(".${pack.ext}") } }.getOrNull() ?: 0
 
-    /** Telegram has no complete, licensed, bundled pack yet; it is listed but never selectable. */
-    const val TELEGRAM_UNAVAILABLE_REASON = "Unavailable: no complete Telegram emoji pack has been licensed or bundled yet"
+    const val TELEGRAM_UNAVAILABLE_REASON = "Unavailable: the 19 supplied Telegram-style animations are not installed"
     const val ASSET_DIR = "emoji/ios_animated"
 
-    /** Source record for the iOS pack artwork (kept with the code, not shown in the picker). */
+    /** Source facts only; the user's permission statement is in the conversation. */
     const val IOS_PACK_PROVENANCE =
-        "Google Drive folder 'Animated Emoji' (id 1PGn6PDk6hcy2niWc1dzz_ETKz9LUoKMW), 50 .mov files dated Mar 13 2023, " +
-            "shared by Drive account nsedits29; converted to animated WebP. No licence or reuse terms found. Rights unverified."
+        "User-supplied ios_animated_webp.zip, 50 animated WebP files. Overlaps the first 50 entries of a third-party shared Drive MOV folder. User states licensed; no independent license file supplied."
 
     fun normalize(style: String?): String =
         ORDER.firstOrNull { it != CHATY && it.equals(style, ignoreCase = true) } ?: CHATY
@@ -120,7 +128,7 @@ object ChatyEmojiPack {
 
     private val byCodePoint: Map<Int, String> = files.toMap()
 
-    /** Number of emojis the iOS pack covers; every other emoji shows the Chaty pack. */
+    /** Number of emojis the iOS ZIP covers. */
     val coverage: Int get() = files.size
 
     /** Asset path under assets/ for a single emoji, or null when the iOS pack has no art for it. */

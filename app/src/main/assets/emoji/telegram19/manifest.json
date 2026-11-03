@@ -1,0 +1,314 @@
+{
+  "pack": "telegram19_clear",
+  "title": "Supplied 19-emoji animated source variants",
+  "generated": "2026-11-03",
+  "format": "animated WebP 240x240 RGBA, loop=0, native timing preserved",
+  "provenance": "Original 19 GIFs uploaded from the meii pack on emoji.gg. Higher-resolution variants from user-supplied iOS ZIP and a third-party shared MOV folder; yawn is an enlarged GIF. These are source variants, not verified official Telegram assets or frame-identical restorations.",
+  "attribution": "Telegram-style emoji artwork; original GIF collection assembled by meii on emoji.gg. No ownership claim. User license/permission statements are recorded in the conversation, not authenticated by this file.",
+  "items": [
+    {
+      "file": "yum_1F60B.webp",
+      "codepoint": "1F60B",
+      "label": "yum",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/11_face_savoring_food.webp",
+      "original_gif": "1352-yum.gif",
+      "emojigg_id": 1352,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 100,
+      "bytes": 487754,
+      "notes": ""
+    },
+    {
+      "file": "party_1F973.webp",
+      "codepoint": "1F973",
+      "label": "party",
+      "source": "user_drive_mov",
+      "source_detail": "132-emoji folder/86_Partying Face.mov",
+      "original_gif": "13961-party.gif",
+      "emojigg_id": 13961,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 68,
+      "bytes": 544008,
+      "notes": ""
+    },
+    {
+      "file": "yawn_1F971.webp",
+      "codepoint": "1F971",
+      "label": "yawn",
+      "source": "enhanced_gif",
+      "source_detail": "userzip/17320-yawn.gif lanczos240+mild unsharp",
+      "original_gif": "17320-yawn.gif",
+      "emojigg_id": 17320,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 82,
+      "bytes": 1065880,
+      "notes": "No higher-quality same-design source exists in user's files (Yawning Face not in iOS zip or MOV folder); this is the honest best from the 72px GIF - visibly smoother but not true original detail."
+    },
+    {
+      "file": "gasp_1F62E.webp",
+      "codepoint": "1F62E",
+      "label": "gasp",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/31_face_with_open_mouth.webp",
+      "original_gif": "20543-gasp.gif",
+      "emojigg_id": 20543,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 51,
+      "bytes": 240222,
+      "notes": ""
+    },
+    {
+      "file": "clown_1F921.webp",
+      "codepoint": "1F921",
+      "label": "clown",
+      "source": "user_drive_mov",
+      "source_detail": "132-emoji folder/79_Clown Face.mov",
+      "original_gif": "22727-clown.gif",
+      "emojigg_id": 22727,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 72,
+      "bytes": 728368,
+      "notes": ""
+    },
+    {
+      "file": "swear_1F92C.webp",
+      "codepoint": "1F92C",
+      "label": "swear",
+      "source": "user_drive_mov",
+      "source_detail": "132-emoji folder/70_Face With Symbols on Mouth.mov",
+      "original_gif": "25754-swear.gif",
+      "emojigg_id": 25754,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 73,
+      "bytes": 518086,
+      "notes": ""
+    },
+    {
+      "file": "cool_1F60E.webp",
+      "codepoint": "1F60E",
+      "label": "cool",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/12_smiling_face_with_sunglasses.webp",
+      "original_gif": "28433-cool.gif",
+      "emojigg_id": 28433,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 12,
+      "bytes": 63268,
+      "notes": ""
+    },
+    {
+      "file": "demon_1F608.webp",
+      "codepoint": "1F608",
+      "label": "demon",
+      "source": "user_drive_mov",
+      "source_detail": "132-emoji folder/91_Smiling Face With Horns.mov",
+      "original_gif": "36840-demon-smile.gif",
+      "emojigg_id": 36840,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 45,
+      "bytes": 298846,
+      "notes": "Pixel-verified as Smiling Face With Horns 1F608, NOT Angry Face With Horns 1F47F."
+    },
+    {
+      "file": "bored_1F611.webp",
+      "codepoint": "1F611",
+      "label": "bored",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/25_expressionless_face.webp",
+      "original_gif": "39391-bored.gif",
+      "emojigg_id": 39391,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 32,
+      "bytes": 145902,
+      "notes": ""
+    },
+    {
+      "file": "laugh_1F923.webp",
+      "codepoint": "1F923",
+      "label": "laugh",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/4_rolling_on_the_floor.webp",
+      "original_gif": "44214-laugh.gif",
+      "emojigg_id": 44214,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 39,
+      "bytes": 209812,
+      "notes": ""
+    },
+    {
+      "file": "think_1F914.webp",
+      "codepoint": "1F914",
+      "label": "think",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/22_thinking_face.webp",
+      "original_gif": "46858-think.gif",
+      "emojigg_id": 46858,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 40,
+      "bytes": 115466,
+      "notes": ""
+    },
+    {
+      "file": "anxious_1F630.webp",
+      "codepoint": "1F630",
+      "label": "anxious",
+      "source": "user_drive_mov",
+      "source_detail": "132-emoji folder/63_Anxious Face.mov",
+      "original_gif": "49113-anxious.gif",
+      "emojigg_id": 49113,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 52,
+      "bytes": 362174,
+      "notes": ""
+    },
+    {
+      "file": "freaky1_1F61B.webp",
+      "codepoint": "1F61B",
+      "label": "freaky-1",
+      "source": "user_drive_mov",
+      "source_detail": "132-emoji folder/38_Face With Tongue.mov",
+      "original_gif": "49250-freaky-1.gif",
+      "emojigg_id": 49250,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 69,
+      "bytes": 440444,
+      "notes": "Same emoji (Face With Tongue 1F61B) but the user's GIF is an older Telegram revision whose animation inserts a happy-smile interlude; the new asset is the current official animation, phase sequence differs slightly."
+    },
+    {
+      "file": "freaky2_1F61D.webp",
+      "codepoint": "1F61D",
+      "label": "freaky-2",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/40_squinting_face_with_tongue.webp",
+      "original_gif": "6153-freaky-2.gif",
+      "emojigg_id": 6153,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 69,
+      "bytes": 343486,
+      "notes": ""
+    },
+    {
+      "file": "sad_1F641.webp",
+      "codepoint": "1F641",
+      "label": "sad",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/50_slightly_frowning_face.webp",
+      "original_gif": "68034-sad.gif",
+      "emojigg_id": 68034,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 52,
+      "bytes": 235022,
+      "notes": ""
+    },
+    {
+      "file": "liar_1F925.webp",
+      "codepoint": "1F925",
+      "label": "liar",
+      "source": "user_drive_mov",
+      "source_detail": "132-emoji folder/80_Lying Face.mov",
+      "original_gif": "78235-liar.gif",
+      "emojigg_id": 78235,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 38,
+      "bytes": 237560,
+      "notes": ""
+    },
+    {
+      "file": "silent_1F910.webp",
+      "codepoint": "1F910",
+      "label": "silent",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/32_zipper_mouth_face.webp",
+      "original_gif": "81026-silent.gif",
+      "emojigg_id": 81026,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 45,
+      "bytes": 146566,
+      "notes": "Pixel-verified as Zipper-Mouth Face 1F910, NOT shushing 1F92B."
+    },
+    {
+      "file": "sleep_1F634.webp",
+      "codepoint": "1F634",
+      "label": "sleep",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/36_sleeping_face.webp",
+      "original_gif": "83447-sleep.gif",
+      "emojigg_id": 83447,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 150,
+      "bytes": 462194,
+      "notes": ""
+    },
+    {
+      "file": "scream_1F62B.webp",
+      "codepoint": "1F62B",
+      "label": "scream",
+      "source": "user_ios_webp",
+      "source_detail": "ios_animated_webp.zip/35_tired_face.webp",
+      "original_gif": "98791-scream.gif",
+      "emojigg_id": 98791,
+      "size": [
+        240,
+        240
+      ],
+      "frames": 43,
+      "bytes": 235526,
+      "notes": "Pixel-verified the GIF's actual design is Tired Face 1F62B (no hands-on-cheeks), despite the emoji.gg label 'scream'."
+    }
+  ]
+}
