@@ -41,6 +41,16 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.example.chat.ui.theme.LocalAppColors
 
+/** One presentation mapping for the root, navigation shell, and real previews. */
+fun referenceLayoutStyleFor(mode: com.example.chat.core.theme.AppNavigationMode): ReferenceLayoutStyle = when (mode) {
+    com.example.chat.core.theme.AppNavigationMode.oneUi -> ReferenceLayoutStyle.Default
+    com.example.chat.core.theme.AppNavigationMode.topWhatsAppBar -> ReferenceLayoutStyle.Old
+    com.example.chat.core.theme.AppNavigationMode.iosStyle -> ReferenceLayoutStyle.Ios
+    else -> ReferenceLayoutStyle.Other
+}
+
+val LocalReferenceLayoutPresentation = androidx.compose.runtime.staticCompositionLocalOf { ReferenceLayoutPresentation() }
+
 /** Content-sized popup, bounded to the device width and 80% of its available height.
  * Intrinsic width prevents weighted menu labels from expanding to the full popup constraint.
  * Foundation handles scrolling and Popup handles Back/outside dismissal.
@@ -55,8 +65,15 @@ fun ChatyDropdownMenu(
     border: BorderStroke? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (!expanded) return
     val colors = LocalAppColors.current
+    val presentation = LocalReferenceLayoutPresentation.current
+    val menuVisibility = remember { androidx.compose.animation.core.MutableTransitionState(false) }
+    menuVisibility.targetState = expanded
+    if (!menuVisibility.currentState && !menuVisibility.targetState) return
+    // Existing callers using the shared default shape opt into the active layout.
+    // An explicit custom shape remains the caller's choice.
+    val effectiveShape = if (shape == ChatyModalShape)
+        androidx.compose.foundation.shape.RoundedCornerShape(presentation.menuCornerDp.dp) else shape
     val configuration = LocalConfiguration.current
     val maxMenuWidth = (configuration.screenWidthDp.dp - 16.dp).coerceAtLeast(1.dp)
     val maxMenuHeight = (configuration.screenHeightDp.dp * 0.8f).coerceAtLeast(1.dp)
@@ -67,10 +84,17 @@ fun ChatyDropdownMenu(
         onDismissRequest = onDismissRequest,
         properties = PopupProperties(focusable = true),
     ) {
+        androidx.compose.animation.AnimatedVisibility(
+            visibleState = menuVisibility,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(presentation.menuEnterMs)) +
+                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(presentation.menuEnterMs), initialScale = 0.96f),
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(presentation.menuExitMs)) +
+                androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(presentation.menuExitMs), targetScale = 0.98f),
+        ) {
         Column(
-            modifier.shadow(12.dp, shape).clip(shape)
+            modifier.shadow(12.dp, effectiveShape).clip(effectiveShape)
                 .background(containerColor)
-                .border(border ?: BorderStroke(1.dp, colors.border), shape)
+                .border(border ?: BorderStroke(1.dp, colors.border), effectiveShape)
                 .widthIn(max = maxMenuWidth)
                 .width(IntrinsicSize.Max)
                 .heightIn(max = maxMenuHeight)
@@ -78,6 +102,7 @@ fun ChatyDropdownMenu(
                 .padding(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) { content() }
+        }
     }
 }
 
@@ -93,10 +118,12 @@ fun ChatyDropdownMenuItem(
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
 ) {
     val colors = LocalAppColors.current
+    val rowShape = androidx.compose.foundation.shape.RoundedCornerShape(
+        LocalReferenceLayoutPresentation.current.menuCornerDp.coerceAtMost(12).dp)
     CompositionLocalProvider(LocalContentColor provides if (enabled) colors.foreground else colors.disabledForeground) {
         Row(
             modifier.defaultMinSize(minHeight = 48.dp)
-                .clip(ChatyModalShape)
+                .clip(rowShape)
                 .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
                 .padding(contentPadding),
             verticalAlignment = Alignment.CenterVertically,
