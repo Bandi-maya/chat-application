@@ -355,7 +355,7 @@ fun ConversationRow(
                     .padding(start = 76.dp, end = 16.dp)
                     .fillMaxWidth()
                     .height(0.5.dp)
-                    .background(Color(argbWithAlpha(theme.cardColor, 0.55))),
+                    .background(Color(theme.dividerColor)),
             )
         }
     }

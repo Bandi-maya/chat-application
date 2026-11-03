@@ -77,6 +77,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -211,18 +213,36 @@ fun StandardHomeAppBar(
     val showStatus = !homePrefs.disableStatusUnderName && userAbout.isNotEmpty()
 
     val largeDefault = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)
+    val headerCollapse = if (largeDefault) com.example.chat.ui.navigation.LocalReferenceHeaderCollapse.current else 0f
     Column(Modifier.fillMaxWidth()) {
     if (largeDefault) {
-        Column(Modifier.fillMaxWidth().height(164.dp).padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = Color(theme.primaryTextColor), fontSize = (32 * theme.fontScale).sp,
-                fontWeight = FontWeight.W700)
-            if (showStatus) Text(userAbout, color = Color(theme.secondaryTextColor), fontSize = (12 * theme.fontScale).sp)
+        Row(Modifier.fillMaxWidth()
+            .height((com.example.chat.ui.navigation.ReferenceLayoutMetrics.expandedIdentityHeightDp * (1f - headerCollapse)).dp)
+            .padding(top = (com.example.chat.ui.navigation.ReferenceLayoutMetrics.actionBarHeightDp * (1f - headerCollapse)).dp)
+            .clipToBounds().alpha(1f - headerCollapse)
+            .padding(horizontal = 24.dp)
+            .combinedClickable(onClick = { if (homePrefs.nameTapOpensLocked) onIdentityTap() }, onLongClick = onIdentityLongPress),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            // Use Chaty's selected icon family, never GB branding or a copied contact avatar.
+            com.example.chat.ui.navigation.NavDestinationIcon(
+                if (forcedTypeIsSet) "groups" else "chats",
+                size = com.example.chat.ui.navigation.ReferenceLayoutMetrics.identityIconSizeDp,
+                tint = Color(theme.primaryTextColor),
+            )
+            Spacer(Modifier.width(6.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = Color(theme.primaryTextColor),
+                    fontSize = (com.example.chat.ui.navigation.ReferenceLayoutMetrics.identityTextSizeSp * theme.fontScale).sp,
+                    fontWeight = FontWeight.W700)
+                if (showStatus) Text(userAbout, color = Color(theme.secondaryTextColor), fontSize = (14 * theme.fontScale).sp)
+            }
         }
     }
     Row(
-        modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 4.dp, bottom = 6.dp),
+        modifier = Modifier
+            .then(if (largeDefault) Modifier.height(com.example.chat.ui.navigation.ReferenceLayoutMetrics.actionBarHeightDp.dp) else Modifier)
+            .padding(start = 16.dp, top = if (largeDefault) 0.dp else 8.dp, end = 4.dp, bottom = if (largeDefault) 0.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -232,8 +252,9 @@ fun StandardHomeAppBar(
                     .combinedClickable(onClick = { if (homePrefs.nameTapOpensLocked) onIdentityTap() }, onLongClick = onIdentityLongPress)
                     .padding(horizontal = 4.dp, vertical = 2.dp),
             ) {
-                if (!largeDefault) Text(
+                if (!largeDefault || headerCollapse > 0f) Text(
                     title,
+                    modifier = if (largeDefault) Modifier.alpha(headerCollapse) else Modifier,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = if (homeStyle == "Classic") Color(theme.accentColor) else Color(theme.primaryTextColor),
