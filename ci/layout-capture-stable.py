@@ -28,6 +28,7 @@ def write_prefs(name, values):
 
 def capture(name, settle=2):
     time.sleep(settle)
+    print('CAPTURE '+name,flush=True)
     (out/f'{name}.png').write_bytes(adb('exec-out','screencap','-p'))
     adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
     xml=adb('shell','cat','/sdcard/window.xml',check=False)
@@ -88,23 +89,42 @@ def find_label(label):
             return True
     return False
 
+def dismiss_known_modals():
+    """Only close the diagnosed emulator launcher ANR, never an app ANR."""
+    adb('shell','uiautomator','dump','/sdcard/window.xml',check=False)
+    xml=adb('shell','cat','/sdcard/window.xml',check=False)
+    try: root=ET.fromstring(xml)
+    except ET.ParseError: return False
+    texts=[n.get('text','') for n in root.iter('node')]
+    anr=[t for t in texts if "isn't responding" in t or 'is not responding' in t]
+    if anr:
+        if anr != ["Pixel Launcher isn't responding"]:
+            raise RuntimeError('APP_ANR_NOT_DISMISSED:'+repr(anr))
+        print('RECOVER verified Pixel Launcher ANR',flush=True)
+        if not tap_label('Close app',optional=True,settle=2):
+            raise RuntimeError('LAUNCHER_ANR_CLOSE_UNAVAILABLE')
+        return True
+    for label in ('Close','Not now','Not Now'):
+        if label in texts and tap_label(label,optional=True,settle=1):
+            print('DISMISS known modal '+label,flush=True)
+            return True
+    return False
+
 def dismiss_until_ready(identity='Chats', attempts=8):
-    """Bounded readiness guard: dismiss known non-destructive modals - system
-    ANR 'Wait' (NEVER 'Close app'), changelog 'Close', notification
-    'Not now'/'Not Now' - then require BOTH no known modal present AND the
-    expected screen identity label before any capture is treated as proof.
-    Returns True only when identity is verified modal-free."""
     for _ in range(attempts):
-        tapped = False
-        for label in ('Wait','Close','Not now','Not Now'):
-            if tap_label(label, optional=True, settle=1):
-                tapped = True
-        if not tapped:
-            r = find_label(identity)
-            if r is True:
-                return True
+        if dismiss_known_modals(): continue
+        if find_label(identity) is True:
+            print('READY '+identity,flush=True)
+            return True
         time.sleep(2)
     return False
+
+def require_ready(slug, identity='Chats'):
+    print('READINESS '+slug,flush=True)
+    if not dismiss_until_ready(identity):
+        capture(slug+'-READINESS-FAILED',settle=0)
+        raise RuntimeError('READINESS_NOT_VERIFIED:'+slug+':'+identity)
+
 
 def record_layout_walkthrough(slug):
     """Actual emulator walkthrough, isolated signed-out presentation only.
@@ -240,9 +260,8 @@ try:
         # Readiness before proof: bounded modal dismissal (ANR 'Wait', never
         # 'Close app'; changelog 'Close'; notification 'Not now') AND verified
         # screen identity. Failure is recorded, never relabeled a pass.
-        ready = dismiss_until_ready()
-        if not ready:
-            (out/f'{slug}-readiness.txt').write_text('READINESS_NOT_VERIFIED: modal-free Chats identity not reached')
+        require_ready(slug)
+        ready = True
         capture(f'{slug}-01-chats')
         if ready and style in ('Chaty Default', 'WhatsApp OLD UI') and brightness == 'dark':
             record_layout_walkthrough(slug)
@@ -296,9 +315,7 @@ try:
         adb('shell','am','force-stop',pkg)
         adb('shell','am','start','-n',pkg+'/com.example.chat.MainActivity')
         time.sleep(8)
-        ready2 = dismiss_until_ready()
-        if not ready2:
-            (out/f'{slug}-reopen-readiness.txt').write_text('REOPEN_READINESS_NOT_VERIFIED')
+        require_ready(slug+'-reopen')
         capture(f'{slug}-07-reopened')
 
     # BOUNDED MENU PIXELS - fixture presentation proof only (signed-out bare-bucket
@@ -337,6 +354,7 @@ try:
     try:
         adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen','menu',check=False)
         time.sleep(3)
+        require_ready('debug-menu','Alice Rao')
         capture('menu-02-chat-header-open',settle=2)
         time.sleep(3)
         reach = tap_label('See you at 6!', optional=True, settle=0)
@@ -356,13 +374,16 @@ try:
                     menu_notes.append('SELECTION_OVERFLOW_ABSENT')
     except Exception as e:
         menu_notes.append('BUBBLE_MENU_ERROR:' + type(e).__name__)
+        raise
     # Separate >4 album fixture proof; no sends or backend.
     adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen','album',check=False)
     time.sleep(3)
+    require_ready('debug-album','Alice Rao')
     capture('menu-04-six-image-album',settle=2)
     for proof_screen in ('contactinfo','allmedia','profile'):
         adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen',proof_screen,check=False)
         time.sleep(3)
+        require_ready('debug-'+proof_screen, 'All media' if proof_screen == 'allmedia' else 'Alice Rao')
         capture('proof-'+proof_screen+'-top',settle=2)
         x,y1,y2=viewport()
         adb('shell','input','swipe',str(x),str(y1),str(x),str(y2),'350')
