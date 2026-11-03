@@ -202,6 +202,7 @@ fun HeaderSettingsScreen(
                 hideTasks = preferences.gbBool("nav_hide_tasks"),
                 hideUpdates = preferences.gbBool("nav_hide_updates") || !com.example.chat.ReleaseFeatures.STATUS_UPDATES,
                 bottomBarStyle = com.example.chat.ServiceLocator.appearanceVariantController.bottomBarStyle,
+                oneUiRaisedCenterDock = com.example.chat.ui.navigation.HomePresetNormalizer.oneUiRaisedCenterDockEnabled(home.homeStyle),
                 navigationStyleName = com.example.chat.ServiceLocator.appearanceVariantController.navigationStyle,
             ),
             screenContent = {
