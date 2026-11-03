@@ -1,1 +1,1 @@
-combined quickfix1+batch2-rebased+3a-rootfix+3b+4+5-centerfix; strict launcher ANR capture recovery; reviewed hash inventory89038cda count137; 2026-11-03T22:14+05:30
+same combined d9fede4c + missing layout.offset import only; reviewed ea1fb5ac; 2026-11-03T22:34+05:30
