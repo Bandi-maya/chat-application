@@ -111,7 +111,7 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 81:
+          if applied != 82:
               raise SystemExit(f"Expected 82 override files, applied {applied}")
           PYOVERRIDES
       - name: Patch debug-only proof fixtures to current Kotlin ports
@@ -417,6 +417,7 @@ jobs:
   # duration. Same Rust cache as the build job, so its native build is warm.
   runtime-smoke:
     needs: [build, gate]
+    if: false # EMULATOR TIER DISABLED 2026-11-03 (user directive): no emulator runs; delete this line to re-enable
     runs-on: ubuntu-latest
     # Job bound grounded in run-133 measured runner phases: core-ui 39.5min,
     # calls-camera 18.1, all other shards <=8.7. 60 for core-ui leaves 12min of
@@ -497,7 +498,7 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 81:
+          if applied != 82:
               raise SystemExit(f"Expected 82 override files, applied {applied}")
           PYOVERRIDES
       - name: Disable unused Firebase messaging entrypoint
@@ -627,7 +628,7 @@ jobs:
   # Not a proven contention fix; original 175 artifacts/results preserved.
   retry-media-emoji:
     needs: gate
-    if: needs.gate.outputs.retry == 'true'
+    if: needs.gate.outputs.retry == 'true' && false # EMULATOR TIER DISABLED 2026-11-03 (user directive): no emulator runs; remove '&& false' to re-enable
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
