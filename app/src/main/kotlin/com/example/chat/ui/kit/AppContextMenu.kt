@@ -113,6 +113,7 @@ fun AppContextMenu(
     reactionRail: ReactionRail? = null,
 ) {
     val colors = LocalAppColors.current
+    val layoutShape = RoundedCornerShape(LocalReferenceLayoutPresentation.current.menuCornerDp.dp)
     val bg = backgroundColor ?: colors.surfaceElevated
     val primary = primaryTextColor ?: colors.foreground
     val secondary = secondaryTextColor ?: colors.foregroundSecondary
@@ -128,7 +129,7 @@ fun AppContextMenu(
     ModalBottomSheet(tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         containerColor = bg,
-        shape = com.example.chat.ui.kit.ChatyModalShape,
+        shape = layoutShape,
         dragHandle = null,
     ) {
         Column(
@@ -156,6 +157,7 @@ internal fun ContextSectionsList(
     danger: Color,
     onDismiss: () -> Unit,
 ) {
+    val rowShape = RoundedCornerShape(LocalReferenceLayoutPresentation.current.menuCornerDp.coerceAtMost(12).dp)
     sections.forEachIndexed { s, section ->
         if (s > 0) HorizontalDivider(thickness = 0.8.dp, color = secondary.copy(alpha = 0.12f))
         section.title?.let {
@@ -165,7 +167,9 @@ internal fun ContextSectionsList(
             val color = if (!item.isEnabled) secondary.copy(alpha = 0.5f) else if (item.isDestructive) danger else primary
             Row(
                 Modifier.fillMaxWidth()
-                    .then(if (item.isEnabled) Modifier.clickable { onDismiss(); item.onTap() } else Modifier)
+                    .heightIn(min = 48.dp)
+                    .clip(rowShape)
+                    .clickable(enabled = item.isEnabled, role = androidx.compose.ui.semantics.Role.Button) { onDismiss(); item.onTap() }
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -204,11 +208,13 @@ private fun AnchoredContextSurface(
     maxWidth: Float,
     rail: ReactionRail?,
 ) {
+    val presentation = LocalReferenceLayoutPresentation.current
+    val layoutShape = RoundedCornerShape(presentation.menuCornerDp.dp)
     val density = LocalDensity.current
     val dir = LocalLayoutDirection.current
     val total = sections.sumOf { it.items.size }
-    // Dart: show -> (title?48:0)+items*44+16 ; reaction rail -> 56+8+items*44
-    val estimatedHeight = if (rail != null) 56f + 8f + total * 44f else (if (title != null) 48f else 0f) + total * 44f + 16f
+    // Dart: show -> (title?48:0)+items*48+16 ; reaction rail -> 56+8+items*48
+    val estimatedHeight = if (rail != null) 56f + 8f + total * 48f else (if (title != null) 48f else 0f) + total * 48f + 16f
     val state = remember { MutableTransitionState(false).apply { targetState = true } }
     Dialog(
         onDismissRequest = onDismiss,
@@ -229,7 +235,7 @@ private fun AnchoredContextSurface(
         )
         val transition = updateTransition(state, label = "contextSurface")
         val curved by transition.animateFloat(
-            transitionSpec = { tween(170, easing = CubicBezierEasing(0.215f, 0.61f, 0.355f, 1f)) }, label = "t",
+            transitionSpec = { tween(presentation.menuEnterMs, easing = CubicBezierEasing(0.215f, 0.61f, 0.355f, 1f)) }, label = "t",
         ) { if (it) 1f else 0f }
         Box(
             Modifier.fillMaxSize().background(Color(0x33000000))
@@ -248,10 +254,10 @@ private fun AnchoredContextSurface(
                         scaleX = sc; scaleY = sc
                         transformOrigin = TransformOrigin((o.x + 1f) / 2f, (o.y + 1f) / 2f)
                     }
-                    .shadow(12.dp, ChatyModalShape, ambientColor = Color.Black.copy(alpha = 0.16f), spotColor = Color.Black.copy(alpha = 0.16f))
-                    .background(bg, ChatyModalShape)
-                    .border(1.1.dp, secondary.copy(alpha = 0.18f), ChatyModalShape)
-                    .clip(ChatyModalShape)
+                    .shadow(12.dp, layoutShape, ambientColor = Color.Black.copy(alpha = 0.16f), spotColor = Color.Black.copy(alpha = 0.16f))
+                    .background(bg, layoutShape)
+                    .border(1.1.dp, secondary.copy(alpha = 0.18f), layoutShape)
+                    .clip(layoutShape)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
                     .verticalScroll(rememberScrollState()),
             ) {

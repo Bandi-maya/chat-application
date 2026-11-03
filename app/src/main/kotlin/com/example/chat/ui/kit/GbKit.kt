@@ -95,7 +95,7 @@ fun GbModalSheet(
 ) {
     val colors = LocalAppColors.current
     val config = LocalThemeConfig.current
-    val shape = ChatyModalShape
+    val shape = RoundedCornerShape(LocalReferenceLayoutPresentation.current.menuCornerDp.dp)
     Dialog(onDismissRequest = onDismiss) {
         Column(
             Modifier.widthIn(max = 480.dp)
