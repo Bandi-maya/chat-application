@@ -133,7 +133,7 @@ fun ChatsHomeScreen(
     securityPreferences: SecurityPreferences = SecurityPreferences(),
     forcedType: ConversationType? = null,
     pageTitle: String? = null,
-    templates: HomeTemplates = defaultHomeTemplates,
+    templates: HomeTemplates = if (com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePreferences.homeStyle)) com.example.chat.ui.chats.home.referenceDefaultHomeTemplates else defaultHomeTemplates,
     presenceFor: (conversationId: String, otherUserId: String) -> HomePresence? = { _, _ -> null },
     isOnline: (String) -> Boolean = { false },
     messagesFor: (String) -> List<ChatMessage> = { emptyList() },
@@ -221,7 +221,10 @@ fun ChatsHomeScreen(
     val homePrefs = homePreferences
     val rawHomeUiStyle = homePrefs.homeStyle.trim().lowercase()
     val homeStyle = com.example.chat.core.preferences.HomePresentationPolicy.listStyle(homePrefs.homeStyle)
-    val spec = HomeStyleSpec.resolve(homeStyle, rawHomeUiStyle)
+    val referenceRows = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle) && templates.chatList.referenceDefault
+    val spec = HomeStyleSpec.resolve(homeStyle, rawHomeUiStyle).let {
+        if (referenceRows) it.copy(showSections = false) else it
+    }
     val searchPlacement = resolveSearchPlacement(homePrefs.searchPlacement, homePrefs.disableSearchBar)
     val searchEnabled = homePrefs.showSearchBar
     val storiesStyle = com.example.chat.core.preferences.HomePresentationPolicy.effectiveStoriesStyle(
@@ -748,7 +751,10 @@ private fun HomeConversationList(
         modifier = Modifier.fillMaxSize(),
         state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = 8.dp, top = 0.dp, end = 8.dp, bottom = 96.dp,
+            start = if (templates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
+            top = 0.dp,
+            end = if (templates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
+            bottom = 96.dp,
         ),
     ) {
         items(
