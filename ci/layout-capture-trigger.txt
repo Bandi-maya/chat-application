@@ -1,0 +1,3 @@
+Deliberate bump file for the isolated layout reference capture job (kotlin only).
+Each deliberate run bumps this file.
+run-1 2026-11-03 source_run=41618557841
