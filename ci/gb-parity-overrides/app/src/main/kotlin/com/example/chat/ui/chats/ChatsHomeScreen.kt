@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
@@ -727,7 +728,11 @@ private fun HomeConversationList(
     onStartCall: (Conversation, Boolean) -> Unit,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
+    val oneUiPanel = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)
+    val listShape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     LazyColumn(
+        modifier = if (oneUiPanel) Modifier.fillMaxSize().clip(listShape)
+            .background(com.example.chat.ServiceLocator.preferencesController.universal.listBackgroundColor?.let(::Color) ?: Color(theme.surfaceColor)) else Modifier,
         state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
             start = 8.dp, top = 0.dp, end = 8.dp, bottom = 96.dp,
@@ -847,7 +852,7 @@ private fun HomeConversationList(
                             chatList = templates.chatList,
                             density = spec.tileDensity,
                             isDark = theme.isDark,
-                            cardRows = spec.cardRows,
+                            cardRows = spec.cardRows && !com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle),
                             isTelegramRows = rawIsTelegram(homePrefs.homeStyle),
                             displayTitle = displayConversationTitle(
                                 conversation,
