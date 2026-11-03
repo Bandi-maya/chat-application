@@ -6,6 +6,7 @@ import android.widget.Toast
 import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.File
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
