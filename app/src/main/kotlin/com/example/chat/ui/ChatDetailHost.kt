@@ -316,6 +316,7 @@ fun ChatDetailHost(
     var taskEditor by remember { mutableStateOf<Triple<Boolean, ChatTask?, String?>?>(null) }
     var taskDetail by remember { mutableStateOf<ChatTask?>(null) }
     // 0 none, 1 info (ContactInfo/GroupInfo), 2 contact privacy; viewer = MediaViewerScreen target.
+    var infoSearchRequest by remember(conversation.id, mediaStamp) { mutableIntStateOf(0) }
     var infoRoute by remember(conversation.id) { mutableIntStateOf(0) }
     var viewerBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     var viewerMessage by remember(conversation.id, mediaStamp) { mutableStateOf<ChatMessage?>(null) }
@@ -372,6 +373,7 @@ fun ChatDetailHost(
     }
     val lookup: (String) -> com.example.chat.domain.models.UserProfile? = { id -> api.users.firstOrNull { it.id == id } }
 
+    val stickerScope = api.authSnapshot()
     val attachments = rememberChatAttachments(conversation.id) { rev++ }
     fun closeChatCamera() {
         videoHoldRequest?.close()
@@ -588,6 +590,7 @@ fun ChatDetailHost(
                 else -> toast("This attachment type is not connected in this build yet.")
             }
         },
+        externalSearchRequest = infoSearchRequest,
         onOpenInfo = {
             if (!isDirect) infoRoute = 1
             else if (other != null) {
@@ -674,6 +677,37 @@ fun ChatDetailHost(
         onCameraTap = { openChatCamera(com.example.chat.ui.camera.CameraEntryPreset.photoBack) },
         attachmentReviewImages = attachments.onReviewImages,
         attachmentDirectSendImages = attachments.onDirectSendImages,
+        onStickerSend = { sticker ->
+            val expected = stickerScope
+            scope.launch {
+                try {
+                    check(api.authSnapshot() === expected) { "Account changed. Open the sticker picker again." }
+                    check(!expected.userId.isNullOrBlank() && !expected.token.isNullOrBlank()) { "Sign in to send stickers." }
+                    check(com.example.chat.core.stickers.BundledStickerPacks.packs.any { it.id == sticker.packId && sticker in it.stickers }) { "Sticker is no longer installed." }
+                    val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        context.assets.open(sticker.assetPath).use { input ->
+                            val output = java.io.ByteArrayOutputStream()
+                            val buffer = ByteArray(8192)
+                            while (true) { val count = input.read(buffer); if (count < 0) break
+                                check(output.size() + count <= 2 * 1024 * 1024) { "Sticker is too large." }; output.write(buffer, 0, count) }
+                            output.toByteArray()
+                        }
+                    }
+                    check(bytes.size in 1..(2 * 1024 * 1024)) { "Sticker is too large." }
+                    val actualSha = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+                    check(com.example.chat.core.stickers.BundledStickerPacks.expectedSha256[sticker.id] == actualSha) { "Sticker asset is damaged." }
+                    val uploaded = api.uploadMedia("${sticker.id}.webp", bytes, expectedScope = expected)
+                    val attachment = com.example.chat.domain.models.MessageAttachment(
+                        id = java.util.UUID.randomUUID().toString(), type = "image", name = "${sticker.label}.webp",
+                        size = com.example.chat.data.services.ChatMediaService.formatBytes(bytes.size.toLong()),
+                        url = uploaded["url"]?.toString()?.takeIf { it.isNotBlank() } ?: error("Upload did not return a media URL."))
+                    api.sendMessage(conversation.id, "", com.example.chat.domain.models.MessageType.image,
+                        attachment, com.example.chat.core.stickers.StickerMessagePolicy.metadata(sticker), expectedScope = expected)
+                    rev++
+                } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                catch (error: Exception) { android.widget.Toast.makeText(context, error.message ?: "Unable to send sticker", android.widget.Toast.LENGTH_SHORT).show() }
+            }
+        },
         onGalleryTap = { attachments.onMedia("image") },
         onAudioTap = { attachments.onMedia("audio") },
         onContactTap = { attachments.onContact() },
@@ -769,6 +803,9 @@ fun ChatDetailHost(
             if (!isDirect) {
                 com.example.chat.ui.chats.group_info.GroupInfoScreen(
                     conversation = live,
+                    onSearch = { infoRoute = 0; infoSearchRequest++ },
+                    messages = messages,
+                    onOpenMedia = { m -> viewerBounds = null; viewerMessage = m },
                     participants = live.participantIds.mapNotNull { id -> api.users.firstOrNull { it.id == id } },
                     currentUserId = myId,
                     onLeave = { infoRoute = 0; onBack() },
@@ -822,7 +859,7 @@ fun ChatDetailHost(
                     onDeleteUser = { if (api.isAuthenticated) api.deleteUser(other.id) },
                     onOpenPrivacy = { infoRoute = 2 },
                     onOpenMedia = { m -> viewerMessage = m },
-                    onSearch = { infoRoute = 0 },
+                    onSearch = { infoRoute = 0; infoSearchRequest++ },
                     onDeletedPopToRoot = { infoRoute = 0; onBack() },
                     onBack = { infoRoute = 0 },
                 )
@@ -1058,18 +1095,14 @@ fun ChatDetailHost(
         if (forwardItems.isEmpty()) {
             LaunchedEffect(batch) { toast("No other chats to forward to."); forwardMessages = emptyList() }
         } else {
-            // Dart showModalBottomSheet (chat_detail_screen.dart:2402-2499): isScrollControlled,
-            // surfaceColor sheet, top rounded 18, max height 0.7x screen, shortcut icon + limit
-            // title, sectioned avatar rows.
-            ModalBottomSheet(dragHandle = { com.example.chat.ui.kit.ChatySheetGrabber() }, tonalElevation = 0.dp,
-                onDismissRequest = { forwardMessages = emptyList() },
-                containerColor = Color(theme.surfaceColor),
-                shape = com.example.chat.ui.kit.ChatyModalShape,
-            ) {
+            // User's centered forward chooser; existing sectioned targets and scoped send retained.
+            androidx.compose.ui.window.Dialog(onDismissRequest = { forwardMessages = emptyList() }) {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.7f).dp),
+                        .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.7f).dp)
+                        .background(Color(theme.surfaceColor), com.example.chat.ui.kit.ChatyModalShape)
+                        .padding(vertical = 10.dp),
                 ) {
                     Spacer(Modifier.height(14.dp))
                     Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
