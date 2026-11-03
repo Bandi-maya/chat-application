@@ -148,15 +148,9 @@ internal fun FloatingIslandRailShell(
                     .clip(RoundedCornerShape(30.dp))
                     .background(colors.surface),
             ) {
+                // User directive: slim floating rail - the decorative three-dot
+                // traffic-light row and the bottom avatar are removed.
                 Spacer(Modifier.height(14.dp))
-                Row {
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(colors.error))
-                    Spacer(Modifier.width(4.dp))
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(colors.warning))
-                    Spacer(Modifier.width(4.dp))
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(colors.success))
-                }
-                Spacer(Modifier.height(16.dp))
                 Icon(Icons.Rounded.Bolt, contentDescription = null, tint = colors.primary, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.height(16.dp))
                 Box(Modifier.padding(horizontal = 12.dp).fillMaxWidth().height(1.dp).background(colors.divider))
@@ -183,14 +177,6 @@ internal fun FloatingIslandRailShell(
                             )
                         }
                     }
-                }
-                Box(Modifier.padding(horizontal = 12.dp).fillMaxWidth().height(1.dp).background(colors.divider))
-                Spacer(Modifier.height(12.dp))
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(32.dp).clip(CircleShape).background(colors.surfaceSecondary),
-                ) {
-                    Text(userInitials, color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
                 Spacer(Modifier.height(14.dp))
             }
