@@ -36,6 +36,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,7 +62,7 @@ import com.example.chat.ui.core.theme.ChatyColors
 val LocalReferenceContentSurface = androidx.compose.runtime.staticCompositionLocalOf<Color?> { null }
 
 /** Reusable preset content surface. Callers provide real content, never screen-specific copies.
- * A null override uses reference dark contrast or the caller's light-theme surface. */
+ * A null override uses the caller's active theme surface in both light and dark mode. */
 @Composable
 fun ReferenceLayoutContentSurface(
     rounded: Boolean,
@@ -62,7 +72,7 @@ fun ReferenceLayoutContentSurface(
     surfaceOverride: Color? = null,
     content: @Composable () -> Unit,
 ) {
-    val surface = surfaceOverride ?: if (isDark) Color(0xFF1A2127) else lightSurface
+    val surface = surfaceOverride ?: lightSurface
     Box(modifier.then(if (rounded) Modifier.clip(RoundedCornerShape(24.dp)).background(surface) else Modifier)) {
         androidx.compose.runtime.CompositionLocalProvider(
             LocalReferenceContentSurface provides if (rounded) surface else null,
@@ -83,6 +93,7 @@ internal fun PresetNavigationShell(
     fab: @Composable () -> Unit,
     content: @Composable () -> Unit,
     animationsDisabled: Boolean = false,
+    rootHeaderActions: @Composable () -> Unit = {},
 ) {
     val accent = colors.primary
     val foreground = colors.foreground
@@ -104,32 +115,60 @@ internal fun PresetNavigationShell(
     }
     val horizontalPadding = 0f
     val referenceDarkChrome = isDark && (isOneUi || isIos)
-    val exterior = if (referenceDarkChrome) Color.Black else colors.background
+    val exterior = colors.background
     val dockBackground = when {
-        referenceDarkChrome -> Color.Black
+        referenceDarkChrome -> colors.background
         isIos -> colors.surface.copy(alpha = if (isDark) 0.96f else 0.93f)
         isTelegram -> colors.surfaceElevated
         else -> colors.surface
     }
 
-    Box(Modifier.fillMaxSize().background(exterior)) {
-        val activeId = navItemIds.getOrNull(selectedIndex)
+    val activeId = navItemIds.getOrNull(selectedIndex)
+    val collapseRangePx = with(LocalDensity.current) { ReferenceLayoutMetrics.expandedIdentityHeightDp.dp.toPx() }
+    var headerOffsetPx by remember(activeId, mode) { mutableFloatStateOf(0f) }
+    val headerCollapse = if (isOneUi && collapseRangePx > 0f) -headerOffsetPx / collapseRangePx else 0f
+    val headerScroll = remember(activeId, mode, collapseRangePx) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (!isOneUi) return Offset.Zero
+                val old = headerOffsetPx
+                headerOffsetPx = referenceHeaderScrollOffset(old, available.y, collapseRangePx)
+                return Offset(0f, headerOffsetPx - old)
+            }
+        }
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalReferenceHeaderCollapse provides headerCollapse) {
+    Box(Modifier.fillMaxSize().background(exterior).nestedScroll(headerScroll)) {
         // Only adapters that already honor the title hand-off may suppress their title.
         // Other enabled destinations retain their existing functional header.
-        val shellOwnsHeading = (isOneUi || isIos) && activeId in setOf("calls", "updates", "settings")
+        val shellOwnsHeading = (isOneUi || isIos) && activeId in setOf("calls", "updates", "settings", "tasks")
         Column(Modifier.fillMaxSize().padding(bottom = barHeight.dp)) {
             if (shellOwnsHeading) {
-                Row(Modifier.fillMaxWidth().height(if (isOneUi) 164.dp else 56.dp)
+                Row(Modifier.fillMaxWidth().height(if (isOneUi) (ReferenceLayoutMetrics.expandedIdentityHeightDp * (1f - headerCollapse)).dp else 56.dp)
+                    .padding(top = if (isOneUi) (ReferenceLayoutMetrics.actionBarHeightDp * (1f - headerCollapse)).dp else 0.dp)
+                    .then(if (isOneUi) Modifier.clipToBounds().alpha(1f - headerCollapse) else Modifier)
                     .padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = if (isOneUi) Arrangement.Center else Arrangement.Start) {
                     if (isOneUi) {
-                        NavDestinationIcon(activeId!!, size = 32, tint = foreground)
+                        NavDestinationIcon(activeId!!, size = ReferenceLayoutMetrics.identityIconSizeDp, tint = foreground)
                         Spacer(Modifier.width(8.dp))
                     }
                     Text(NavigationCatalog.labelFor(activeId!!), color = foreground,
-                        fontSize = if (isOneUi) 32.sp else 20.sp, fontWeight = FontWeight.Bold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        fontSize = if (isOneUi) ReferenceLayoutMetrics.identityTextSizeSp.sp else 20.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = if (isOneUi) Modifier else Modifier.weight(1f))
+                    if (!isOneUi) rootHeaderActions()
                 }
+            }
+            if (shellOwnsHeading && isOneUi) Row(
+                Modifier.fillMaxWidth().height(ReferenceLayoutMetrics.actionBarHeightDp.dp).padding(end = 4.dp),
+                horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(NavigationCatalog.labelFor(activeId!!), color = foreground,
+                    fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f).padding(start = 16.dp).alpha(headerCollapse),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                rootHeaderActions()
             }
             ReferenceLayoutContentSurface(rounded = isOneUi && activeId != null && activeId !in setOf("chats", "groups"), isDark = isDark,
                 lightSurface = colors.surface, modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -171,7 +210,7 @@ internal fun PresetNavigationShell(
                 navItemIds.forEachIndexed { index, id ->
                     val selected = index == selectedIndex
                     val label = NavigationCatalog.labelFor(id)
-                    val targetTint = if (referenceDarkChrome) Color.White else if (selected) foreground else secondary
+                    val targetTint = if (selected) foreground else secondary
                     val tint by animateColorAsState(targetValue = targetTint,
                         animationSpec = tween(if (animationsDisabled) 0 else 140), label = "navigation-item-tint")
                     val selectedModifier = Modifier
@@ -225,6 +264,7 @@ internal fun PresetNavigationShell(
         }
         Box(Modifier.align(Alignment.BottomEnd).padding(bottom = (barHeight + 16).dp, end = 16.dp)) { fab() }
     }
+}
 }
 
 /** Port of _buildBottomShell: the 12 named bottom-bar styles' container
