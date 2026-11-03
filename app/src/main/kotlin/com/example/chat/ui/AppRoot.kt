@@ -105,6 +105,16 @@ fun AppRoot() {
     )
     ChatyTheme(config = resolvedTheme) {
     com.example.chat.ui.icons.ProvideChatyIconTheme(ServiceLocator.preferencesController) {
+    val rootMode = com.example.chat.ui.navigation.HomePresetNormalizer.presentationNavigationMode(
+        ServiceLocator.preferencesController.home.homeStyle,
+    ) ?: themeController.navigationMode
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.example.chat.ui.kit.LocalReferenceLayoutPresentation provides
+            com.example.chat.ui.kit.ReferenceLayoutPresentation(
+                com.example.chat.ui.kit.referenceLayoutStyleFor(rootMode),
+                com.example.chat.ui.kit.rememberChatyReduceMotion(),
+            ),
+    ) {
     GlobalTypographyScale {
         com.example.chat.ui.core.system.ChatySystemBarsEffect(ServiceLocator.preferencesController, resolvedTheme.surfaceColor)
         com.example.chat.ui.core.system.ChatyPresenceEffect(
@@ -1648,6 +1658,7 @@ fun AppRoot() {
     }
     }
     }
+    } // app-wide reference layout, including pushed pages
 }
 
 /** Honest work-in-progress destination for not-yet-ported auth screens. */
