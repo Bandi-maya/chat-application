@@ -360,6 +360,13 @@ try:
     adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen','album',check=False)
     time.sleep(3)
     capture('menu-04-six-image-album',settle=2)
+    for proof_screen in ('contactinfo','allmedia','profile'):
+        adb('shell','am','start','-n',pkg+'/com.example.chat.MenuAlbumProofActivity','--es','screen',proof_screen,check=False)
+        time.sleep(3)
+        capture('proof-'+proof_screen+'-top',settle=2)
+        x,y1,y2=viewport()
+        adb('shell','input','swipe',str(x),str(y1),str(x),str(y2),'350')
+        capture('proof-'+proof_screen+'-scrolled',settle=2)
     (out/'menu-notes.txt').write_text('SCOPE:fixture-presentation-proof-not-production-account-state\n' + ('\n'.join(menu_notes) if menu_notes else 'MENU_CAPTURE_OK'))
 
 finally:
