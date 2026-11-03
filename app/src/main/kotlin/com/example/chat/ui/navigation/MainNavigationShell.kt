@@ -112,6 +112,7 @@ fun MainNavigationShell(
     previewOnly: Boolean = false,
     /** Read-only picker thumbnails reveal the selected drawer; normal app previews stay closed. */
     previewMenusOpen: Boolean = false,
+    rootHeaderActions: @Composable () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
 
@@ -212,7 +213,7 @@ fun MainNavigationShell(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .pagerTransition(prefs.pagerTransition3d, delta),
+                    .pagerTransition(if (prefs.animationsDisabled) "Default" else prefs.pagerTransition3d, delta),
             ) {
                 screenContent(destinationId)
             }
@@ -255,6 +256,7 @@ fun MainNavigationShell(
                 navItemIds = allDestinationIds,
                 selectedIndex = effectiveIndex,
                 activeDestinationId = activeDestinationId,
+                rootHeaderActions = rootHeaderActions,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
                 homeHeaderTabsSlot = homeHeaderTabsSlot,
                 fab = { fab(activeDestinationId) },
@@ -316,6 +318,7 @@ fun MainNavigationShell(
                 AppNavigationMode.basicTabStyle,
                 AppNavigationMode.gestureTabs,
             ) -> PresetNavigationShell(
+                rootHeaderActions = rootHeaderActions,
                 animationsDisabled = prefs.animationsDisabled,
                 mode = navMode,
                 colors = colors,
