@@ -57,6 +57,7 @@ fun UniversalEmojiPackScreen(
     val iosBundled = remember { ChatyEmojiPack.iosBundledCount(context) }
     val sdkOk = ChatyEmojiPack.iosSupported()
     val msBundled = remember { ChatyEmojiPack.packBundledCount(context, ChatyEmojiPack.MICROSOFT_PACK) }
+    val driveBundled = remember { ChatyEmojiPack.driveBundledCount(context) }
     val lottieBundled = remember { ChatyEmojiPack.lottieBundledCount(context) }
     val telegramBundled = remember { ChatyEmojiPack.packBundledCount(context, ChatyEmojiPack.TELEGRAM_PACK) }
     val omBundled = remember { ChatyEmojiPack.packBundledCount(context, ChatyEmojiPack.OPENMOJI_PACK) }
@@ -92,6 +93,7 @@ fun UniversalEmojiPackScreen(
             else "OpenMoji static emojis, not animated ($omBundled installed, others use the Chaty style)",
             omBundled > 0,
         ),
+        Entry(ChatyEmojiPack.DRIVE_MOV, "Drive MOV animations", if (!sdkOk) "Unavailable: these animations need Android 9 or newer" else "$driveBundled of 132 source animations installed. This separate source overlaps the iOS ZIP's first 50 designs; missing animations use normal glyphs.", sdkOk && driveBundled > 0),
         Entry(ChatyEmojiPack.TELEGRAM_LOTTIE, "Telegram-style Lottie - TheSub", "$lottieBundled of 11 supplied animations. Separate style; other emojis use normal glyphs. LottieFiles License; not official Telegram art.", lottieBundled == 11),
         Entry(ChatyEmojiPack.TELEGRAM, "Telegram - supplied pack", when {
             !sdkOk -> "Unavailable: these animations need Android 9 or newer"
@@ -125,7 +127,7 @@ fun UniversalEmojiPackScreen(
                 if (active != effective)
                     "$active is saved as your choice but is not available here, so Chaty emojis are shown."
                 else
-                    if (active == ChatyEmojiPack.TELEGRAM_LOTTIE) "TheSub on LottieFiles, LottieFiles License. Telegram-style recreations, not official Telegram art. Other emojis use normal glyphs." else if (active == ChatyEmojiPack.TELEGRAM) "Telegram emoji designs; meii pack on emoji.gg. Higher-quality variants from supplied files; not an official or complete Telegram pack. Other emojis use normal glyphs, not substitute artwork." else "Emojis a pack does not include are shown in the Chaty style. Animated emojis loop continuously. OpenMoji is a static pack.",
+                    if (active == ChatyEmojiPack.DRIVE_MOV) "User-supplied third-party shared Drive MOV source. Converted from the source animations, not an official or complete Unicode pack. Missing artwork uses normal glyphs." else if (active == ChatyEmojiPack.TELEGRAM_LOTTIE) "TheSub on LottieFiles, LottieFiles License. Telegram-style recreations, not official Telegram art. Other emojis use normal glyphs." else if (active == ChatyEmojiPack.TELEGRAM) "Telegram emoji designs; meii pack on emoji.gg. Higher-quality variants from supplied files; not an official or complete Telegram pack. Other emojis use normal glyphs, not substitute artwork." else "Emojis a pack does not include are shown in the Chaty style. Animated emojis loop continuously. OpenMoji is a static pack.",
                 color = secondaryText, fontSize = 12.sp,
             )
         }
@@ -149,7 +151,7 @@ private fun PackCard(
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             // Disabled packs show no sample: it would only be the Chaty fallback.
-            if (enabled) for (e in if (pack == ChatyEmojiPack.TELEGRAM) listOf("🥳", "🤔", "😴") else if (pack == ChatyEmojiPack.TELEGRAM_LOTTIE) listOf("😅", "📖", "🚗") else listOf("😂", "😍", "😴")) {
+            if (enabled) for (e in if (pack == ChatyEmojiPack.DRIVE_MOV) listOf("🤯", "🤷‍♂️", "🔥") else if (pack == ChatyEmojiPack.TELEGRAM) listOf("🥳", "🤔", "😴") else if (pack == ChatyEmojiPack.TELEGRAM_LOTTIE) listOf("😅", "📖", "🚗") else listOf("😂", "😍", "😴")) {
                 AnimatedEmojiView(unicode = e, size = 34f, emojiStyle = pack)
             }
         }
