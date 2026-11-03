@@ -1,0 +1,107 @@
+{
+  "generated": "2026-11-03T14:35 IST (v2 - corrected converter + verified XML renders)",
+  "converter": "svg2vd v3: preserves per-path fill/stroke semantics (fill=none -> no fillColor); handles path/circle/ellipse/rect/line/polyline/polygon; fill-rule evenodd -> fillType. All renders below are from the generated Android XML, not source SVGs.",
+  "android_layout": "flat res/drawable with unique prefixes (ic_hgf_, ic_mjl_, ic_mjs_, ic_pks_, ic_pkf_, ic_phr_) - no custom qualifiers",
+  "themes": {
+    "phosphorRegular": {
+      "title": "Phosphor",
+      "license": "MIT (verified LICENSE bytes, @phosphor-icons/core@2.1.1)",
+      "source": "https://github.com/phosphor-icons/core / npm @phosphor-icons/core 2.1.1",
+      "prefix": "ic_phr_",
+      "coverage": "77/77",
+      "available": true,
+      "notes": [
+        "77 semantic IDs mapped; 2 explicit compositions (scheduled send, stop screen sharing); earpiece uses mobile-device adaptation; genuine same-family native fill variants for nine navigation destinations",
+        "User approved related-style SVG adaptations 2026-11-03. Resource compilation and JVM mapping tests passed; Android runtime acceptance remains pending."
+      ],
+      "map_file": "phos_77_map.json"
+    },
+    "hugeiconsFree": {
+      "title": "Hugeicons Free",
+      "license": "MIT (verified)",
+      "prefix": "ic_hgf_",
+      "coverage": "77/77",
+      "missing": [],
+      "notes": [
+        "Adapted forward (mirrored genuine Reply), fullscreen (authored 1.5 stroke corners), filled heart (filled genuine path), scheduled-send (genuine family composition). Provenance and authored SVGs bundled. Not Hugeicons Pro.",
+        "Updates genuine ring retained with authored center dot, labeled adapted."
+      ],
+      "map_file": "chatyid_map.json",
+      "available": true
+    },
+    "majesticonsLine": {
+      "prefix": "ic_mjl_",
+      "coverage": "77/77 genuine + explicitly adapted glyphs",
+      "license": "MIT",
+      "missing_count": 0,
+      "notes": [
+        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected."
+      ],
+      "title": "Majesticons line",
+      "available": true
+    },
+    "majesticonsSolid": {
+      "prefix": "ic_mjs_",
+      "coverage": "77/77 genuine + explicitly adapted glyphs",
+      "license": "MIT",
+      "missing_count": 0,
+      "notes": [
+        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected."
+      ],
+      "title": "Majesticons solid",
+      "available": true
+    },
+    "pikaiconsStroke": {
+      "prefix": "ic_pks_",
+      "coverage": "77/77 genuine + explicitly adapted glyphs",
+      "license": "MIT (@pikaicons/core-free@0.1.0)",
+      "notes": [
+        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected."
+      ],
+      "title": "Pikaicons stroke",
+      "available": true,
+      "missing_count": 0
+    },
+    "pikaiconsSolid": {
+      "prefix": "ic_pkf_",
+      "coverage": "77/77 genuine + explicitly adapted glyphs",
+      "license": "MIT (@pikaicons/core-free@0.1.0)",
+      "notes": [
+        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected."
+      ],
+      "title": "Pikaicons solid",
+      "available": true,
+      "missing_count": 0
+    }
+  },
+  "blocked_packs": [
+    {
+      "title": "Hugeicons Pro",
+      "reason": "paid tier; free variant offered separately as Hugeicons Free, no silent substitution"
+    },
+    {
+      "title": "Iconly Pro",
+      "reason": "license scope ambiguous per writer review - not simply paid; held pending clarification"
+    },
+    {
+      "title": "Nucleo",
+      "reason": "restricted license (not merely paid) per writer review"
+    },
+    {
+      "title": "Streamline",
+      "reason": "free tier prohibits use as selectable asset library per license text"
+    },
+    {
+      "title": "Untitled UI",
+      "reason": "custom restrictive package LICENSE (not MIT despite package.json); interpretation pending"
+    },
+    {
+      "title": "Icons8",
+      "reason": "account + attribution required; user decision pending"
+    },
+    {
+      "title": "Lordicon",
+      "reason": "free tier carries distribution restriction; user decision pending"
+    }
+  ]
+}

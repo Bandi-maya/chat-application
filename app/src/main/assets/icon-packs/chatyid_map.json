@@ -1,0 +1,387 @@
+{
+ "chats": {
+  "hugeicons": "BubbleChat",
+  "majesticons": "chat-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "updates": {
+  "hugeicons": "Status",
+  "majesticons": "ADAPTED (see provenance.json)",
+  "status": "Status ring glyph (pixel-verified); Notification01 bell did not match updates/status semantic"
+ },
+ "calls": {
+  "hugeicons": "Call",
+  "majesticons": "phone-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "profile": {
+  "hugeicons": "UserCircle",
+  "majesticons": "user-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "tasks": {
+  "hugeicons": "Task01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "groups": {
+  "hugeicons": "UserGroup",
+  "majesticons": "users-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "desktop": {
+  "hugeicons": "Computer",
+  "majesticons": "monitor-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "more": {
+  "hugeicons": "MoreHorizontal",
+  "majesticons": "more-menu-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "moreOptions": {
+  "hugeicons": "MoreVertical",
+  "majesticons": "more-menu-vertical-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "search": {
+  "hugeicons": "Search01",
+  "majesticons": "search-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "settings": {
+  "hugeicons": "Settings01",
+  "majesticons": "settings-cog-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "close": {
+  "hugeicons": "Cancel01",
+  "majesticons": "close-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "check": {
+  "hugeicons": "Tick01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "tune": {
+  "hugeicons": "PreferenceHorizontal",
+  "majesticons": "filter-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "chevronRight": {
+  "hugeicons": "ChevronRight",
+  "majesticons": "chevron-right-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "back": {
+  "hugeicons": "ArrowLeft01",
+  "majesticons": "arrow-left-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "send": {
+  "hugeicons": "Sent",
+  "majesticons": "send-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "emoji": {
+  "hugeicons": "Smile",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "attachment": {
+  "hugeicons": "Attachment",
+  "majesticons": "attachment-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "attachmentPlus": {
+  "hugeicons": "CirclePlus",
+  "majesticons": "ADAPTED (authored, see provenance.json)",
+  "status": "maj: attachment-line APPROXIMATION (loses plus; family has no plus-circle); hugeicons: CirclePlus exact"
+ },
+ "microphone": {
+  "hugeicons": "Mic01",
+  "majesticons": "microphone-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "microphoneOff": {
+  "hugeicons": "MicOff01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "pin": {
+  "hugeicons": "Pin",
+  "majesticons": "pin-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "unpin": {
+  "hugeicons": "PinOff",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "archive": {
+  "hugeicons": "Archive",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "lock": {
+  "hugeicons": "Lock",
+  "majesticons": "lock-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "unlock": {
+  "hugeicons": "LockOpen",
+  "majesticons": "unlock-open-line",
+  "status": "LockOpen (was ChatUnlock chat-bubble, wrong semantics)"
+ },
+ "mute": {
+  "hugeicons": "VolumeOff",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "unmute": {
+  "hugeicons": "VolumeHigh",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "favourite": {
+  "hugeicons": "Favourite",
+  "majesticons": "heart-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "favouriteFilled": {
+  "hugeicons": "Favourite",
+  "majesticons": "ADAPTED (heart-line filled)",
+  "status": "APPROXIMATION: same outline heart as favourite; free set has no filled heart"
+ },
+ "delete": {
+  "hugeicons": "Delete01",
+  "majesticons": "delete-bin-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "reply": {
+  "hugeicons": "Reply",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "forward": {
+  "hugeicons": null,
+  "majesticons": null,
+  "status": "UNMAPPED: free set has no message-forward glyph (Forward01/02 are media next/fast-forward, Maximize01/02 are gestures)"
+ },
+ "edit": {
+  "hugeicons": "Edit01",
+  "majesticons": "edit-pen-2-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "copy": {
+  "hugeicons": "Copy",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "share": {
+  "hugeicons": "Share01",
+  "majesticons": "share-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "camera": {
+  "hugeicons": "Camera01",
+  "majesticons": "camera-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "cameraFlip": {
+  "hugeicons": "SwitchCamera",
+  "majesticons": null,
+  "status": "SwitchCamera per writer: cameraFlip/cameraSwitch dispatch the same painter action"
+ },
+ "cameraShutter": {
+  "hugeicons": "Aperture",
+  "majesticons": "ADAPTED (authored, see provenance.json)",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "cameraFlashOn": {
+  "hugeicons": "Flash",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "cameraFlashOff": {
+  "hugeicons": "FlashOff",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "gallery": {
+  "hugeicons": "Image01",
+  "majesticons": "image-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "callAudio": {
+  "hugeicons": "Call",
+  "majesticons": "phone-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "callVideo": {
+  "hugeicons": "Video01",
+  "majesticons": "video-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "callVideoOff": {
+  "hugeicons": "VideoOff",
+  "majesticons": "camera-off-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "callEnd": {
+  "hugeicons": "CallEnd01",
+  "majesticons": "phone-hangup-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "cameraSwitch": {
+  "hugeicons": "SwitchCamera",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "screenShare": {
+  "hugeicons": "ScreenShare",
+  "majesticons": "ADAPTED (authored, see provenance.json)",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "screenShareStop": {
+  "hugeicons": "ScreenShareOff",
+  "majesticons": "ADAPTED (authored, see provenance.json)",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "speaker": {
+  "hugeicons": "Speaker",
+  "majesticons": "speaker-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "earpiece": {
+  "hugeicons": "Call",
+  "majesticons": "ADAPTED (see provenance.json)",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "signal": {
+  "hugeicons": "SignalFull01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "messageCheckSingle": {
+  "hugeicons": "Tick01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "messageCheckDouble": {
+  "hugeicons": "TickDouble01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "messageClock": {
+  "hugeicons": "Clock01",
+  "majesticons": "clock-line",
+  "status": "clock-line, plain clock matches base"
+ },
+ "pictureInPicture": {
+  "hugeicons": "PictureInPicture",
+  "majesticons": "image-in-picture-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "autoAwesome": {
+  "hugeicons": "Sparkles",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "fullscreen": {
+  "hugeicons": null,
+  "majesticons": "maximize-line",
+  "status": "UNMAPPED: Maximize01/02 are hand gestures, no 4-corner expand glyph in free set"
+ },
+ "fullscreenExit": {
+  "hugeicons": "Minimize",
+  "majesticons": "minimize-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "openInNew": {
+  "hugeicons": "LinkSquare01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "clear": {
+  "hugeicons": "Cancel01",
+  "majesticons": "close-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "addTask": {
+  "hugeicons": "TaskAdd01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "editOutline": {
+  "hugeicons": "Edit01",
+  "majesticons": "edit-pen-2-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "videoCam": {
+  "hugeicons": "Video01",
+  "majesticons": "video-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "voiceCall": {
+  "hugeicons": "Call",
+  "majesticons": "phone-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "logout": {
+  "hugeicons": "Logout01",
+  "majesticons": "logout-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "deleteOutline": {
+  "hugeicons": "Delete01",
+  "majesticons": "delete-bin-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "schedule": {
+  "hugeicons": "Clock01",
+  "majesticons": "clock-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "scheduleSend": {
+  "hugeicons": null,
+  "majesticons": "ADAPTED (authored, see provenance.json)",
+  "status": "maj: clock-line APPROXIMATION (loses plane); hugeicons: composite Sent+Clock01 genuine family glyphs"
+ },
+ "sync": {
+  "hugeicons": "Refresh",
+  "majesticons": "reload-line",
+  "status": "reload-line = sync arrows (was repeat-circle, media repeat - wrong)"
+ },
+ "checkSingle": {
+  "hugeicons": "Tick01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "checkDouble": {
+  "hugeicons": "TickDouble01",
+  "majesticons": null,
+  "status": "single-family mapping; verify glyph visually before use"
+ },
+ "errorOutline": {
+  "hugeicons": "Alert01",
+  "majesticons": "alert-circle-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "pause": {
+  "hugeicons": "Pause",
+  "majesticons": "pause-circle-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "playArrow": {
+  "hugeicons": "Play",
+  "majesticons": "play-circle-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "musicNote": {
+  "hugeicons": "MusicNote01",
+  "majesticons": "music-note-line",
+  "status": "both families mapped; verify glyph visually before use"
+ }
+}

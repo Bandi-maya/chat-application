@@ -1,0 +1,11 @@
+{
+ "chats": "chat-fill",
+ "updates": "radio-button-fill",
+ "calls": "phone-fill",
+ "profile": "user-fill",
+ "tasks": "clipboard-text-fill",
+ "groups": "users-fill",
+ "desktop": "monitor-fill",
+ "more": "dots-three-fill",
+ "settings": "gear-fill"
+}
