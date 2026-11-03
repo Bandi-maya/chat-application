@@ -116,6 +116,16 @@ def dismiss_until_ready(identity='Chats', attempts=8):
         if find_label(identity) is True:
             print('READY '+identity,flush=True)
             return True
+        # Drawer shells have no visible Chats label until navigation opens.
+        # Verify the actual drawer affordance, open it, require Chats, then
+        # close through that real destination. Never accept a blind fallback.
+        if identity == 'Chats':
+            for drawer_label in ('Open navigation drawer', 'Open navigation menu'):
+                if find_label(drawer_label) is True and tap_label(drawer_label,optional=True,settle=1):
+                    if find_label('Chats') is True and tap_label('Chats',optional=True,settle=1):
+                        if not dismiss_known_modals():
+                            print('READY Chats via '+drawer_label,flush=True)
+                            return True
         time.sleep(2)
     return False
 
