@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.ui.icons.ChatyIcon
 import com.example.chat.ui.icons.ChatyIconId
+import com.example.chat.ui.icons.ChatyIconPackCatalog
 import com.example.chat.ui.icons.ChatyIconThemeId
 import com.example.chat.ui.kit.ChatyHapticsPort
 import com.example.chat.ui.settings.rememberPreferencesVersion
@@ -138,6 +139,7 @@ fun UniversalChatyIconsScreen(
     val previewIconColor = if (previewIsDark) Color.White else Black87
 
     fun applyTheme(theme: ChatyIconThemeId) {
+        if (!ChatyIconPackCatalog.isSelectable(theme)) return
         ChatyHapticsPort.selection(view)
         preferences.updateUniversal(preferences.universal.copy(iconTheme = theme.title))
         // Dart snackbar: '<title> icon theme applied across Chaty', 2s.
@@ -242,9 +244,9 @@ fun UniversalChatyIconsScreen(
         }
         Spacer(Modifier.height(20.dp))
 
-        // SECTION 2: the ten theme selection cards.
+        // Available families and honest status rows share the same selector.
         Text(
-            "10 ICON THEMES (GENUINELY DISTINCT SHAPE GRAMMARS)",
+            "${ChatyIconThemeId.entries.size + ChatyIconPackCatalog.blockedPacks.size} ICON PACK OPTIONS",
             color = secondaryText,
             fontSize = 11.5.sp,
             fontWeight = FontWeight.W800,
@@ -254,11 +256,13 @@ fun UniversalChatyIconsScreen(
         ChatyIconThemeId.entries.forEachIndexed { index, itemTheme ->
             if (index > 0) Spacer(Modifier.height(10.dp))
             val isSelected = activeTheme == itemTheme
+            val packInfo = ChatyIconPackCatalog.info(itemTheme)
+            val selectable = packInfo?.available ?: true
             val groupIconColor = if (isSelected) accent else if (previewIsDark) Color.White else Color.Black
             Column(
                 Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .clickable { resetTheme = false; showThemeSelector = true }
+                    .clickable(enabled = selectable) { resetTheme = false; showThemeSelector = true }
                     .background(
                         if (isSelected) accent.copy(alpha = 0.12f) else surface,
                         RoundedCornerShape(16.dp),
@@ -280,13 +284,13 @@ fun UniversalChatyIconsScreen(
                             .padding(horizontal = 10.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        ChatyIcon(ChatyIconId.chats, size = previewSize * 0.9f, color = groupIconColor, themeOverride = itemTheme)
-                        Spacer(Modifier.width(8.dp))
-                        ChatyIcon(ChatyIconId.more, size = previewSize * 0.9f, color = groupIconColor, themeOverride = itemTheme)
-                        Spacer(Modifier.width(8.dp))
-                        ChatyIcon(ChatyIconId.camera, size = previewSize * 0.9f, color = groupIconColor, themeOverride = itemTheme)
-                        Spacer(Modifier.width(8.dp))
-                        ChatyIcon(ChatyIconId.favourite, size = previewSize * 0.9f, color = groupIconColor, themeOverride = itemTheme)
+                        if (packInfo == null || com.example.chat.ui.icons.ChatyAssetIcons.hasPreview(itemTheme)) {
+                            ChatyIcon(ChatyIconId.chats, size = previewSize * 0.9f, color = groupIconColor, themeOverride = itemTheme)
+                            Spacer(Modifier.width(8.dp))
+                            ChatyIcon(ChatyIconId.settings, size = previewSize * 0.9f, color = groupIconColor, themeOverride = itemTheme)
+                        } else {
+                            Text("No verified preview", color = secondaryText, fontSize = 10.sp)
+                        }
                     }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
@@ -317,12 +321,47 @@ fun UniversalChatyIconsScreen(
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        if (packInfo?.reason != null) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(packInfo.reason, color = secondaryText, fontSize = 11.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                     Spacer(Modifier.width(8.dp))
                     if (isSelected) {
                         Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
+                    } else if (!selectable) {
+                        Text("Unavailable", color = secondaryText, fontSize = 10.sp, fontWeight = FontWeight.W700)
                     } else {
                         Icon(Icons.Outlined.RadioButtonUnchecked, contentDescription = null, tint = White24, modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
+        }
+        if (ChatyIconPackCatalog.blockedPacks.isNotEmpty()) {
+            Spacer(Modifier.height(20.dp))
+            Text(
+                "REQUESTED PACKS - UNAVAILABLE",
+                color = secondaryText,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.W800,
+                letterSpacing = 0.8.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            ChatyIconPackCatalog.blockedPacks.forEachIndexed { index, pack ->
+                if (index > 0) Spacer(Modifier.height(8.dp))
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(surface, RoundedCornerShape(14.dp))
+                        .border(1.dp, White10, RoundedCornerShape(14.dp))
+                        .padding(14.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(pack.title, color = primaryText, fontSize = 14.sp, fontWeight = FontWeight.W600, modifier = Modifier.weight(1f))
+                        Text("Unavailable", color = secondaryText, fontSize = 10.sp, fontWeight = FontWeight.W700)
+                    }
+                    if (pack.reason != null) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(pack.reason, color = secondaryText, fontSize = 11.5.sp)
                     }
                 }
             }
@@ -486,7 +525,7 @@ fun UniversalChatyIconsScreen(
     if (showThemeSelector) {
         com.example.chat.ui.kit.ChatySingleChoiceModal(
             title = if (resetTheme) "Reset icons" else "Select icons", value = activeTheme,
-            options = if (resetTheme) listOf(ChatyIconThemeId.chatySigil) else ChatyIconThemeId.entries.toList(),
+            options = if (resetTheme) listOf(ChatyIconThemeId.chatySigil) else ChatyIconThemeId.entries.filter(ChatyIconPackCatalog::isSelectable),
             labelBuilder = { it.title }, onDismiss = { showThemeSelector = false },
             onApply = { chosen -> applyTheme(chosen); showThemeSelector = false },
             previewBuilder = { theme ->
@@ -539,7 +578,7 @@ fun UniversalChatyIconsScreen(
                             color = scheme.primary,
                         )
                         Text(
-                            "Side-by-side preview across all 10 distinct icon themes. Applying a theme updates this icon everywhere it is displayed.",
+                            "Side-by-side preview across the available icon themes. Applying a theme updates this icon everywhere it is displayed.",
                             fontSize = 12.5.sp,
                             color = scheme.onSurfaceVariant,
                         )
@@ -547,7 +586,7 @@ fun UniversalChatyIconsScreen(
                 }
                 Spacer(Modifier.height(20.dp))
                 FixedGrid(
-                    items = ChatyIconThemeId.entries,
+                    items = ChatyIconThemeId.entries.filter(ChatyIconPackCatalog::isSelectable),
                     columns = 5,
                     horizontalSpacing = 10.dp,
                     verticalSpacing = 12.dp,
