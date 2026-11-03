@@ -6,6 +6,10 @@ on:
         description: Build run containing synthetic-runtime-apk-pair
         required: true
         default: '41618557841'
+  push:
+    branches: [kotlin]
+    paths:
+      - ci/layout-capture-trigger.txt
 permissions:
   contents: read
   actions: read
@@ -19,7 +23,7 @@ jobs:
         with:
           name: synthetic-runtime-apk-pair
           path: runtime-apks
-          run-id: ${{ inputs.source_run }}
+          run-id: ${{ inputs.source_run || '41618557841' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify immutable isolated pair
         run: cd runtime-apks && sha256sum -c SHA256SUMS
@@ -40,6 +44,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: layout-capture-${{ inputs.source_run }}
+          name: layout-capture-${{ inputs.source_run || '41618557841' }}
           path: screenshots/
           if-no-files-found: error
