@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalFoundationApi::class)
 package com.example.chat.ui.chats.home
 
+import androidx.compose.foundation.horizontalScroll
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -256,6 +258,12 @@ fun StandardHomeAppBar(
             Spacer(Modifier.width(8.dp))
             headerExtras?.invoke()
         }
+        // Keep every configured action reachable on narrow screens and large text.
+        Row(
+            Modifier.widthIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.65f - 48f).coerceAtLeast(0f).dp)
+                .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
         if (homePrefs.showCameraIcon) {
             IconButton(onClick = nav.onOpenCameraEffects) {
                 HomeGlyphIcon(glyph = HomeGlyph.camera, size = 20.dp, color = Color(theme.primaryTextColor), semanticLabel = "Camera Effects")
@@ -323,7 +331,9 @@ fun StandardHomeAppBar(
                 )
             }
         }
-        IconButton(onClick = onOpenOverflowMenu) {
+        } // bounded, scrollable optional action lane
+        // Primary overflow stays visible and anchored, never hidden by horizontal scrolling.
+        IconButton(onClick = onOpenOverflowMenu, modifier = Modifier.size(48.dp)) {
             Icon(Icons.Rounded.MoreVert, contentDescription = "More options", tint = Color(theme.primaryTextColor))
         }
     }
