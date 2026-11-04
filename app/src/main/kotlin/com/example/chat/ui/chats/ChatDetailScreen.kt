@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -850,10 +851,14 @@ fun ChatDetailScreen(
                 // Compact album geometry stays stable while selecting; effects still use each real message ID.
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().testTag("chat-message-list"),
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
-                    itemsIndexed(timelineRows, key = { _, row -> row.anchor.id }) { rowIndex, row ->
+                    itemsIndexed(
+                        timelineRows,
+                        key = { _, row -> row.anchor.id },
+                        contentType = { _, row -> if (row.messages.size > 1) "media-album" else row.anchor.type },
+                    ) { rowIndex, row ->
                         Column(Modifier.fillMaxWidth()) {
                         if (com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.startsDay(timelineRows, rowIndex, timelineZone)) {
                             Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
