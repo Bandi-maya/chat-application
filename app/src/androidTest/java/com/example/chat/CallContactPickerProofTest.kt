@@ -169,6 +169,17 @@ class CallContactPickerProofTest {
         }
     }
 
+    /** Same mounted control: successful answer, successful decline, then a small
+     * wiggle must not inherit either previous drag's exit offset. */
+    @Test
+    fun samsungControlResetsAfterSuccessBeforeSmallDrag() {
+        runGestureCase(
+            "samsung-reset-regression", CallBundleId.SAMSUNG_ONE_UI,
+            controlDesc = "Answer call", acceptDelta = 420 to 0,
+            declineDelta = -420 to 0, declineDesc = "Decline call",
+        )
+    }
+
     @Test
     fun bundleIncomingReferenceGesturesFireRealCallbacks() {
         // Samsung One UI: drag the action circle OUT of its halo.
@@ -321,21 +332,36 @@ class CallContactPickerProofTest {
     fun pickerSelectionAppliesAndRoutesLiveDemoIncomingCall() {
         ins.uiAutomation.grantRuntimePermission(ins.targetContext.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
         val appCtx = ins.targetContext
-        val scope = kotlinx.coroutines.CoroutineScope(
-            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
-        )
-        val store = CallPresentationPreferencesStore(AndroidCallPresentationPrefsStorage(appCtx), scope)
-        store.initialize()
-        var deadline = System.currentTimeMillis() + 8000
-        while (!store.isInitialized) {
-            if (System.currentTimeMillis() > deadline) fail("store did not initialize")
-            Thread.sleep(50)
-        }
-        val original = store.value.callExperienceBundleId
+        var store: CallPresentationPreferencesStore? = null
+        var original: String? = null
         try {
             val launch = appCtx.packageManager.getLaunchIntentForPackage(appCtx.packageName)!!
             appCtx.startActivity(launch)
+            val api = com.example.chat.ServiceLocator.apiBackend
+            assertTrue("isolated QA profile must not contain a real account", !api.isAuthenticated || api.isDemoSession)
+            if (!api.isDemoSession) {
+                assertTrue("welcome never appeared", dev.wait(Until.hasObject(By.textContains("Welcome")), 30000))
+                dev.findObject(By.text("Log In")).click()
+                assertTrue("demo card never appeared", dev.wait(Until.hasObject(By.textContains("Try the demo")), 10000))
+                dev.findObject(By.textContains("Try the demo")).click()
+                if (dev.wait(Until.hasObject(By.text("Enable App Lock?")), 5000)) {
+                    dev.findObject(By.text("Not now")).click()
+                }
+                if (dev.wait(Until.hasObject(By.text("Not Now")), 4000)) {
+                    dev.findObject(By.text("Not Now")).click()
+                }
+                assertTrue("demo home never appeared", dev.wait(Until.hasObject(By.textContains("Aisha (sample)")), 15000))
+            }
+            assertTrue("only the offline demo may be used", api.isDemoSession)
             assertTrue("app shell visible", dev.wait(Until.hasObject(By.text("Chats")), 20000))
+            val liveStore = com.example.chat.ServiceLocator.callPresentationPrefs
+            store = liveStore
+            var deadline = System.currentTimeMillis() + 8000
+            while (!liveStore.isInitialized) {
+                if (System.currentTimeMillis() > deadline) fail("live store did not initialize")
+                Thread.sleep(50)
+            }
+            original = liveStore.value.callExperienceBundleId
 
             var settingsEntry = dev.wait(Until.findObject(By.text("Settings")), 8000)
             if (settingsEntry == null) settingsEntry = dev.wait(Until.findObject(By.desc("Settings")), 4000)
@@ -364,7 +390,7 @@ class CallContactPickerProofTest {
             shot("bundle-picker-applied-mono-chevron")
 
             deadline = System.currentTimeMillis() + 8000
-            while (store.value.callExperienceBundleId != "mono_chevron_dark") {
+            while (liveStore.value.callExperienceBundleId != "mono_chevron_dark") {
                 if (System.currentTimeMillis() > deadline) fail("picker Apply did not persist mono_chevron_dark")
                 Thread.sleep(100)
             }
@@ -387,9 +413,20 @@ class CallContactPickerProofTest {
                 if (System.currentTimeMillis() > deadline) fail("demo session not cleared after decline gesture")
                 Thread.sleep(100)
             }
+        } catch (failure: Throwable) {
+            // Preserve the exact window at any entry/navigation assertion failure.
+            try { shot("bundle-live-demo-failure") } catch (_: Throwable) {}
+            try {
+                val dir = File(appCtx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+                dev.dumpWindowHierarchy(File(dir, "bundle-live-demo-failure.xml"))
+            } catch (_: Throwable) {}
+            throw failure
         } finally {
-            store.setCallExperienceBundle(original)
-            Thread.sleep(500)
+            val prior = original
+            if (prior != null && com.example.chat.ServiceLocator.apiBackend.isDemoSession) {
+                store?.setCallExperienceBundle(prior)
+                Thread.sleep(500)
+            }
         }
     }
 }
