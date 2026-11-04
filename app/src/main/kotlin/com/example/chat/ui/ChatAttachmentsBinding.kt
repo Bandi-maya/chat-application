@@ -107,7 +107,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                 if (s >= 0 && !c.isNull(s)) size = c.getLong(s)
             }
         }
-        val max = ServiceLocator.chatMedia.maxBytes(type)
+        val max = if (type == "image") 50L * 1024 * 1024 else ServiceLocator.chatMedia.maxBytes(type)
         // Guard before reading the stream: images are compressed after, so allow headroom for them.
         if (size > 0 && size > max) {
             throw IllegalStateException("This $type exceeds the ${max / (1024 * 1024)} MB storage limit.")
@@ -151,19 +151,35 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                     // matching Dart ChatMediaService.uploadFile(sourcePath:).
                     val stagedFile = file.path?.let { java.io.File(it) }
                     if (api.isAuthenticated && stagedFile != null) {
+                        var uploadTarget = stagedFile
+                        var compressedTemp: java.io.File? = null
+                        if (type == "image") {
+                            val compressed = com.example.chat.ui.media.ImageSendCompressor.compressFile(stagedFile)
+                            if (compressed !== stagedFile) {
+                                compressedTemp = compressed
+                                uploadTarget = compressed
+                            }
+                        }
                         try {
-                            val uploaded = api.uploadMedia(stagedFile) { _, _ -> }
+                            val uploaded = api.uploadMedia(uploadTarget) { _, _ -> }
+                            val effectiveName = if (type == "image" && compressedTemp != null) {
+                                if (file.name.contains('.')) "${file.name.substringBeforeLast('.')}.jpg" else "${file.name}.jpg"
+                            } else {
+                                file.name
+                            }
                             return MessageAttachment(
                                 id = java.util.UUID.randomUUID().toString(),
                                 type = type,
-                                name = file.name,
-                                size = com.example.chat.data.services.ChatMediaService.formatBytes(stagedFile.length()),
+                                name = effectiveName,
+                                size = com.example.chat.data.services.ChatMediaService.formatBytes(uploadTarget.length()),
                                 url = uploaded["url"]?.toString() ?: throw IllegalStateException("Upload response did not contain a media URL."),
                                 durationSeconds = durationSeconds,
                             )
                         } finally {
-                            if (stagedFile.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")
-                            ) stagedFile.delete()
+                            compressedTemp?.delete()
+                            if (stagedFile.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")) {
+                                stagedFile.delete()
+                            }
                         }
                     }
                     // The legacy Supabase storage adapter accepts ByteArray only.

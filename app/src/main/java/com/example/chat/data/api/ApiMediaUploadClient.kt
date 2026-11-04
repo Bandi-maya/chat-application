@@ -111,10 +111,21 @@ class ApiMediaUploadClient(
         return decodeResponse(response)
     }
 
-    private fun safeMultipartFilename(value: String): String =
-        value.map { ch ->
+    private fun safeMultipartFilename(value: String): String {
+        val sanitized = value.map { ch ->
             if (ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9' || ch == '.' || ch == '_' || ch == '-') ch else '_'
-        }.joinToString("").trim('.', '_').take(120).ifBlank { "upload.bin" }
+        }.joinToString("").trim('.', '_')
+        if (sanitized.isBlank()) return "upload.bin"
+        if (sanitized.length <= 120) return sanitized
+        val dot = sanitized.lastIndexOf('.')
+        return if (dot in 1 until sanitized.length) {
+            val ext = sanitized.substring(dot).take(15)
+            val name = sanitized.substring(0, dot).take(120 - ext.length)
+            "$name$ext"
+        } else {
+            sanitized.take(120)
+        }
+    }
 
     /** Account-scoped file upload uses the captured account credentials, never live getters. */
     fun uploadMedia(
@@ -210,6 +221,8 @@ class ApiMediaUploadClient(
             val detail = root?.let { json ->
                 json.optString("detail").takeIf { it.isNotBlank() }
                     ?: json.optString("message").takeIf { it.isNotBlank() }
+                    ?: json.optJSONObject("error")?.optString("message")?.takeIf { it.isNotBlank() }
+                    ?: json.optString("error").takeIf { it.isNotBlank() }
             }
             throw UploadException(detail ?: "Failed to upload media (${response.statusCode})")
         }
@@ -245,7 +258,18 @@ class ApiMediaUploadClient(
             file: File,
             onProgress: (Long, Long) -> Unit,
         ): Response {
-            val fileBody = file.asRequestBody("application/octet-stream".toMediaType())
+            val mime = when (filename.substringAfterLast('.', "").lowercase()) {
+                "jpg", "jpeg" -> "image/jpeg"
+                "png" -> "image/png"
+                "webp" -> "image/webp"
+                "gif" -> "image/gif"
+                "mp4" -> "video/mp4"
+                "m4a" -> "audio/mp4"
+                "mp3" -> "audio/mpeg"
+                "pdf" -> "application/pdf"
+                else -> "application/octet-stream"
+            }
+            val fileBody = file.asRequestBody(mime.toMediaType())
             val multipart = okhttp3.MultipartBody.Builder()
                 .setType(okhttp3.MultipartBody.FORM)
                 .addFormDataPart("file", filename, fileBody)
@@ -287,9 +311,20 @@ class ApiMediaUploadClient(
             fileBytes: ByteArray,
             onProgress: (Long, Long) -> Unit,
         ): Response {
+            val mime = when (filename.substringAfterLast('.', "").lowercase()) {
+                "jpg", "jpeg" -> "image/jpeg"
+                "png" -> "image/png"
+                "webp" -> "image/webp"
+                "gif" -> "image/gif"
+                "mp4" -> "video/mp4"
+                "m4a" -> "audio/mp4"
+                "mp3" -> "audio/mpeg"
+                "pdf" -> "application/pdf"
+                else -> "application/octet-stream"
+            }
             val multipart = okhttp3.MultipartBody.Builder()
                 .setType(okhttp3.MultipartBody.FORM)
-                .addFormDataPart("file", filename, okhttp3.RequestBody.create(null, fileBytes))
+                .addFormDataPart("file", filename, okhttp3.RequestBody.create(mime.toMediaType(), fileBytes))
                 .build()
             val total = multipart.contentLength()
             val body = object : okhttp3.RequestBody() {
