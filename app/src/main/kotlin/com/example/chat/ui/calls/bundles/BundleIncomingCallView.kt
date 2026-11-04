@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -1123,7 +1124,6 @@ private fun NextcloudTalkIncomingCall(
                 puckDescription = "Accept call",
                 onDragUp = onAccept,
                 onDragDown = {},
-                tapBelowPx = 14f,
                 onTap = onAccept,
                 upA11yLabel = "Accept call",
                 downA11yLabel = null,
@@ -1250,7 +1250,7 @@ private fun DragOutOfCircleControl(
 
 /** Vertical two-target puck: drag up past the threshold = [onDragUp] (decline),
  *  down = [onDragDown] (answer); springs back otherwise. [onTap] fires when the
- *  gesture ends almost stationary (Nextcloud-style accept button). */
+ *  true tap recognizer completes without crossing touch slop (Nextcloud accept button). */
 @Composable
 private fun VerticalDragPuck(
     puckDescription: String,
@@ -1258,7 +1258,6 @@ private fun VerticalDragPuck(
     onDragDown: () -> Unit,
     modifier: Modifier = Modifier,
     thresholdDp: Float = 80f,
-    tapBelowPx: Float = 0f,
     onTap: (() -> Unit)? = null,
     upA11yLabel: String? = "Decline call",
     downA11yLabel: String? = "Answer call",
@@ -1284,7 +1283,12 @@ private fun VerticalDragPuck(
                     downA11yLabel?.let { CustomAccessibilityAction(it) { if (!settling) currentDown(); true } },
                 )
             }
-            .pointerInput(thresholdPx, tapBelowPx, reduceMotion) {
+            .then(if (onTap != null) Modifier.pointerInput(Unit) {
+                // A drag recognizer has already crossed touch slop. Its small residual
+                // displacement must never be reclassified as a tap on release.
+                detectTapGestures(onTap = { if (!settling) currentTap?.invoke() })
+            } else Modifier)
+            .pointerInput(thresholdPx, reduceMotion) {
                 detectDragGestures(
                     onDragStart = {
                         gestureAdmitted = !settling
@@ -1310,7 +1314,6 @@ private fun VerticalDragPuck(
                                 start >= thresholdPx -> 1
                                 else -> 0
                             }
-                            val tap = direction == 0 && currentTap != null && kotlin.math.abs(start) < tapBelowPx
                             coroutineScope.launch {
                                 try {
                                     val target = direction * thresholdPx * 1.4f
@@ -1323,7 +1326,6 @@ private fun VerticalDragPuck(
                                     when {
                                         direction < 0 -> currentUp()
                                         direction > 0 -> currentDown()
-                                        tap -> currentTap?.invoke()
                                     }
                                 } finally {
                                     // The parent may leave this control mounted after a callback.
