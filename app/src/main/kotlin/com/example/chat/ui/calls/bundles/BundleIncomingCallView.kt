@@ -1,6 +1,7 @@
 package com.example.chat.ui.calls.bundles
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -46,7 +47,7 @@ import kotlin.math.roundToInt
  * Universal Unified Bundle Incoming Call Screen.
  * Renders the incoming call screen specifically styled for each bundle.
  * Gesture-faithful answer mechanics per user-supplied references (2026-10-31):
- * Samsung = drag the action circle out of its halo; Google Latest = separate
+ * Samsung = tap the action circle; Google Latest = horizontal puck;
  * red decline / green answer buttons; Azure Ring & Mono Chevron = vertical two-target drag;
  * Nextcloud Talk = tap or swipe up to accept. Unsupported reference functions
  * (Bixby text call, AI Call Assistant, Screen call, Live Translation, Remind,
@@ -60,9 +61,17 @@ fun BundleIncomingCallView(
     onDecline: () -> Unit,
     onTogglePreviewMode: (() -> Unit)? = null,
     actionPending: Boolean = false,
+    banner: Boolean = false,
+    onExpand: () -> Unit = {},
+    onMinimize: (() -> Unit)? = null,
 ) {
     val tokens = remember(bundleId) { CallBundleRegistry.getTokens(bundleId) }
 
+    if (banner) {
+        SharedIncomingCallBanner(session, actionPending, onAccept, onDecline, onExpand)
+        return
+    }
+    Box(Modifier.fillMaxSize()) {
     when (bundleId) {
         CallBundleId.CHATY_DEFAULT -> ChatyDefaultIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.APPLE_IOS -> AppleIosIncomingCall(tokens, session, onAccept, onDecline)
@@ -74,6 +83,13 @@ fun BundleIncomingCallView(
         CallBundleId.MONO_CHEVRON_DARK -> MonoChevronDarkIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.NEXTCLOUD_TALK -> NextcloudTalkIncomingCall(tokens, session, onAccept, onDecline)
     }
+        if (onMinimize != null) {
+            TextButton(onClick = onMinimize, modifier = Modifier.align(Alignment.TopEnd).windowInsetsPadding(WindowInsets.safeDrawing)) {
+                Text("Show banner", color = tokens.primaryText)
+            }
+        }
+    }
+
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -197,7 +213,7 @@ private fun AppleIosIncomingCall(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
 ) {
-    var isLockedScreenSimulation by remember { mutableStateOf(false) }
+    val isLockedScreenSimulation = true // Approved slider interaction, no testing-mode switch in production.
 
     Box(
         modifier = Modifier
@@ -228,7 +244,7 @@ private fun AppleIosIncomingCall(
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = if (session.isVideo) "Chaty FaceTime Video…" else "Chaty Audio…",
+                    text = if (session.isVideo) "Chaty video call" else "Chaty Audio…",
                     fontSize = 17.sp,
                     color = Color(0xFF8E8E93),
                 )
@@ -236,18 +252,7 @@ private fun AppleIosIncomingCall(
                 Spacer(Modifier.height(24.dp))
                 CallTypeCenterIcon(session, tint = Color.White, modifier = Modifier.size(64.dp))
 
-                // Quick toggle pill to test both locked slider & unlocked 2-button layouts
-                Spacer(Modifier.height(16.dp))
-                FilterChip(
-                    selected = isLockedScreenSimulation,
-                    onClick = { isLockedScreenSimulation = !isLockedScreenSimulation },
-                    label = { Text(if (isLockedScreenSimulation) "Mode: Slide to Answer" else "Mode: Two-Button Accept") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        labelColor = Color.White.copy(alpha = 0.7f),
-                        selectedLabelColor = Color.White,
-                        containerColor = Color.White.copy(alpha = 0.08f),
-                    ),
-                )
+
             }
 
             // Bottom Section: iOS Style Controls
@@ -255,19 +260,6 @@ private fun AppleIosIncomingCall(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Secondary actions row: Remind Me & Message
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    IosSecondaryAction(icon = Icons.Rounded.Alarm, label = "Remind Me")
-                    IosSecondaryAction(icon = Icons.Rounded.ChatBubble, label = "Message")
-                }
-
-                Spacer(Modifier.height(12.dp))
-
                 if (isLockedScreenSimulation) {
                     // Slide to Answer Horizontal Slider
                     IosSlideToAnswerPill(
@@ -321,67 +313,61 @@ private fun IosSecondaryAction(icon: ImageVector, label: String) {
 }
 
 @Composable
-private fun IosSlideToAnswerPill(
-    accentColor: Color,
-    onConfirmed: () -> Unit,
-) {
-    val coroutineScope = rememberCoroutineScope()
-    val dragOffset = remember { Animatable(0f) }
-    val maxDragPx = with(LocalDensity.current) { 220.dp.toPx() }
+private fun IosSlideToAnswerPill(accentColor: Color, onConfirmed: () -> Unit) {
+    ReferenceHorizontalPuck(false, Color.White.copy(alpha = 0.16f), accentColor, Color(0xFFFF3B30),
+        onConfirmed, {}, Modifier.fillMaxWidth(), "Slide to answer")
+}
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp)
-            .clip(RoundedCornerShape(36.dp))
-            .background(Color.White.copy(alpha = 0.16f))
-            .padding(6.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Text(
-            text = "slide to answer  ››",
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center,
-            color = Color.White.copy(alpha = 0.65f),
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-        )
-
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(dragOffset.value.roundToInt(), 0) }
-                .size(60.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta ->
-                        coroutineScope.launch {
-                            val next = (dragOffset.value + delta).coerceIn(0f, maxDragPx)
-                            dragOffset.snapTo(next)
+/** Tracks the finger directly, clamps to measured width, and resets after cancellation/success. */
+@Composable
+private fun ReferenceHorizontalPuck(twoWay: Boolean, background: Color, accept: Color, decline: Color,
+    onAccept: () -> Unit, onDecline: () -> Unit, modifier: Modifier, description: String) {
+    val reduced = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val scope = rememberCoroutineScope()
+    val acceptNow by rememberUpdatedState(onAccept)
+    val declineNow by rememberUpdatedState(onDecline)
+    var offset by remember { mutableFloatStateOf(0f) }
+    var settling by remember { mutableStateOf(false) }
+    BoxWithConstraints(modifier.heightIn(min = 80.dp).clip(RoundedCornerShape(40.dp)).background(background)) {
+        val range = with(LocalDensity.current) { ((maxWidth - 76.dp).coerceAtLeast(24.dp) / (if (twoWay) 2 else 1)).toPx() }
+        val home = if (twoWay) Alignment.Center else Alignment.CenterStart
+        if (twoWay) {
+            Row(Modifier.fillMaxWidth().align(Alignment.Center).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Decline", color = decline, fontSize = 14.sp)
+                Text("Answer", color = accept, fontSize = 14.sp)
+            }
+        } else Text("slide to answer", color = Color.White, modifier = Modifier.align(Alignment.Center).padding(start = 36.dp), fontSize = 16.sp)
+        Box(Modifier.align(home).padding(horizontal = 6.dp).offset { IntOffset(offset.roundToInt(), 0) }
+            .size(64.dp).clip(CircleShape).background(Color.White)
+            .semantics {
+                contentDescription = description
+                customActions = buildList {
+                    add(CustomAccessibilityAction("Answer call") { acceptNow(); true })
+                    if (twoWay) add(CustomAccessibilityAction("Decline call") { declineNow(); true })
+                }
+            }.testTag(if (twoWay) "google_puck" else "ios_answer_puck")
+            .pointerInput(range, reduced) {
+                detectDragGestures(
+                    onDragStart = { if (!settling) offset = 0f },
+                    onDrag = { change, drag -> if (!settling) { change.consume(); offset = (offset + drag.x).coerceIn(if (twoWay) -range else 0f, range) } },
+                    onDragCancel = { if (!settling) { settling = true; scope.launch {
+                        val start = offset
+                        androidx.compose.animation.core.animate(start, 0f, animationSpec = tween(if (reduced) 0 else 200)) { value, _ -> offset = value }
+                        settling = false
+                    } } },
+                    onDragEnd = { if (!settling) {
+                        settling = true
+                        val direction = when { offset >= range * 0.7f -> 1; twoWay && offset <= -range * 0.7f -> -1; else -> 0 }
+                        scope.launch {
+                            val start = offset
+                            androidx.compose.animation.core.animate(start, direction * range, animationSpec = tween(if (reduced) 0 else 180)) { value, _ -> offset = value }
+                            offset = 0f; settling = false
+                            if (direction == 1) acceptNow() else if (direction == -1) declineNow()
                         }
-                    },
-                    onDragStopped = {
-                        if (dragOffset.value > maxDragPx * 0.75f) {
-                            coroutineScope.launch {
-                                dragOffset.animateTo(maxDragPx)
-                                onConfirmed()
-                            }
-                        } else {
-                            coroutineScope.launch {
-                                dragOffset.animateTo(0f, tween(200))
-                            }
-                        }
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Call,
-                contentDescription = "Slide to answer",
-                tint = accentColor,
-                modifier = Modifier.size(30.dp),
-            )
+                    } },
+                )
+            }, contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.Call, null, tint = if (offset < 0f) decline else accept, modifier = Modifier.size(30.dp))
         }
     }
 }
@@ -456,7 +442,7 @@ private fun SamsungOneUiIncomingCall(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DragOutOfCircleControl(
+                TapHaloControl(
                     label = "Answer call",
                     icon = Icons.Rounded.Call,
                     iconTint = tokens.acceptColor,
@@ -464,7 +450,7 @@ private fun SamsungOneUiIncomingCall(
                     onTrigger = onAccept,
                     modifier = Modifier.testTag("samsung_answer_control"),
                 )
-                DragOutOfCircleControl(
+                TapHaloControl(
                     label = "Decline call",
                     icon = Icons.Rounded.CallEnd,
                     iconTint = tokens.declineColor,
@@ -536,124 +522,20 @@ private fun GoogleLatestIncomingCall(
                 }
             }
 
-            Row(
-                Modifier.fillMaxWidth().padding(bottom = 36.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                Button(
-                    onClick = { if (!actionPending) onDecline() },
-                    enabled = !actionPending,
-                    colors = ButtonDefaults.buttonColors(containerColor = tokens.declineColor, contentColor = Color.White),
-                    modifier = Modifier.weight(1f).heightIn(min = 64.dp).testTag("google_latest_decline"),
-                    shape = RoundedCornerShape(32.dp),
-                ) {
-                    Icon(Icons.Rounded.CallEnd, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Decline")
-                }
-                Button(
-                    onClick = { if (!actionPending) onAccept() },
-                    enabled = !actionPending,
-                    colors = ButtonDefaults.buttonColors(containerColor = tokens.acceptColor, contentColor = Color.White),
-                    modifier = Modifier.weight(1f).heightIn(min = 64.dp).testTag("google_latest_answer"),
-                    shape = RoundedCornerShape(32.dp),
-                ) {
-                    Icon(Icons.Rounded.Call, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Answer")
-                }
-            }
+            DeclineAnswerPuckBar(tokens,
+                onAccept = { if (!actionPending) onAccept() },
+                onDecline = { if (!actionPending) onDecline() },
+                modifier = Modifier.padding(bottom = 36.dp).testTag("google_latest_puck_bar"))
+
         }
     }
 }
 
 /** Material You bottom bar: Decline | draggable white puck | Answer. */
 @Composable
-private fun DeclineAnswerPuckBar(
-    tokens: CallBundleThemeTokens,
-    onAccept: () -> Unit,
-    onDecline: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val coroutineScope = rememberCoroutineScope()
-    val drag = remember { Animatable(0f) }
-    val maxDragPx = with(LocalDensity.current) { 120.dp.toPx() }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(80.dp)
-            .clip(RoundedCornerShape(40.dp))
-            .background(tokens.cardBackground),
-    ) {
-        Text(
-            text = "Decline",
-            color = tokens.declineColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 28.dp),
-        )
-        Text(
-            text = "Answer",
-            color = tokens.acceptColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 28.dp),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset { IntOffset(drag.value.roundToInt(), 0) }
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .semantics {
-                    contentDescription = "Answer or decline puck"
-                    customActions = listOf(
-                        CustomAccessibilityAction("Answer call") { onAccept(); true },
-                        CustomAccessibilityAction("Decline call") { onDecline(); true },
-                    )
-                }
-                .testTag("google_puck")
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta ->
-                        coroutineScope.launch {
-                            drag.snapTo((drag.value + delta).coerceIn(-maxDragPx, maxDragPx))
-                        }
-                    },
-                    onDragStopped = {
-                        when {
-                            drag.value <= -maxDragPx * 0.7f -> {
-                                coroutineScope.launch {
-                                    drag.animateTo(-maxDragPx)
-                                    onDecline()
-                                }
-                            }
-                            drag.value >= maxDragPx * 0.7f -> {
-                                coroutineScope.launch {
-                                    drag.animateTo(maxDragPx)
-                                    onAccept()
-                                }
-                            }
-                            else -> coroutineScope.launch { drag.animateTo(0f, tween(200)) }
-                        }
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Call,
-                contentDescription = null,
-                tint = tokens.acceptColor,
-                modifier = Modifier.size(30.dp),
-            )
-        }
-    }
+private fun DeclineAnswerPuckBar(tokens: CallBundleThemeTokens, onAccept: () -> Unit, onDecline: () -> Unit, modifier: Modifier = Modifier) {
+    ReferenceHorizontalPuck(true, tokens.cardBackground, tokens.acceptColor, tokens.declineColor,
+        onAccept, onDecline, modifier.fillMaxWidth(), "Answer or decline puck")
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -721,23 +603,16 @@ private fun GoogleClassicIncomingCall(
                     fontSize = 13.sp,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
-                    BundleActionButton(
-                        icon = Icons.Rounded.CallEnd,
-                        label = "Reject",
-                        color = tokens.declineColor,
-                        onClick = onDecline,
-                    )
-                    BundleActionButton(
-                        icon = Icons.Rounded.Call,
-                        label = "Answer",
-                        color = tokens.acceptColor,
-                        onClick = onAccept,
-                    )
-                }
+                VerticalDragPuck(
+                    puckDescription = "Google classic swipe up to answer",
+                    onDragUp = onAccept, onDragDown = {},
+                    modifier = Modifier.testTag("google_classic_answer_puck"),
+                ) { Box(Modifier.size(72.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Call, null, tint = tokens.acceptColor, modifier = Modifier.size(32.dp))
+                } }
+                Spacer(Modifier.height(16.dp))
+                TextButton(onClick = onDecline) { Text("Decline", color = tokens.declineColor) }
+
             }
         }
     }
@@ -891,6 +766,14 @@ private fun AzureRingVerticalIncomingCall(
                 modifier = Modifier.size(30.dp),
             )
             VerticalDottedTrack(tokens.secondaryText)
+            val reducedRingMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+            val pulseAlpha = if (reducedRingMotion) 0.18f else {
+                val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "ringing-hint")
+                val alpha by transition.animateFloat(initialValue = 0.10f, targetValue = 0.22f,
+                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                        androidx.compose.animation.core.tween(1800), androidx.compose.animation.core.RepeatMode.Reverse), label = "ringing-opacity")
+                alpha
+            }
             VerticalDragPuck(
                 puckDescription = "Azure ring answer or decline puck",
                 onDragUp = onDecline,
@@ -902,7 +785,7 @@ private fun AzureRingVerticalIncomingCall(
                         Modifier
                             .size(96.dp)
                             .clip(CircleShape)
-                            .background(tokens.primaryAccent.copy(alpha = 0.16f)),
+                            .background(tokens.primaryAccent.copy(alpha = pulseAlpha)),
                     )
                     Box(
                         Modifier
@@ -1390,4 +1273,43 @@ private fun CallTypeCenterIcon(session: ChatyCallSession, tint: Color, modifier:
         tint = tint,
         modifier = modifier.testTag("incoming_call_type_badge"),
     )
+}
+
+/** Reference-approved Samsung tap controls. Uses the same incoming action gate as every other bundle. */
+@Composable
+private fun TapHaloControl(label: String, icon: ImageVector, iconTint: Color, haloColor: Color,
+    onTrigger: () -> Unit, modifier: Modifier = Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier.size(100.dp).clip(CircleShape).background(haloColor)
+            .clickable(onClickLabel = label, onClick = onTrigger), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(72.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = iconTint, modifier = Modifier.size(32.dp))
+            }
+        }
+        Text(label, color = Color.White, fontSize = 12.sp)
+    }
+}
+
+/** Shared in-app heads-up presentation. No fake screening/AI actions; OS notification layout stays system-owned. */
+@Composable
+fun SharedIncomingCallBanner(session: ChatyCallSession, pending: Boolean,
+    onAccept: () -> Unit, onDecline: () -> Unit, onExpand: () -> Unit) {
+    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing), contentAlignment = Alignment.TopCenter) {
+        Surface(Modifier.fillMaxWidth().padding(12.dp), shape = RoundedCornerShape(28.dp), color = Color(0xFF26272B), tonalElevation = 6.dp) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.fillMaxWidth().clickable(onClickLabel = "Open incoming call", onClick = onExpand)) {
+                    Text(session.remoteDisplayName, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(if (session.isVideo) "Incoming video call · Chaty" else "Incoming call · Chaty", color = Color(0xFFD7D7DB), fontSize = 13.sp)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onDecline, enabled = !pending, modifier = Modifier.weight(1f).heightIn(min = 52.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEB6B63), contentColor = Color.Black)) {
+                        Icon(Icons.Rounded.CallEnd, null); Spacer(Modifier.width(6.dp)); Text("Decline")
+                    }
+                    Button(onAccept, enabled = !pending, modifier = Modifier.weight(1f).heightIn(min = 52.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF70C99A), contentColor = Color.Black)) {
+                        Icon(Icons.Rounded.Call, null); Spacer(Modifier.width(6.dp)); Text("Answer")
+                    }
+                }
+            }
+        }
+    }
 }
