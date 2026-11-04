@@ -183,6 +183,7 @@ jobs:
         run: |
           git checkout HEAD -- \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentGallerySheet.kt \
+            app/src/androidTest/java/com/example/chat/AttachmentInitialOpenProofTest.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentGalleryViewport.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentSheet.kt \
             app/src/main/java/com/example/chat/data/transfer/ChatyDirectProtocol.kt \
