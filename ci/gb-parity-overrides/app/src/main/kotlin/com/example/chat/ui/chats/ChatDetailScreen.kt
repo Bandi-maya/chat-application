@@ -225,6 +225,8 @@ fun ChatDetailScreen(
     onOpenAppearance: (() -> Unit)? = null,
     onToggleMute: (() -> Unit)? = null,
     onBlockContact: (() -> Unit)? = null,
+    onReportMessage: (ChatMessage) -> Unit = {},
+    onBlockMessageSender: (String) -> Unit = {},
     hideDateAndName: Boolean = false,
     showDeletedContent: Boolean = false,
     retainViewOnce: Boolean = false,
@@ -639,13 +641,8 @@ fun ChatDetailScreen(
                     )
                 }
             }
-            MessageActionType.report -> {
-                scope.launch {
-                    snackbarHostState.showSnackbar(
-                        "Use Contact info → Block to stop unwanted messages.",
-                    )
-                }
-            }
+            MessageActionType.report -> if (message.senderId != currentUserId) onReportMessage(message)
+            MessageActionType.blockUser -> if (message.senderId != currentUserId) onBlockMessageSender(message.senderId)
             else -> Unit
         }
     }
@@ -1782,7 +1779,7 @@ private fun AnchoredMessageContextMenu(
             message = menuMessage, isMe = menuMessage.senderId == currentUserId,
         )
         val order = listOf(MessageActionType.reply, MessageActionType.forward, MessageActionType.copy,
-            MessageActionType.edit, MessageActionType.deleteForMe, MessageActionType.info)
+            MessageActionType.edit, MessageActionType.deleteForMe, MessageActionType.info, MessageActionType.report, MessageActionType.blockUser)
         val primary = order.mapNotNull { type -> available.firstOrNull { it.type == type } }
         val secondary = available.filter { it.type !in order }
         val actions = if (extraActions) secondary else primary
