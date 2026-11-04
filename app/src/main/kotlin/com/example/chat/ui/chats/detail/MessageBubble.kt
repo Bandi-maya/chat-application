@@ -1432,8 +1432,8 @@ private fun P2pFileInviteCard(
     transferState: P2pFileTransferService.TransferState? = null,
 ) {
     val transferLabel = when (transferState?.status) {
-        "Sending" -> "Sending · ${(transferState.progress * 100).toInt()}%"
-        "Receiving" -> "Receiving · ${(transferState.progress * 100).toInt()}%"
+        "Sending" -> "Sending · ${(transferState.progress * 100).toInt().coerceAtMost(99)}%"
+        "Receiving" -> "Receiving · ${(transferState.progress * 100).toInt().coerceAtMost(99)}%"
         "Waiting for recipient" -> "Waiting for recipient"
         "Secure channel connected", "Secure channel ready" -> "Secure connection · ready"
         "Connecting", "Waiting for secure data channel" -> "Connecting securely"
@@ -1443,10 +1443,12 @@ private fun P2pFileInviteCard(
         "Peer paused" -> "Recipient paused"
         "Connection could not recover" -> "Connection lost · retry available"
         "Received and verified" -> "Received · ready to play"
-        "Sent" -> "Sent securely"
-        "Failed" -> "Transfer failed · see connection details"
+        "Sent" -> "Sent securely · verified"
+        "Channel closed" -> "Direct connection closed · tap to retry"
+        "Waiting for recipient — resuming", "Paused — source ready to resume" -> "Waiting · tap to resume"
+        "Failed" -> "Transfer failed · tap to retry/cancel"
         "Cancelled" -> "Transfer cancelled"
-        else -> if (isMe) "Waiting for recipient" else "Tap to receive video"
+        else -> if (isMe) "Waiting for recipient" else "Tap to receive original"
     }
     if (attachment.type == "video") {
         // Keep the invitation looking like a native video message, not a pasted URL.
