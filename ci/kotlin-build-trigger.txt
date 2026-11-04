@@ -1,1 +1,1 @@
-Isolated Direct Phase1 original-only verification, base4583f81b, source212f5fae. No strict-fix-run changes. Nine writer files, explicit branch restore ownership, protocol JVM tests + ChatyDirectPhaseOneProofTest only. No two-device/NAT/security audit claim, no relay/upload fallback, no Phase2.
+Direct Phase1 narrow compile fix: add missing material rounded.Send import only, preserve original batch and own Direct proof. FullJVM+Direct instrumentation, no kotlin/main merge.
