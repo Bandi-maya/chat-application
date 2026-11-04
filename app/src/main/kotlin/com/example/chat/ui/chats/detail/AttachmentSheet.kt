@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PinDrop
 import androidx.compose.material.icons.rounded.Poll
 import androidx.compose.material.icons.rounded.Science
+import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
