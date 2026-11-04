@@ -24,24 +24,8 @@ import org.junit.runner.RunWith
 /** No server/network side effects. Two-device NAT/transport acceptance remains separate. */
 @RunWith(AndroidJUnit4::class)
 class ChatyDirectPhaseOneProofTest {
-    @Test fun directOriginalOptionSelectsItsOwnActionWithoutChangingUploads() {
-        val selected = AtomicReference<AttachmentAction?>()
-        val inst = InstrumentationRegistry.getInstrumentation()
-        val dev = UiDevice.getInstance(inst)
-        ActivityScenario.launch(ChatFixtureActivity::class.java).use { scenario ->
-            scenario.onActivity { activity -> activity.setContent {
-                ChatyTheme(ThemePresets.monochromeDark) {
-                    AttachmentSheetContent(ThemePresets.monochromeDark) { selected.set(it) }
-                }
-            } }
-            assertTrue(dev.wait(Until.hasObject(By.text("Chaty Direct")),8000))
-            assertTrue("Legacy Large file must remain",dev.hasObject(By.text("Large file")))
-            val shots=File(inst.targetContext.getExternalFilesDir(null),"screenshots").apply { mkdirs() }
-            dev.takeScreenshot(File(shots,"chaty-direct-original-option.png"))
-            dev.findObject(By.text("Chaty Direct")).click()
-            assertEquals(AttachmentAction.chatyDirect,selected.get())
-        }
-    }
+    // The UI acceptance proof is AttachmentInitialOpenProofTest: actual production
+    // gallery sheet, partial anchor, existing dock, fonts1x/2x, not legacy action grid.
     @Test fun realAndroidLedgerReopensOnlyVerifiedOriginalChunks() {
         val root=File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,"direct-proof-${System.nanoTime()}").apply{mkdirs()}
         val source=File(root,"original.mp4").apply{writeBytes(ByteArray(130123){(it*29).toByte()})}
