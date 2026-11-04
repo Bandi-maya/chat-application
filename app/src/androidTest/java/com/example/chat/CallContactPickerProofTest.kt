@@ -57,7 +57,7 @@ class CallContactPickerProofTest {
             contact("c02", "Rohan Iyer"),
             contact("c03", "Meera Nair"),
         )
-        val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+        val scenario = ActivityScenario.launch(MediaFixtureActivity::class.java)
         scenario.onActivity { activity ->
             activity.setContent {
                 ChatyTheme(ThemePresets.whatsappIosLight) {
@@ -105,7 +105,12 @@ class CallContactPickerProofTest {
     )
 
     private fun swipeFrom(desc: String, dx: Int, dy: Int) {
-        val obj = dev.findObject(By.desc(desc)) ?: throw AssertionError("control '$desc' not found")
+        val obj = dev.wait(Until.findObject(By.desc(desc)), 8000) ?: run {
+            shot("call-control-missing")
+            val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+            dev.dumpWindowHierarchy(File(dir, "call-control-missing.xml"))
+            throw AssertionError("control '$desc' not found after mounted-target wait")
+        }
         // Gesture must start on the actual target, not the unrelated display center.
         val bounds = obj.visibleBounds
         val x = bounds.centerX()
@@ -130,7 +135,7 @@ class CallContactPickerProofTest {
     ) {
         val accepted = java.util.concurrent.atomic.AtomicBoolean(false)
         val declined = java.util.concurrent.atomic.AtomicBoolean(false)
-        val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+        val scenario = ActivityScenario.launch(MediaFixtureActivity::class.java)
         try {
             scenario.onActivity { activity ->
                 activity.setContent {
@@ -187,13 +192,12 @@ class CallContactPickerProofTest {
         }
     }
 
-    /** Same mounted control: successful answer, successful decline, then a small
-     * wiggle must not inherit either previous drag's exit offset. */
+    /** Real Samsung tap targets expose accessibility descriptions and callbacks. */
     @Test
     fun samsungReferenceTapButtonsFireRealCallbacks() {
         val accepted = java.util.concurrent.atomic.AtomicInteger()
         val declined = java.util.concurrent.atomic.AtomicInteger()
-        ActivityScenario.launch(ChatFixtureActivity::class.java).use { scenario ->
+        ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
             scenario.onActivity { activity -> activity.setContent {
                 ChatyTheme(ThemePresets.monochromeDark) {
                     BundleIncomingCallView(CallBundleId.SAMSUNG_ONE_UI, incomingSession("Synthetic caller"),
@@ -218,7 +222,7 @@ class CallContactPickerProofTest {
     @Test fun sharedIncomingBannerUsesSameCallbacks() {
         val accepted = java.util.concurrent.atomic.AtomicInteger()
         val declined = java.util.concurrent.atomic.AtomicInteger()
-        ActivityScenario.launch(ChatFixtureActivity::class.java).use { scenario ->
+        ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
             scenario.onActivity { activity -> activity.setContent {
                 ChatyTheme(ThemePresets.monochromeDark) {
                     BundleIncomingCallView(CallBundleId.APPLE_IOS, incomingSession("Synthetic caller"),
@@ -263,11 +267,11 @@ class CallContactPickerProofTest {
     }
 
     @Test
-    fun googleLatestSeparateActionsHaveCorrectSideAndSingleFire() {
+    fun googleLatestHorizontalPuckHasCorrectSideAndSingleFire() {
         for (answer in listOf(true, false)) {
             val accepted = java.util.concurrent.atomic.AtomicInteger(0)
             val declined = java.util.concurrent.atomic.AtomicInteger(0)
-            val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+            val scenario = ActivityScenario.launch(MediaFixtureActivity::class.java)
             try {
                 scenario.onActivity { activity ->
                     activity.setContent {
@@ -286,11 +290,14 @@ class CallContactPickerProofTest {
                 assertNotNull(accept)
                 assertNotNull(decline)
                 assertTrue("Decline stays left of Answer", decline.visibleBounds.centerX() < accept.visibleBounds.centerX())
-                shot("google-latest-separate-actions")
-                val target = if (answer) accept else decline
-                val bounds = target.visibleBounds
-                repeat(2) { dev.click(bounds.centerX(), bounds.centerY()) }
-                dev.waitForIdle(2000)
+                assertTrue("Horizontal puck is present", dev.wait(Until.hasObject(By.desc("Answer or decline puck")), 8000))
+                shot("google-latest-horizontal-puck-single-fire")
+                // Labels establish side layout but are not tap actions. Drive real puck.
+                repeat(2) {
+                    swipeFrom("Answer or decline puck", if (answer) 430 else -430, 0)
+                    dev.waitForIdle(2000)
+                    Thread.sleep(600) // settle/reset completes; pending still blocks repeat
+                }
                 assertEquals(if (answer) 1 else 0, accepted.get())
                 assertEquals(if (answer) 0 else 1, declined.get())
             } finally { scenario.close() }
@@ -342,7 +349,7 @@ class CallContactPickerProofTest {
 
             // Route exactly like GlobalCallHost: fromId(prefs) -> BundleIncomingCallView.
             val accepted = java.util.concurrent.atomic.AtomicBoolean(false)
-            val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+            val scenario = ActivityScenario.launch(MediaFixtureActivity::class.java)
             try {
                 scenario.onActivity { activity ->
                     activity.setContent {
@@ -360,7 +367,9 @@ class CallContactPickerProofTest {
                     "persisted id must route to the Mono Chevron incoming view",
                     dev.wait(Until.hasObject(By.desc("Mono chevron answer or decline puck")), 8000),
                 )
+                assertEquals("Isolated fixture remains resumed", androidx.lifecycle.Lifecycle.State.RESUMED, scenario.state)
                 shot("bundle-applied-mono-chevron")
+                assertTrue("Mounted Mono view remains after capture", dev.wait(Until.hasObject(By.desc("Mono chevron answer or decline puck")), 8000))
                 swipeFrom("Mono chevron answer or decline puck", 0, 430)
                 dev.waitForIdle(3000)
                 Thread.sleep(1200)
