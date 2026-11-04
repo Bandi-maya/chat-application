@@ -33,7 +33,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.chat"
+        applicationId = "com.logybyte.chaty"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -47,7 +47,7 @@ android {
         // -PCHATY_PLAY_STORE_URL=... or the CHATY_PLAY_STORE_URL environment variable at build time.
         val playStoreUrl = providers.gradleProperty("CHATY_PLAY_STORE_URL")
             .orElse(providers.environmentVariable("CHATY_PLAY_STORE_URL"))
-            .orElse("https://play.google.com/store/apps/details?id=com.example.chat")
+            .orElse("https://play.google.com/store/apps/details?id=com.logybyte.chaty")
             .get()
         buildConfigField("String", "CHATY_PLAY_STORE_URL", "\"" + playStoreUrl.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
     }
