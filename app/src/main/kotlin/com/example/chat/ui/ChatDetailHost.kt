@@ -88,6 +88,15 @@ fun ChatDetailHost(
     /** Dart quick-contact tap: Navigator.pushReplacement(ChatDetailScreen(next.id)). */
     onOpenConversation: (Conversation) -> Unit = {},
 ) {
+    val vaultProtection = ServiceLocator.hiddenVaultController
+    var vaultPrivacyRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(vaultProtection) {
+        val listener: () -> Unit = { vaultPrivacyRevision++ }
+        vaultProtection.addListener(listener)
+        onDispose { vaultProtection.removeListener(listener) }
+    }
+    @Suppress("UNUSED_EXPRESSION") vaultPrivacyRevision
+    com.example.chat.ui.kit.ProtectSensitiveWindow(vaultProtection.isConversationLocked(conversation.id))
     val api = ServiceLocator.apiBackend
     val p2pTransfers = ServiceLocator.p2pFileTransfers
     val liveNetworkStatus by ServiceLocator.networkMonitor.state.collectAsState()
