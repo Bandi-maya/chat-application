@@ -1,2 +1,2 @@
-combined-call-stages6-11-signal-compiler-correction 2026-11-04
-fix-sha256 6e895fc25a5e69b02271389c4c6e255424ccbf506c5fb39d453ce047db801666
+combined-call6-11-with-A-B-map-only-F-UI 2026-11-04
+UI-delta-sha256 3450ab4cec5bc20e812660b7cfd132958a62f9695f89123a2745909654af45d8
