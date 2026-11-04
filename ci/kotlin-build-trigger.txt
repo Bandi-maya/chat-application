@@ -1,3 +1,2 @@
-combined-call-stages6-11-direct-preserved 2026-11-04
-stages6-10-sha256 cff6bf2cb8eb793f2796f858d8d5cc35e2097dbb85ebc99f3c229b20fa63b215
-stage11-test-sha256 f9972429525dd682582252d9c3371d297bcf7d87ab2c735d1be31aa165311f9f
+combined-call-stages6-11-signal-compiler-correction 2026-11-04
+fix-sha256 6e895fc25a5e69b02271389c4c6e255424ccbf506c5fb39d453ce047db801666
