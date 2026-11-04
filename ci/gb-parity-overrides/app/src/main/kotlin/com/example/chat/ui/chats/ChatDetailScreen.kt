@@ -68,6 +68,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -1000,21 +1001,20 @@ fun ChatDetailScreen(
                     Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = 14.dp, bottom = 12.dp)
-                        .size(44.dp)
+                        .size(48.dp).testTag("chat-scroll-to-latest")
                         .scale(fabScale)
                         .alpha(fabAlpha)
                         .background(Color(theme.cardColor), CircleShape)
                         .border(1.dp, Color(theme.surfaceColor), CircleShape)
-                        .pointerInput(fabVisible) {
-                            detectTapGestures(
-                                onTap = {
-                                    if (fabVisible) {
-                                        scrollToBottom()
-                                        pendingBelowCount = 0
-                                    }
-                                },
-                            )
-                        },
+                        .clickable(
+                            enabled = fabVisible,
+                            role = androidx.compose.ui.semantics.Role.Button,
+                            onClickLabel = "Scroll to latest messages",
+                        ) {
+                            scrollToBottom()
+                            pendingBelowCount = 0
+                        }
+                        .then(if (!fabVisible) Modifier.clearAndSetSemantics { } else Modifier),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -1554,7 +1554,8 @@ private fun ConversationHeader(
             Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(12.dp))
-                .pointerInput(conversation.id) { detectTapGestures(onTap = { onOpenInfo() }) },
+                .heightIn(min = 48.dp)
+                .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = "Open conversation info", onClick = onOpenInfo),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showHeaderAvatar) {
