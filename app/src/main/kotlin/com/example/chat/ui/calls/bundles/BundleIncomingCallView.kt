@@ -143,12 +143,7 @@ private fun ChatyDefaultIncomingCall(
                             .background(tokens.primaryAccent),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "C" },
-                            fontSize = 44.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        )
+                        CallTypeCenterIcon(session, tint = Color.White, modifier = Modifier.size(44.dp))
                     }
                 }
                 Spacer(Modifier.height(20.dp))
@@ -236,6 +231,9 @@ private fun AppleIosIncomingCall(
                     fontSize = 17.sp,
                     color = Color(0xFF8E8E93),
                 )
+
+                Spacer(Modifier.height(24.dp))
+                CallTypeCenterIcon(session, tint = Color.White, modifier = Modifier.size(64.dp))
 
                 // Quick toggle pill to test both locked slider & unlocked 2-button layouts
                 Spacer(Modifier.height(16.dp))
@@ -428,12 +426,7 @@ private fun SamsungOneUiIncomingCall(
                     .background(tokens.cardBackground),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "S" },
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                )
+                CallTypeCenterIcon(session, tint = Color.White, modifier = Modifier.size(36.dp))
             }
             Spacer(Modifier.height(16.dp))
             Text(
@@ -538,12 +531,7 @@ private fun GoogleLatestIncomingCall(
                         .background(tokens.cardBackground),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "G" },
-                        fontSize = 64.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = tokens.primaryText,
-                    )
+                    CallTypeCenterIcon(session, tint = tokens.primaryText, modifier = Modifier.size(64.dp))
                 }
             }
 
@@ -702,12 +690,7 @@ private fun GoogleClassicIncomingCall(
                         .background(Color.White),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "C" },
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF00695C),
-                    )
+                    CallTypeCenterIcon(session, tint = Color(0xFF00695C), modifier = Modifier.size(34.dp))
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -809,12 +792,7 @@ private fun VivoIqooIncomingCall(
                         .background(tokens.primaryAccent.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "V" },
-                        fontSize = 38.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = tokens.primaryAccent,
-                    )
+                    CallTypeCenterIcon(session, tint = tokens.primaryAccent, modifier = Modifier.size(38.dp))
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -936,7 +914,10 @@ private fun AzureRingVerticalIncomingCall(
                             .size(54.dp)
                             .clip(CircleShape)
                             .background(Color.White),
-                    )
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CallTypeCenterIcon(session, tint = tokens.primaryAccent, modifier = Modifier.size(28.dp))
+                    }
                 }
             }
             VerticalDottedTrack(tokens.secondaryText)
@@ -1029,12 +1010,7 @@ private fun MonoChevronDarkIncomingCall(
                         .background(Color.White),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Call,
-                        contentDescription = null,
-                        tint = Color(0xFF111114),
-                        modifier = Modifier.size(36.dp),
-                    )
+                    CallTypeCenterIcon(session, tint = Color(0xFF111114), modifier = Modifier.size(36.dp))
                 }
             }
             ChevronPair(up = false, color = tokens.acceptColor)
@@ -1095,12 +1071,7 @@ private fun NextcloudTalkIncomingCall(
                     .background(Color(0xFFD8DEE3)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "N" },
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = tokens.primaryAccent,
-                )
+                CallTypeCenterIcon(session, tint = tokens.primaryAccent, modifier = Modifier.size(26.dp))
             }
             Spacer(Modifier.height(10.dp))
             Text(
@@ -1376,4 +1347,16 @@ fun BundleActionButton(
             color = Color.White,
         )
     }
+}
+
+
+/** Centre call-type badge, distinct from Answer/Decline actions and caller name. */
+@Composable
+private fun CallTypeCenterIcon(session: ChatyCallSession, tint: Color, modifier: Modifier = Modifier) {
+    Icon(
+        imageVector = if (session.isVideo) Icons.Rounded.Videocam else Icons.Rounded.Call,
+        contentDescription = if (session.isVideo) "Video call" else "Voice call",
+        tint = tint,
+        modifier = modifier.testTag("incoming_call_type_badge"),
+    )
 }
