@@ -1,2 +1,2 @@
-combined-reviewed-jvm-incoming-r3colors-translation 2026-11-04
-archive-sha256 6fc304babdc39230e6b28a96c2a502405052285a2d8d2f6bc64fc9e363747843
+reviewed-frontend-followup-56files-role-import 2026-11-04
+sha256 f89f21b15f97f2277e3e765368bad50bf53bb6d57a499754e4db9f4f8903155c
