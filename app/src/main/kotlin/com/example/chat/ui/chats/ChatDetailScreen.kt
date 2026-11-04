@@ -1355,32 +1355,33 @@ fun ChatDetailScreen(
                     },
                 )
             } else {
-                com.example.chat.ui.chats.detail.AttachmentGallerySheet(
-                    theme = theme,
-                    // User directive: the clip/attachment panel opens taller and expands
-                    // to full height when pulled up.
-                    heightFraction = if (attachmentSheetState.targetValue == androidx.compose.material3.SheetValue.Expanded) 1.0f else 0.72f,
-                    onAction = { action ->
-                        attachmentSheetOpen = false
-                        onAttachmentAction(action)
-                    },
-                    onCamera = {
-                        attachmentSheetOpen = false
-                        onCameraTap()
-                    },
-                    onReviewImages = attachmentReviewImages?.let { review ->
-                        { uris ->
+                com.example.chat.ui.chats.detail.AttachmentGalleryViewport(attachmentSheetState) {
+                    com.example.chat.ui.chats.detail.AttachmentGallerySheet(
+                        theme = theme,
+                        // The wrapper follows the actual visible viewport, not targetValue.
+                        heightFraction = 1.0f,
+                        onAction = { action ->
                             attachmentSheetOpen = false
-                            review(uris)
-                        }
-                    },
-                    onDirectSendImages = attachmentDirectSendImages?.let { send ->
-                        { uris ->
+                            onAttachmentAction(action)
+                        },
+                        onCamera = {
                             attachmentSheetOpen = false
-                            send(uris)
-                        }
-                    },
-                )
+                            onCameraTap()
+                        },
+                        onReviewImages = attachmentReviewImages?.let { review ->
+                            { uris ->
+                                attachmentSheetOpen = false
+                                review(uris)
+                            }
+                        },
+                        onDirectSendImages = attachmentDirectSendImages?.let { send ->
+                            { uris ->
+                                attachmentSheetOpen = false
+                                send(uris)
+                            }
+                        },
+                    )
+                }
             }
         }
     }
