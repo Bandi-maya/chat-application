@@ -1265,44 +1265,73 @@ private fun VerticalDragPuck(
     puckContent: @Composable () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val dy = remember { Animatable(0f) }
+    var dy by remember { mutableStateOf(0f) }
+    var settling by remember { mutableStateOf(false) }
+    var gestureAdmitted by remember { mutableStateOf(false) }
+    val currentUp by androidx.compose.runtime.rememberUpdatedState(onDragUp)
+    val currentDown by androidx.compose.runtime.rememberUpdatedState(onDragDown)
+    val currentTap by androidx.compose.runtime.rememberUpdatedState(onTap)
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val thresholdPx = with(LocalDensity.current) { thresholdDp.dp.toPx() }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .offset { IntOffset(0, dy.value.roundToInt()) }
+            .offset { IntOffset(0, dy.roundToInt()) }
             .semantics {
                 contentDescription = puckDescription
                 customActions = listOfNotNull(
-                    upA11yLabel?.let { CustomAccessibilityAction(it) { onDragUp(); true } },
-                    downA11yLabel?.let { CustomAccessibilityAction(it) { onDragDown(); true } },
+                    upA11yLabel?.let { CustomAccessibilityAction(it) { if (!settling) currentUp(); true } },
+                    downA11yLabel?.let { CustomAccessibilityAction(it) { if (!settling) currentDown(); true } },
                 )
             }
-            .pointerInput(Unit) {
+            .pointerInput(thresholdPx, tapBelowPx, reduceMotion) {
                 detectDragGestures(
+                    onDragStart = {
+                        gestureAdmitted = !settling
+                        if (gestureAdmitted) dy = 0f
+                    },
                     onDrag = { change, dragAmount ->
-                        change.consume()
-                        coroutineScope.launch {
-                            dy.snapTo(
-                                (dy.value + dragAmount.y)
-                                    .coerceIn(-thresholdPx * 1.4f, thresholdPx * 1.4f),
-                            )
+                        if (gestureAdmitted && !settling) {
+                            change.consume()
+                            dy = (dy + dragAmount.y).coerceIn(-thresholdPx * 1.4f, thresholdPx * 1.4f)
                         }
                     },
+                    onDragCancel = {
+                        if (gestureAdmitted && !settling) dy = 0f
+                        gestureAdmitted = false
+                    },
                     onDragEnd = {
-                        when {
-                            dy.value <= -thresholdPx -> coroutineScope.launch {
-                                dy.animateTo(-thresholdPx * 1.4f, tween(120))
-                                onDragUp()
+                        if (gestureAdmitted && !settling) {
+                            gestureAdmitted = false
+                            settling = true
+                            val start = dy
+                            val direction = when {
+                                start <= -thresholdPx -> -1
+                                start >= thresholdPx -> 1
+                                else -> 0
                             }
-                            dy.value >= thresholdPx -> coroutineScope.launch {
-                                dy.animateTo(thresholdPx * 1.4f, tween(120))
-                                onDragDown()
+                            val tap = direction == 0 && currentTap != null && kotlin.math.abs(start) < tapBelowPx
+                            coroutineScope.launch {
+                                try {
+                                    val target = direction * thresholdPx * 1.4f
+                                    if (!reduceMotion) {
+                                        androidx.compose.animation.core.animate(
+                                            initialValue = start, targetValue = target,
+                                            animationSpec = tween(if (direction != 0) 120 else 220),
+                                        ) { value, _ -> dy = value }
+                                    } else dy = target
+                                    when {
+                                        direction < 0 -> currentUp()
+                                        direction > 0 -> currentDown()
+                                        tap -> currentTap?.invoke()
+                                    }
+                                } finally {
+                                    // The parent may leave this control mounted after a callback.
+                                    // An exit offset never belongs to the next gesture.
+                                    dy = 0f
+                                    settling = false
+                                }
                             }
-                            onTap != null && kotlin.math.abs(dy.value) < tapBelowPx -> {
-                                onTap()
-                            }
-                            else -> coroutineScope.launch { dy.animateTo(0f, tween(220)) }
                         }
                     },
                 )
