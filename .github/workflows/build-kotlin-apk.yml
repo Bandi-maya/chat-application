@@ -182,6 +182,10 @@ jobs:
       - name: Restore branch-owned adaptive network sources after candidate overlay
         run: |
           git checkout HEAD -- \
+            app/src/main/kotlin/com/example/chat/ui/vault/HiddenVaultScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/ChatyVideoPlayerWidget.kt \
+            app/src/main/kotlin/com/example/chat/ui/updates/UpdatesScreenParts.kt \
+            app/src/main/java/com/example/chat/data/services/AndroidVoiceNoteAdapters.kt \
             app/src/main/java/com/example/chat/data/network/NetworkStatusMonitor.kt \
             app/src/main/java/com/example/chat/data/network/TransferMonitor.kt \
             app/src/main/java/com/example/chat/data/network/AppTrafficMonitor.kt \
@@ -220,6 +224,12 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/calls/InAppCallPip.kt \
             app/src/main/kotlin/com/example/chat/ui/kit/SpringInteractiveScale.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/RegisterOrganizationScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/RegisterScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/CreateNewPasswordScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/AuthComponents.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/ForgotPasswordScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/LoginScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/AnimatedEmojiAsset.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/home/HomeAppBars.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/AlbumSelectionPolicy.kt \
