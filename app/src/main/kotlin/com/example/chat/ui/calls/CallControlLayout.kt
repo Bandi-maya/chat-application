@@ -6,3 +6,7 @@ internal fun visibleCallActionCount(availableWidthDp: Int, actionCount: Int): In
     val slots = ((availableWidthDp + 8) / 62).coerceAtLeast(2)
     return if (actionCount + 1 <= slots) actionCount else (slots - 2).coerceAtLeast(0)
 }
+
+/** 88dp labelled pills separated by 12dp; small windows stack rather than overlap. */
+internal fun googleLatestCallControlColumns(availableWidthDp: Int): Int =
+    ((availableWidthDp + 12) / 100).coerceIn(1, 3)
