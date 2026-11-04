@@ -6,7 +6,7 @@ def adb(*args):
 for p in ['runtime-apks/app-debug.apk','runtime-apks/app-debug-androidTest.apk']:
  result=adb('install','-r','-t',p)
  if b'Success' not in result:raise RuntimeError(result)
-result=adb('shell','am','instrument','-w','-r','-e','class','com.example.chat.ChatyDirectPhaseOneProofTest','com.logybyte.chaty.test/androidx.test.runner.AndroidJUnitRunner')
+result=adb('shell','am','instrument','-w','-r','-e','class','com.example.chat.ChatyDirectPhaseOneProofTest,com.example.chat.AttachmentInitialOpenProofTest','com.logybyte.chaty.test/androidx.test.runner.AndroidJUnitRunner')
 text=result.decode(errors='replace');print(text,flush=True);(out/'ChatyDirectPhaseOneProofTest.txt').write_text(text)
 adb('pull','/sdcard/Android/data/com.logybyte.chaty/files/screenshots',str(out/'screenshots'))
 (out/'logcat.txt').write_bytes(adb('logcat','-d','-v','threadtime'))
