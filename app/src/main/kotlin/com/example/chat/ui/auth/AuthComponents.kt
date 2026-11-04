@@ -101,6 +101,7 @@ fun AuthTextField(
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth().testTag("auth-field-" + label.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-'))
                 .semantics { contentDescription = label },
+            label = { Text(label) },
             placeholder = {
                 Text(
                     hintText,
