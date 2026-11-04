@@ -1,1 +1,1 @@
-A-N corrected combined verification: preserve optional suspend demoLogin and full demo card with A IME/accessibility; vertical-drag reset and same-mounted regression; existing changelog Close fixture. Compile gates device jobs. Native ABI/signing/backend unchanged.
+A-N combined verification, narrow auth-proof test compile fix: existing ActivityScenario/setContent/UIAutomator only, all target/input/callback assertions retained, no dependencies or product changes. Preserve prior compile-failed runs. Compile-gated JVM and device jobs.
