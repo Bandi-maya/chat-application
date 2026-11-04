@@ -1071,6 +1071,17 @@ private fun VoiceNoteCard(
             try { player.release() } finally { releasePlaybackLeaseAfterReader() }
         }
     }
+    val voiceLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(voiceLifecycleOwner, player) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                runCatching { if (player.isPlaying) player.pause() }
+                playing = false
+            }
+        }
+        voiceLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { voiceLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     androidx.compose.runtime.LaunchedEffect(playing, playbackSpeed) {
         if (playing && prepared) {
             try {
@@ -1138,6 +1149,10 @@ private fun VoiceNoteCard(
                 }
                 if (completed) { player.seekTo(0); completed = false; positionMs = 0 }
                 try { player.playbackParams = player.playbackParams.setSpeed(playbackSpeed.toFloat()) } catch (_: Exception) {}
+                // A slow prepare can finish after ON_STOP; do not restart hidden audio.
+                check(voiceLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                    "Playback paused while app is in background."
+                }
                 if (binding != null) {
                     check(binding.deliverIfCurrent { player.start(); playing = true }) { "Session changed" }
                 } else { player.start(); playing = true }
