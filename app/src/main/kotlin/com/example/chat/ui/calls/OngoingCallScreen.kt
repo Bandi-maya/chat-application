@@ -113,18 +113,28 @@ fun OngoingCallScreen(
     onEnterNativePip: () -> Unit,
     effectProvider: CallEffectProvider? = null,
     autoHideControls: Boolean = true,
+    bundleId: com.example.chat.ui.calls.bundles.CallBundleId? = null,
+    observeNativePip: Boolean = true,
 ) {
     val theme = LocalThemeConfig.current
+    val bundleTokens = bundleId?.let { com.example.chat.ui.calls.bundles.CallBundleRegistry.getTokens(it) }
+    val callAccent = bundleTokens?.primaryAccent ?: Color(theme.accentColor)
+    val endCallColor = bundleTokens?.declineColor ?: Color(theme.dangerColor)
+    val controlBackground = bundleTokens?.cardBackground ?: Color(0xB32C3038)
     var controlsVisible by remember { mutableStateOf(true) }
     var focusMode by remember { mutableStateOf(false) }
     var localPipOffsetX by remember { mutableStateOf(20f) }
     var localPipOffsetY by remember { mutableStateOf(80f) }
 
     // Dart _pipModeSubscription: system PiP mode drives focus mode and hides controls.
-    DisposableEffect(Unit) {
-        val l: (Boolean) -> Unit = { active -> focusMode = active; controlsVisible = !active }
-        com.example.chat.ServiceLocator.nativeCallPip.addModeListener(l)
-        onDispose { com.example.chat.ServiceLocator.nativeCallPip.removeModeListener(l) }
+    // Read-only previews render this same production component without subscribing
+    // to the user's live call/PiP service. Runtime keeps the existing observer.
+    if (observeNativePip) {
+        DisposableEffect(Unit) {
+            val l: (Boolean) -> Unit = { active -> focusMode = active; controlsVisible = !active }
+            com.example.chat.ServiceLocator.nativeCallPip.addModeListener(l)
+            onDispose { com.example.chat.ServiceLocator.nativeCallPip.removeModeListener(l) }
+        }
     }
 
     // Dart _startAutoHideTimer: controls hide after 5s unless focus mode.
@@ -188,7 +198,7 @@ fun OngoingCallScreen(
             if (session.isVideo) {
                 RemoteVideoSurface(session, videoSurfaces, callDurationSeconds)
             } else {
-                VoiceCallBackdrop(session, callDurationSeconds)
+                VoiceCallBackdrop(session, callDurationSeconds, bundleTokens)
             }
 
             // Draggable local preview PiP (Dart _localPipOffset, 120x160).
@@ -358,13 +368,13 @@ fun OngoingCallScreen(
                 val shownCount = if (compact) 0 else visibleCallActionCount(maxWidth.value.toInt(), actions.size)
                 val controls: @Composable () -> Unit = {
                     actions.take(shownCount).forEach { action ->
-                        CallControlButton(action.label, action.active, Color(theme.accentColor), action.enabled, action.onClick) { tint ->
+                        CallControlButton(action.label, action.active, callAccent, action.enabled, action.onClick, controlBackground) { tint ->
                             Icon(action.icon, null, tint = tint, modifier = Modifier.size(23.dp))
                         }
                     }
                     if (shownCount < actions.size) {
                         Box {
-                            CallControlButton("More call controls", false, Color(theme.accentColor), true, { showMore = !showMore }) { tint ->
+                            CallControlButton("More call controls", false, callAccent, true, { showMore = !showMore }, controlBackground) { tint ->
                                 Icon(Icons.Rounded.MoreHoriz, null, tint = tint)
                             }
                             com.example.chat.ui.kit.ChatyDropdownMenu(showMore, { showMore = false }) {
@@ -379,7 +389,7 @@ fun OngoingCallScreen(
                         }
                     }
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(54.dp)
-                        .clip(RoundedCornerShape(10.dp)).background(Color(theme.dangerColor))
+                        .clip(RoundedCornerShape(10.dp)).background(endCallColor)
                         .semantics { contentDescription = "End call" }.clickable { onEndCall() }) {
                         Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(28.dp))
                     }
@@ -424,6 +434,7 @@ private fun CallControlButton(
     activeColor: Color,
     enabled: Boolean,
     onClick: () -> Unit,
+    inactiveBackground: Color = Color(0xB32C3038),
     icon: @Composable (tint: Color) -> Unit,
 ) {
     val tint = if (active) activeColor else Color.White
@@ -434,7 +445,7 @@ private fun CallControlButton(
             .clip(RoundedCornerShape(10.dp))
             .semantics { contentDescription = label }
             .background(
-                if (active) activeColor.copy(alpha = 0.28f) else Color(0xB32C3038),
+                if (active) activeColor.copy(alpha = 0.28f) else inactiveBackground,
                 RoundedCornerShape(10.dp),
             )
             .clickable(enabled = enabled) { onClick() },
@@ -505,11 +516,14 @@ private fun LocalVideoSurface(videoSurfaces: CallVideoSurfaceProvider, mirror: B
 }
 
 @Composable
-private fun VoiceCallBackdrop(session: ChatyCallSession, callDurationSeconds: Int) {
+private fun VoiceCallBackdrop(
+    session: ChatyCallSession, callDurationSeconds: Int,
+    bundleTokens: com.example.chat.ui.calls.bundles.CallBundleThemeTokens? = null,
+) {
     val theme = LocalThemeConfig.current
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.fillMaxSize().background(Color(theme.cardColor)),
+        modifier = Modifier.fillMaxSize().background(bundleTokens?.surfaceBackground ?: Color(theme.cardColor)),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CallAvatar(
@@ -525,14 +539,14 @@ private fun VoiceCallBackdrop(session: ChatyCallSession, callDurationSeconds: In
             Spacer(Modifier.height(16.dp))
             Text(
                 session.remoteDisplayName,
-                color = Color(theme.primaryTextColor),
+                color = bundleTokens?.primaryText ?: Color(theme.primaryTextColor),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 statusLabel(session, callDurationSeconds),
-                color = Color(theme.secondaryTextColor),
+                color = bundleTokens?.secondaryText ?: Color(theme.secondaryTextColor),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
             )
