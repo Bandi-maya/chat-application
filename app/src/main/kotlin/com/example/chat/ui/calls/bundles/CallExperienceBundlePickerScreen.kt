@@ -205,7 +205,7 @@ fun CallExperienceBundlePickerScreen(
 }
 
 /**
- * Interactive accurate Live Preview Screen of the selected bundle across all supported states.
+ * Preview of production 1:1 rendering plus explicitly labelled group concept fixtures.
  */
 @Composable
 fun CallBundleLivePreviewScreen(
@@ -255,7 +255,7 @@ fun CallBundleLivePreviewScreen(
     var previewSharing by remember(bundleId) { mutableStateOf(false) }
     var previewRoute by remember(bundleId) { mutableStateOf(com.example.chat.data.services.AudioRouteType.speaker) }
     var invitedIds by remember { mutableStateOf(setOf<String>()) }
-    var isExpandedCard by remember { mutableStateOf(false) }
+    var previewSpeakerFocused by remember(bundleId) { mutableStateOf(true) }
 
     Scaffold(
         topBar = {
@@ -297,9 +297,9 @@ fun CallBundleLivePreviewScreen(
                     ) {
                         Tab(selected = previewTab == 0, onClick = { previewTab = 0 }, text = { Text("Incoming") })
                         Tab(selected = previewTab == 1, onClick = { previewTab = 1 }, text = { Text("Active 1:1") })
-                        Tab(selected = previewTab == 2, onClick = { previewTab = 2 }, text = { Text("Group Video") })
-                        Tab(selected = previewTab == 3, onClick = { previewTab = 3 }, text = { Text("Invite Sheet") })
-                        Tab(selected = previewTab == 4, onClick = { previewTab = 4 }, text = { Text("Call Cards (Ref 3)") })
+                        Tab(selected = previewTab == 2, onClick = { previewTab = 2 }, text = { Text("Group concept") })
+                        Tab(selected = previewTab == 3, onClick = { previewTab = 3 }, text = { Text("Invite concept") })
+                        Tab(selected = previewTab == 4, onClick = { previewTab = 4 }, text = { Text("Production PiP") })
                         Tab(selected = previewTab == 5, onClick = { previewTab = 5 }, text = { Text("Outgoing") })
                         Tab(selected = previewTab == 6, onClick = { previewTab = 6 }, text = { Text("Connecting") })
                         Tab(selected = previewTab == 7, onClick = { previewTab = 7 }, text = { Text("Reconnecting") })
@@ -354,8 +354,8 @@ fun CallBundleLivePreviewScreen(
                     meetingTitle = "Weekly Sync",
                     durationSeconds = 240,
                     participants = mockParticipants,
-                    isSpeakerFocused = true,
-                    onToggleSpeakerFocus = {},
+                    isSpeakerFocused = previewSpeakerFocused,
+                    onToggleSpeakerFocus = { previewSpeakerFocused = !previewSpeakerFocused },
                     onInviteClicked = { previewTab = 3 },
                     onLeaveMeeting = onClose,
                 )
@@ -368,37 +368,23 @@ fun CallBundleLivePreviewScreen(
                     },
                     onClose = { previewTab = 2 },
                 )
-                4 -> Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF0F172A))
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Reference 3 Card Presentations",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = "Tap the card below to toggle compact vs expanded presentation",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 13.sp,
-                        )
-                        Spacer(Modifier.height(28.dp))
-                        BundleCompactCallCard(
-                            bundleId = bundleId,
-                            session = mockSession,
-                            isExpanded = isExpandedCard,
-                            onToggleExpand = { isExpandedCard = !isExpandedCard },
-                            onAccept = { previewTab = 1 },
-                            onDecline = onClose,
-                        )
-                    }
-                }
+                4 -> com.example.chat.ui.calls.InAppCallPip(
+                    bundleId = bundleId,
+                    session = mockSession.copy(state = CallSessionState.connected),
+                    videoSurfaces = null,
+                    durationSeconds = 142,
+                    onTap = { previewTab = 8 },
+                    onCollapseToIsland = { previewTab = 1 },
+                    onEndCall = onClose,
+                )
+            }
+            if (previewTab == 2 || previewTab == 3) {
+                Text(
+                    text = "Concept fixture only: group calling is not available in the current runtime.",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.BottomCenter).background(Color(0xFF1E1E24)).padding(8.dp),
+                )
             }
         }
     }
