@@ -1074,5 +1074,7 @@ jobs:
         if: always()
         with:
           name: call-bundle-proof
-          path: call-proof/
+          path: |
+            call-proof/
+            screenshots/emulator-preflight/
           if-no-files-found: error
