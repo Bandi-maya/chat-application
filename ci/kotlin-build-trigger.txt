@@ -1,1 +1,1 @@
-A-N combined verification, narrow auth-proof test compile fix: existing ActivityScenario/setContent/UIAutomator only, all target/input/callback assertions retained, no dependencies or product changes. Preserve prior compile-failed runs. Compile-gated JVM and device jobs.
+A-N strict-proof corrections only: labelled48dp auth Back parent; Call Settings fixture route; true-tap recognizer prevents Nextcloud small-drag false accept. Added wiggle/true-tap regression, preserves thresholds/assertions. No Direct Phase1 changes. Compile and JVM gate strict device proof.
