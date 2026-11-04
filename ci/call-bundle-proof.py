@@ -9,7 +9,7 @@ try:
  for p in ['runtime-apks/app-debug.apk','runtime-apks/app-debug-androidTest.apk']:
   result=adb('install','-r','-t',p);print(result.decode(errors='replace'),flush=True)
   if b'Success' not in result:raise RuntimeError('Install failed')
- for cls in ['CallContactPickerProofTest','CallBundleMatrixProofTest']:
+ for cls in ['CallContactPickerProofTest','CallBundleMatrixProofTest','IncomingCallTypeBadgeProofTest']:
   result=adb('shell','am','instrument','-w','-r','-e','class','com.example.chat.'+cls,pkg+'.test/androidx.test.runner.AndroidJUnitRunner')
   text=result.decode(errors='replace');(out/(cls+'.txt')).write_text(text);print(text,flush=True)
   if 'FAILURES!!!' in text or 'INSTRUMENTATION_FAILED' in text or 'OK (' not in text:failure=True
