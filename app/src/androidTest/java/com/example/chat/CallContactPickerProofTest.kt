@@ -190,12 +190,46 @@ class CallContactPickerProofTest {
     /** Same mounted control: successful answer, successful decline, then a small
      * wiggle must not inherit either previous drag's exit offset. */
     @Test
-    fun samsungControlResetsAfterSuccessBeforeSmallDrag() {
-        runGestureCase(
-            "samsung-reset-regression", CallBundleId.SAMSUNG_ONE_UI,
-            controlDesc = "Answer call", acceptDelta = 420 to 0,
-            declineDelta = -420 to 0, declineDesc = "Decline call",
-        )
+    fun samsungReferenceTapButtonsFireRealCallbacks() {
+        val accepted = java.util.concurrent.atomic.AtomicInteger()
+        val declined = java.util.concurrent.atomic.AtomicInteger()
+        ActivityScenario.launch(ChatFixtureActivity::class.java).use { scenario ->
+            scenario.onActivity { activity -> activity.setContent {
+                ChatyTheme(ThemePresets.monochromeDark) {
+                    BundleIncomingCallView(CallBundleId.SAMSUNG_ONE_UI, incomingSession("Synthetic caller"),
+                        onAccept = { accepted.incrementAndGet() }, onDecline = { declined.incrementAndGet() })
+                }
+            } }
+            val answer = dev.wait(Until.findObject(By.desc("Answer call")), 5000) ?: throw AssertionError("Answer tap target missing")
+            answer.click(); ins.waitForIdleSync()
+            assertEquals(1, accepted.get()); assertEquals(0, declined.get())
+            val decline = dev.wait(Until.findObject(By.desc("Decline call")), 5000) ?: throw AssertionError("Decline tap target missing")
+            decline.click(); ins.waitForIdleSync()
+            assertEquals(1, accepted.get()); assertEquals(1, declined.get())
+            shot("samsung-reference-tap-buttons")
+        }
+    }
+
+    @Test fun horizontalReferencePucksCancelAndCommit() {
+        runGestureCase("google-latest-reference", CallBundleId.GOOGLE_PHONE_LATEST,
+            controlDesc = "Answer or decline puck", acceptDelta = 430 to 0, declineDelta = -430 to 0)
+    }
+
+    @Test fun sharedIncomingBannerUsesSameCallbacks() {
+        val accepted = java.util.concurrent.atomic.AtomicInteger()
+        val declined = java.util.concurrent.atomic.AtomicInteger()
+        ActivityScenario.launch(ChatFixtureActivity::class.java).use { scenario ->
+            scenario.onActivity { activity -> activity.setContent {
+                ChatyTheme(ThemePresets.monochromeDark) {
+                    BundleIncomingCallView(CallBundleId.APPLE_IOS, incomingSession("Synthetic caller"),
+                        onAccept = { accepted.incrementAndGet() }, onDecline = { declined.incrementAndGet() }, banner = true)
+                }
+            } }
+            dev.wait(Until.findObject(By.text("Answer")), 5000)?.click() ?: throw AssertionError("Banner Answer missing")
+            ins.waitForIdleSync(); assertEquals(1, accepted.get())
+            dev.findObject(By.text("Decline")).click(); ins.waitForIdleSync(); assertEquals(1, declined.get())
+            shot("shared-incoming-banner-reference")
+        }
     }
 
     @Test
@@ -209,12 +243,7 @@ class CallContactPickerProofTest {
 
     @Test
     fun bundleIncomingReferenceGesturesFireRealCallbacks() {
-        // Samsung One UI: drag the action circle OUT of its halo.
-        runGestureCase(
-            "samsung_one_ui", CallBundleId.SAMSUNG_ONE_UI,
-            controlDesc = "Answer call", acceptDelta = 420 to 0,
-            declineDelta = -420 to 0, declineDesc = "Decline call",
-        )
+        // Samsung is now separately tested as reference-approved TAP controls.
         // Azure Ring Vertical: drag the ring down = answer, up = decline.
         runGestureCase(
             "azure_ring_vertical", CallBundleId.AZURE_RING_VERTICAL,
@@ -456,10 +485,16 @@ class CallContactPickerProofTest {
 
             swipeFrom("Mono chevron answer or decline puck", 0, -430)
             deadline = System.currentTimeMillis() + 8000
-            while (calls.currentSession != null) {
-                if (System.currentTimeMillis() > deadline) fail("demo session not cleared after decline gesture")
+            val declinedCallId = calls.currentSession?.callId
+            while (calls.currentSession?.state != com.example.chat.data.services.CallSessionState.declined) {
+                if (System.currentTimeMillis() > deadline) fail("demo session did not reach declined after gesture: ${calls.currentSession?.state}")
                 Thread.sleep(100)
             }
+            assertNotNull("Declined demo keeps its terminal record until next session", declinedCallId)
+            assertEquals(declinedCallId, calls.currentSession?.callId)
+            assertTrue("Decline must remove rendered incoming control", dev.wait(Until.gone(By.desc("Mono chevron answer or decline puck")), 5000))
+            assertFalse("Declined call must not remain active", calls.hasActiveSession)
+            shot("bundle-live-demo-declined-state-and-dismissal")
         } catch (failure: Throwable) {
             // Preserve the exact window at any entry/navigation assertion failure.
             try { shot("bundle-live-demo-failure") } catch (_: Throwable) {}
