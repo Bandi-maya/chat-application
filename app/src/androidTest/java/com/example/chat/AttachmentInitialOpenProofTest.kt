@@ -35,6 +35,7 @@ class AttachmentInitialOpenProofTest {
             file.outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }; b.recycle()
         } }
         try {
+            val selectedAction = java.util.concurrent.atomic.AtomicReference<AttachmentAction?>()
             for (font in listOf(1f, 2f)) ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
                 scenario.onActivity { activity -> activity.setContent {
                     val density = LocalDensity.current
@@ -44,7 +45,7 @@ class AttachmentInitialOpenProofTest {
                             ModalBottomSheet(sheetState = state,
                                 onDismissRequest = {}, dragHandle = null) {
                                 AttachmentGalleryViewport(state) {
-                                AttachmentGallerySheet(ThemePresets.whatsappIosLight, onAction = {}, onCamera = {},
+                                AttachmentGallerySheet(ThemePresets.whatsappIosLight, onAction = { selectedAction.set(it) }, onCamera = {},
                                     onReviewImages = {}, heightFraction = 1f, fixtureItems = files.mapIndexed { i, f -> AttachmentGalleryItem(android.net.Uri.fromFile(f), "Initial $i") })
                                 }
                             }
@@ -79,6 +80,10 @@ class AttachmentInitialOpenProofTest {
                     assertTrue("Initial dock option $label visible",bounds.height()>0 && bounds.top>=types.top && bounds.bottom<=types.bottom)
                 }
                 capture("direct-visible-in-existing-dock")
+                selectedAction.set(null)
+                d.findObject(By.desc("Attachment type options")).findObject(By.text("Chaty Direct")).click()
+                ins.waitForIdleSync()
+                assertEquals("Real dock invokes Direct action", AttachmentAction.chatyDirect, selectedAction.get())
                 val grid = d.findObject(By.desc("Recent attachment photos")).visibleBounds
                 d.swipe(grid.centerX(),grid.bottom-12,grid.centerX(),grid.top+12,30)
                 assertEquals("Dock stays pinned during photo scroll",types,d.findObject(By.desc("Attachment type options")).visibleBounds)
