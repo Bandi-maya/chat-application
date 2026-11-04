@@ -45,12 +45,23 @@ class GoogleLatestIncomingContract(unittest.TestCase):
     def test_actions_are_distinct_semantic_and_token_colored(self):
         source = (ROOT / 'app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt').read_text()
         section = source.split('private fun GoogleLatestIncomingCall(', 1)[1].split('/** Material You bottom bar', 1)[0]
-        self.assertNotIn('DeclineAnswerPuckBar(', section)
-        for token in ['containerColor = tokens.declineColor', 'containerColor = tokens.acceptColor',
-                      'Icons.Rounded.CallEnd', 'Icons.Rounded.Call', 'Text("Decline")', 'Text("Answer")',
-                      'enabled = !actionPending']:
+        self.assertIn('DeclineAnswerPuckBar(tokens,', section)
+        for token in ['onAccept = { if (!actionPending) onAccept() }',
+                      'onDecline = { if (!actionPending) onDecline() }', 'google_latest_puck_bar']:
             self.assertIn(token, section)
-        self.assertLess(section.index('Text("Decline")'), section.index('Text("Answer")'))
+        bar = source.split('private fun DeclineAnswerPuckBar(', 1)[1].split('// 05', 1)[0]
+        self.assertIn('ReferenceHorizontalPuck(true, tokens.cardBackground, tokens.acceptColor, tokens.declineColor,', bar)
+        self.assertIn('"Answer or decline puck"', bar)
+        puck = source.split('private fun ReferenceHorizontalPuck(', 1)[1].split('// 03', 1)[0]
+        for token in ['Text("Decline", color = decline', 'Text("Answer", color = accept',
+                      'CustomAccessibilityAction("Answer call")', 'CustomAccessibilityAction("Decline call")',
+                      'offset + drag.x', '.coerceIn(if (twoWay) -range else 0f, range)',
+                      'offset >= range * 0.7f -> 1', 'offset <= -range * 0.7f -> -1',
+                      'if (direction == 1) acceptNow() else if (direction == -1) declineNow()',
+                      'onDragCancel', 'animate(start, 0f', 'offset = 0f; settling = false',
+                      'if (reduced) 0 else 180', 'tint = if (offset < 0f) decline else accept']:
+            self.assertIn(token, puck)
+        self.assertLess(puck.index('Text("Decline"'), puck.index('Text("Answer"'))
 
 class CallPreviewRuntimeParityContract(unittest.TestCase):
     def test_live_preview_uses_production_surface_and_isolated_local_state(self):
