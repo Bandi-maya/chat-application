@@ -105,6 +105,13 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
                     timestamp = java.time.Instant.now(),
                     durationSeconds = service.callDurationSeconds,
                     isVideo = cs.isVideo,
+                    isMuted = cs.isMuted,
+                    callStatusLabel = compactCallStatus(cs.state, service.callDurationSeconds),
+                    callShowsDuration = cs.state == CallSessionState.connected,
+                    onToggleCallMute = { callAction(cs.callId, "Unable to change microphone state.") { service.toggleMute() } },
+                    onToggleCallSpeaker = { callAction(cs.callId, "Unable to change audio route.") {
+                        service.setAudioRoute(if (cs.audioRoute == AudioRouteType.speaker) AudioRouteType.earpiece else AudioRouteType.speaker)
+                    } },
                     isSpeaker = cs.audioRoute == AudioRouteType.speaker,
                     onTap = { if (cs.isVideo) presentation.expandFromIsland() else presentation.showFullScreen() },
                     onAcceptCall = { callAction(cs.callId, "Unable to accept the call. Check microphone and camera permissions.") { service.acceptCall() } },
