@@ -154,6 +154,7 @@ fun ChatMessageBubble(
     modifier: Modifier = Modifier,
     senderName: String? = null,
     showGroupAvatar: Boolean = true,
+    senderCluster: SenderClusterPosition = SenderClusterPosition.SINGLE,
     isSenderAdmin: Boolean = false,
     makeTextSelectable: Boolean = true,
     enableAnimatedEmojis: Boolean = true,
@@ -411,6 +412,24 @@ fun ChatMessageBubble(
                             if (isVisualMedia) {
                                 drawRoundRect(Color(bubbleBg), cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()))
                                 drawRoundRect(Color(theme.dividerColor).copy(alpha = 0.45f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()), style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+                            } else if (theme.bubbleStyle == com.example.chat.core.theme.BubbleStyleId.stock &&
+                                message.type == MessageType.text && senderCluster != SenderClusterPosition.SINGLE) {
+                                val outer = 20.dp.toPx()
+                                val inner = 5.dp.toPx()
+                                val top = if (senderCluster == SenderClusterPosition.MIDDLE || senderCluster == SenderClusterPosition.LAST) inner else outer
+                                val bottom = if (senderCluster == SenderClusterPosition.MIDDLE || senderCluster == SenderClusterPosition.FIRST) inner else outer
+                                val path = androidx.compose.ui.graphics.Path().apply {
+                                    addRoundRect(androidx.compose.ui.geometry.RoundRect(
+                                        androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height),
+                                        topLeft = androidx.compose.ui.geometry.CornerRadius(if (isMe) outer else top),
+                                        topRight = androidx.compose.ui.geometry.CornerRadius(if (isMe) top else outer),
+                                        bottomLeft = androidx.compose.ui.geometry.CornerRadius(if (isMe) outer else bottom),
+                                        bottomRight = androidx.compose.ui.geometry.CornerRadius(if (isMe) bottom else outer),
+                                    ))
+                                }
+                                drawPath(path, Color(bubbleBg))
+                                if (!isMe) drawPath(path, Color(argbWithAlpha(theme.accentColor, 0.4)),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = density))
                             } else drawBubble(
                                 styleId = theme.bubbleStyle,
                                 isMe = isMe,
