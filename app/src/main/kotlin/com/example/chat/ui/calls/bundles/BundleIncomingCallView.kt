@@ -45,8 +45,8 @@ import kotlin.math.roundToInt
  * Universal Unified Bundle Incoming Call Screen.
  * Renders the incoming call screen specifically styled for each bundle.
  * Gesture-faithful answer mechanics per user-supplied references (2026-10-31):
- * Samsung = drag the action circle out of its halo; Google Latest = drag the
- * center puck left/right; Azure Ring & Mono Chevron = vertical two-target drag;
+ * Samsung = drag the action circle out of its halo; Google Latest = separate
+ * red decline / green answer buttons; Azure Ring & Mono Chevron = vertical two-target drag;
  * Nextcloud Talk = tap or swipe up to accept. Unsupported reference functions
  * (Bixby text call, AI Call Assistant, Screen call, Live Translation, Remind,
  * SMS, Voicemail) are intentionally NOT rendered - no fake buttons.
@@ -58,6 +58,7 @@ fun BundleIncomingCallView(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     onTogglePreviewMode: (() -> Unit)? = null,
+    actionPending: Boolean = false,
 ) {
     val tokens = remember(bundleId) { CallBundleRegistry.getTokens(bundleId) }
 
@@ -65,7 +66,7 @@ fun BundleIncomingCallView(
         CallBundleId.CHATY_DEFAULT -> ChatyDefaultIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.APPLE_IOS -> AppleIosIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.SAMSUNG_ONE_UI -> SamsungOneUiIncomingCall(tokens, session, onAccept, onDecline)
-        CallBundleId.GOOGLE_PHONE_LATEST -> GoogleLatestIncomingCall(tokens, session, onAccept, onDecline)
+        CallBundleId.GOOGLE_PHONE_LATEST -> GoogleLatestIncomingCall(tokens, session, onAccept, onDecline, actionPending)
         CallBundleId.GOOGLE_PHONE_CLASSIC -> GoogleClassicIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.VIVO_IQOO -> VivoIqooIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.AZURE_RING_VERTICAL -> AzureRingVerticalIncomingCall(tokens, session, onAccept, onDecline)
@@ -484,8 +485,8 @@ private fun SamsungOneUiIncomingCall(
 
 // -------------------------------------------------------------------------------------------------
 // 04 — GOOGLE PHONE LATEST (Material You / Pixel; reference: M3 fullscreen incoming
-// with name chip, large avatar and the Decline | puck | Answer bottom bar).
-// Mechanic: drag the center puck right to answer, left to decline.
+// with name chip and large avatar. Chaty product choice: explicit red decline
+// left / green answer right; not a claim of one universal Google gesture.)
 // -------------------------------------------------------------------------------------------------
 @Composable
 private fun GoogleLatestIncomingCall(
@@ -493,6 +494,7 @@ private fun GoogleLatestIncomingCall(
     session: ChatyCallSession,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
+    actionPending: Boolean,
 ) {
     Box(
         modifier = Modifier
@@ -545,12 +547,33 @@ private fun GoogleLatestIncomingCall(
                 }
             }
 
-            DeclineAnswerPuckBar(
-                tokens = tokens,
-                onAccept = onAccept,
-                onDecline = onDecline,
-                modifier = Modifier.padding(bottom = 36.dp),
-            )
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 36.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                Button(
+                    onClick = { if (!actionPending) onDecline() },
+                    enabled = !actionPending,
+                    colors = ButtonDefaults.buttonColors(containerColor = tokens.declineColor, contentColor = Color.White),
+                    modifier = Modifier.weight(1f).heightIn(min = 64.dp).testTag("google_latest_decline"),
+                    shape = RoundedCornerShape(32.dp),
+                ) {
+                    Icon(Icons.Rounded.CallEnd, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Decline")
+                }
+                Button(
+                    onClick = { if (!actionPending) onAccept() },
+                    enabled = !actionPending,
+                    colors = ButtonDefaults.buttonColors(containerColor = tokens.acceptColor, contentColor = Color.White),
+                    modifier = Modifier.weight(1f).heightIn(min = 64.dp).testTag("google_latest_answer"),
+                    shape = RoundedCornerShape(32.dp),
+                ) {
+                    Icon(Icons.Rounded.Call, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Answer")
+                }
+            }
         }
     }
 }
@@ -1331,5 +1354,4 @@ fun BundleActionButton(
         )
     }
 }
-
 
