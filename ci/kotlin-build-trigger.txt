@@ -1,2 +1,2 @@
-combined-call6-11-with-A-B-map-only-F-UI 2026-11-04
-UI-delta-sha256 3450ab4cec5bc20e812660b7cfd132958a62f9695f89123a2745909654af45d8
+combined-reviewed-jvm-incoming-r3colors-translation 2026-11-04
+archive-sha256 6fc304babdc39230e6b28a96c2a502405052285a2d8d2f6bc64fc9e363747843
