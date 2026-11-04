@@ -1,6 +1,8 @@
 package com.example.chat
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
 import androidx.activity.compose.setContent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -68,6 +70,41 @@ class CallBundleMatrixProofTest {
                         assertTrue("End action missing", dev.hasObject(By.desc("End call")))
                     }
                     capture("${bundle.id}-$state-voice")
+                } finally { scenario.close() }
+            }
+        }
+    }
+    @Test fun googleLatestWidthsAndFontScales() {
+        for (width in listOf(220, 360)) for (font in listOf(1f, 1.5f)) {
+            for (state in listOf(CallSessionState.ringing, CallSessionState.connecting, CallSessionState.connected)) {
+                val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+                try {
+                    val session = ChatyCallSession("google-width-$width-$font-$state", "synthetic-peer",
+                        "Synthetic Caller", isVideo = false, isOutgoing = true, state = state,
+                        startedAt = Instant.EPOCH, isDemo = true)
+                    val presentation = resolveCallBundlePresentation(CallBundleId.GOOGLE_PHONE_LATEST.id, state)
+                    scenario.onActivity { activity -> activity.setContent {
+                        val density = androidx.compose.ui.platform.LocalDensity.current.density
+                        androidx.compose.runtime.CompositionLocalProvider(
+                            androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density, font)) {
+                            ChatyTheme(ThemePresets.monochromeDark) {
+                                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier
+                                    .width(width.dp)) {
+                                    OngoingCallScreen(session = session, callDurationSeconds = if (state == CallSessionState.connected) 142 else 0,
+                                        hasLocalMedia = false, videoSurfaces = null, setupError = null,
+                                        template = presentation.template, bundleId = CallBundleId.GOOGLE_PHONE_LATEST,
+                                        pictureInPictureEnabled = false, observeNativePip = false,
+                                        autoHideControls = false, onBack = {}, onSessionGone = {}, onEndCall = {},
+                                        onToggleMute = {}, onToggleCamera = {}, onSwitchCamera = {},
+                                        onToggleScreenShare = {}, onToggleAudioRoute = {}, onEnterNativePip = {})
+                                }
+                            }
+                        }
+                    } }
+                    assertTrue(dev.wait(Until.hasObject(By.text("Synthetic Caller")), 8000))
+                    assertTrue("End action missing", dev.hasObject(By.desc("End call")))
+                    assertFalse("Outgoing must not offer Answer", dev.hasObject(By.text("Answer")))
+                    capture("google-latest-$state-width$width-font$font")
                 } finally { scenario.close() }
             }
         }
