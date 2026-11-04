@@ -375,7 +375,7 @@ private fun ReferenceHorizontalPuck(twoWay: Boolean, background: Color, accept: 
 // -------------------------------------------------------------------------------------------------
 // 03 — SAMSUNG ONE UI INCOMING CALL (reference verified One UI by its "Bixby text call"
 // pill; that feature is unsupported by Chaty and intentionally not rendered).
-// One UI default answer mechanic: drag the action circle OUT of its halo.
+// Approved reference interaction: tap the action circle.
 // -------------------------------------------------------------------------------------------------
 @Composable
 private fun SamsungOneUiIncomingCall(
@@ -430,7 +430,7 @@ private fun SamsungOneUiIncomingCall(
             )
             Spacer(Modifier.weight(1f))
             Text(
-                text = "Drag a button out of its circle",
+                text = "Tap Answer or Decline",
                 color = tokens.secondaryText,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(bottom = 18.dp),
@@ -1281,6 +1281,7 @@ private fun TapHaloControl(label: String, icon: ImageVector, iconTint: Color, ha
     onTrigger: () -> Unit, modifier: Modifier = Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(modifier.size(100.dp).clip(CircleShape).background(haloColor)
+            .semantics { contentDescription = label }
             .clickable(onClickLabel = label, onClick = onTrigger), contentAlignment = Alignment.Center) {
             Box(Modifier.size(72.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = iconTint, modifier = Modifier.size(32.dp))
