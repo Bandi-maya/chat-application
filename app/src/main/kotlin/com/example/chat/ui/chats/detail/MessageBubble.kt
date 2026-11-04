@@ -1179,11 +1179,10 @@ private fun VoiceNoteCard(
     ) {
         Box(
             Modifier
-                .size(34.dp)
+                .size(48.dp)
                 .background(playButtonColor ?: accentColor, CircleShape)
-                .pointerInput(attachment.id) {
-                    detectTapGestures(onTap = { toggle() })
-                },
+                .testTag("voice-note-toggle-" + message.id)
+                .clickable(enabled = !loading, role = androidx.compose.ui.semantics.Role.Button, onClickLabel = if (playing) "Pause voice note" else "Play voice note") { toggle() },
             contentAlignment = Alignment.Center,
         ) {
             if (loading) {
