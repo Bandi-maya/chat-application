@@ -217,6 +217,7 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/updates/ReleaseNotesPolicy.kt \
             app/src/main/kotlin/com/example/chat/ui/navigation/NavigationShells3.kt \
             app/src/main/kotlin/com/example/chat/ui/navigation/MainNavigationShell.kt \
+            app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/home/HomeAppBars.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/AlbumSelectionPolicy.kt \
             app/src/test/java/com/example/chat/AlbumSelectionPolicyTest.kt \
@@ -245,6 +246,8 @@ jobs:
             app/src/test/java/com/example/chat/LocalLockServiceFullTest.kt \
             app/src/test/java/com/example/chat/ProtectedResourceGateParityTest.kt \
             app/src/test/java/com/example/chat/ui/media/MediaLibraryServiceHardeningTest.kt
+      - name: Call bundle source contracts
+        run: python3 ci/tests/test_call_bundle_settings_contract.py -v
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
       - uses: actions/setup-java@v4
@@ -1011,4 +1014,37 @@ jobs:
         with:
           name: layout-capture-testref
           path: screenshots/
+          if-no-files-found: error
+
+  call-proof:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: synthetic-runtime-apk-pair
+          path: runtime-apks
+      - name: Verify isolated pair
+        run: cd runtime-apks && sha256sum -c SHA256SUMS
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-call.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: python3 ci/call-bundle-proof.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: call-bundle-proof
+          path: call-proof/
           if-no-files-found: error
