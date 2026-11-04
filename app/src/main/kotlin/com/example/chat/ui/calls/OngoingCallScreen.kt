@@ -1,6 +1,8 @@
 package com.example.chat.ui.calls
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
@@ -119,6 +121,7 @@ fun OngoingCallScreen(
     bundleId: com.example.chat.ui.calls.bundles.CallBundleId? = null,
     observeNativePip: Boolean = true,
 ) {
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val theme = LocalThemeConfig.current
     val bundleTokens = bundleId?.let { com.example.chat.ui.calls.bundles.CallBundleRegistry.getTokens(it) }
     val callAccent = bundleTokens?.primaryAccent ?: Color(theme.accentColor)
@@ -214,13 +217,13 @@ fun OngoingCallScreen(
                         .offset(localPipOffsetX.dp, localPipOffsetY.dp)
                         .size(120.dp, 160.dp)
                         .background(Color.Black, RoundedCornerShape(16.dp))
-                        .pointerInput(Unit) {
+                        .pointerInput(screenW, screenH) {
                             detectDragGestures { change, dragAmount ->
                                 change.consume()
                                 localPipOffsetX = (localPipOffsetX + dragAmount.x / density)
-                                    .coerceIn(16f, screenW - 136f)
+                                    .coerceIn(0f, (screenW - 120f).coerceAtLeast(0f))
                                 localPipOffsetY = (localPipOffsetY + dragAmount.y / density)
-                                    .coerceIn(60f, screenH - 220f)
+                                    .coerceIn(0f, (screenH - 160f).coerceAtLeast(0f))
                             }
                         },
                 ) {
@@ -271,7 +274,7 @@ fun OngoingCallScreen(
             }
 
             // Top panel (Dart AnimatedPositioned slide).
-            val topOffset by animateDpAsState(if (controlsVisible) 0.dp else (-110).dp, label = "topPanel")
+            val topOffset by animateDpAsState(if (controlsVisible) 0.dp else (-110).dp, animationSpec = if (reduceMotion) snap() else tween(220), label = "topPanel")
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -339,7 +342,7 @@ fun OngoingCallScreen(
             }
 
             // Bottom control bar.
-            val bottomOffset by animateDpAsState(if (controlsVisible) 0.dp else 150.dp, label = "bottomPanel")
+            val bottomOffset by animateDpAsState(if (controlsVisible) 0.dp else 150.dp, animationSpec = if (reduceMotion) snap() else tween(220), label = "bottomPanel")
             BoxWithConstraints(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.48f).dp)
