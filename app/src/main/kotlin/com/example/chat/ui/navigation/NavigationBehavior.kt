@@ -54,4 +54,19 @@ object HomePresetNormalizer {
     fun presentationNavigationMode(value: String): AppNavigationMode? =
         navigationMode(com.example.chat.core.preferences.HomePresentationPolicy.navigationStyle(value))
 
+    /** True only for an explicit One UI / Cards pick; the Default presentation
+     *  and stock WhatsApp UI never get the raised-centre scrolling dock. */
+    fun oneUiRaisedCenterDockEnabled(homeStyle: String?): Boolean =
+        homeStyle != null && com.example.chat.core.preferences.HomePresentationPolicy.isOneUi(homeStyle)
+
+    /** Dock-variant name the bottom shell renders for an explicit One UI pick. */
+    const val RAISED_CENTER_SCROLL_DOCK = "OneUiRaisedCenterScroll"
+
+    /** Which dock the bottom shell renders: the raised-centre scrolling dock only
+     *  when the One UI flag is set; every other configuration keeps its configured
+     *  named dock style. Pure so the mapping/renderer contract is testable without
+     *  composition. */
+    fun resolvedBottomDockVariant(styleName: String, oneUiRaisedCenterDock: Boolean): String =
+        if (oneUiRaisedCenterDock) RAISED_CENTER_SCROLL_DOCK else styleName
+
 }

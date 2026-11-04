@@ -5,6 +5,9 @@ import androidx.compose.animation.core.EaseInCubic
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -667,10 +670,11 @@ private fun ComposerActionButton(
 ) {
     val pressedState = remember { mutableStateOf(false) }
     val pressed = pressedState.value
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val haptics = LocalHapticFeedback.current
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = tween(120, easing = FastOutSlowInEasing),
+        targetValue = if (!reduceMotion && pressed) 0.96f else 1f,
+        animationSpec = if (reduceMotion) snap() else spring(dampingRatio = 0.82f, stiffness = 380f),
         label = "press-scale",
     )
     val alpha by animateFloatAsState(
@@ -680,6 +684,7 @@ private fun ComposerActionButton(
     )
     Box(
         modifier
+            .testTag(composerActionTag(semanticsLabel))
             .size(48.dp)
             .graphicsLayer {
                 scaleX = scale
@@ -821,7 +826,7 @@ private fun SendMicMorph(
     }
 }
 
-/** Dart composer TextField port: hint 'Messageâ¦  /task or #reply', dense
+/** Dart composer TextField port: hint 'Message\u2026  /task or #reply', dense
  *  padding (default h12/v11), 14sp * fontScale, min 1 / max 5 lines. */
 @Composable
 private fun ComposerTextField(
@@ -858,7 +863,7 @@ private fun ComposerTextField(
         Box(Modifier.weight(1f)) {
             if (text.isEmpty()) {
                 Text(
-                    "Messageâ¦  /task or #reply",
+                    "Message\u2026  /task or #reply",
                     color = Color(theme.secondaryTextColor),
                     fontSize = fontSize,
                     maxLines = 1,
@@ -871,9 +876,19 @@ private fun ComposerTextField(
                 textStyle = TextStyle(color = colors.inputText, fontSize = fontSize),
                 cursorBrush = SolidColor(Color(theme.accentColor)),
                 maxLines = 5,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("composer-input"),
             )
         }
         suffix?.invoke()
     }
+}
+
+/** Stable action IDs stay constant when the spoken mode label changes. */
+internal fun composerActionTag(label: String): String = when {
+    label == "Emoji" || label == "Return to keyboard" -> "composer-emoji"
+    label == "Attach" -> "composer-attach"
+    label == "Camera" -> "composer-camera"
+    label == "Send message" -> "composer-send"
+    label.startsWith("Microphone mode") || label.startsWith("Video mode") || label.startsWith("Voice note") -> "composer-record"
+    else -> "composer-action"
 }

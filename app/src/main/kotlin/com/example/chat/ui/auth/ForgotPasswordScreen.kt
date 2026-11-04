@@ -1,5 +1,6 @@
 package com.example.chat.ui.auth
 
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -72,7 +73,7 @@ fun ForgotPasswordScreen(
     }
 
     Scaffold(containerColor = Color(theme.backgroundColor)) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(modifier = Modifier.fillMaxSize().padding(padding).imePadding()) {
             Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)) {
                 AuthBackButton(onClick = onBack)
             }

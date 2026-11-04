@@ -37,26 +37,28 @@ import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.MarkChatRead
 import androidx.compose.material.icons.outlined.MarkChatUnread
-import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PersonAddAlt1
 import androidx.compose.material.icons.outlined.PushPin as OutlinedPushPin
 import androidx.compose.material.icons.outlined.Reply
 import androidx.compose.material.icons.outlined.ScheduleSend
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material.icons.outlined.VolumeOff
 import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DarkMode
-import androidx.compose.material.icons.rounded.DoneAll
-import androidx.compose.material.icons.rounded.GroupAdd
+import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material.icons.outlined.GroupAdd
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.RestartAlt
+import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SelectAll
-import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
@@ -77,6 +79,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -124,6 +128,13 @@ data class ChatsHomeNav(
     val onRestartApp: () -> Unit = {},
     val onToggleBrightness: () -> Unit = {},
     val onSelectPlan: () -> Unit = {},
+    /** Rail-hidden Tasks/Updates surface as header overflow entries (user
+     *  directive); the flags say the entries show, the callbacks open the real
+     *  destination screens. */
+    val showTasksEntry: Boolean = false,
+    val showUpdatesEntry: Boolean = false,
+    val onOpenTasks: () -> Unit = {},
+    val onOpenUpdates: () -> Unit = {},
 )
 
 /** _ghostModePill: toggles ghost mode with the exact Dart snackbar copy. */
@@ -211,18 +222,36 @@ fun StandardHomeAppBar(
     val showStatus = !homePrefs.disableStatusUnderName && userAbout.isNotEmpty()
 
     val largeDefault = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)
+    val headerCollapse = if (largeDefault) com.example.chat.ui.navigation.LocalReferenceHeaderCollapse.current else 0f
     Column(Modifier.fillMaxWidth()) {
     if (largeDefault) {
-        Column(Modifier.fillMaxWidth().height(164.dp).padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = Color(theme.primaryTextColor), fontSize = (32 * theme.fontScale).sp,
-                fontWeight = FontWeight.W700)
-            if (showStatus) Text(userAbout, color = Color(theme.secondaryTextColor), fontSize = (12 * theme.fontScale).sp)
+        Row(Modifier.fillMaxWidth()
+            .height((com.example.chat.ui.navigation.ReferenceLayoutMetrics.expandedIdentityHeightDp * (1f - headerCollapse)).dp)
+            .padding(top = (com.example.chat.ui.navigation.ReferenceLayoutMetrics.actionBarHeightDp * (1f - headerCollapse)).dp)
+            .clipToBounds().alpha(1f - headerCollapse)
+            .padding(horizontal = 24.dp)
+            .combinedClickable(onClick = { if (homePrefs.nameTapOpensLocked) onIdentityTap() }, onLongClick = onIdentityLongPress),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            // Use Chaty's selected icon family, never GB branding or a copied contact avatar.
+            com.example.chat.ui.navigation.NavDestinationIcon(
+                if (forcedTypeIsSet) "groups" else "chats",
+                size = com.example.chat.ui.navigation.ReferenceLayoutMetrics.identityIconSizeDp,
+                tint = Color(theme.primaryTextColor),
+            )
+            Spacer(Modifier.width(6.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = Color(theme.primaryTextColor),
+                    fontSize = (com.example.chat.ui.navigation.ReferenceLayoutMetrics.identityTextSizeSp * theme.fontScale).sp,
+                    fontWeight = FontWeight.W700)
+                if (showStatus) Text(userAbout, color = Color(theme.secondaryTextColor), fontSize = (14 * theme.fontScale).sp)
+            }
         }
     }
     Row(
-        modifier = Modifier.padding(start = 16.dp, top = 8.dp, end = 4.dp, bottom = 6.dp),
+        modifier = Modifier
+            .then(if (largeDefault) Modifier.height(com.example.chat.ui.navigation.ReferenceLayoutMetrics.actionBarHeightDp.dp) else Modifier)
+            .padding(start = 16.dp, top = if (largeDefault) 0.dp else 8.dp, end = 4.dp, bottom = if (largeDefault) 0.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -232,13 +261,14 @@ fun StandardHomeAppBar(
                     .combinedClickable(onClick = { if (homePrefs.nameTapOpensLocked) onIdentityTap() }, onLongClick = onIdentityLongPress)
                     .padding(horizontal = 4.dp, vertical = 2.dp),
             ) {
-                if (!largeDefault) Text(
+                if (!largeDefault || headerCollapse > 0f) Text(
                     title,
+                    modifier = if (largeDefault) Modifier.alpha(headerCollapse) else Modifier,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = if (homeStyle == "Classic") Color(theme.accentColor) else Color(theme.primaryTextColor),
-                    fontSize = (titleFontSize * theme.fontScale).sp,
-                    fontWeight = FontWeight.W800,
+                    fontSize = ((if (largeDefault) 20.0 else titleFontSize) * theme.fontScale).sp,
+                    fontWeight = if (largeDefault) FontWeight.W700 else FontWeight.W800,
                     letterSpacing = if (headerStyle == HomeHeaderStyle.prominentIdentity) (-0.55).sp else (-0.2).sp,
                 )
                 if (showStatus && !largeDefault) {
@@ -287,14 +317,6 @@ fun StandardHomeAppBar(
             IconButton(onClick = nav.onOpenProfile) {
                 Icon(Icons.Outlined.PersonAddAlt1, contentDescription = "Account settings", tint = Color(theme.primaryTextColor))
             }
-        }
-        // Notifications is a separate destination from Settings.
-        IconButton(onClick = nav.onOpenNotifications, modifier = Modifier.testTag("home_notifications_button")) {
-            Icon(
-                Icons.Outlined.Notifications,
-                contentDescription = "Open notifications",
-                tint = Color(theme.primaryTextColor),
-            )
         }
         // Small profile avatar -> Settings (real photo when uploaded, via
         // the shared ChatyAsyncImage wrapper).
@@ -353,21 +375,25 @@ fun HomeOverflowMenu(
 ) {
     // Linked Devices / Scheduler / Auto Reply are deferred to the next release (ReleaseFeatures).
     val items: List<Triple<ImageVector, String, () -> Unit>> = listOfNotNull(
-        Triple(Icons.Rounded.GroupAdd, "New Group") { nav.onOpenNewChat(true, false) },
-        if (ReleaseFeatures.LINKED_DEVICES) Triple(Icons.Outlined.Devices, "Linked Devices") { nav.onOpenLinkedDevices() } else null,
-        Triple(Icons.Rounded.Star, "Starred Messages") { nav.onOpenStarredMessages() },
         if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.ScheduleSend, "Message Scheduler") { nav.onOpenMessageManagement() } else null,
         if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.Reply, "Auto Reply") { nav.onOpenMessageManagement() } else null,
+        Triple(Icons.Outlined.RestartAlt, "Restart Chaty") { nav.onRestartApp() },
         Triple(Icons.Outlined.Dialpad, "Message a Number") { onMessageANumber() },
         Triple(Icons.Outlined.Campaign, "Mass Message") { nav.onOpenNewChat(false, true) },
+        Triple(Icons.Outlined.GroupAdd, "New Group") { nav.onOpenNewChat(true, false) },
+        if (nav.showUpdatesEntry) Triple(Icons.Outlined.Update, "Updates") { nav.onOpenUpdates() } else null,
+        if (nav.showTasksEntry) Triple(Icons.Outlined.TaskAlt, "Tasks") { nav.onOpenTasks() } else null,
+        if (ReleaseFeatures.LINKED_DEVICES) Triple(Icons.Outlined.Devices, "Linked Devices") { nav.onOpenLinkedDevices() } else null,
+        Triple(Icons.Outlined.Star, "Starred Messages") { nav.onOpenStarredMessages() },
+        Triple(Icons.Outlined.DoneAll, "Mark All as Read") { onMarkAllAsRead() },
         Triple(Icons.Outlined.Call, "Who can call me?") { nav.onWhoCanCallMe() },
-        Triple(Icons.Rounded.DoneAll, "Mark All as Read") { onMarkAllAsRead() },
         Triple(Icons.Outlined.Share, "Share Chaty") { nav.onShareApp() },
-        Triple(Icons.Rounded.RestartAlt, "Restart Chaty") { nav.onRestartApp() },
+        Triple(Icons.Outlined.Settings, "Settings") { nav.onOpenSettings() },
     )
     DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
         expanded = expanded,
         onDismissRequest = onDismiss,
+        rememberKey = "home-overflow-menu",
         containerColor = Color(theme.cardColor),
         border = androidx.compose.foundation.BorderStroke(1.1.dp, Color(argbWithAlpha(theme.secondaryTextColor, 0.2))),
     ) {
@@ -375,9 +401,9 @@ fun HomeOverflowMenu(
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(icon, contentDescription = null, tint = Color(argbWithAlpha(theme.primaryTextColor, 0.9)))
+                        Icon(icon, contentDescription = null, tint = Color(theme.secondaryTextColor), modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(12.dp))
-                        Text(label, color = Color(theme.primaryTextColor), fontSize = 15.5.sp, fontWeight = FontWeight.W600)
+                        Text(label, color = Color(theme.primaryTextColor), fontSize = 15.5.sp, fontWeight = FontWeight.Normal)
                     }
                 },
                 onClick = {

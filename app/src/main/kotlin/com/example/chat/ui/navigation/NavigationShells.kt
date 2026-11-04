@@ -69,16 +69,19 @@ import com.example.chat.ui.tasks.TaskAvatar
  *  shell background, drawn once by the shell so every enabled destination gets the
  *  same header. Action slots are added only where a destination has real actions. */
 @Composable
-internal fun OldUiDestinationTitleHeader(colors: ChatyColors, title: String) {
-    Box(Modifier.fillMaxWidth().background(colors.surface).padding(horizontal = 16.dp, vertical = 12.dp)) {
+internal fun OldUiDestinationTitleHeader(colors: ChatyColors, title: String, actions: @Composable () -> Unit = {}) {
+    Row(Modifier.fillMaxWidth().height(56.dp).background(colors.background).padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,
+            modifier = Modifier.weight(1f),
             color = colors.foreground,
             fontWeight = FontWeight.Bold,
             fontSize = 20.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        actions()
     }
 }
 
@@ -93,12 +96,13 @@ internal fun TopWhatsAppShell(
     homeHeaderTabsSlot: ((@Composable () -> Unit)?) -> Unit,
     fab: @Composable () -> Unit,
     content: @Composable () -> Unit,
+    rootHeaderActions: @Composable () -> Unit = {},
 ) {
     val tabsBelongUnderHomeHeader =
         activeDestinationId == ChatyNavigationDestinationIds.chats ||
             activeDestinationId == ChatyNavigationDestinationIds.groups
 
-    val heightDp = template.height.coerceIn(48.0, 88.0).toFloat()
+    val heightDp = 48f
     val headerTabs = LocalHomeHeaderTabs.current
     // Publish data only (no lambdas in state); cleared when this shell leaves or the root is not Chats/Groups.
     androidx.compose.runtime.SideEffect {
@@ -111,7 +115,10 @@ internal fun TopWhatsAppShell(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             if (!underHeaderPublished) {
-                OldUiDestinationTitleHeader(colors, NavigationCatalog.labelFor(activeDestinationId))
+                OldUiDestinationTitleHeader(colors, NavigationCatalog.labelFor(activeDestinationId)) {
+                    // Settings already owns its search/QR actions; keep the title and tabs.
+                    if (activeDestinationId != "settings") rootHeaderActions()
+                }
                 HomeHeaderTabsBar(colors, navItemIds, selectedIndex, heightDp, onSelect)
             }
             Box(Modifier.weight(1f)) { content() }
@@ -144,15 +151,9 @@ internal fun FloatingIslandRailShell(
                     .clip(RoundedCornerShape(30.dp))
                     .background(colors.surface),
             ) {
+                // User directive: slim floating rail - the decorative three-dot
+                // traffic-light row and the bottom avatar are removed.
                 Spacer(Modifier.height(14.dp))
-                Row {
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(colors.error))
-                    Spacer(Modifier.width(4.dp))
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(colors.warning))
-                    Spacer(Modifier.width(4.dp))
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(colors.success))
-                }
-                Spacer(Modifier.height(16.dp))
                 Icon(Icons.Rounded.Bolt, contentDescription = null, tint = colors.primary, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.height(16.dp))
                 Box(Modifier.padding(horizontal = 12.dp).fillMaxWidth().height(1.dp).background(colors.divider))
@@ -179,14 +180,6 @@ internal fun FloatingIslandRailShell(
                             )
                         }
                     }
-                }
-                Box(Modifier.padding(horizontal = 12.dp).fillMaxWidth().height(1.dp).background(colors.divider))
-                Spacer(Modifier.height(12.dp))
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(32.dp).clip(CircleShape).background(colors.surfaceSecondary),
-                ) {
-                    Text(userInitials, color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
                 Spacer(Modifier.height(14.dp))
             }

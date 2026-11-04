@@ -14,6 +14,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.mandatorySystemGestures
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Arrangement
@@ -77,6 +82,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -124,17 +133,24 @@ fun CallContactPickerScreen(
     val tones = remember(context) { runCatching { ToneGenerator(AudioManager.STREAM_DTMF, 70) }.getOrNull() }
     DisposableEffect(tones) { onDispose { tones?.release() } }
 
+    val toneDispatcher = remember(tones) {
+        DialpadToneDispatcher { tone, durationMs ->
+            val androidTone = when (tone) {
+                DialpadToneDispatcher.Tone.STAR -> ToneGenerator.TONE_DTMF_S
+                DialpadToneDispatcher.Tone.HASH -> ToneGenerator.TONE_DTMF_P
+                else -> ToneGenerator.TONE_DTMF_0 + tone.ordinal
+            }
+            tones?.startTone(androidTone, durationMs) == true
+        }
+    }
     fun playDialTone(digit: String) {
-        val audio = context.getSystemService(AudioManager::class.java)
-        val enabled = Settings.System.getInt(context.contentResolver, Settings.System.DTMF_TONE_WHEN_DIALING, 1) != 0
-        if (!enabled || audio?.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
-        val tone = when (digit) {
-            "*" -> ToneGenerator.TONE_DTMF_S
-            "#" -> ToneGenerator.TONE_DTMF_P
-            "+" -> ToneGenerator.TONE_DTMF_0
-            else -> digit.toIntOrNull()?.let { ToneGenerator.TONE_DTMF_0 + it }
-        } ?: return
-        runCatching { tones?.startTone(tone, 100) }
+        // Preference/audio-service reads must not prevent the digit from appearing
+        // on devices whose platform service is unavailable or denies the read.
+        runCatching {
+            val audio = context.getSystemService(AudioManager::class.java)
+            val enabled = Settings.System.getInt(context.contentResolver, Settings.System.DTMF_TONE_WHEN_DIALING, 1) != 0
+            toneDispatcher.dispatch(digit, enabled, audio?.ringerMode == AudioManager.RINGER_MODE_NORMAL)
+        }
     }
 
     var query by remember { mutableStateOf("") }
@@ -192,11 +208,12 @@ fun CallContactPickerScreen(
     }
 
     var backspaceRepeating by remember { mutableStateOf(false) }
-    LaunchedEffect(backspaceRepeating) {
+    LaunchedEffect(backspaceRepeating, startingContactId) {
         if (!backspaceRepeating) return@LaunchedEffect
-        while (backspaceRepeating && query.isNotEmpty()) {
+        if (startingContactId != null) { backspaceRepeating = false; return@LaunchedEffect }
+        while (backspaceRepeating && query.isNotEmpty() && startingContactId == null) {
             delay(100)
-            if (query.isEmpty()) break
+            if (query.isEmpty() || startingContactId != null) break
             removeDigit()
         }
         backspaceRepeating = false
@@ -221,7 +238,9 @@ fun CallContactPickerScreen(
     }
 
     Scaffold(
-        modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
+        modifier = Modifier.windowInsetsPadding(
+            WindowInsets.safeDrawing.union(WindowInsets.mandatorySystemGestures.only(WindowInsetsSides.Bottom)),
+        ),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = Color(theme.backgroundColor),
         floatingActionButton = {
@@ -255,10 +274,13 @@ fun CallContactPickerScreen(
                     letterSpacing = (-0.3).sp,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = { isDialpad = !isDialpad }) {
+                IconButton(onClick = { isDialpad = !isDialpad },
+                    modifier = Modifier.size(48.dp).semantics(mergeDescendants = true) {
+                        contentDescription = if (isDialpad) "Show contacts" else "Open dialpad"
+                    }) {
                     Icon(
                         if (isDialpad) Icons.Rounded.Contacts else Icons.Rounded.Dialpad,
-                        contentDescription = if (isDialpad) "Show contacts" else "Open dialpad",
+                        contentDescription = null,
                         tint = Color(theme.accentColor),
                         modifier = Modifier.size(24.dp),
                     )
@@ -290,6 +312,8 @@ fun CallContactPickerScreen(
                         Text(
                             if (isDialpad) "Enter number" else "Search contacts",
                             color = Color(theme.secondaryTextColor),
+                            textAlign = if (isDialpad) TextAlign.Center else TextAlign.Start,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     },
                     leadingIcon = if (!isDialpad) {
@@ -305,11 +329,6 @@ fun CallContactPickerScreen(
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier.weight(1f),
                 )
-                if (isDialpad && query.isNotEmpty()) {
-                    IconButton(onClick = { query = "" }) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Clear number", tint = Color(theme.secondaryTextColor))
-                    }
-                }
             }
 
             if (isDialpad && query.isNotEmpty()) {
@@ -464,6 +483,7 @@ fun CallContactPickerScreen(
                             Color(theme.surfaceColor),
                             com.example.chat.ui.kit.ChatyModalShape,
                         )
+                        .navigationBarsPadding()
                         .padding(start = 28.dp, top = 16.dp, end = 28.dp, bottom = 16.dp),
                 ) {
                     LazyVerticalGrid(
@@ -558,7 +578,20 @@ fun CallContactPickerScreen(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .size(48.dp)
-                                .semantics(mergeDescendants = true) { contentDescription = "Delete digit" }
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = "Delete digit"
+                                    role = Role.Button
+                                    // Semantic actions are for accessibility only. Pointer input below
+                                    // keeps ownership of touch gestures, so a tap deletes only once.
+                                    onClick(label = "Delete one digit") {
+                                        if (startingContactId == null && query.isNotEmpty()) removeDigit()
+                                        true
+                                    }
+                                    onLongClick(label = "Delete digits repeatedly") {
+                                        if (startingContactId == null && query.isNotEmpty()) backspaceRepeating = true
+                                        true
+                                    }
+                                }
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onTap = { if (query.isNotEmpty()) removeDigit() },

@@ -582,6 +582,8 @@ fun AppRoot() {
                 var pushedUniversalAppearance by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedComponentStyles by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedThemeStudio by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedTasks by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedUpdates by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedAppIcon by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedSettingsSearch by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedNetworkUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
@@ -621,7 +623,159 @@ fun AppRoot() {
                 val shellHome = ServiceLocator.preferencesController.home
                 val shellPrefsCtl = ServiceLocator.preferencesController
                 val shellPrivacy = shellPrefsCtl.privacy
+                // User directive: Tasks/Updates hidden from the rail remain reachable
+                // from the home header overflow menu as pushed full screens (no live
+                // preview - the real destination content). The destination bodies are
+                // shared between the pager branch and the pushed overlay.
+                val tasksDestinationContent: @Composable () -> Unit = {
+                val controller = ServiceLocator.tasksController
+                var tasksRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                val tasksAccountKey = ServiceLocator.apiBackend.currentUser?.id ?: ""
+                fun editorDraftKey(taskId: String?) = tasksAccountKey + "|" + (taskId ?: "new")
+                fun storeEditorDraft(taskId: String?, d: com.example.chat.ui.tasks.TaskDraftValues) {
+                    editorDrafts = editorDrafts + (editorDraftKey(taskId) to com.example.chat.ui.tasks.TaskDraftCodec.encode(d))
+                }
+                fun loadEditorDraft(taskId: String?): com.example.chat.ui.tasks.TaskDraftValues? =
+                    editorDrafts[editorDraftKey(taskId)]?.let { e -> com.example.chat.ui.tasks.TaskDraftCodec.decode(e) }
+                fun clearEditorDraft(taskId: String?) {
+                    editorDrafts = editorDrafts - editorDraftKey(taskId)
+                }
+                val detailTaskId = detailTaskIds[tasksAccountKey]
+                val editorOpen = editorOpenByAccount[tasksAccountKey] == true
+                val editorTaskId = editorTaskIds[tasksAccountKey]
+                fun setDetailTaskId(id: String?) {
+                    detailTaskIds = if (id == null) detailTaskIds - tasksAccountKey else detailTaskIds + (tasksAccountKey to id)
+                }
+                fun setEditorState(open: Boolean, taskId: String?) {
+                    editorOpenByAccount = if (open) editorOpenByAccount + (tasksAccountKey to true) else editorOpenByAccount - tasksAccountKey
+                    editorTaskIds = if (taskId == null) editorTaskIds - tasksAccountKey else editorTaskIds + (tasksAccountKey to taskId)
+                }
+                // Snapshot counts only loads validated for the CURRENT account:
+                // prior-account cache can neither resolve nor close restored state.
+                val tasksLoaded = tasksRevision.let { controller.hasLoadedOnce }
+                val tasksSnapshot = if (tasksLoaded) controller.tasks else emptyList()
+                val detailTask = detailTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
+                val editorResolved = editorTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
+                if (editorResolved != null) lastResolvedEditorByAccount = lastResolvedEditorByAccount + (tasksAccountKey to editorResolved)
+                val editorTask = editorResolved ?: lastResolvedEditorByAccount[tasksAccountKey]
+                // Non-destructive settle: a restore target confirmed gone AFTER a
+                // current-account load (and never resolved here, so no draft exists)
+                // closes with a notice instead of vanishing; never flashes create flow.
+                androidx.compose.runtime.LaunchedEffect(tasksLoaded, editorTaskId, editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
+                    if (tasksLoaded && editorTaskId != null && editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
+                        setEditorState(false, null)
+                        settingsNotice = "This task is no longer available."
+                    }
+                }
+                androidx.compose.runtime.LaunchedEffect(tasksLoaded, detailTaskId, detailTask == null) {
+                    if (tasksLoaded && detailTaskId != null && detailTask == null) setDetailTaskId(null)
+                }
+                // Contextual FAB 'Create task' (hoisted tick from the shell FAB).
+                androidx.compose.runtime.LaunchedEffect(createTaskTick) {
+                    if (createTaskTick > handledCreateTaskTick) {
+                        handledCreateTaskTick = createTaskTick
+                        setEditorState(true, null)
+                    }
+                }
+                androidx.compose.runtime.DisposableEffect(controller) {
+                    val l: () -> Unit = { tasksRevision++ }
+                    controller.addListener(l)
+                    onDispose { controller.removeListener(l) }
+                }
+                androidx.compose.runtime.LaunchedEffect(Unit) { controller.loadTasks() }
+                val taskUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                val lookup: (String) -> com.example.chat.domain.models.UserProfile? =
+                    { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } }
+                val detail = detailTask
+                // System Back from a task detail returns to the task list, not out of the Tasks tab.
+                androidx.activity.compose.BackHandler(enabled = detail != null && !editorOpen) { setDetailTaskId(null) }
+                if (taskUser != null && detail != null) {
+                    com.example.chat.ui.tasks.TaskDetailScreen(
+                        task = detail,
+                        controller = controller,
+                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
+                        currentUser = taskUser,
+                        getUser = lookup,
+                        onBack = { setDetailTaskId(null) },
+                        onEditTask = { setEditorState(true, it.id) },
+                    )
+                } else {
+                    com.example.chat.ui.tasks.TasksScreen(
+                        controller = controller,
+                        tasksRevision = tasksRevision,
+                        conversations = ServiceLocator.apiBackend.conversations,
+                        getUser = lookup,
+                        onOpenDetail = { setDetailTaskId(it.id) },
+                        onEditTask = { setEditorState(true, it.id) },
+                        onCreateTask = { setEditorState(true, null) },
+                    )
+                }
+                if (editorOpen && taskUser != null && (editorTaskId == null || editorTask != null)) {
+                    com.example.chat.ui.tasks.TaskCreateEditModal(
+                        controller = controller,
+                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
+                        conversations = ServiceLocator.apiBackend.conversations,
+                        currentUser = taskUser,
+                        getUser = lookup,
+                        sourceConversationId = "",
+                        existingTask = editorTask,
+                        initialDraft = loadEditorDraft(editorTaskId),
+                        onDraftChange = { d -> storeEditorDraft(editorTaskId, d) },
+                        onDismiss = { clearEditorDraft(editorTaskId); setEditorState(false, null) },
+                        onSaved = { msg -> clearEditorDraft(editorTaskId); setEditorState(false, null); settingsNotice = msg },
+                        onError = { msg -> settingsNotice = msg },
+                    )
+                }
+                }
+                val updatesDestinationContent: @Composable () -> Unit = {
+                val updUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                if (updUser != null) {
+                    val statusService = ServiceLocator.statusService
+                    val statusFlow = remember(statusService) {
+                        statusService.watchActiveStatuses(
+                            keepDeleted = { ServiceLocator.preferencesController.privacy.antiDeleteStatus },
+                        )
+                    }
+                    val toastContext = androidx.compose.ui.platform.LocalContext.current
+                    com.example.chat.ui.updates.UpdatesScreen(
+                        // Dart launchUrl(signedUrl, LaunchMode.externalApplication).
+                        openUrl = { url ->
+                            try {
+                                toastContext.startActivity(
+                                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            } catch (e: Exception) {
+                                android.util.Log.w("AppRoot", "open status url failed: $e")
+                            }
+                        },
+                        statusService = statusService,
+                        colors = shellColors,
+                        currentUser = updUser,
+                        getUser = { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } },
+                        statuses = statusFlow,
+                        captureStory = captureStory,
+                        pickStatusMedia = com.example.chat.ui.updates.rememberStatusMediaPicker(),
+                        onNotify = { msg ->
+                            android.widget.Toast.makeText(toastContext, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                    )
+                }
+                }
                 com.example.chat.ui.navigation.MainNavigationShell(
+                    rootHeaderActions = {
+                        com.example.chat.ui.navigation.ReferenceRootActions(
+                            colors = shellColors, user = ServiceLocator.apiBackend.currentUser?.let { u ->
+                                com.example.chat.domain.models.UserProfile(
+                                    id = u.id, displayName = u.displayName, username = u.username,
+                                    avatarInitials = u.avatarInitials, avatarColorHex = u.avatarColorHex, avatarUrl = u.avatarUrl,
+                                    about = u.about, lastSeenAt = java.time.Instant.now(),
+                                )
+                            },
+                            onSearch = { route = AuthRoute.GlobalSearch },
+                            onSettings = { pushedSettings = true },
+                        )
+                    },
                     colors = shellColors,
                     template = ServiceLocator.templateController.navigation,
                     navigationMode = themeController.navigationMode,
@@ -636,6 +790,7 @@ fun AppRoot() {
                         bottomBarStyle = ServiceLocator.appearanceVariantController.bottomBarStyle,
                         navigationStyleName = ServiceLocator.appearanceVariantController.navigationStyle,
                         homeStyle = shellHome.homeStyle,
+                        oneUiRaisedCenterDock = com.example.chat.ui.navigation.HomePresetNormalizer.oneUiRaisedCenterDockEnabled(shellHome.homeStyle),
                         animationsDisabled = com.example.chat.ui.kit.rememberChatyReduceMotion(),
                     ),
                     myNameOverride = { shellHome.myNameOverride },
@@ -763,6 +918,12 @@ fun AppRoot() {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.chats -> {
                 com.example.chat.ui.ChatsHomeHost(
                     forcedType = null, pageTitle = null, gate = gate,
+                    onOpenDestination = { id ->
+                        when (id) {
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> pushedTasks = true
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.updates -> pushedUpdates = true
+                        }
+                    },
                     onOpenConversation = { conversation ->
                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
                         selectedConversation = conversation
@@ -883,141 +1044,8 @@ fun AppRoot() {
                                     },
                                 )
                             }
-                            com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> {
-                                val controller = ServiceLocator.tasksController
-                                var tasksRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                                val tasksAccountKey = ServiceLocator.apiBackend.currentUser?.id ?: ""
-                                fun editorDraftKey(taskId: String?) = tasksAccountKey + "|" + (taskId ?: "new")
-                                fun storeEditorDraft(taskId: String?, d: com.example.chat.ui.tasks.TaskDraftValues) {
-                                    editorDrafts = editorDrafts + (editorDraftKey(taskId) to com.example.chat.ui.tasks.TaskDraftCodec.encode(d))
-                                }
-                                fun loadEditorDraft(taskId: String?): com.example.chat.ui.tasks.TaskDraftValues? =
-                                    editorDrafts[editorDraftKey(taskId)]?.let { e -> com.example.chat.ui.tasks.TaskDraftCodec.decode(e) }
-                                fun clearEditorDraft(taskId: String?) {
-                                    editorDrafts = editorDrafts - editorDraftKey(taskId)
-                                }
-                                val detailTaskId = detailTaskIds[tasksAccountKey]
-                                val editorOpen = editorOpenByAccount[tasksAccountKey] == true
-                                val editorTaskId = editorTaskIds[tasksAccountKey]
-                                fun setDetailTaskId(id: String?) {
-                                    detailTaskIds = if (id == null) detailTaskIds - tasksAccountKey else detailTaskIds + (tasksAccountKey to id)
-                                }
-                                fun setEditorState(open: Boolean, taskId: String?) {
-                                    editorOpenByAccount = if (open) editorOpenByAccount + (tasksAccountKey to true) else editorOpenByAccount - tasksAccountKey
-                                    editorTaskIds = if (taskId == null) editorTaskIds - tasksAccountKey else editorTaskIds + (tasksAccountKey to taskId)
-                                }
-                                // Snapshot counts only loads validated for the CURRENT account:
-                                // prior-account cache can neither resolve nor close restored state.
-                                val tasksLoaded = tasksRevision.let { controller.hasLoadedOnce }
-                                val tasksSnapshot = if (tasksLoaded) controller.tasks else emptyList()
-                                val detailTask = detailTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
-                                val editorResolved = editorTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
-                                if (editorResolved != null) lastResolvedEditorByAccount = lastResolvedEditorByAccount + (tasksAccountKey to editorResolved)
-                                val editorTask = editorResolved ?: lastResolvedEditorByAccount[tasksAccountKey]
-                                // Non-destructive settle: a restore target confirmed gone AFTER a
-                                // current-account load (and never resolved here, so no draft exists)
-                                // closes with a notice instead of vanishing; never flashes create flow.
-                                androidx.compose.runtime.LaunchedEffect(tasksLoaded, editorTaskId, editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
-                                    if (tasksLoaded && editorTaskId != null && editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
-                                        setEditorState(false, null)
-                                        settingsNotice = "This task is no longer available."
-                                    }
-                                }
-                                androidx.compose.runtime.LaunchedEffect(tasksLoaded, detailTaskId, detailTask == null) {
-                                    if (tasksLoaded && detailTaskId != null && detailTask == null) setDetailTaskId(null)
-                                }
-                                // Contextual FAB 'Create task' (hoisted tick from the shell FAB).
-                                androidx.compose.runtime.LaunchedEffect(createTaskTick) {
-                                    if (createTaskTick > handledCreateTaskTick) {
-                                        handledCreateTaskTick = createTaskTick
-                                        setEditorState(true, null)
-                                    }
-                                }
-                                androidx.compose.runtime.DisposableEffect(controller) {
-                                    val l: () -> Unit = { tasksRevision++ }
-                                    controller.addListener(l)
-                                    onDispose { controller.removeListener(l) }
-                                }
-                                androidx.compose.runtime.LaunchedEffect(Unit) { controller.loadTasks() }
-                                val taskUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
-                                val lookup: (String) -> com.example.chat.domain.models.UserProfile? =
-                                    { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } }
-                                val detail = detailTask
-                                // System Back from a task detail returns to the task list, not out of the Tasks tab.
-                                androidx.activity.compose.BackHandler(enabled = detail != null && !editorOpen) { setDetailTaskId(null) }
-                                if (taskUser != null && detail != null) {
-                                    com.example.chat.ui.tasks.TaskDetailScreen(
-                                        task = detail,
-                                        controller = controller,
-                                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
-                                        currentUser = taskUser,
-                                        getUser = lookup,
-                                        onBack = { setDetailTaskId(null) },
-                                        onEditTask = { setEditorState(true, it.id) },
-                                    )
-                                } else {
-                                    com.example.chat.ui.tasks.TasksScreen(
-                                        controller = controller,
-                                        tasksRevision = tasksRevision,
-                                        conversations = ServiceLocator.apiBackend.conversations,
-                                        getUser = lookup,
-                                        onOpenDetail = { setDetailTaskId(it.id) },
-                                        onEditTask = { setEditorState(true, it.id) },
-                                        onCreateTask = { setEditorState(true, null) },
-                                    )
-                                }
-                                if (editorOpen && taskUser != null && (editorTaskId == null || editorTask != null)) {
-                                    com.example.chat.ui.tasks.TaskCreateEditModal(
-                                        controller = controller,
-                                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
-                                        conversations = ServiceLocator.apiBackend.conversations,
-                                        currentUser = taskUser,
-                                        getUser = lookup,
-                                        sourceConversationId = "",
-                                        existingTask = editorTask,
-                                        initialDraft = loadEditorDraft(editorTaskId),
-                                        onDraftChange = { d -> storeEditorDraft(editorTaskId, d) },
-                                        onDismiss = { clearEditorDraft(editorTaskId); setEditorState(false, null) },
-                                        onSaved = { msg -> clearEditorDraft(editorTaskId); setEditorState(false, null); settingsNotice = msg },
-                                        onError = { msg -> settingsNotice = msg },
-                                    )
-                                }
-                            }
-                            com.example.chat.core.templates.ChatyNavigationDestinationIds.updates -> {
-                                val updUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
-                                if (updUser != null) {
-                                    val statusService = ServiceLocator.statusService
-                                    val statusFlow = remember(statusService) {
-                                        statusService.watchActiveStatuses(
-                                            keepDeleted = { ServiceLocator.preferencesController.privacy.antiDeleteStatus },
-                                        )
-                                    }
-                                    val toastContext = androidx.compose.ui.platform.LocalContext.current
-                                    com.example.chat.ui.updates.UpdatesScreen(
-                                        // Dart launchUrl(signedUrl, LaunchMode.externalApplication).
-                                        openUrl = { url ->
-                                            try {
-                                                toastContext.startActivity(
-                                                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                                )
-                                            } catch (e: Exception) {
-                                                android.util.Log.w("AppRoot", "open status url failed: $e")
-                                            }
-                                        },
-                                        statusService = statusService,
-                                        colors = shellColors,
-                                        currentUser = updUser,
-                                        getUser = { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } },
-                                        statuses = statusFlow,
-                                        captureStory = captureStory,
-                                        pickStatusMedia = com.example.chat.ui.updates.rememberStatusMediaPicker(),
-                                        onNotify = { msg ->
-                                            android.widget.Toast.makeText(toastContext, msg, android.widget.Toast.LENGTH_SHORT).show()
-                                        },
-                                    )
-                                }
-                            }
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> tasksDestinationContent()
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.updates -> updatesDestinationContent()
                             else -> androidx.compose.material3.Text(
                                 "Destination \"$destinationId\" is not hosted in this build yet.",
                                 modifier = Modifier.padding(24.dp),
@@ -1025,6 +1053,15 @@ fun AppRoot() {
                         }
                     },
                 )
+                // Hidden Tasks/Updates pushed from the home header overflow menu.
+                ChatyPushedPage(pushedTasks) {
+                    androidx.activity.compose.BackHandler { pushedTasks = false }
+                    tasksDestinationContent()
+                }
+                ChatyPushedPage(pushedUpdates) {
+                    androidx.activity.compose.BackHandler { pushedUpdates = false }
+                    updatesDestinationContent()
+                }
                 if (showCenterEffects) com.example.chat.ui.camera.EffectPickerHost(onDismiss = { showCenterEffects = false })
                 storyCapture?.let { pending ->
                     androidx.compose.ui.window.Dialog(

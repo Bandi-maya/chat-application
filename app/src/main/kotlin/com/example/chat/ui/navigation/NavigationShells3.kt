@@ -11,11 +11,15 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,6 +40,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,10 +63,12 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.AppNavigationMode
 import com.example.chat.ui.core.theme.ChatyColors
 
+val LocalReferenceDefaultPresentation = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 val LocalReferenceContentSurface = androidx.compose.runtime.staticCompositionLocalOf<Color?> { null }
 
 /** Reusable preset content surface. Callers provide real content, never screen-specific copies.
- * A null override uses reference dark contrast or the caller's light-theme surface. */
+ * A null override uses the caller's active theme surface in both light and dark mode. */
 @Composable
 fun ReferenceLayoutContentSurface(
     rounded: Boolean,
@@ -62,7 +78,7 @@ fun ReferenceLayoutContentSurface(
     surfaceOverride: Color? = null,
     content: @Composable () -> Unit,
 ) {
-    val surface = surfaceOverride ?: if (isDark) Color(0xFF1A2127) else lightSurface
+    val surface = surfaceOverride ?: lightSurface
     Box(modifier.then(if (rounded) Modifier.clip(RoundedCornerShape(24.dp)).background(surface) else Modifier)) {
         androidx.compose.runtime.CompositionLocalProvider(
             LocalReferenceContentSurface provides if (rounded) surface else null,
@@ -83,6 +99,10 @@ internal fun PresetNavigationShell(
     fab: @Composable () -> Unit,
     content: @Composable () -> Unit,
     animationsDisabled: Boolean = false,
+    rootHeaderActions: @Composable () -> Unit = {},
+    referenceDefaultPresentation: Boolean = false,
+    /** OneUI center-button dock: the raised circle in the dock middle. */
+    onCenterAction: () -> Unit = {},
 ) {
     val accent = colors.primary
     val foreground = colors.foreground
@@ -104,32 +124,61 @@ internal fun PresetNavigationShell(
     }
     val horizontalPadding = 0f
     val referenceDarkChrome = isDark && (isOneUi || isIos)
-    val exterior = if (referenceDarkChrome) Color.Black else colors.background
+    val exterior = colors.background
     val dockBackground = when {
-        referenceDarkChrome -> Color.Black
+        referenceDarkChrome -> colors.background
         isIos -> colors.surface.copy(alpha = if (isDark) 0.96f else 0.93f)
         isTelegram -> colors.surfaceElevated
         else -> colors.surface
     }
 
-    Box(Modifier.fillMaxSize().background(exterior)) {
-        val activeId = navItemIds.getOrNull(selectedIndex)
+    val activeId = navItemIds.getOrNull(selectedIndex)
+    val collapseRangePx = with(LocalDensity.current) { ReferenceLayoutMetrics.expandedIdentityHeightDp.dp.toPx() }
+    var headerOffsetPx by remember(activeId, mode) { mutableFloatStateOf(0f) }
+    val headerCollapse = if (isOneUi && collapseRangePx > 0f) -headerOffsetPx / collapseRangePx else 0f
+    val headerScroll = remember(activeId, mode, collapseRangePx) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (!isOneUi) return Offset.Zero
+                val old = headerOffsetPx
+                headerOffsetPx = referenceHeaderScrollOffset(old, available.y, collapseRangePx)
+                return Offset(0f, headerOffsetPx - old)
+            }
+        }
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalReferenceHeaderCollapse provides headerCollapse, LocalReferenceDefaultPresentation provides (isOneUi && referenceDefaultPresentation)) {
+    Box(Modifier.fillMaxSize().background(exterior).nestedScroll(headerScroll)) {
         // Only adapters that already honor the title hand-off may suppress their title.
         // Other enabled destinations retain their existing functional header.
-        val shellOwnsHeading = (isOneUi || isIos) && activeId in setOf("calls", "updates", "settings")
+        val shellOwnsHeading = (isOneUi || isIos) && activeId in setOf("calls", "updates", "settings", "tasks")
         Column(Modifier.fillMaxSize().padding(bottom = barHeight.dp)) {
             if (shellOwnsHeading) {
-                Row(Modifier.fillMaxWidth().height(if (isOneUi) 164.dp else 56.dp)
+                Row(Modifier.fillMaxWidth().height(if (isOneUi) (ReferenceLayoutMetrics.expandedIdentityHeightDp * (1f - headerCollapse)).dp else 56.dp)
+                    .padding(top = if (isOneUi) (ReferenceLayoutMetrics.actionBarHeightDp * (1f - headerCollapse)).dp else 0.dp)
+                    .then(if (isOneUi) Modifier.clipToBounds().alpha(1f - headerCollapse) else Modifier)
                     .padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = if (isOneUi) Arrangement.Center else Arrangement.Start) {
                     if (isOneUi) {
-                        NavDestinationIcon(activeId!!, size = 32, tint = foreground)
+                        NavDestinationIcon(activeId!!, size = ReferenceLayoutMetrics.identityIconSizeDp, tint = foreground)
                         Spacer(Modifier.width(8.dp))
                     }
                     Text(NavigationCatalog.labelFor(activeId!!), color = foreground,
-                        fontSize = if (isOneUi) 32.sp else 20.sp, fontWeight = FontWeight.Bold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        fontSize = if (isOneUi) ReferenceLayoutMetrics.identityTextSizeSp.sp else 20.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = if (isOneUi) Modifier else Modifier.weight(1f))
+                    if (!isOneUi && activeId != "settings") rootHeaderActions() // Settings hosts its own edit/search/QR row; the avatar already opens Settings.
                 }
+            }
+            if (shellOwnsHeading && isOneUi) Row(
+                Modifier.fillMaxWidth().height(ReferenceLayoutMetrics.actionBarHeightDp.dp).padding(end = 4.dp),
+                horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(NavigationCatalog.labelFor(activeId!!), color = foreground,
+                    fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f).padding(start = 16.dp).alpha(headerCollapse),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // Settings hosts its own edit/search/QR row; the avatar already opens Settings.
+                if (activeId != "settings") rootHeaderActions()
             }
             ReferenceLayoutContentSurface(rounded = isOneUi && activeId != null && activeId !in setOf("chats", "groups"), isDark = isDark,
                 lightSurface = colors.surface, modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -141,11 +190,14 @@ internal fun PresetNavigationShell(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(horizontal = horizontalPadding.dp)
+                // User directive (Telegram dock reference): the Telegram dock floats
+                // as a rounded pill above the system bar instead of a full-width bar.
+                .then(if (isTelegram) Modifier.padding(horizontal = 12.dp) else Modifier.padding(horizontal = horizontalPadding.dp))
                 .fillMaxWidth()
+                .padding(bottom = if (isTelegram) 10.dp else 0.dp)
                 .height(barHeight.dp)
                 .then(
-                    if (isTelegram) Modifier.shadow(6.dp) else Modifier,
+                    if (isTelegram) Modifier.shadow(6.dp, RoundedCornerShape(24.dp)).clip(RoundedCornerShape(24.dp)) else Modifier,
                 )
                 .background(dockBackground),
         ) {
@@ -168,10 +220,10 @@ internal fun PresetNavigationShell(
             }
             // Shared by applied Home and read-only preview: preserve every configured destination.
             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                navItemIds.forEachIndexed { index, id ->
+                val renderDockItem: @Composable androidx.compose.foundation.layout.RowScope.(Int, String) -> Unit = { index, id ->
                     val selected = index == selectedIndex
                     val label = NavigationCatalog.labelFor(id)
-                    val targetTint = if (referenceDarkChrome) Color.White else if (selected) foreground else secondary
+                    val targetTint = if (selected) foreground else secondary
                     val tint by animateColorAsState(targetValue = targetTint,
                         animationSpec = tween(if (animationsDisabled) 0 else 140), label = "navigation-item-tint")
                     val selectedModifier = Modifier
@@ -203,28 +255,66 @@ internal fun PresetNavigationShell(
                                     overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
                             }
                         }
-                        else -> Column(selectedModifier, horizontalAlignment = Alignment.CenterHorizontally,
+                        else -> Column(
+                            // Telegram reference: selection is a rounded pill behind the
+                            // icon+label; tint stays foreground for every item, no underline.
+                            if (isTelegram) selectedModifier
+                                .padding(horizontal = 2.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (selected) colors.primary.copy(alpha = if (isDark) 0.22f else 0.12f) else Color.Transparent)
+                            else selectedModifier,
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center) {
                             if (isInstagram) Box(Modifier.width(26.dp).height(2.dp)
                                 .background(if (selected) accent else Color.Transparent))
                             NavDestinationIcon(id, size = if (isBasic) 23 else 24,
                                 selected = isIos && selected,
-                                tint = if (isIos) tint else if (selected) accent else secondary)
+                                tint = if (isTelegram) foreground else if (isIos) tint else if (selected) accent else secondary)
                             if (!isInstagram) {
                                 Spacer(Modifier.height(if (isIos) 4.dp else 3.dp))
-                                Text(label, color = tint, fontSize = if (isIos) 11.sp else if (isBasic) 13.sp else 11.sp,
+                                Text(label, color = if (isTelegram) foreground else tint, fontSize = if (isIos) 11.sp else if (isBasic) 13.sp else 11.sp,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                                    fontWeight = if (!isTelegram && selected) FontWeight.Bold else FontWeight.Medium)
                             }
-                            if (isTelegram) Box(Modifier.width(16.dp).height(2.dp)
-                                .background(if (selected) accent else Color.Transparent))
                         }
                     }
+                }
+                // OneUI center-button dock: left half / fixed center gap for the
+                // raised circle / right half. Both halves are weight(1f), so the gap
+                // sits exactly at the bar's center for odd and even item counts.
+                // Explicit One UI pick only - the Chaty Default presentation, which
+                // also renders through the oneUi mode, keeps the plain weight row.
+                if (isOneUi && !referenceDefaultPresentation) {
+                    val half = navItemIds.size / 2
+                    Row(Modifier.weight(1f).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+                        navItemIds.subList(0, half).forEachIndexed { i, id -> renderDockItem(i, id) }
+                    }
+                    Spacer(Modifier.width(56.dp))
+                    Row(Modifier.weight(1f).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
+                        navItemIds.subList(half, navItemIds.size).forEachIndexed { i, id -> renderDockItem(half + i, id) }
+                    }
+                } else {
+                    navItemIds.forEachIndexed { index, id -> renderDockItem(index, id) }
+                }
+            }
+            // The OneUI dock carries a raised circular center action button
+            // overlapping the bar top (explicit One UI pick only).
+            if (isOneUi && !referenceDefaultPresentation) {
+                Box(
+                    Modifier.align(Alignment.TopCenter).offset(y = (-14).dp)
+                        .size(52.dp).shadow(6.dp, CircleShape).clip(CircleShape)
+                        .background(accent)
+                        .clickable { onCenterAction() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.CameraAlt, contentDescription = "Quick action", tint = colors.onPrimary,
+                        modifier = Modifier.size(24.dp))
                 }
             }
         }
         Box(Modifier.align(Alignment.BottomEnd).padding(bottom = (barHeight + 16).dp, end = 16.dp)) { fab() }
     }
+}
 }
 
 /** Port of _buildBottomShell: the 12 named bottom-bar styles' container
@@ -241,6 +331,9 @@ internal fun BottomShell(
     animationsDisabled: Boolean,
     onDestinationTap: (Int) -> Unit,
     onCenterAction: () -> Unit,
+    /** Explicit One UI pick only: render the raised-centre horizontally
+     *  scrolling dock instead of the configured named dock style. */
+    raisedCenterScrollDock: Boolean = false,
     fab: @Composable () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -296,6 +389,8 @@ internal fun BottomShell(
         "Classic Label Bar", "Soft Square Tile",
     )
 
+    val dockVariant = HomePresetNormalizer.resolvedBottomDockVariant(styleName, raisedCenterScrollDock)
+
     Box(Modifier.fillMaxSize().background(colors.background)) {
         // Reserve the complete dock footprint for every destination. Page-owned
         // Scaffold FABs (Calls) and last rows must not be drawn underneath it.
@@ -324,6 +419,49 @@ internal fun BottomShell(
             if (topBorderOnly) {
                 Box(Modifier.fillMaxWidth().height(1.dp).background(colors.borderSubtle).align(Alignment.TopCenter))
             }
+            if (dockVariant == HomePresetNormalizer.RAISED_CENTER_SCROLL_DOCK) {
+                // Fixed 64dp items scroll horizontally in two independent
+                // halves; the 56dp centre gap is a FIXED sibling (never scrolled)
+                // so it stays centred under the raised button. With few items the
+                // halves hug the gap and need no scrolling.
+                Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                    val half = navItemIds.size / 2
+                    val left = navItemIds.subList(0, half)
+                    val right = navItemIds.subList(half, navItemIds.size)
+                    Row(
+                        Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.End),
+                    ) {
+                        left.forEachIndexed { i, id ->
+                            Box(Modifier.width(64.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                                CustomNavItem(
+                                    id = id, isSelected = selectedIndex == i, isCenter = false,
+                                    styleName = styleName, colors = colors, accent = accent,
+                                    onTap = { onDestinationTap(i) },
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.width(56.dp))
+                    Row(
+                        Modifier.weight(1f).fillMaxHeight().horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.Start),
+                    ) {
+                        right.forEachIndexed { i, id ->
+                            val index = half + i
+                            Box(Modifier.width(64.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                                CustomNavItem(
+                                    id = id, isSelected = selectedIndex == index, isCenter = false,
+                                    styleName = styleName, colors = colors, accent = accent,
+                                    onTap = { onDestinationTap(index) },
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
             Row(
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.SpaceAround,
@@ -378,6 +516,25 @@ internal fun BottomShell(
                         }
                     }
                 }
+            }
+            }
+        }
+        if (dockVariant == HomePresetNormalizer.RAISED_CENTER_SCROLL_DOCK) {
+            // Raised circular centre action overlapping the dock top. Sibling of
+            // the (clipped) dock container in the outer unclipped Box so the
+            // raised 14dp is not cut off: the circle's bottom sits 38dp below the
+            // dock's top edge, i.e. (bottomMargin + barHeight - 38) above the
+            // outer bottom, horizontally centred like the dock.
+            Box(
+                Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = (bottomMargin + barHeight - 38).dp)
+                    .size(52.dp).shadow(6.dp, CircleShape).clip(CircleShape)
+                    .background(accent)
+                    .clickable(onClick = onCenterAction),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.CameraAlt, contentDescription = "Quick action", tint = colors.onPrimary,
+                    modifier = Modifier.size(24.dp))
             }
         }
         Box(Modifier.align(Alignment.BottomEnd).padding(bottom = (barHeight + bottomMargin + 16).dp, end = 16.dp)) { fab() }

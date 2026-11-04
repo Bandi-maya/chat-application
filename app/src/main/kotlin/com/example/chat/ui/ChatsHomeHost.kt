@@ -42,6 +42,9 @@ fun ChatsHomeHost(
     onOpenProfile: () -> Unit = {},
     onOpenQr: () -> Unit = {},
     onOpenLinkedDevices: () -> Unit = {},
+    /** Opens a root destination (tasks/updates) as a pushed screen; used when the
+     *  user hides them from the rail into the home header overflow menu. */
+    onOpenDestination: (String) -> Unit = {},
 ) {
     val api = ServiceLocator.apiBackend
     val prefs = ServiceLocator.preferencesController
@@ -51,10 +54,12 @@ fun ChatsHomeHost(
     var rev by remember { mutableIntStateOf(0) }
     var connectionSheetOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
     var connectionTesting by remember { androidx.compose.runtime.mutableStateOf(false) }
-    DisposableEffect(prefs) {
+    val templateController = ServiceLocator.templateController
+    DisposableEffect(prefs, templateController) {
         val l: () -> Unit = { rev++ }
         prefs.addListener(l)
-        onDispose { prefs.removeListener(l) }
+        templateController.addListener(l)
+        onDispose { prefs.removeListener(l); templateController.removeListener(l) }
     }
     @Suppress("UNUSED_EXPRESSION") rev
     val me = api.currentUser
@@ -81,6 +86,7 @@ fun ChatsHomeHost(
     } else null
     ChatsHomeScreen(
         headerBottom = headerBottom,
+        templates = com.example.chat.ui.chats.home.resolveHomeTemplates(templateController.config, com.example.chat.core.preferences.HomePresentationPolicy.isDefault(prefs.home.homeStyle), templateController.chatList),
         conversations = conversations,
         requiresSubscription = api.requiresSubscription,
         subscriptionMessage = api.subscriptionErrorMessage,
@@ -116,6 +122,12 @@ fun ChatsHomeHost(
         onToggleGhostMode = { on -> prefs.updateHome(prefs.home.copy(ghostMode = on)) },
         verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },
         nav = ChatsHomeNav(
+            // User directive: rail-hidden Tasks/Updates live in the home header
+            // overflow menu and open the real destination screens (no preview).
+            showTasksEntry = prefs.gbBool("nav_hide_tasks", false),
+            showUpdatesEntry = prefs.gbBool("nav_hide_updates", false) && com.example.chat.ReleaseFeatures.STATUS_UPDATES,
+            onOpenTasks = { onOpenDestination(com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks) },
+            onOpenUpdates = { onOpenDestination(com.example.chat.core.templates.ChatyNavigationDestinationIds.updates) },
             onOpenSettings = onOpenSettings,
             onOpenNotifications = onOpenNotifications,
             onOpenSecuritySettings = onOpenSecurity,

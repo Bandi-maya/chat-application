@@ -3,6 +3,7 @@ package com.example.chat.ui.auth
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,6 +62,7 @@ fun LoginScreen(
     onRegister: () -> Unit,
     onRegisterOrganization: () -> Unit,
     login: suspend (identifier: String, password: String, tenant: String?, isDefaultTenant: Boolean) -> String,
+    demoLogin: (suspend () -> String)? = null,
     /** Dart initState: getSavedTenantId + isUsingDefaultTenant. */
     loadSavedTenant: suspend () -> Pair<String?, Boolean>,
 ) {
@@ -132,7 +134,7 @@ fun LoginScreen(
 
     Scaffold(containerColor = Color(theme.backgroundColor)) { padding ->
         Box(
-            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
             contentAlignment = Alignment.Center,
         ) {
             Column(
@@ -284,8 +286,72 @@ fun LoginScreen(
                     )
                 }
                 Spacer(Modifier.height(16.dp))
+                if (demoLogin != null) {
+                    DemoLoginCard(theme = theme, enabled = !isLoading, onClick = {
+                        errorMessage = null
+                        isLoading = true
+                        scope.launch {
+                            try {
+                                val userId = demoLogin()
+                                onLoggedIn(userId)
+                            } catch (e: Exception) {
+                                errorMessage = e.message ?: "Demo login failed. Please try again."
+                                isLoading = false
+                            }
+                        }
+                    })
+                    Spacer(Modifier.height(8.dp))
+                }
             }
         }
+    }
+}
+
+/** Offline demo entry (NOT in Flutter): clearly labelled sample session. */
+@Composable
+private fun DemoLoginCard(theme: ThemeConfig, enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(argbWithAlpha(theme.accentColor, 0.06)), RoundedCornerShape(14.dp))
+            .border(1.dp, Color(argbWithAlpha(theme.accentColor, 0.2)), RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .background(Color(argbWithAlpha(theme.accentColor, 0.15)), RoundedCornerShape(10.dp))
+                .padding(7.dp),
+        ) {
+            Icon(
+                Icons.Rounded.Info,
+                contentDescription = null,
+                tint = Color(theme.accentColor),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "Try the demo",
+                color = Color(theme.primaryTextColor),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(1.dp))
+            Text(
+                "Explore with offline sample data - no account or server",
+                color = Color(theme.secondaryTextColor),
+                fontSize = 11.5.sp,
+            )
+        }
+        Icon(
+            Icons.Rounded.ArrowForwardIos,
+            contentDescription = null,
+            tint = Color(theme.accentColor),
+            modifier = Modifier.size(14.dp),
+        )
     }
 }
 

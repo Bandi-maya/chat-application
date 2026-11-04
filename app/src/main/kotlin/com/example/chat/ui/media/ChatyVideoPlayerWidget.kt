@@ -95,6 +95,10 @@ fun ChatyVideoPlayerWidget(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var isForeground by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
+    }
 
     var isInitialized by remember { mutableStateOf(false) }
     var hasError by remember { mutableStateOf(false) }
@@ -111,7 +115,7 @@ fun ChatyVideoPlayerWidget(
     var videoWidth by remember { mutableIntStateOf(0) }
     var videoHeight by remember { mutableIntStateOf(0) }
 
-    val player = remember {
+    val player = remember(context, videoPath, isNetworkUrl) {
         ExoPlayer.Builder(context).build().apply {
             val item = if (isNetworkUrl) MediaItem.fromUri(videoPath)
             else MediaItem.fromUri(android.net.Uri.fromFile(File(videoPath)))
@@ -120,7 +124,22 @@ fun ChatyVideoPlayerWidget(
         }
     }
 
-    DisposableEffect(player) {
+    LaunchedEffect(player) {
+        isInitialized = false
+        hasError = false
+        errorMessage = ""
+        positionMs = 0L
+        durationMs = 0L
+        videoWidth = 0
+        videoHeight = 0
+    }
+
+    DisposableEffect(player, lifecycleOwner) {
+        val lifecycleObserver = androidx.lifecycle.LifecycleEventObserver { _, _ ->
+            isForeground = lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+            if (!isForeground) player.pause()
+        }
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 isBuffering = playbackState == Player.STATE_BUFFERING
@@ -140,8 +159,9 @@ fun ChatyVideoPlayerWidget(
             }
         }
         player.addListener(listener)
-        if (autoPlay) player.play()
+        if (autoPlay && isForeground) player.play()
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
             player.removeListener(listener)
             player.release()
             if (isFullscreen) {
@@ -151,8 +171,8 @@ fun ChatyVideoPlayerWidget(
     }
 
     // Position polling (video_player value listener equivalent)
-    LaunchedEffect(player, isPlaying) {
-        while (true) {
+    LaunchedEffect(player, isPlaying, isForeground) {
+        while (isForeground) {
             positionMs = player.currentPosition.coerceAtLeast(0)
             durationMs = player.duration.coerceAtLeast(0)
             delay(if (isPlaying) 250 else 1000)
@@ -184,6 +204,7 @@ fun ChatyVideoPlayerWidget(
     }
 
     fun togglePlayPause() {
+        if (!lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) return
         ChatyHapticsPort.light(view)
         if (player.isPlaying) {
             player.pause()

@@ -1,6 +1,7 @@
 package com.example.chat.ui.calls.bundles
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -8,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -45,8 +47,8 @@ import kotlin.math.roundToInt
  * Universal Unified Bundle Incoming Call Screen.
  * Renders the incoming call screen specifically styled for each bundle.
  * Gesture-faithful answer mechanics per user-supplied references (2026-10-31):
- * Samsung = drag the action circle out of its halo; Google Latest = drag the
- * center puck left/right; Azure Ring & Mono Chevron = vertical two-target drag;
+ * Samsung = tap the action circle; Google Latest = horizontal puck;
+ * red decline / green answer buttons; Azure Ring & Mono Chevron = vertical two-target drag;
  * Nextcloud Talk = tap or swipe up to accept. Unsupported reference functions
  * (Bixby text call, AI Call Assistant, Screen call, Live Translation, Remind,
  * SMS, Voicemail) are intentionally NOT rendered - no fake buttons.
@@ -58,20 +60,36 @@ fun BundleIncomingCallView(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     onTogglePreviewMode: (() -> Unit)? = null,
+    actionPending: Boolean = false,
+    banner: Boolean = false,
+    onExpand: () -> Unit = {},
+    onMinimize: (() -> Unit)? = null,
 ) {
     val tokens = remember(bundleId) { CallBundleRegistry.getTokens(bundleId) }
 
+    if (banner) {
+        SharedIncomingCallBanner(session, actionPending, onAccept, onDecline, onExpand)
+        return
+    }
+    Box(Modifier.fillMaxSize()) {
     when (bundleId) {
         CallBundleId.CHATY_DEFAULT -> ChatyDefaultIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.APPLE_IOS -> AppleIosIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.SAMSUNG_ONE_UI -> SamsungOneUiIncomingCall(tokens, session, onAccept, onDecline)
-        CallBundleId.GOOGLE_PHONE_LATEST -> GoogleLatestIncomingCall(tokens, session, onAccept, onDecline)
+        CallBundleId.GOOGLE_PHONE_LATEST -> GoogleLatestIncomingCall(tokens, session, onAccept, onDecline, actionPending)
         CallBundleId.GOOGLE_PHONE_CLASSIC -> GoogleClassicIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.VIVO_IQOO -> VivoIqooIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.AZURE_RING_VERTICAL -> AzureRingVerticalIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.MONO_CHEVRON_DARK -> MonoChevronDarkIncomingCall(tokens, session, onAccept, onDecline)
         CallBundleId.NEXTCLOUD_TALK -> NextcloudTalkIncomingCall(tokens, session, onAccept, onDecline)
     }
+        if (onMinimize != null) {
+            TextButton(onClick = onMinimize, modifier = Modifier.align(Alignment.TopEnd).windowInsetsPadding(WindowInsets.safeDrawing)) {
+                Text("Show banner", color = tokens.primaryText)
+            }
+        }
+    }
+
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -142,12 +160,7 @@ private fun ChatyDefaultIncomingCall(
                             .background(tokens.primaryAccent),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "C" },
-                            fontSize = 44.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        )
+                        CallTypeCenterIcon(session, tint = Color.White, modifier = Modifier.size(44.dp))
                     }
                 }
                 Spacer(Modifier.height(20.dp))
@@ -200,7 +213,7 @@ private fun AppleIosIncomingCall(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
 ) {
-    var isLockedScreenSimulation by remember { mutableStateOf(false) }
+    val isLockedScreenSimulation = true // Approved slider interaction, no testing-mode switch in production.
 
     Box(
         modifier = Modifier
@@ -231,23 +244,15 @@ private fun AppleIosIncomingCall(
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = if (session.isVideo) "Chaty FaceTime Video…" else "Chaty Audio…",
+                    text = if (session.isVideo) "Chaty video call" else "Chaty Audio…",
                     fontSize = 17.sp,
                     color = Color(0xFF8E8E93),
                 )
 
-                // Quick toggle pill to test both locked slider & unlocked 2-button layouts
-                Spacer(Modifier.height(16.dp))
-                FilterChip(
-                    selected = isLockedScreenSimulation,
-                    onClick = { isLockedScreenSimulation = !isLockedScreenSimulation },
-                    label = { Text(if (isLockedScreenSimulation) "Mode: Slide to Answer" else "Mode: Two-Button Accept") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        labelColor = Color.White.copy(alpha = 0.7f),
-                        selectedLabelColor = Color.White,
-                        containerColor = Color.White.copy(alpha = 0.08f),
-                    ),
-                )
+                Spacer(Modifier.height(24.dp))
+                CallTypeCenterIcon(session, tint = Color.White, modifier = Modifier.size(64.dp))
+
+
             }
 
             // Bottom Section: iOS Style Controls
@@ -255,19 +260,6 @@ private fun AppleIosIncomingCall(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                // Secondary actions row: Remind Me & Message
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    IosSecondaryAction(icon = Icons.Rounded.Alarm, label = "Remind Me")
-                    IosSecondaryAction(icon = Icons.Rounded.ChatBubble, label = "Message")
-                }
-
-                Spacer(Modifier.height(12.dp))
-
                 if (isLockedScreenSimulation) {
                     // Slide to Answer Horizontal Slider
                     IosSlideToAnswerPill(
@@ -321,67 +313,61 @@ private fun IosSecondaryAction(icon: ImageVector, label: String) {
 }
 
 @Composable
-private fun IosSlideToAnswerPill(
-    accentColor: Color,
-    onConfirmed: () -> Unit,
-) {
-    val coroutineScope = rememberCoroutineScope()
-    val dragOffset = remember { Animatable(0f) }
-    val maxDragPx = with(LocalDensity.current) { 220.dp.toPx() }
+private fun IosSlideToAnswerPill(accentColor: Color, onConfirmed: () -> Unit) {
+    ReferenceHorizontalPuck(false, Color.White.copy(alpha = 0.16f), accentColor, Color(0xFFFF3B30),
+        onConfirmed, {}, Modifier.fillMaxWidth(), "Slide to answer")
+}
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp)
-            .clip(RoundedCornerShape(36.dp))
-            .background(Color.White.copy(alpha = 0.16f))
-            .padding(6.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Text(
-            text = "slide to answer  ››",
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center,
-            color = Color.White.copy(alpha = 0.65f),
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-        )
-
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(dragOffset.value.roundToInt(), 0) }
-                .size(60.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta ->
-                        coroutineScope.launch {
-                            val next = (dragOffset.value + delta).coerceIn(0f, maxDragPx)
-                            dragOffset.snapTo(next)
+/** Tracks the finger directly, clamps to measured width, and resets after cancellation/success. */
+@Composable
+private fun ReferenceHorizontalPuck(twoWay: Boolean, background: Color, accept: Color, decline: Color,
+    onAccept: () -> Unit, onDecline: () -> Unit, modifier: Modifier, description: String) {
+    val reduced = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val scope = rememberCoroutineScope()
+    val acceptNow by rememberUpdatedState(onAccept)
+    val declineNow by rememberUpdatedState(onDecline)
+    var offset by remember { mutableFloatStateOf(0f) }
+    var settling by remember { mutableStateOf(false) }
+    BoxWithConstraints(modifier.heightIn(min = 80.dp).clip(RoundedCornerShape(40.dp)).background(background)) {
+        val range = with(LocalDensity.current) { ((maxWidth - 76.dp).coerceAtLeast(24.dp) / (if (twoWay) 2 else 1)).toPx() }
+        val home = if (twoWay) Alignment.Center else Alignment.CenterStart
+        if (twoWay) {
+            Row(Modifier.fillMaxWidth().align(Alignment.Center).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Decline", color = decline, fontSize = 14.sp)
+                Text("Answer", color = accept, fontSize = 14.sp)
+            }
+        } else Text("slide to answer", color = Color.White, modifier = Modifier.align(Alignment.Center).padding(start = 36.dp), fontSize = 16.sp)
+        Box(Modifier.align(home).padding(horizontal = 6.dp).offset { IntOffset(offset.roundToInt(), 0) }
+            .size(64.dp).clip(CircleShape).background(Color.White)
+            .semantics {
+                contentDescription = description
+                customActions = buildList {
+                    add(CustomAccessibilityAction("Answer call") { acceptNow(); true })
+                    if (twoWay) add(CustomAccessibilityAction("Decline call") { declineNow(); true })
+                }
+            }.testTag(if (twoWay) "google_puck" else "ios_answer_puck")
+            .pointerInput(range, reduced) {
+                detectDragGestures(
+                    onDragStart = { if (!settling) offset = 0f },
+                    onDrag = { change, drag -> if (!settling) { change.consume(); offset = (offset + drag.x).coerceIn(if (twoWay) -range else 0f, range) } },
+                    onDragCancel = { if (!settling) { settling = true; scope.launch {
+                        val start = offset
+                        androidx.compose.animation.core.animate(start, 0f, animationSpec = tween(if (reduced) 0 else 200)) { value, _ -> offset = value }
+                        settling = false
+                    } } },
+                    onDragEnd = { if (!settling) {
+                        settling = true
+                        val direction = when { offset >= range * 0.7f -> 1; twoWay && offset <= -range * 0.7f -> -1; else -> 0 }
+                        scope.launch {
+                            val start = offset
+                            androidx.compose.animation.core.animate(start, direction * range, animationSpec = tween(if (reduced) 0 else 180)) { value, _ -> offset = value }
+                            offset = 0f; settling = false
+                            if (direction == 1) acceptNow() else if (direction == -1) declineNow()
                         }
-                    },
-                    onDragStopped = {
-                        if (dragOffset.value > maxDragPx * 0.75f) {
-                            coroutineScope.launch {
-                                dragOffset.animateTo(maxDragPx)
-                                onConfirmed()
-                            }
-                        } else {
-                            coroutineScope.launch {
-                                dragOffset.animateTo(0f, tween(200))
-                            }
-                        }
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Call,
-                contentDescription = "Slide to answer",
-                tint = accentColor,
-                modifier = Modifier.size(30.dp),
-            )
+                    } },
+                )
+            }, contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.Call, null, tint = if (offset < 0f) decline else accept, modifier = Modifier.size(30.dp))
         }
     }
 }
@@ -389,7 +375,7 @@ private fun IosSlideToAnswerPill(
 // -------------------------------------------------------------------------------------------------
 // 03 — SAMSUNG ONE UI INCOMING CALL (reference verified One UI by its "Bixby text call"
 // pill; that feature is unsupported by Chaty and intentionally not rendered).
-// One UI default answer mechanic: drag the action circle OUT of its halo.
+// Approved reference interaction: tap the action circle.
 // -------------------------------------------------------------------------------------------------
 @Composable
 private fun SamsungOneUiIncomingCall(
@@ -427,12 +413,7 @@ private fun SamsungOneUiIncomingCall(
                     .background(tokens.cardBackground),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "S" },
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                )
+                CallTypeCenterIcon(session, tint = Color.White, modifier = Modifier.size(36.dp))
             }
             Spacer(Modifier.height(16.dp))
             Text(
@@ -449,7 +430,7 @@ private fun SamsungOneUiIncomingCall(
             )
             Spacer(Modifier.weight(1f))
             Text(
-                text = "Drag a button out of its circle",
+                text = "Tap Answer or Decline",
                 color = tokens.secondaryText,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(bottom = 18.dp),
@@ -461,7 +442,7 @@ private fun SamsungOneUiIncomingCall(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DragOutOfCircleControl(
+                TapHaloControl(
                     label = "Answer call",
                     icon = Icons.Rounded.Call,
                     iconTint = tokens.acceptColor,
@@ -469,7 +450,7 @@ private fun SamsungOneUiIncomingCall(
                     onTrigger = onAccept,
                     modifier = Modifier.testTag("samsung_answer_control"),
                 )
-                DragOutOfCircleControl(
+                TapHaloControl(
                     label = "Decline call",
                     icon = Icons.Rounded.CallEnd,
                     iconTint = tokens.declineColor,
@@ -484,8 +465,8 @@ private fun SamsungOneUiIncomingCall(
 
 // -------------------------------------------------------------------------------------------------
 // 04 — GOOGLE PHONE LATEST (Material You / Pixel; reference: M3 fullscreen incoming
-// with name chip, large avatar and the Decline | puck | Answer bottom bar).
-// Mechanic: drag the center puck right to answer, left to decline.
+// with name chip and large avatar. Chaty product choice: explicit red decline
+// left / green answer right; not a claim of one universal Google gesture.)
 // -------------------------------------------------------------------------------------------------
 @Composable
 private fun GoogleLatestIncomingCall(
@@ -493,6 +474,7 @@ private fun GoogleLatestIncomingCall(
     session: ChatyCallSession,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
+    actionPending: Boolean,
 ) {
     Box(
         modifier = Modifier
@@ -536,112 +518,24 @@ private fun GoogleLatestIncomingCall(
                         .background(tokens.cardBackground),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "G" },
-                        fontSize = 64.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = tokens.primaryText,
-                    )
+                    CallTypeCenterIcon(session, tint = tokens.primaryText, modifier = Modifier.size(64.dp))
                 }
             }
 
-            DeclineAnswerPuckBar(
-                tokens = tokens,
-                onAccept = onAccept,
-                onDecline = onDecline,
-                modifier = Modifier.padding(bottom = 36.dp),
-            )
+            DeclineAnswerPuckBar(tokens,
+                onAccept = { if (!actionPending) onAccept() },
+                onDecline = { if (!actionPending) onDecline() },
+                modifier = Modifier.padding(bottom = 36.dp).testTag("google_latest_puck_bar"))
+
         }
     }
 }
 
 /** Material You bottom bar: Decline | draggable white puck | Answer. */
 @Composable
-private fun DeclineAnswerPuckBar(
-    tokens: CallBundleThemeTokens,
-    onAccept: () -> Unit,
-    onDecline: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val coroutineScope = rememberCoroutineScope()
-    val drag = remember { Animatable(0f) }
-    val maxDragPx = with(LocalDensity.current) { 120.dp.toPx() }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(80.dp)
-            .clip(RoundedCornerShape(40.dp))
-            .background(tokens.cardBackground),
-    ) {
-        Text(
-            text = "Decline",
-            color = tokens.declineColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 28.dp),
-        )
-        Text(
-            text = "Answer",
-            color = tokens.acceptColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 28.dp),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset { IntOffset(drag.value.roundToInt(), 0) }
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .semantics {
-                    contentDescription = "Answer or decline puck"
-                    customActions = listOf(
-                        CustomAccessibilityAction("Answer call") { onAccept(); true },
-                        CustomAccessibilityAction("Decline call") { onDecline(); true },
-                    )
-                }
-                .testTag("google_puck")
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta ->
-                        coroutineScope.launch {
-                            drag.snapTo((drag.value + delta).coerceIn(-maxDragPx, maxDragPx))
-                        }
-                    },
-                    onDragStopped = {
-                        when {
-                            drag.value <= -maxDragPx * 0.7f -> {
-                                coroutineScope.launch {
-                                    drag.animateTo(-maxDragPx)
-                                    onDecline()
-                                }
-                            }
-                            drag.value >= maxDragPx * 0.7f -> {
-                                coroutineScope.launch {
-                                    drag.animateTo(maxDragPx)
-                                    onAccept()
-                                }
-                            }
-                            else -> coroutineScope.launch { drag.animateTo(0f, tween(200)) }
-                        }
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Call,
-                contentDescription = null,
-                tint = tokens.acceptColor,
-                modifier = Modifier.size(30.dp),
-            )
-        }
-    }
+private fun DeclineAnswerPuckBar(tokens: CallBundleThemeTokens, onAccept: () -> Unit, onDecline: () -> Unit, modifier: Modifier = Modifier) {
+    ReferenceHorizontalPuck(true, tokens.cardBackground, tokens.acceptColor, tokens.declineColor,
+        onAccept, onDecline, modifier.fillMaxWidth(), "Answer or decline puck")
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -679,12 +573,7 @@ private fun GoogleClassicIncomingCall(
                         .background(Color.White),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "C" },
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF00695C),
-                    )
+                    CallTypeCenterIcon(session, tint = Color(0xFF00695C), modifier = Modifier.size(34.dp))
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -714,23 +603,16 @@ private fun GoogleClassicIncomingCall(
                     fontSize = 13.sp,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
-                    BundleActionButton(
-                        icon = Icons.Rounded.CallEnd,
-                        label = "Reject",
-                        color = tokens.declineColor,
-                        onClick = onDecline,
-                    )
-                    BundleActionButton(
-                        icon = Icons.Rounded.Call,
-                        label = "Answer",
-                        color = tokens.acceptColor,
-                        onClick = onAccept,
-                    )
-                }
+                VerticalDragPuck(
+                    puckDescription = "Google classic swipe up to answer",
+                    onDragUp = onAccept, onDragDown = {},
+                    modifier = Modifier.testTag("google_classic_answer_puck"),
+                ) { Box(Modifier.size(72.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Call, null, tint = tokens.acceptColor, modifier = Modifier.size(32.dp))
+                } }
+                Spacer(Modifier.height(16.dp))
+                TextButton(onClick = onDecline) { Text("Decline", color = tokens.declineColor) }
+
             }
         }
     }
@@ -786,12 +668,7 @@ private fun VivoIqooIncomingCall(
                         .background(tokens.primaryAccent.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "V" },
-                        fontSize = 38.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = tokens.primaryAccent,
-                    )
+                    CallTypeCenterIcon(session, tint = tokens.primaryAccent, modifier = Modifier.size(38.dp))
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -889,6 +766,14 @@ private fun AzureRingVerticalIncomingCall(
                 modifier = Modifier.size(30.dp),
             )
             VerticalDottedTrack(tokens.secondaryText)
+            val reducedRingMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+            val pulseAlpha = if (reducedRingMotion) 0.18f else {
+                val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "ringing-hint")
+                val alpha by transition.animateFloat(initialValue = 0.10f, targetValue = 0.22f,
+                    animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                        androidx.compose.animation.core.tween(1800), androidx.compose.animation.core.RepeatMode.Reverse), label = "ringing-opacity")
+                alpha
+            }
             VerticalDragPuck(
                 puckDescription = "Azure ring answer or decline puck",
                 onDragUp = onDecline,
@@ -900,7 +785,7 @@ private fun AzureRingVerticalIncomingCall(
                         Modifier
                             .size(96.dp)
                             .clip(CircleShape)
-                            .background(tokens.primaryAccent.copy(alpha = 0.16f)),
+                            .background(tokens.primaryAccent.copy(alpha = pulseAlpha)),
                     )
                     Box(
                         Modifier
@@ -913,7 +798,10 @@ private fun AzureRingVerticalIncomingCall(
                             .size(54.dp)
                             .clip(CircleShape)
                             .background(Color.White),
-                    )
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CallTypeCenterIcon(session, tint = tokens.primaryAccent, modifier = Modifier.size(28.dp))
+                    }
                 }
             }
             VerticalDottedTrack(tokens.secondaryText)
@@ -1006,12 +894,7 @@ private fun MonoChevronDarkIncomingCall(
                         .background(Color.White),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Call,
-                        contentDescription = null,
-                        tint = Color(0xFF111114),
-                        modifier = Modifier.size(36.dp),
-                    )
+                    CallTypeCenterIcon(session, tint = Color(0xFF111114), modifier = Modifier.size(36.dp))
                 }
             }
             ChevronPair(up = false, color = tokens.acceptColor)
@@ -1072,12 +955,7 @@ private fun NextcloudTalkIncomingCall(
                     .background(Color(0xFFD8DEE3)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = session.remoteDisplayName.take(1).uppercase().ifEmpty { "N" },
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = tokens.primaryAccent,
-                )
+                CallTypeCenterIcon(session, tint = tokens.primaryAccent, modifier = Modifier.size(26.dp))
             }
             Spacer(Modifier.height(10.dp))
             Text(
@@ -1129,7 +1007,6 @@ private fun NextcloudTalkIncomingCall(
                 puckDescription = "Accept call",
                 onDragUp = onAccept,
                 onDragDown = {},
-                tapBelowPx = 14f,
                 onTap = onAccept,
                 upA11yLabel = "Accept call",
                 downA11yLabel = null,
@@ -1171,8 +1048,10 @@ private fun DragOutOfCircleControl(
     modifier: Modifier = Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val dx = remember { Animatable(0f) }
-    val dy = remember { Animatable(0f) }
+    var dx by remember { mutableFloatStateOf(0f) }
+    var dy by remember { mutableFloatStateOf(0f) }
+    var settling by remember { mutableStateOf(false) }
+    var gestureAdmitted by remember { mutableStateOf(false) }
     val thresholdPx = with(LocalDensity.current) { 52.dp.toPx() }
     Box(contentAlignment = Alignment.Center, modifier = modifier.size(108.dp)) {
         Box(
@@ -1183,37 +1062,58 @@ private fun DragOutOfCircleControl(
         )
         Box(
             modifier = Modifier
-                .offset { IntOffset(dx.value.roundToInt(), dy.value.roundToInt()) }
+                .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
                 .size(72.dp)
                 .clip(CircleShape)
                 .background(Color.White)
                 .semantics {
                     contentDescription = label
                     // TalkBack/switch-access activation; touch input still requires the drag gesture.
-                    onClick(label = label) { onTrigger(); true }
+                    onClick(label = label) { if (!settling) onTrigger(); true }
                 }
                 .pointerInput(Unit) {
                     detectDragGestures(
+                        onDragStart = {
+                            gestureAdmitted = !settling
+                            if (gestureAdmitted) { dx = 0f; dy = 0f }
+                        },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            coroutineScope.launch {
-                                dx.snapTo(dx.value + dragAmount.x)
-                                dy.snapTo(dy.value + dragAmount.y)
+                            if (gestureAdmitted && !settling) {
+                                dx += dragAmount.x
+                                dy += dragAmount.y
                             }
                         },
+                        onDragCancel = {
+                            if (gestureAdmitted && !settling) { dx = 0f; dy = 0f }
+                            gestureAdmitted = false
+                        },
                         onDragEnd = {
-                            val dist = kotlin.math.hypot(dx.value, dy.value)
-                            if (dist >= thresholdPx) {
+                            if (gestureAdmitted && !settling) {
+                                gestureAdmitted = false
+                                settling = true
+                                val startX = dx
+                                val startY = dy
+                                val distance = kotlin.math.hypot(startX, startY)
+                                val accepted = distance >= thresholdPx
                                 coroutineScope.launch {
-                                    val scale = (thresholdPx * 1.8f) / dist
-                                    dx.animateTo(dx.value * scale, tween(120))
-                                    dy.animateTo(dy.value * scale, tween(120))
-                                    onTrigger()
-                                }
-                            } else {
-                                coroutineScope.launch {
-                                    dx.animateTo(0f, tween(220))
-                                    dy.animateTo(0f, tween(220))
+                                    try {
+                                        val scale = if (accepted) thresholdPx * 1.8f / distance else 0f
+                                        androidx.compose.animation.core.animate(
+                                            initialValue = 0f, targetValue = 1f,
+                                            animationSpec = tween(if (accepted) 120 else 220),
+                                        ) { fraction, _ ->
+                                            dx = startX * (1f + (scale - 1f) * fraction)
+                                            dy = startY * (1f + (scale - 1f) * fraction)
+                                        }
+                                        if (accepted) onTrigger()
+                                    } finally {
+                                        // A mounted control can be reused after either result.
+                                        // Never let its previous exit offset count as a new drag.
+                                        dx = 0f
+                                        dy = 0f
+                                        settling = false
+                                    }
                                 }
                             }
                         },
@@ -1233,7 +1133,7 @@ private fun DragOutOfCircleControl(
 
 /** Vertical two-target puck: drag up past the threshold = [onDragUp] (decline),
  *  down = [onDragDown] (answer); springs back otherwise. [onTap] fires when the
- *  gesture ends almost stationary (Nextcloud-style accept button). */
+ *  true tap recognizer completes without crossing touch slop (Nextcloud accept button). */
 @Composable
 private fun VerticalDragPuck(
     puckDescription: String,
@@ -1241,51 +1141,82 @@ private fun VerticalDragPuck(
     onDragDown: () -> Unit,
     modifier: Modifier = Modifier,
     thresholdDp: Float = 80f,
-    tapBelowPx: Float = 0f,
     onTap: (() -> Unit)? = null,
     upA11yLabel: String? = "Decline call",
     downA11yLabel: String? = "Answer call",
     puckContent: @Composable () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val dy = remember { Animatable(0f) }
+    var dy by remember { mutableStateOf(0f) }
+    var settling by remember { mutableStateOf(false) }
+    var gestureAdmitted by remember { mutableStateOf(false) }
+    val currentUp by androidx.compose.runtime.rememberUpdatedState(onDragUp)
+    val currentDown by androidx.compose.runtime.rememberUpdatedState(onDragDown)
+    val currentTap by androidx.compose.runtime.rememberUpdatedState(onTap)
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val thresholdPx = with(LocalDensity.current) { thresholdDp.dp.toPx() }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .offset { IntOffset(0, dy.value.roundToInt()) }
+            .offset { IntOffset(0, dy.roundToInt()) }
             .semantics {
                 contentDescription = puckDescription
                 customActions = listOfNotNull(
-                    upA11yLabel?.let { CustomAccessibilityAction(it) { onDragUp(); true } },
-                    downA11yLabel?.let { CustomAccessibilityAction(it) { onDragDown(); true } },
+                    upA11yLabel?.let { CustomAccessibilityAction(it) { if (!settling) currentUp(); true } },
+                    downA11yLabel?.let { CustomAccessibilityAction(it) { if (!settling) currentDown(); true } },
                 )
             }
-            .pointerInput(Unit) {
+            .then(if (onTap != null) Modifier.pointerInput(Unit) {
+                // A drag recognizer has already crossed touch slop. Its small residual
+                // displacement must never be reclassified as a tap on release.
+                detectTapGestures(onTap = { if (!settling) currentTap?.invoke() })
+            } else Modifier)
+            .pointerInput(thresholdPx, reduceMotion) {
                 detectDragGestures(
+                    onDragStart = {
+                        gestureAdmitted = !settling
+                        if (gestureAdmitted) dy = 0f
+                    },
                     onDrag = { change, dragAmount ->
-                        change.consume()
-                        coroutineScope.launch {
-                            dy.snapTo(
-                                (dy.value + dragAmount.y)
-                                    .coerceIn(-thresholdPx * 1.4f, thresholdPx * 1.4f),
-                            )
+                        if (gestureAdmitted && !settling) {
+                            change.consume()
+                            dy = (dy + dragAmount.y).coerceIn(-thresholdPx * 1.4f, thresholdPx * 1.4f)
                         }
                     },
+                    onDragCancel = {
+                        if (gestureAdmitted && !settling) dy = 0f
+                        gestureAdmitted = false
+                    },
                     onDragEnd = {
-                        when {
-                            dy.value <= -thresholdPx -> coroutineScope.launch {
-                                dy.animateTo(-thresholdPx * 1.4f, tween(120))
-                                onDragUp()
+                        if (gestureAdmitted && !settling) {
+                            gestureAdmitted = false
+                            settling = true
+                            val start = dy
+                            val direction = when {
+                                start <= -thresholdPx -> -1
+                                start >= thresholdPx -> 1
+                                else -> 0
                             }
-                            dy.value >= thresholdPx -> coroutineScope.launch {
-                                dy.animateTo(thresholdPx * 1.4f, tween(120))
-                                onDragDown()
+                            coroutineScope.launch {
+                                try {
+                                    val target = direction * thresholdPx * 1.4f
+                                    if (!reduceMotion) {
+                                        androidx.compose.animation.core.animate(
+                                            initialValue = start, targetValue = target,
+                                            animationSpec = tween(if (direction != 0) 120 else 220),
+                                        ) { value, _ -> dy = value }
+                                    } else dy = target
+                                    when {
+                                        direction < 0 -> currentUp()
+                                        direction > 0 -> currentDown()
+                                    }
+                                } finally {
+                                    // The parent may leave this control mounted after a callback.
+                                    // An exit offset never belongs to the next gesture.
+                                    dy = 0f
+                                    settling = false
+                                }
                             }
-                            onTap != null && kotlin.math.abs(dy.value) < tapBelowPx -> {
-                                onTap()
-                            }
-                            else -> coroutineScope.launch { dy.animateTo(0f, tween(220)) }
                         }
                     },
                 )
@@ -1333,3 +1264,53 @@ fun BundleActionButton(
 }
 
 
+/** Centre call-type badge, distinct from Answer/Decline actions and caller name. */
+@Composable
+private fun CallTypeCenterIcon(session: ChatyCallSession, tint: Color, modifier: Modifier = Modifier) {
+    Icon(
+        imageVector = if (session.isVideo) Icons.Rounded.Videocam else Icons.Rounded.Call,
+        contentDescription = if (session.isVideo) "Video call" else "Voice call",
+        tint = tint,
+        modifier = modifier.testTag("incoming_call_type_badge"),
+    )
+}
+
+/** Reference-approved Samsung tap controls. Uses the same incoming action gate as every other bundle. */
+@Composable
+private fun TapHaloControl(label: String, icon: ImageVector, iconTint: Color, haloColor: Color,
+    onTrigger: () -> Unit, modifier: Modifier = Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier.size(100.dp).clip(CircleShape).background(haloColor)
+            .semantics { contentDescription = label }
+            .clickable(onClickLabel = label, onClick = onTrigger), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(72.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = iconTint, modifier = Modifier.size(32.dp))
+            }
+        }
+        Text(label, color = Color.White, fontSize = 12.sp)
+    }
+}
+
+/** Shared in-app heads-up presentation. No fake screening/AI actions; OS notification layout stays system-owned. */
+@Composable
+fun SharedIncomingCallBanner(session: ChatyCallSession, pending: Boolean,
+    onAccept: () -> Unit, onDecline: () -> Unit, onExpand: () -> Unit) {
+    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing), contentAlignment = Alignment.TopCenter) {
+        Surface(Modifier.fillMaxWidth().padding(12.dp), shape = RoundedCornerShape(28.dp), color = Color(0xFF26272B), tonalElevation = 6.dp) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.fillMaxWidth().clickable(onClickLabel = "Open incoming call", onClick = onExpand)) {
+                    Text(session.remoteDisplayName, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(if (session.isVideo) "Incoming video call · Chaty" else "Incoming call · Chaty", color = Color(0xFFD7D7DB), fontSize = 13.sp)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onDecline, enabled = !pending, modifier = Modifier.weight(1f).heightIn(min = 52.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEB6B63), contentColor = Color.Black)) {
+                        Icon(Icons.Rounded.CallEnd, null); Spacer(Modifier.width(6.dp)); Text("Decline")
+                    }
+                    Button(onAccept, enabled = !pending, modifier = Modifier.weight(1f).heightIn(min = 52.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF70C99A), contentColor = Color.Black)) {
+                        Icon(Icons.Rounded.Call, null); Spacer(Modifier.width(6.dp)); Text("Answer")
+                    }
+                }
+            }
+        }
+    }
+}

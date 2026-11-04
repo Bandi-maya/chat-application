@@ -42,20 +42,20 @@ jobs:
           print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
           PYOVERLAY
 
-      - name: Patch pinned candidate sources for com.logybyte.chat
+      - name: Patch pinned candidate sources for com.logybyte.chaty
         run: |
           python3 - <<'PYLOGYPATCH'
           import pathlib
           subs = {
-              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chat.test/')],
-              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chat'")],
-              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chat')],
+              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chaty.test/')],
+              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chaty'")],
+              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chaty')],
               'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [
                   ('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),
                   ('        device.findObject(By.desc("Clear number")).click()\n        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))',
                    '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
               ],
-              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
+              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chaty"')],
               'build.gradle.kts': [('    id("com.google.gms.google-services") version "4.4.2" apply false\\n', '')],
           }
           for rel, pairs in subs.items():
@@ -89,8 +89,8 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 120:
-              raise SystemExit(f"Expected 120 override files, applied {applied}")
+          if applied != 136:
+              raise SystemExit(f"Expected 136 override files, applied {applied}")
           PYOVERRIDES
 
       - name: Patch debug-only proof fixtures to current Kotlin ports
@@ -160,6 +160,10 @@ jobs:
       - name: Restore branch-owned adaptive network sources after candidate overlay
         run: |
           git checkout HEAD -- \
+            app/src/main/kotlin/com/example/chat/ui/vault/HiddenVaultScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/media/ChatyVideoPlayerWidget.kt \
+            app/src/main/kotlin/com/example/chat/ui/updates/UpdatesScreenParts.kt \
+            app/src/main/java/com/example/chat/data/services/AndroidVoiceNoteAdapters.kt \
             app/src/main/java/com/example/chat/data/network/NetworkStatusMonitor.kt \
             app/src/main/java/com/example/chat/data/network/TransferMonitor.kt \
             app/src/main/java/com/example/chat/data/network/AppTrafficMonitor.kt \
@@ -192,6 +196,16 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/updates/ReleaseNotesPolicy.kt \
             app/src/main/kotlin/com/example/chat/ui/navigation/NavigationShells3.kt \
             app/src/main/kotlin/com/example/chat/ui/navigation/MainNavigationShell.kt \
+            app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/calls/InAppCallPip.kt \
+            app/src/main/kotlin/com/example/chat/ui/kit/SpringInteractiveScale.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/RegisterOrganizationScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/RegisterScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/CreateNewPasswordScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/AuthComponents.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/ForgotPasswordScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/auth/LoginScreen.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/AnimatedEmojiAsset.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/home/HomeAppBars.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/AlbumSelectionPolicy.kt \
             app/src/test/java/com/example/chat/AlbumSelectionPolicyTest.kt \
