@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -45,13 +46,15 @@ class PrdAuthAccessibilityProofTest {
                     CompositionLocalProvider(LocalDensity provides Density(density, 2f)) {
                         ChatyTheme(ThemePresets.monochromeDark) {
                             val value = androidx.compose.runtime.remember { mutableStateOf("") }
-                            androidx.compose.material3.Surface(color = androidx.compose.material3.MaterialTheme.colorScheme.background) {
+                            androidx.compose.material3.Surface(modifier = Modifier.fillMaxSize(), color = androidx.compose.material3.MaterialTheme.colorScheme.background) {
+                            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                             Column(Modifier.width(280.dp)) {
                                 AuthBackButton { back.incrementAndGet() }
                                 AuthTextField("Email", "name@example.invalid", ThemePresets.monochromeDark,
                                     value.value, { value.value = it; entered.set(it) })
                                 AuthPrimaryButton("Continue with this account", ThemePresets.monochromeDark,
                                     { submit.incrementAndGet() })
+                            }
                             }
                             }
                         }
@@ -78,7 +81,16 @@ class PrdAuthAccessibilityProofTest {
                 ?: throw AssertionError("Native labelled editable Email field missing")
             field.text = "test@example.invalid"
             device.waitForIdle()
-            device.pressBack() // dismiss the keyboard, not the fixture
+            // Programmatic setText may not open an IME. Back in that state finishes
+            // this fixture Activity. Hide IME directly instead of sending navigation.
+            scenario.onActivity { activity ->
+                androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+                    .hide(androidx.core.view.WindowInsetsCompat.Type.ime())
+                activity.window.decorView.clearFocus()
+            }
+            device.waitForIdle()
+            device.takeScreenshot(File(diagnostics, "prd-auth-after-input-ime-dismissed.png"))
+            device.dumpWindowHierarchy(File(diagnostics, "prd-auth-after-input-ime-dismissed.xml"))
             val action = device.wait(Until.findObject(By.text("Continue with this account")), 5000)
                 ?: throw AssertionError("Growing primary action unreachable at280dp/font2x")
             val image = inst.uiAutomation.takeScreenshot() ?: throw AssertionError("No actual auth pixels")
