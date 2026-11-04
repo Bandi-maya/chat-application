@@ -1,1 +1,1 @@
-Final A-N combined verification. PRD accessibility/account-deletion/vault/playback/recorder/banner; implementation PDF swipe/targets/latest/clusters/ghost. ANR guarded strict proof, original PDF run preserved. No ABI/dependency/signing/backend changes.
+A-N corrected combined verification: preserve optional suspend demoLogin and full demo card with A IME/accessibility; vertical-drag reset and same-mounted regression; existing changelog Close fixture. Compile gates device jobs. Native ABI/signing/backend unchanged.
