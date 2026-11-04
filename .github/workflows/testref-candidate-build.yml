@@ -182,6 +182,8 @@ jobs:
       - name: Restore branch-owned adaptive network sources after candidate overlay
         run: |
           git checkout HEAD -- \
+            app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt \
+            app/src/main/kotlin/com/example/chat/ui/calls/GlobalCallHost.kt \
             app/src/main/kotlin/com/example/chat/ui/vault/HiddenVaultScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/media/ChatyVideoPlayerWidget.kt \
             app/src/main/kotlin/com/example/chat/ui/updates/UpdatesScreenParts.kt \
