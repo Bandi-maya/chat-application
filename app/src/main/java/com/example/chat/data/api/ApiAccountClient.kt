@@ -101,7 +101,11 @@ class ApiAccountClient(
         var detail = "Failed to upload profile photo (${response.first})"
         try {
             val parsed = JSONObject(response.second)
-            detail = parsed.optString("detail").ifEmpty { parsed.optString("message").ifEmpty { detail } }
+            detail = parsed.optString("detail").ifEmpty {
+                parsed.optString("message").ifEmpty {
+                    parsed.optJSONObject("error")?.optString("message")?.ifEmpty { null } ?: detail
+                }
+            }
         } catch (_: Exception) {
         }
         throw Exception(detail)
