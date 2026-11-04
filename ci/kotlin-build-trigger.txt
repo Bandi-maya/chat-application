@@ -1,1 +1,1 @@
-A-N combined verification, narrow auth-proof test compile fix: existing ActivityScenario/setContent/UIAutomator only, all target/input/callback assertions retained, no dependencies or product changes. Preserve prior compile-failed runs. Compile-gated JVM and device jobs.
+Isolated Direct Phase1 original-only verification, base4583f81b, source212f5fae. No strict-fix-run changes. Nine writer files, explicit branch restore ownership, protocol JVM tests + ChatyDirectPhaseOneProofTest only. No two-device/NAT/security audit claim, no relay/upload fallback, no Phase2.
