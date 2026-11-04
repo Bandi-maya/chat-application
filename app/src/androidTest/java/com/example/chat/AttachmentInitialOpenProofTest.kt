@@ -67,21 +67,43 @@ class AttachmentInitialOpenProofTest {
                     ins.uiAutomation.takeScreenshot()?.let { b -> File(out,"gallery-$font-$label.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG,100,it) }; b.recycle() }
                 }
                 capture("initial")
-                for (label in listOf("Gallery", "File", "Location", "Poll", "Contact", "Chaty Direct")) {
-                    var node = d.findObject(By.desc("Attachment type options"))?.findObject(By.text(label))
-                    repeat(8) {
-                    if (node == null) {
-                        d.findObject(By.desc("Attachment type options")).scroll(Direction.RIGHT,0.8f)
-                        node = d.findObject(By.desc("Attachment type options"))?.wait(Until.findObject(By.text(label)),2000)
+                val density = c.resources.displayMetrics.density
+                var verifiedScroll = false
+                fun reveal(label: String): androidx.test.uiautomator.UiObject2 {
+                    val selector = By.desc("Attachment option $label").clickable(true)
+                    val requiredWidth = (if (label == "Chaty Direct") 104f * font.coerceAtLeast(1f) else 76f) * density
+                    fun usable(node: androidx.test.uiautomator.UiObject2?): Boolean {
+                        if (node == null) return false
+                        val b = node.visibleBounds
+                        val dock = d.findObject(By.desc("Attachment type options")).visibleBounds
+                        return b.width() + 2 >= requiredWidth && b.height() >= 48f * density &&
+                            b.left >= dock.left && b.right <= dock.right && b.top >= dock.top && b.bottom <= dock.bottom
                     }
+                    var node = d.findObject(selector)
+                    var tries = 0
+                    while (!usable(node) && tries++ < 10) {
+                        val dock = d.findObject(By.desc("Attachment type options")).visibleBounds
+                        val anchorSelector = By.desc("Attachment option Contact").clickable(true)
+                        val anchorBefore = d.findObject(anchorSelector)?.visibleBounds
+                        val targetBefore = d.findObject(selector)?.visibleBounds
+                        // Finger moves LEFT to reveal content to the RIGHT, inside dock only.
+                        d.swipe(dock.right - dock.width()/8, dock.centerY(), dock.left + dock.width()/8, dock.centerY(), 35)
+                        d.waitForIdle()
+                        val anchorAfter = d.findObject(anchorSelector)?.visibleBounds
+                        val targetAfter = d.findObject(selector)?.visibleBounds
+                        if ((anchorBefore != null && anchorAfter != null && anchorAfter.centerX() < anchorBefore.centerX()) ||
+                            (targetBefore != null && targetAfter != null && targetAfter.centerX() < targetBefore.centerX())) verifiedScroll = true
+                        node = d.findObject(selector)
                     }
-                    assertNotNull("Initial dock option $label reachable",node)
-                    val bounds = node!!.visibleBounds
-                    assertTrue("Initial dock option $label visible",bounds.height()>0 && bounds.top>=types.top && bounds.bottom<=types.bottom)
+                    if (!usable(node)) { capture("dock-target-clipped-$label"); fail("Useful full dock target $label not reachable") }
+                    return node!!
                 }
+                for (label in listOf("Gallery", "File", "Location", "Poll", "Contact", "Chaty Direct")) reveal(label)
+                val direct = reveal("Chaty Direct")
+                assertTrue("Leftward finger swipe must move content left to reveal Direct", verifiedScroll)
                 capture("direct-visible-in-existing-dock")
                 selectedAction.set(null)
-                d.findObject(By.desc("Attachment type options")).findObject(By.text("Chaty Direct")).click()
+                direct.click()
                 ins.waitForIdleSync()
                 assertEquals("Real dock invokes Direct action", AttachmentAction.chatyDirect, selectedAction.get())
                 val grid = d.findObject(By.desc("Recent attachment photos")).visibleBounds
