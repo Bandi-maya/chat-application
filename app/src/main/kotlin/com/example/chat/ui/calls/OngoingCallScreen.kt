@@ -3,6 +3,9 @@ package com.example.chat.ui.calls
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
@@ -339,6 +342,8 @@ fun OngoingCallScreen(
             val bottomOffset by animateDpAsState(if (controlsVisible) 0.dp else 150.dp, label = "bottomPanel")
             BoxWithConstraints(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.48f).dp)
+                    .verticalScroll(rememberScrollState())
                     .offset(y = bottomOffset)
                     .then(bottomPanelDecoration(template))
                     .then(bottomPanelPadding(template)),
@@ -535,11 +540,17 @@ private fun VoiceCallBackdrop(
     bundleTokens: com.example.chat.ui.calls.bundles.CallBundleThemeTokens? = null,
 ) {
     val theme = LocalThemeConfig.current
+    val bundle = bundleTokens?.bundleId
+    val identity = voiceBundleIdentity(bundle)
     Box(
-        contentAlignment = Alignment.Center,
+        contentAlignment = if (identity.upperIdentity) Alignment.TopCenter else Alignment.Center,
         modifier = Modifier.fillMaxSize().background(bundleTokens?.surfaceBackground ?: Color(theme.cardColor)),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                .padding(top = if (identity.upperIdentity) 116.dp else 0.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             CallAvatar(
                 initials = session.remoteAvatarInitials
                     ?: (if (session.remoteDisplayName.isNotEmpty()) {
@@ -548,14 +559,15 @@ private fun VoiceCallBackdrop(
                         "U"
                     }),
                 colorHex = session.remoteAvatarColorHex,
-                size = 110.dp,
+                size = identity.avatarDp.dp,
             )
             Spacer(Modifier.height(16.dp))
             Text(
                 session.remoteDisplayName,
                 color = bundleTokens?.primaryText ?: Color(theme.primaryTextColor),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = identity.nameSp.sp,
+                fontWeight = if (identity.lightName) FontWeight.Light else FontWeight.Bold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(4.dp))
             Text(
