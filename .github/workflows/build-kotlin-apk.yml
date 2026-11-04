@@ -219,6 +219,8 @@ jobs:
             app/src/main/kotlin/com/example/chat/ui/navigation/MainNavigationShell.kt \
             app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/calls/InAppCallPip.kt \
+            app/src/main/kotlin/com/example/chat/ui/kit/SpringInteractiveScale.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/AnimatedEmojiAsset.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/home/HomeAppBars.kt \
             app/src/main/kotlin/com/example/chat/ui/chats/detail/AlbumSelectionPolicy.kt \
             app/src/test/java/com/example/chat/AlbumSelectionPolicyTest.kt \
