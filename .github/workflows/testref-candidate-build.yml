@@ -182,8 +182,10 @@ jobs:
       - name: Restore branch-owned adaptive network sources after candidate overlay
         run: |
           git checkout HEAD -- \
+            app/src/androidTest/java/com/example/chat/CallBundleMatrixProofTest.kt \
             app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt \
             app/src/main/kotlin/com/example/chat/ui/calls/GlobalCallHost.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentSheet.kt \
             app/src/main/kotlin/com/example/chat/ui/vault/HiddenVaultScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/media/ChatyVideoPlayerWidget.kt \
             app/src/main/kotlin/com/example/chat/ui/updates/UpdatesScreenParts.kt \
@@ -261,6 +263,22 @@ jobs:
             app/src/test/java/com/example/chat/LocalLockServiceFullTest.kt \
             app/src/test/java/com/example/chat/ProtectedResourceGateParityTest.kt \
             app/src/test/java/com/example/chat/ui/media/MediaLibraryServiceHardeningTest.kt
+      - name: Apply hash-verified combined call4 and Direct delta
+        run: |
+          python3 - <<'PYCOMBINED'
+          import pathlib,zipfile,hashlib,base64,io
+          raw=base64.b64decode(''.join(pathlib.Path('call4-part-'+str(i)+'.b64').read_text().strip() for i in range(4)),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='e9f286ef66d9b1d09d7febe6424a9aa08b0ba0be8b6d23663d6c106c33e4e9cd'
+          expected={'app/src/androidTest/java/com/example/chat/AttachmentInitialOpenProofTest.kt': 'dd64279951135f25586007c20b2b909824e0624cdd8f3f3449ed618e416925ea', 'app/src/androidTest/java/com/example/chat/CallBundleMatrixProofTest.kt': 'b176e0f3f489325c3a4563bd7ef0b8c1f5f59458a3336d1fd2f8cc4c1cd80cbc', 'app/src/androidTest/java/com/example/chat/ChatyDirectPhaseOneProofTest.kt': 'e3a5ae13d87d8ce9055c576c224c713f5c5698830231062abe459c222f6bf854', 'app/src/main/java/com/example/chat/data/services/CallSignalingService.kt': 'cd49d44d75b3d539e629a1c83fc56257fadd6287b8097fd957e4bf5966dbdcc0', 'app/src/main/java/com/example/chat/data/services/CallVideoUpgradeCoordinator.kt': 'e649fef92fa70d45564c07c2cd54b1ac35a455513a7b320e2490d6f7aee26582', 'app/src/main/java/com/example/chat/data/services/VideoUpgradeState.kt': 'c8fff359cb9c4a75b3e4c2dbe35f1db3b787612766d62a8050e7f4ccc25525cf', 'app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt': '1394d2f5e5e723f9215880f4403174e6146d26e5f74aca18ea85b41a42d642b9', 'app/src/main/java/com/example/chat/data/transfer/ChatyDirectProtocol.kt': 'cabc0853c5362865ae61eea534f5b20167a43eb7112ec2b2cbe4cc5b5ecf5a19', 'app/src/main/java/com/example/chat/data/transfer/P2pFileTransferService.kt': 'bb1f46d6ccf2a4320852196273e9e1258319ceada8e45b8c0d42872e30949d42', 'app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt': '4e8306243bbdbcac70fe5abbb2c0150c4dd1864967c083bdb5b38319fb1d7f92', 'app/src/main/kotlin/com/example/chat/ui/calls/CallThemeRoles.kt': '4d4d4e86fb23c482489b07eec6eb59ecb7afbf0a20ac8aa4dc71a897649cb400', 'app/src/main/kotlin/com/example/chat/ui/calls/GlobalCallHost.kt': 'ab1f7851c1ab07fd363f56f6bcfc7215780dcaff9d087cac8690337d5130d55a', 'app/src/main/kotlin/com/example/chat/ui/calls/InAppCallPip.kt': '5f0242946b69b3507e40984a25680d50081125d94336c624e466e66c64d3ebdf', 'app/src/main/kotlin/com/example/chat/ui/calls/IncomingLocalCameraPreview.kt': '8d6b90e810245f53c47874b805969a138065df91f7bb22a57552a41e2990af12', 'app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt': '51c4f7cfdca02007bf6882bcb76e50774848d6678372212c7d840ce3443fd958', 'app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt': '8dc5335985a0363fc72abc8d909f84922350b8944cdfe5f7f215d9f652c50123', 'app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt': 'b2645bd9286c63cd27f7a748fd723f26dde85936180afcbace755db64bae5274', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentGallerySheet.kt': '5107d77070278650d8ebe68d63dffda7c197d45d3b5b4d803f06ca5ffd2c1c57', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentGalleryViewport.kt': '6e1645e7aeb2823478c49a63da708455ccff0f41a280d44e830c5d43062646df', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentSheet.kt': '62242bf33da9d250d163cadad58e35f0ab3618870cda62e3d7efc52cbe4479b6', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt': '371283cc226532bf3d7ff74f7257c5af46a81c8be9b4bd0379241620324afedd', 'app/src/test/java/com/example/chat/CallRedesignSourceContractTest.kt': 'c3325b539db2554761f2db9d2f343c26bf15e5fb3ca9a4d421204fbb8fdc93e0', 'app/src/test/java/com/example/chat/CallVideoUpgradeCoordinatorTest.kt': '00e0bc8c6cf094a33bc7ee1230687c0c9144b0f54698b3e58d99eacd3c250d09', 'app/src/test/java/com/example/chat/VideoUpgradeStateTest.kt': 'ff22f4c31fc307d9d90910bd8cf564b74190bd2c4b5e8acf1c93101ba4fe6ada', 'app/src/test/java/com/example/chat/data/transfer/ChatyDirectProtocolTest.kt': '352157db34963b0d4ac1bcad6a0d1a42cfc0b0ed154f5f3da75b9ded6a81f82c', 'ci/direct-phase1-proof.py': '256e999ffb4fa5dbdd5cb0499cd6735c80429e1dd4527fff4fb54bb9127e86d8', 'ci/emulator-preflight.py': '5c6f9d564d15ea8870c47444f9ee882313f36cc436b57ff4f0859f8819d3c342', 'docs/CHATY_DIRECT_PHASE1_ACCEPTANCE.md': '07ec9e084ff4b2d92341eeb8cff31475b977a4ce6d9581aac51e56e15af9065e', 'docs/CALL_REDESIGN_STAGE3_STATUS.md': '5280fc3aee04db649ad8b387d1c290413e86efd96de4206a511e264629d970de', 'docs/CALL_VIDEO_UPGRADE_BACKEND_CONTRACT.md': 'a211f3e3954d7012bee463e34b7c1ed0ef016c4853576b7d6d91739d2f1c25bc'}
+          z=zipfile.ZipFile(io.BytesIO(raw))
+          assert set(z.namelist())==set(expected)
+          for name in z.namelist():
+              q=pathlib.PurePosixPath(name)
+              assert not q.is_absolute() and '..' not in q.parts
+              data=z.read(name); assert hashlib.sha256(data).hexdigest()==expected[name]
+              target=pathlib.Path(name); target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
+          print('COMBINED-DELTA','e9f286ef66d9b1d09d7febe6424a9aa08b0ba0be8b6d23663d6c106c33e4e9cd','files',len(expected))
+          PYCOMBINED
       - name: Call bundle source contracts
         run: python3 ci/tests/test_call_bundle_settings_contract.py -v
       - name: PDF identity and native parser contracts
@@ -1019,6 +1037,22 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Apply hash-verified combined call4 and Direct delta
+        run: |
+          python3 - <<'PYCOMBINED'
+          import pathlib,zipfile,hashlib,base64,io
+          raw=base64.b64decode(''.join(pathlib.Path('call4-part-'+str(i)+'.b64').read_text().strip() for i in range(4)),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='e9f286ef66d9b1d09d7febe6424a9aa08b0ba0be8b6d23663d6c106c33e4e9cd'
+          expected={'app/src/androidTest/java/com/example/chat/AttachmentInitialOpenProofTest.kt': 'dd64279951135f25586007c20b2b909824e0624cdd8f3f3449ed618e416925ea', 'app/src/androidTest/java/com/example/chat/CallBundleMatrixProofTest.kt': 'b176e0f3f489325c3a4563bd7ef0b8c1f5f59458a3336d1fd2f8cc4c1cd80cbc', 'app/src/androidTest/java/com/example/chat/ChatyDirectPhaseOneProofTest.kt': 'e3a5ae13d87d8ce9055c576c224c713f5c5698830231062abe459c222f6bf854', 'app/src/main/java/com/example/chat/data/services/CallSignalingService.kt': 'cd49d44d75b3d539e629a1c83fc56257fadd6287b8097fd957e4bf5966dbdcc0', 'app/src/main/java/com/example/chat/data/services/CallVideoUpgradeCoordinator.kt': 'e649fef92fa70d45564c07c2cd54b1ac35a455513a7b320e2490d6f7aee26582', 'app/src/main/java/com/example/chat/data/services/VideoUpgradeState.kt': 'c8fff359cb9c4a75b3e4c2dbe35f1db3b787612766d62a8050e7f4ccc25525cf', 'app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt': '1394d2f5e5e723f9215880f4403174e6146d26e5f74aca18ea85b41a42d642b9', 'app/src/main/java/com/example/chat/data/transfer/ChatyDirectProtocol.kt': 'cabc0853c5362865ae61eea534f5b20167a43eb7112ec2b2cbe4cc5b5ecf5a19', 'app/src/main/java/com/example/chat/data/transfer/P2pFileTransferService.kt': 'bb1f46d6ccf2a4320852196273e9e1258319ceada8e45b8c0d42872e30949d42', 'app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt': '4e8306243bbdbcac70fe5abbb2c0150c4dd1864967c083bdb5b38319fb1d7f92', 'app/src/main/kotlin/com/example/chat/ui/calls/CallThemeRoles.kt': '4d4d4e86fb23c482489b07eec6eb59ecb7afbf0a20ac8aa4dc71a897649cb400', 'app/src/main/kotlin/com/example/chat/ui/calls/GlobalCallHost.kt': 'ab1f7851c1ab07fd363f56f6bcfc7215780dcaff9d087cac8690337d5130d55a', 'app/src/main/kotlin/com/example/chat/ui/calls/InAppCallPip.kt': '5f0242946b69b3507e40984a25680d50081125d94336c624e466e66c64d3ebdf', 'app/src/main/kotlin/com/example/chat/ui/calls/IncomingLocalCameraPreview.kt': '8d6b90e810245f53c47874b805969a138065df91f7bb22a57552a41e2990af12', 'app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt': '51c4f7cfdca02007bf6882bcb76e50774848d6678372212c7d840ce3443fd958', 'app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt': '8dc5335985a0363fc72abc8d909f84922350b8944cdfe5f7f215d9f652c50123', 'app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt': 'b2645bd9286c63cd27f7a748fd723f26dde85936180afcbace755db64bae5274', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentGallerySheet.kt': '5107d77070278650d8ebe68d63dffda7c197d45d3b5b4d803f06ca5ffd2c1c57', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentGalleryViewport.kt': '6e1645e7aeb2823478c49a63da708455ccff0f41a280d44e830c5d43062646df', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentSheet.kt': '62242bf33da9d250d163cadad58e35f0ab3618870cda62e3d7efc52cbe4479b6', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt': '371283cc226532bf3d7ff74f7257c5af46a81c8be9b4bd0379241620324afedd', 'app/src/test/java/com/example/chat/CallRedesignSourceContractTest.kt': 'c3325b539db2554761f2db9d2f343c26bf15e5fb3ca9a4d421204fbb8fdc93e0', 'app/src/test/java/com/example/chat/CallVideoUpgradeCoordinatorTest.kt': '00e0bc8c6cf094a33bc7ee1230687c0c9144b0f54698b3e58d99eacd3c250d09', 'app/src/test/java/com/example/chat/VideoUpgradeStateTest.kt': 'ff22f4c31fc307d9d90910bd8cf564b74190bd2c4b5e8acf1c93101ba4fe6ada', 'app/src/test/java/com/example/chat/data/transfer/ChatyDirectProtocolTest.kt': '352157db34963b0d4ac1bcad6a0d1a42cfc0b0ed154f5f3da75b9ded6a81f82c', 'ci/direct-phase1-proof.py': '256e999ffb4fa5dbdd5cb0499cd6735c80429e1dd4527fff4fb54bb9127e86d8', 'ci/emulator-preflight.py': '5c6f9d564d15ea8870c47444f9ee882313f36cc436b57ff4f0859f8819d3c342', 'docs/CHATY_DIRECT_PHASE1_ACCEPTANCE.md': '07ec9e084ff4b2d92341eeb8cff31475b977a4ce6d9581aac51e56e15af9065e', 'docs/CALL_REDESIGN_STAGE3_STATUS.md': '5280fc3aee04db649ad8b387d1c290413e86efd96de4206a511e264629d970de', 'docs/CALL_VIDEO_UPGRADE_BACKEND_CONTRACT.md': 'a211f3e3954d7012bee463e34b7c1ed0ef016c4853576b7d6d91739d2f1c25bc'}
+          z=zipfile.ZipFile(io.BytesIO(raw))
+          assert set(z.namelist())==set(expected)
+          for name in z.namelist():
+              q=pathlib.PurePosixPath(name)
+              assert not q.is_absolute() and '..' not in q.parts
+              data=z.read(name); assert hashlib.sha256(data).hexdigest()==expected[name]
+              target=pathlib.Path(name); target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
+          print('COMBINED-DELTA','e9f286ef66d9b1d09d7febe6424a9aa08b0ba0be8b6d23663d6c106c33e4e9cd','files',len(expected))
+          PYCOMBINED
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair
@@ -1049,9 +1083,25 @@ jobs:
   call-proof:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: Apply hash-verified combined call4 and Direct delta
+        run: |
+          python3 - <<'PYCOMBINED'
+          import pathlib,zipfile,hashlib,base64,io
+          raw=base64.b64decode(''.join(pathlib.Path('call4-part-'+str(i)+'.b64').read_text().strip() for i in range(4)),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='e9f286ef66d9b1d09d7febe6424a9aa08b0ba0be8b6d23663d6c106c33e4e9cd'
+          expected={'app/src/androidTest/java/com/example/chat/AttachmentInitialOpenProofTest.kt': 'dd64279951135f25586007c20b2b909824e0624cdd8f3f3449ed618e416925ea', 'app/src/androidTest/java/com/example/chat/CallBundleMatrixProofTest.kt': 'b176e0f3f489325c3a4563bd7ef0b8c1f5f59458a3336d1fd2f8cc4c1cd80cbc', 'app/src/androidTest/java/com/example/chat/ChatyDirectPhaseOneProofTest.kt': 'e3a5ae13d87d8ce9055c576c224c713f5c5698830231062abe459c222f6bf854', 'app/src/main/java/com/example/chat/data/services/CallSignalingService.kt': 'cd49d44d75b3d539e629a1c83fc56257fadd6287b8097fd957e4bf5966dbdcc0', 'app/src/main/java/com/example/chat/data/services/CallVideoUpgradeCoordinator.kt': 'e649fef92fa70d45564c07c2cd54b1ac35a455513a7b320e2490d6f7aee26582', 'app/src/main/java/com/example/chat/data/services/VideoUpgradeState.kt': 'c8fff359cb9c4a75b3e4c2dbe35f1db3b787612766d62a8050e7f4ccc25525cf', 'app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt': '1394d2f5e5e723f9215880f4403174e6146d26e5f74aca18ea85b41a42d642b9', 'app/src/main/java/com/example/chat/data/transfer/ChatyDirectProtocol.kt': 'cabc0853c5362865ae61eea534f5b20167a43eb7112ec2b2cbe4cc5b5ecf5a19', 'app/src/main/java/com/example/chat/data/transfer/P2pFileTransferService.kt': 'bb1f46d6ccf2a4320852196273e9e1258319ceada8e45b8c0d42872e30949d42', 'app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt': '4e8306243bbdbcac70fe5abbb2c0150c4dd1864967c083bdb5b38319fb1d7f92', 'app/src/main/kotlin/com/example/chat/ui/calls/CallThemeRoles.kt': '4d4d4e86fb23c482489b07eec6eb59ecb7afbf0a20ac8aa4dc71a897649cb400', 'app/src/main/kotlin/com/example/chat/ui/calls/GlobalCallHost.kt': 'ab1f7851c1ab07fd363f56f6bcfc7215780dcaff9d087cac8690337d5130d55a', 'app/src/main/kotlin/com/example/chat/ui/calls/InAppCallPip.kt': '5f0242946b69b3507e40984a25680d50081125d94336c624e466e66c64d3ebdf', 'app/src/main/kotlin/com/example/chat/ui/calls/IncomingLocalCameraPreview.kt': '8d6b90e810245f53c47874b805969a138065df91f7bb22a57552a41e2990af12', 'app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt': '51c4f7cfdca02007bf6882bcb76e50774848d6678372212c7d840ce3443fd958', 'app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt': '8dc5335985a0363fc72abc8d909f84922350b8944cdfe5f7f215d9f652c50123', 'app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt': 'b2645bd9286c63cd27f7a748fd723f26dde85936180afcbace755db64bae5274', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentGallerySheet.kt': '5107d77070278650d8ebe68d63dffda7c197d45d3b5b4d803f06ca5ffd2c1c57', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentGalleryViewport.kt': '6e1645e7aeb2823478c49a63da708455ccff0f41a280d44e830c5d43062646df', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentSheet.kt': '62242bf33da9d250d163cadad58e35f0ab3618870cda62e3d7efc52cbe4479b6', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt': '371283cc226532bf3d7ff74f7257c5af46a81c8be9b4bd0379241620324afedd', 'app/src/test/java/com/example/chat/CallRedesignSourceContractTest.kt': 'c3325b539db2554761f2db9d2f343c26bf15e5fb3ca9a4d421204fbb8fdc93e0', 'app/src/test/java/com/example/chat/CallVideoUpgradeCoordinatorTest.kt': '00e0bc8c6cf094a33bc7ee1230687c0c9144b0f54698b3e58d99eacd3c250d09', 'app/src/test/java/com/example/chat/VideoUpgradeStateTest.kt': 'ff22f4c31fc307d9d90910bd8cf564b74190bd2c4b5e8acf1c93101ba4fe6ada', 'app/src/test/java/com/example/chat/data/transfer/ChatyDirectProtocolTest.kt': '352157db34963b0d4ac1bcad6a0d1a42cfc0b0ed154f5f3da75b9ded6a81f82c', 'ci/direct-phase1-proof.py': '256e999ffb4fa5dbdd5cb0499cd6735c80429e1dd4527fff4fb54bb9127e86d8', 'ci/emulator-preflight.py': '5c6f9d564d15ea8870c47444f9ee882313f36cc436b57ff4f0859f8819d3c342', 'docs/CHATY_DIRECT_PHASE1_ACCEPTANCE.md': '07ec9e084ff4b2d92341eeb8cff31475b977a4ce6d9581aac51e56e15af9065e', 'docs/CALL_REDESIGN_STAGE3_STATUS.md': '5280fc3aee04db649ad8b387d1c290413e86efd96de4206a511e264629d970de', 'docs/CALL_VIDEO_UPGRADE_BACKEND_CONTRACT.md': 'a211f3e3954d7012bee463e34b7c1ed0ef016c4853576b7d6d91739d2f1c25bc'}
+          z=zipfile.ZipFile(io.BytesIO(raw))
+          assert set(z.namelist())==set(expected)
+          for name in z.namelist():
+              q=pathlib.PurePosixPath(name)
+              assert not q.is_absolute() and '..' not in q.parts
+              data=z.read(name); assert hashlib.sha256(data).hexdigest()==expected[name]
+              target=pathlib.Path(name); target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
+          print('COMBINED-DELTA','e9f286ef66d9b1d09d7febe6424a9aa08b0ba0be8b6d23663d6c106c33e4e9cd','files',len(expected))
+          PYCOMBINED
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair
@@ -1071,7 +1121,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: python3 ci/emulator-preflight.py && python3 ci/call-bundle-proof.py
+          script: python3 ci/emulator-preflight.py && python3 ci/call-bundle-proof.py && python3 ci/direct-phase1-proof.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
