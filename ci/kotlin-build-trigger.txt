@@ -1,1 +1,1 @@
-Call combined B+C+D1+D2 plus production-composable matrix and strict proof suite; baseline cc54873e; badge delta queued separately; 2026-11-04 09:20 IST
+Final docs cutoff combined verification 2026-11-04 10:08 IST; staged b3928bfe88957444f2535d419efdcbe18155b535; Samsung/demo fixtures+incoming badge+production control grammars+voice identity+safe motion+preference initialization+compact tokens/state+live island+six reports; source contents checked before trigger. Not a release/merge approval.
