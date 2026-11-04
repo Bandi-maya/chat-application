@@ -279,6 +279,19 @@ jobs:
               target=pathlib.Path(name); target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
           print('COMBINED-DELTA','e9f286ef66d9b1d09d7febe6424a9aa08b0ba0be8b6d23663d6c106c33e4e9cd','files',len(expected))
           PYCOMBINED
+      - name: Apply stage5 compiler import correction
+        run: |
+          python3 - <<'PYFIX'
+          import pathlib,base64,hashlib,zipfile,io
+          raw=base64.b64decode(pathlib.Path('call5-fix.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='70cee04d33ff158a7c608630958765fd7be3d925b45dbd1419333343eb65ed93'
+          expected={'app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt': '01f8c42d8165f232ece375acbc03cd0b1350cbbcabfa55f163249d938a86bd37', 'app/src/test/java/com/example/chat/CallRedesignSourceContractTest.kt': '1ba2cee8a63e3e187d85d61bf8c2ddb48e585262e02cc780dfa23e53fab0ea28'}
+          z=zipfile.ZipFile(io.BytesIO(raw)); assert set(z.namelist())==set(expected)
+          for name in z.namelist():
+              data=z.read(name); assert hashlib.sha256(data).hexdigest()==expected[name]
+              pathlib.Path(name).write_bytes(data)
+          print('STAGE5-FIX','70cee04d33ff158a7c608630958765fd7be3d925b45dbd1419333343eb65ed93')
+          PYFIX
       - name: Call bundle source contracts
         run: python3 ci/tests/test_call_bundle_settings_contract.py -v
       - name: PDF identity and native parser contracts
@@ -1053,6 +1066,19 @@ jobs:
               target=pathlib.Path(name); target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
           print('COMBINED-DELTA','e9f286ef66d9b1d09d7febe6424a9aa08b0ba0be8b6d23663d6c106c33e4e9cd','files',len(expected))
           PYCOMBINED
+      - name: Apply stage5 compiler import correction
+        run: |
+          python3 - <<'PYFIX'
+          import pathlib,base64,hashlib,zipfile,io
+          raw=base64.b64decode(pathlib.Path('call5-fix.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='70cee04d33ff158a7c608630958765fd7be3d925b45dbd1419333343eb65ed93'
+          expected={'app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt': '01f8c42d8165f232ece375acbc03cd0b1350cbbcabfa55f163249d938a86bd37', 'app/src/test/java/com/example/chat/CallRedesignSourceContractTest.kt': '1ba2cee8a63e3e187d85d61bf8c2ddb48e585262e02cc780dfa23e53fab0ea28'}
+          z=zipfile.ZipFile(io.BytesIO(raw)); assert set(z.namelist())==set(expected)
+          for name in z.namelist():
+              data=z.read(name); assert hashlib.sha256(data).hexdigest()==expected[name]
+              pathlib.Path(name).write_bytes(data)
+          print('STAGE5-FIX','70cee04d33ff158a7c608630958765fd7be3d925b45dbd1419333343eb65ed93')
+          PYFIX
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair
@@ -1102,6 +1128,19 @@ jobs:
               target=pathlib.Path(name); target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
           print('COMBINED-DELTA','e9f286ef66d9b1d09d7febe6424a9aa08b0ba0be8b6d23663d6c106c33e4e9cd','files',len(expected))
           PYCOMBINED
+      - name: Apply stage5 compiler import correction
+        run: |
+          python3 - <<'PYFIX'
+          import pathlib,base64,hashlib,zipfile,io
+          raw=base64.b64decode(pathlib.Path('call5-fix.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='70cee04d33ff158a7c608630958765fd7be3d925b45dbd1419333343eb65ed93'
+          expected={'app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt': '01f8c42d8165f232ece375acbc03cd0b1350cbbcabfa55f163249d938a86bd37', 'app/src/test/java/com/example/chat/CallRedesignSourceContractTest.kt': '1ba2cee8a63e3e187d85d61bf8c2ddb48e585262e02cc780dfa23e53fab0ea28'}
+          z=zipfile.ZipFile(io.BytesIO(raw)); assert set(z.namelist())==set(expected)
+          for name in z.namelist():
+              data=z.read(name); assert hashlib.sha256(data).hexdigest()==expected[name]
+              pathlib.Path(name).write_bytes(data)
+          print('STAGE5-FIX','70cee04d33ff158a7c608630958765fd7be3d925b45dbd1419333343eb65ed93')
+          PYFIX
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair
