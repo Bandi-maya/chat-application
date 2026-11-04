@@ -109,8 +109,7 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
         if (secondReference) {
             val capsules = listOf(Triple("Gallery", Icons.Rounded.PhotoLibrary, AttachmentAction.image),
                 Triple("Camera", Icons.Rounded.PhotoCamera, null), Triple("Location", Icons.Rounded.LocationOn, AttachmentAction.location),
-                Triple("Contact", Icons.Rounded.Person, AttachmentAction.contact),
-                Triple("Chaty Direct", Icons.Rounded.Send, AttachmentAction.chatyDirect), Triple("Document", Icons.Rounded.InsertDriveFile, AttachmentAction.document),
+                Triple("Contact", Icons.Rounded.Person, AttachmentAction.contact), Triple("Document", Icons.Rounded.InsertDriveFile, AttachmentAction.document),
                 Triple("Poll", Icons.Rounded.Poll, AttachmentAction.poll), Triple("Audio", Icons.Rounded.GraphicEq, AttachmentAction.audio),
                 Triple("Voice note", Icons.Rounded.Mic, null))
             // Wrap at large fonts rather than forcing four clipped labels into a narrow viewport.
