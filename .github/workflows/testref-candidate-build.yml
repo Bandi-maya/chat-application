@@ -182,6 +182,8 @@ jobs:
       - name: Restore branch-owned adaptive network sources after candidate overlay
         run: |
           git checkout HEAD -- \
+            app/src/androidTest/java/com/example/chat/AttachmentInitialOpenProofTest.kt \
+            app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentGalleryViewport.kt \
             app/src/main/kotlin/com/example/chat/ui/vault/HiddenVaultScreen.kt \
             app/src/main/kotlin/com/example/chat/ui/media/ChatyVideoPlayerWidget.kt \
             app/src/main/kotlin/com/example/chat/ui/updates/UpdatesScreenParts.kt \
@@ -1069,7 +1071,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: python3 ci/emulator-preflight.py && python3 ci/call-bundle-proof.py
+          script: python3 ci/emulator-preflight.py && python3 ci/attachment-viewport-proof.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
