@@ -42,20 +42,20 @@ jobs:
           print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
           PYOVERLAY
 
-      - name: Patch pinned candidate sources for com.logybyte.chat
+      - name: Patch pinned candidate sources for com.logybyte.chaty
         run: |
           python3 - <<'PYLOGYPATCH'
           import pathlib
           subs = {
-              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chat.test/')],
-              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chat'")],
-              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chat')],
+              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chaty.test/')],
+              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chaty'")],
+              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chaty')],
               'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [
                   ('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),
                   ('        device.findObject(By.desc("Clear number")).click()\n        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))',
                    '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
               ],
-              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chat"')],
+              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chaty"')],
               'build.gradle.kts': [('    id("com.google.gms.google-services") version "4.4.2" apply false\\n', '')],
           }
           for rel, pairs in subs.items():
