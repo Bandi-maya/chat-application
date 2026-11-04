@@ -1,1 +1,1 @@
-PDF-priority combined verification 2026-11-04 10:30 IST. Includes staged53a8f7f source deltas and owner-approved applicationId com.logybyte.chaty (namespace/signing unchanged), native final-APK audit. Strict call/runtime gates. Not full release/Play/physical-device proof.
+Final A-N combined verification. PRD accessibility/account-deletion/vault/playback/recorder/banner; implementation PDF swipe/targets/latest/clusters/ghost. ANR guarded strict proof, original PDF run preserved. No ABI/dependency/signing/backend changes.
