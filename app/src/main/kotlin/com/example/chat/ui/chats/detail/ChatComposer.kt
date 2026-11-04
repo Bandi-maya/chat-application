@@ -5,6 +5,9 @@ import androidx.compose.animation.core.EaseInCubic
 import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,8 +34,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
@@ -40,6 +45,9 @@ import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,7 +64,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -112,7 +123,9 @@ data class ComposerColors(
 }
 
 /** Dart _kStockEntryStyle + _normalizeEntryStyle. */
+private val videoHoldIds = java.util.concurrent.atomic.AtomicLong()
 const val STOCK_ENTRY_STYLE = "Stock"
+const val SECOND_REFERENCE_ENTRY_STYLE = "Reference 2"
 
 fun normalizeEntryStyle(raw: String): String {
     val v = raw.trim()
@@ -140,6 +153,7 @@ fun ChatEntryBar(
     onEmoji: () -> Unit = {},
     onAttach: () -> Unit = {},
     onCamera: (() -> Unit)? = null,
+    currentUserAvatarUrl: String? = null,
     onGallery: (() -> Unit)? = null,
     onAudio: (() -> Unit)? = null,
     onLocation: (() -> Unit)? = null,
@@ -149,6 +163,10 @@ fun ChatEntryBar(
     onVoiceMove: (Offset) -> Unit = {},
     onVoiceHoldEnd: () -> Unit = {},
     onSend: () -> Unit = {},
+    onVideoHoldStart: ((Long) -> Unit)? = null,
+    onVideoHoldMove: (Long, Float, Float) -> Unit = { _, _, _ -> },
+    onVideoHoldEnd: (Long) -> Unit = {},
+    onVideoHoldCancel: (Long) -> Unit = {},
 ) {
     val hasText = text.trim().isNotEmpty()
 
@@ -186,19 +204,68 @@ fun ChatEntryBar(
             null
         }
 
+    var videoMode by remember { mutableStateOf(false) }
+    val activeVideoHold = remember { java.util.concurrent.atomic.AtomicReference<Long?>(null) }
+    val cancelVideo by rememberUpdatedState(onVideoHoldCancel)
+    val audioMove by rememberUpdatedState(onVoiceMove)
+    val activeAudioHold = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    DisposableEffect(hasText) {
+        onDispose {
+            activeVideoHold.getAndSet(null)?.let(cancelVideo)
+            if (activeAudioHold.getAndSet(false)) audioMove(Offset(-Float.MAX_VALUE, 0f))
+        }
+    }
+    fun cancelCurrentVideo() { activeVideoHold.getAndSet(null)?.let(onVideoHoldCancel) }
+
     @Composable
-    fun sendMic() = SendMicMorph(
-        theme = theme,
-        template = template,
-        sendFill = colors.sendFill,
-        micFill = colors.micCircleFill,
-        hasText = hasText,
-        onSend = onSend,
-        onVoice = onVoice,
-        onVoiceHoldStart = onVoiceHoldStart,
-        onVoiceMove = onVoiceMove,
-        onVoiceHoldEnd = onVoiceHoldEnd,
-    )
+    fun sendMic() {
+        if (hasText) {
+            ComposerActionButton("Send message", Icons.AutoMirrored.Rounded.Send, Color(theme.onAccentColor),
+                fillColor = colors.sendFill, emphasized = true, onTap = onSend)
+        } else {
+            // MicGestureDiag (bounded, DEBUG-only): timestamps the recomposition
+            // that publishes the new mode label - with the run-127 toggle vs
+            // landing timestamps this discriminates "recomposition ran late"
+            // from "recomposed promptly, frame/a11y publish ran late".
+            if (com.example.chat.BuildConfig.DEBUG) android.util.Log.i("MicGestureDiag", "mic compose videoMode=" + videoMode + " t=" + System.currentTimeMillis())
+            ComposerActionButton(
+                semanticsLabel = if (videoMode) "Video mode. Tap for microphone, hold to record video." else "Microphone mode. Tap for video, hold to record audio.",
+                icon = if (videoMode) Icons.Rounded.Videocam else Icons.Rounded.Mic,
+                iconColor = Color(theme.onAccentColor), fillColor = colors.micCircleFill,
+                onTap = {
+                    // MicGestureDiag (bounded, behavior-preserving): proves whether the tap
+                    // gesture detector fires at all (event-level) vs fires without a state flip
+                    // (state-level) for the emulator-observed tap-does-not-toggle failure.
+                    android.util.Log.i("MicGestureDiag", "mic onTap fired videoMode=" + videoMode + " activeHold=" + activeVideoHold.get() + " t=" + System.currentTimeMillis())
+                    if (activeVideoHold.get() == null) videoMode = !videoMode
+                    android.util.Log.i("MicGestureDiag", "mic onTap settled videoMode=" + videoMode + " t=" + System.currentTimeMillis())
+                },
+                onLongPressStart = {
+                    android.util.Log.i("MicGestureDiag", "mic onLongPressStart videoMode=" + videoMode + " t=" + System.currentTimeMillis())
+                    if (videoMode) {
+                        if (onVideoHoldStart != null) {
+                            val id = videoHoldIds.incrementAndGet()
+                            if (activeVideoHold.compareAndSet(null, id)) onVideoHoldStart(id)
+                        }
+                    } else { activeAudioHold.set(true); onVoiceHoldStart() }
+                },
+                onLongPressMove = { offset ->
+                    if (videoMode) activeVideoHold.get()?.let { id ->
+                        if (offset.x < VoiceGesturePolicy.CANCEL_DX) cancelCurrentVideo()
+                        else onVideoHoldMove(id, offset.x, offset.y)
+                    } else onVoiceMove(offset)
+                },
+                onLongPressEnd = {
+                    if (videoMode) activeVideoHold.getAndSet(null)?.let(onVideoHoldEnd)
+                    else if (activeAudioHold.getAndSet(false)) onVoiceHoldEnd()
+                },
+                onLongPressCancel = {
+                    if (videoMode) cancelCurrentVideo()
+                    else if (activeAudioHold.getAndSet(false)) onVoiceMove(Offset(-Float.MAX_VALUE, 0f))
+                },
+            )
+        }
+    }
 
     @Composable
     fun field(
@@ -296,48 +363,31 @@ fun ChatEntryBar(
     val style = normalizeEntryStyle(entryStyle)
     Box(modifier) {
         when {
-            style == STOCK_ENTRY_STYLE && template.actionPlacement == ComposerActionPlacement.powerRow -> {
-                // Dart _buildPowerRow.
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        attachBtn()
-                        cameraSlot?.invoke()
-                        emojiBtn(24.dp)
-                        Spacer(Modifier.weight(1f))
+            style == STOCK_ENTRY_STYLE -> {
+                // Current Stock/default follows the user-supplied reference, not a new opt-in style.
+                field(radius = 28.dp, contentPadding = PaddingValues(4.dp),
+                    prefix = {
+                        if (!currentUserAvatarUrl.isNullOrBlank()) {
+                            coil.compose.AsyncImage(currentUserAvatarUrl, "Your profile photo",
+                                Modifier.padding(4.dp).size(32.dp).clip(CircleShape),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                        }
+                        emojiBtn()
+                    },
+                    suffix = {
+                        ComposerActionButton("Attach", Icons.Rounded.AttachFile, colors.uiButtons, onTap = onAttach)
                         sendMic()
-                    }
-                    Spacer(Modifier.height(5.dp))
-                    field(radius = template.cornerRadius.dp)
-                }
+                    },
+                )
             }
 
-            style == STOCK_ENTRY_STYLE -> {
-                // Dart _buildInputRow stock: split puts camera+attach outside
-                // left; integrated keeps them inside the pill on the right.
-                Row(verticalAlignment = Alignment.Bottom) {
-                    if (template.actionPlacement == ComposerActionPlacement.split) {
-                        cameraSlot?.invoke()
-                        attachBtn()
-                    }
-                    Box(Modifier.weight(1f)) {
-                        field(
-                            radius = template.cornerRadius.dp,
-                            prefix = { emojiBtn() },
-                            suffix = if (template.actionPlacement == ComposerActionPlacement.split) {
-                                null
-                            } else {
-                                {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        attachBtn()
-                                        cameraSlot?.invoke()
-                                    }
-                                }
-                            },
-                        )
-                    }
-                    Spacer(Modifier.width(6.dp))
-                    sendMic()
+            style == SECOND_REFERENCE_ENTRY_STYLE -> Row(verticalAlignment = Alignment.Bottom) {
+                Box(Modifier.weight(1f)) {
+                    field(radius = 28.dp, contentPadding = PaddingValues(4.dp),
+                        prefix = { attachBtn() }, suffix = { emojiBtn() })
                 }
+                Spacer(Modifier.width(4.dp))
+                sendMic()
             }
 
             // --- GB reference entry styles (23 designs) ---------------------
@@ -616,13 +666,15 @@ private fun ComposerActionButton(
     onLongPressStart: (() -> Unit)? = null,
     onLongPressMove: ((Offset) -> Unit)? = null,
     onLongPressEnd: (() -> Unit)? = null,
+    onLongPressCancel: (() -> Unit)? = null,
 ) {
     val pressedState = remember { mutableStateOf(false) }
     val pressed = pressedState.value
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val haptics = LocalHapticFeedback.current
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.94f else 1f,
-        animationSpec = tween(120, easing = FastOutSlowInEasing),
+        targetValue = if (!reduceMotion && pressed) 0.96f else 1f,
+        animationSpec = if (reduceMotion) snap() else spring(dampingRatio = 0.82f, stiffness = 380f),
         label = "press-scale",
     )
     val alpha by animateFloatAsState(
@@ -632,6 +684,7 @@ private fun ComposerActionButton(
     )
     Box(
         modifier
+            .testTag(composerActionTag(semanticsLabel))
             .size(48.dp)
             .graphicsLayer {
                 scaleX = scale
@@ -640,7 +693,27 @@ private fun ComposerActionButton(
             }
             .background(fillColor ?: Color.Transparent, CircleShape)
             .clip(CircleShape)
-            .semantics { contentDescription = semanticsLabel }
+            .semantics {
+                contentDescription = semanticsLabel
+                // TalkBack/keyboard activation: the tap path is detectTapGestures,
+                // which publishes no click semantics (run-127 proof: the mic node
+                // was clickable=false with no ACTION_CLICK, so assistive tech
+                // could not activate it). Publish ONLY the tap action here;
+                // hold/record stays gesture-only, so a11y activation invokes the
+                // same mode-toggle/send callback as a tap and can never start a
+                // recording. Visuals and gesture handling are unchanged.
+                if (onTap != null) {
+                    this.role = Role.Button
+                    // MicGestureDiag (bounded, DEBUG-only): run-131 saw ONE a11y
+                    // ACTION_CLICK produce TWO toggle callbacks 432ms apart.
+                    // This tag discriminates the semantics-dispatch path from
+                    // the pointer path (logged below) at the next occurrence.
+                    this.onClick(label = null) {
+                        if (com.example.chat.BuildConfig.DEBUG && (semanticsLabel.startsWith("Microphone mode") || semanticsLabel.startsWith("Video mode"))) android.util.Log.i("MicGestureDiag", "mic semanticsOnClick dispatch t=" + System.currentTimeMillis())
+                        onTap(); true
+                    }
+                }
+            }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
                 detectTapGestures(
@@ -651,20 +724,24 @@ private fun ComposerActionButton(
                     },
                     onTap = {
                         if (emphasized) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (com.example.chat.BuildConfig.DEBUG && (semanticsLabel.startsWith("Microphone mode") || semanticsLabel.startsWith("Video mode"))) android.util.Log.i("MicGestureDiag", "mic pointerTap dispatch t=" + System.currentTimeMillis())
                         onTap?.invoke()
                     },
                 )
             }
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
+                var dragOffset = Offset.Zero
                 detectDragGesturesAfterLongPress(
                     onDragStart = {
+                        dragOffset = Offset.Zero
                         pressedState.value = true
                         onLongPressStart?.invoke()
                     },
-                    onDrag = { change, _ ->
+                    onDrag = { change, delta ->
                         change.consume()
-                        onLongPressMove?.invoke(change.position)
+                        dragOffset += delta
+                        onLongPressMove?.invoke(dragOffset)
                     },
                     onDragEnd = {
                         pressedState.value = false
@@ -672,18 +749,31 @@ private fun ComposerActionButton(
                     },
                     onDragCancel = {
                         pressedState.value = false
-                        onLongPressEnd?.invoke()
+                        // System gesture/focus cancellation is never release-to-send.
+                        if (onLongPressCancel != null) onLongPressCancel()
+                        else onLongPressMove?.invoke(Offset(-Float.MAX_VALUE, 0f))
                     },
                 )
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = iconColor,
-            modifier = Modifier.size(iconSize),
-        )
+        val themedId = when (icon) {
+            Icons.AutoMirrored.Rounded.Send -> com.example.chat.ui.icons.ChatyIconId.send
+            Icons.Rounded.Mic -> com.example.chat.ui.icons.ChatyIconId.microphone
+            Icons.Rounded.Videocam -> com.example.chat.ui.icons.ChatyIconId.videoCam
+            Icons.Rounded.EmojiEmotions -> com.example.chat.ui.icons.ChatyIconId.emoji
+            Icons.Rounded.Add -> com.example.chat.ui.icons.ChatyIconId.attachmentPlus
+            Icons.Rounded.AttachFile -> com.example.chat.ui.icons.ChatyIconId.attachment
+            Icons.Rounded.PhotoCamera -> com.example.chat.ui.icons.ChatyIconId.camera
+            Icons.Rounded.PhotoLibrary -> com.example.chat.ui.icons.ChatyIconId.gallery
+            Icons.Rounded.MoreHoriz -> com.example.chat.ui.icons.ChatyIconId.more
+            else -> null
+        }
+        if (themedId != null) {
+            com.example.chat.ui.icons.ChatyIcon(themedId, color = iconColor, size = iconSize)
+        } else {
+            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(iconSize))
+        }
     }
 }
 
@@ -736,7 +826,7 @@ private fun SendMicMorph(
     }
 }
 
-/** Dart composer TextField port: hint 'Message…  /task or #reply', dense
+/** Dart composer TextField port: hint 'Message\u2026  /task or #reply', dense
  *  padding (default h12/v11), 14sp * fontScale, min 1 / max 5 lines. */
 @Composable
 private fun ComposerTextField(
@@ -751,18 +841,14 @@ private fun ComposerTextField(
     prefix: (@Composable () -> Unit)?,
     suffix: (@Composable () -> Unit)?,
 ) {
-    val shape = RoundedCornerShape(radius)
+    val shape = CircleShape
     val fontSize = (14 * theme.fontScale).sp
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (transparent) {
-                    Modifier
-                } else {
-                    Modifier.background(colors.inputBg, shape)
-                },
+                Modifier.background(colors.inputBg, shape),
             )
             .then(
                 if (borderColor != null) {
@@ -777,7 +863,7 @@ private fun ComposerTextField(
         Box(Modifier.weight(1f)) {
             if (text.isEmpty()) {
                 Text(
-                    "Message…  /task or #reply",
+                    "Message\u2026  /task or #reply",
                     color = Color(theme.secondaryTextColor),
                     fontSize = fontSize,
                     maxLines = 1,
@@ -790,9 +876,19 @@ private fun ComposerTextField(
                 textStyle = TextStyle(color = colors.inputText, fontSize = fontSize),
                 cursorBrush = SolidColor(Color(theme.accentColor)),
                 maxLines = 5,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag("composer-input"),
             )
         }
         suffix?.invoke()
     }
+}
+
+/** Stable action IDs stay constant when the spoken mode label changes. */
+internal fun composerActionTag(label: String): String = when {
+    label == "Emoji" || label == "Return to keyboard" -> "composer-emoji"
+    label == "Attach" -> "composer-attach"
+    label == "Camera" -> "composer-camera"
+    label == "Send message" -> "composer-send"
+    label.startsWith("Microphone mode") || label.startsWith("Video mode") || label.startsWith("Voice note") -> "composer-record"
+    else -> "composer-action"
 }
