@@ -22,6 +22,7 @@ enum class MessageActionType {
     deleteForMe,
     deleteForEveryone,
     report,
+    blockUser,
 }
 
 data class MessageActionDescriptor(
@@ -124,6 +125,10 @@ object MessageActionRegistry {
             )
         }
 
+        if (!isMe && message.type != MessageType.system) {
+            if (com.example.chat.ReleaseFeatures.UGC_REPORTING) actions.add(MessageActionDescriptor(MessageActionType.report, "Report", isPrimary = true))
+            if (com.example.chat.ReleaseFeatures.BLOCK_CONTACTS) actions.add(MessageActionDescriptor(MessageActionType.blockUser, "Block sender", isDestructive = true, isPrimary = true))
+        }
         return actions.toList()
     }
 }
