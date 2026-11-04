@@ -1194,8 +1194,10 @@ private fun DragOutOfCircleControl(
     modifier: Modifier = Modifier,
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val dx = remember { Animatable(0f) }
-    val dy = remember { Animatable(0f) }
+    var dx by remember { mutableFloatStateOf(0f) }
+    var dy by remember { mutableFloatStateOf(0f) }
+    var settling by remember { mutableStateOf(false) }
+    var gestureAdmitted by remember { mutableStateOf(false) }
     val thresholdPx = with(LocalDensity.current) { 52.dp.toPx() }
     Box(contentAlignment = Alignment.Center, modifier = modifier.size(108.dp)) {
         Box(
@@ -1206,37 +1208,58 @@ private fun DragOutOfCircleControl(
         )
         Box(
             modifier = Modifier
-                .offset { IntOffset(dx.value.roundToInt(), dy.value.roundToInt()) }
+                .offset { IntOffset(dx.roundToInt(), dy.roundToInt()) }
                 .size(72.dp)
                 .clip(CircleShape)
                 .background(Color.White)
                 .semantics {
                     contentDescription = label
                     // TalkBack/switch-access activation; touch input still requires the drag gesture.
-                    onClick(label = label) { onTrigger(); true }
+                    onClick(label = label) { if (!settling) onTrigger(); true }
                 }
                 .pointerInput(Unit) {
                     detectDragGestures(
+                        onDragStart = {
+                            gestureAdmitted = !settling
+                            if (gestureAdmitted) { dx = 0f; dy = 0f }
+                        },
                         onDrag = { change, dragAmount ->
                             change.consume()
-                            coroutineScope.launch {
-                                dx.snapTo(dx.value + dragAmount.x)
-                                dy.snapTo(dy.value + dragAmount.y)
+                            if (gestureAdmitted && !settling) {
+                                dx += dragAmount.x
+                                dy += dragAmount.y
                             }
                         },
+                        onDragCancel = {
+                            if (gestureAdmitted && !settling) { dx = 0f; dy = 0f }
+                            gestureAdmitted = false
+                        },
                         onDragEnd = {
-                            val dist = kotlin.math.hypot(dx.value, dy.value)
-                            if (dist >= thresholdPx) {
+                            if (gestureAdmitted && !settling) {
+                                gestureAdmitted = false
+                                settling = true
+                                val startX = dx
+                                val startY = dy
+                                val distance = kotlin.math.hypot(startX, startY)
+                                val accepted = distance >= thresholdPx
                                 coroutineScope.launch {
-                                    val scale = (thresholdPx * 1.8f) / dist
-                                    dx.animateTo(dx.value * scale, tween(120))
-                                    dy.animateTo(dy.value * scale, tween(120))
-                                    onTrigger()
-                                }
-                            } else {
-                                coroutineScope.launch {
-                                    dx.animateTo(0f, tween(220))
-                                    dy.animateTo(0f, tween(220))
+                                    try {
+                                        val scale = if (accepted) thresholdPx * 1.8f / distance else 0f
+                                        androidx.compose.animation.core.animate(
+                                            initialValue = 0f, targetValue = 1f,
+                                            animationSpec = tween(if (accepted) 120 else 220),
+                                        ) { fraction, _ ->
+                                            dx = startX * (1f + (scale - 1f) * fraction)
+                                            dy = startY * (1f + (scale - 1f) * fraction)
+                                        }
+                                        if (accepted) onTrigger()
+                                    } finally {
+                                        // A mounted control can be reused after either result.
+                                        // Never let its previous exit offset count as a new drag.
+                                        dx = 0f
+                                        dy = 0f
+                                        settling = false
+                                    }
                                 }
                             }
                         },
@@ -1354,4 +1377,3 @@ fun BundleActionButton(
         )
     }
 }
-
