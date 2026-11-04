@@ -1,1 +1,1 @@
-A-N combined verification, narrow auth-proof test compile fix: existing ActivityScenario/setContent/UIAutomator only, all target/input/callback assertions retained, no dependencies or product changes. Preserve prior compile-failed runs. Compile-gated JVM and device jobs.
+Isolated attachment viewport UI verification only, base4583f81b. Partial-visible-height wrapper,3writer files, fullJVM and AttachmentInitialOpenProofTest font1x/2x initial/scroll/expanded/collapsed captures. No Direct code or current kotlin candidate changes.
