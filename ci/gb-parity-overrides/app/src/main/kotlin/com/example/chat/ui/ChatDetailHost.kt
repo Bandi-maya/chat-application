@@ -311,6 +311,8 @@ fun ChatDetailHost(
     androidx.compose.runtime.key(mediaStamp, conversation.id) {
     ChatDetailScreen(
         conversation = live,
+        ghostModeEnabled = prefs.home.ghostMode,
+        onToggleGhostMode = { prefs.updateHome(prefs.home.copy(ghostMode = !prefs.home.ghostMode)) },
         messages = messages,
         initialMessageId = initialMessageId,
         currentUserId = myId,
