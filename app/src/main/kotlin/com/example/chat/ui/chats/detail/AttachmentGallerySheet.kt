@@ -166,7 +166,12 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
                 Triple("Chaty Direct", Icons.Rounded.Send, AttachmentAction.chatyDirect),
                 Triple("Audio", Icons.Rounded.GraphicEq, AttachmentAction.audio), Triple("Video", Icons.Rounded.Videocam, AttachmentAction.video),
                 Triple("Task", Icons.Rounded.TaskAlt, AttachmentAction.task))
-            for ((label, icon, action) in actions) Column(Modifier.widthIn(min = 76.dp).clickable { if (action == AttachmentAction.image) reload++ else onAction(action) }
+            // Keep original dock styling/spacing. Direct gets enough width for its
+            // longer label at large fonts; the existing horizontal scroll reveals it.
+            val directWidth = (104f * androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)).dp
+            for ((label, icon, action) in actions) Column(Modifier.widthIn(min = if (action == AttachmentAction.chatyDirect) directWidth else 76.dp)
+                .semantics { contentDescription = "Attachment option $label" }
+                .clickable { if (action == AttachmentAction.image) reload++ else onAction(action) }
                 .padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(icon, label, tint = if (action == AttachmentAction.image) accent else foreground)
                 Text(label, color = if (action == AttachmentAction.image) accent else foreground, style = MaterialTheme.typography.labelMedium)
