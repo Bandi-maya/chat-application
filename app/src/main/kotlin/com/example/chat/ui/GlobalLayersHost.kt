@@ -45,7 +45,7 @@ fun GlobalTypographyScale(content: @Composable () -> Unit) {
     }
     @Suppress("UNUSED_EXPRESSION") rev
     val typography = ChatyTypography.apply(MaterialTheme.typography, appearance.typographyStyle, prefs.universal.fontStyle)
-    MaterialTheme(colorScheme = MaterialTheme.colorScheme, typography = typography) {
+    MaterialTheme(colorScheme = MaterialTheme.colorScheme, typography = typography, shapes = MaterialTheme.shapes) {
         ChatyTextScaleProvider(appearance.textScale, content)
     }
 }

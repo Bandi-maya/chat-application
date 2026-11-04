@@ -1,8 +1,13 @@
 package com.example.chat.ui.calls
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
@@ -113,18 +118,29 @@ fun OngoingCallScreen(
     onEnterNativePip: () -> Unit,
     effectProvider: CallEffectProvider? = null,
     autoHideControls: Boolean = true,
+    bundleId: com.example.chat.ui.calls.bundles.CallBundleId? = null,
+    observeNativePip: Boolean = true,
 ) {
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val theme = LocalThemeConfig.current
+    val bundleTokens = bundleId?.let { com.example.chat.ui.calls.bundles.CallBundleRegistry.getTokens(it) }
+    val callAccent = bundleTokens?.primaryAccent ?: Color(theme.accentColor)
+    val endCallColor = bundleTokens?.declineColor ?: Color(theme.dangerColor)
+    val controlBackground = bundleTokens?.cardBackground ?: Color(0xB32C3038)
     var controlsVisible by remember { mutableStateOf(true) }
     var focusMode by remember { mutableStateOf(false) }
     var localPipOffsetX by remember { mutableStateOf(20f) }
     var localPipOffsetY by remember { mutableStateOf(80f) }
 
     // Dart _pipModeSubscription: system PiP mode drives focus mode and hides controls.
-    DisposableEffect(Unit) {
-        val l: (Boolean) -> Unit = { active -> focusMode = active; controlsVisible = !active }
-        com.example.chat.ServiceLocator.nativeCallPip.addModeListener(l)
-        onDispose { com.example.chat.ServiceLocator.nativeCallPip.removeModeListener(l) }
+    // Read-only previews render this same production component without subscribing
+    // to the user's live call/PiP service. Runtime keeps the existing observer.
+    if (observeNativePip) {
+        DisposableEffect(Unit) {
+            val l: (Boolean) -> Unit = { active -> focusMode = active; controlsVisible = !active }
+            com.example.chat.ServiceLocator.nativeCallPip.addModeListener(l)
+            onDispose { com.example.chat.ServiceLocator.nativeCallPip.removeModeListener(l) }
+        }
     }
 
     // Dart _startAutoHideTimer: controls hide after 5s unless focus mode.
@@ -188,7 +204,7 @@ fun OngoingCallScreen(
             if (session.isVideo) {
                 RemoteVideoSurface(session, videoSurfaces, callDurationSeconds)
             } else {
-                VoiceCallBackdrop(session, callDurationSeconds)
+                VoiceCallBackdrop(session, callDurationSeconds, bundleTokens)
             }
 
             // Draggable local preview PiP (Dart _localPipOffset, 120x160).
@@ -201,13 +217,13 @@ fun OngoingCallScreen(
                         .offset(localPipOffsetX.dp, localPipOffsetY.dp)
                         .size(120.dp, 160.dp)
                         .background(Color.Black, RoundedCornerShape(16.dp))
-                        .pointerInput(Unit) {
+                        .pointerInput(screenW, screenH) {
                             detectDragGestures { change, dragAmount ->
                                 change.consume()
                                 localPipOffsetX = (localPipOffsetX + dragAmount.x / density)
-                                    .coerceIn(16f, screenW - 136f)
+                                    .coerceIn(0f, (screenW - 120f).coerceAtLeast(0f))
                                 localPipOffsetY = (localPipOffsetY + dragAmount.y / density)
-                                    .coerceIn(60f, screenH - 220f)
+                                    .coerceIn(0f, (screenH - 160f).coerceAtLeast(0f))
                             }
                         },
                 ) {
@@ -258,7 +274,7 @@ fun OngoingCallScreen(
             }
 
             // Top panel (Dart AnimatedPositioned slide).
-            val topOffset by animateDpAsState(if (controlsVisible) 0.dp else (-110).dp, label = "topPanel")
+            val topOffset by animateDpAsState(if (controlsVisible) 0.dp else (-110).dp, animationSpec = if (reduceMotion) snap() else tween(220), label = "topPanel")
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -326,9 +342,11 @@ fun OngoingCallScreen(
             }
 
             // Bottom control bar.
-            val bottomOffset by animateDpAsState(if (controlsVisible) 0.dp else 150.dp, label = "bottomPanel")
+            val bottomOffset by animateDpAsState(if (controlsVisible) 0.dp else 150.dp, animationSpec = if (reduceMotion) snap() else tween(220), label = "bottomPanel")
             BoxWithConstraints(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.48f).dp)
+                    .verticalScroll(rememberScrollState())
                     .offset(y = bottomOffset)
                     .then(bottomPanelDecoration(template))
                     .then(bottomPanelPadding(template)),
@@ -354,17 +372,30 @@ fun OngoingCallScreen(
                         onToggleAudioRoute(if (session.audioRoute == AudioRouteType.speaker) AudioRouteType.earpiece else AudioRouteType.speaker)
                     })
                 }
+                if (bundleId == com.example.chat.ui.calls.bundles.CallBundleId.GOOGLE_PHONE_LATEST) {
+                    GoogleLatestProductionControls(
+                        actions = actions, availableWidthDp = maxWidth.value.toInt(),
+                        accent = callAccent, surface = controlBackground,
+                        endColor = endCallColor, onEndCall = onEndCall,
+                    )
+                } else if (bundleId != null && bundleId != com.example.chat.ui.calls.bundles.CallBundleId.CHATY_DEFAULT) {
+                    BundleProductionControls(
+                        bundleId = bundleId, actions = actions,
+                        availableWidthDp = maxWidth.value.toInt(), accent = callAccent,
+                        surface = controlBackground, endColor = endCallColor, onEndCall = onEndCall,
+                    )
+                } else {
                 val compact = maxWidth < 116.dp
                 val shownCount = if (compact) 0 else visibleCallActionCount(maxWidth.value.toInt(), actions.size)
                 val controls: @Composable () -> Unit = {
                     actions.take(shownCount).forEach { action ->
-                        CallControlButton(action.label, action.active, Color(theme.accentColor), action.enabled, action.onClick) { tint ->
+                        CallControlButton(action.label, action.active, callAccent, action.enabled, action.onClick, controlBackground) { tint ->
                             Icon(action.icon, null, tint = tint, modifier = Modifier.size(23.dp))
                         }
                     }
                     if (shownCount < actions.size) {
                         Box {
-                            CallControlButton("More call controls", false, Color(theme.accentColor), true, { showMore = !showMore }) { tint ->
+                            CallControlButton("More call controls", false, callAccent, true, { showMore = !showMore }, controlBackground) { tint ->
                                 Icon(Icons.Rounded.MoreHoriz, null, tint = tint)
                             }
                             com.example.chat.ui.kit.ChatyDropdownMenu(showMore, { showMore = false }) {
@@ -379,7 +410,7 @@ fun OngoingCallScreen(
                         }
                     }
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(54.dp)
-                        .clip(RoundedCornerShape(10.dp)).background(Color(theme.dangerColor))
+                        .clip(RoundedCornerShape(10.dp)).background(endCallColor)
                         .semantics { contentDescription = "End call" }.clickable { onEndCall() }) {
                         Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(28.dp))
                     }
@@ -388,6 +419,7 @@ fun OngoingCallScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)) { controls() }
                 else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically) { controls() }
+                }
             }
         }
     }
@@ -424,6 +456,7 @@ private fun CallControlButton(
     activeColor: Color,
     enabled: Boolean,
     onClick: () -> Unit,
+    inactiveBackground: Color = Color(0xB32C3038),
     icon: @Composable (tint: Color) -> Unit,
 ) {
     val tint = if (active) activeColor else Color.White
@@ -434,7 +467,7 @@ private fun CallControlButton(
             .clip(RoundedCornerShape(10.dp))
             .semantics { contentDescription = label }
             .background(
-                if (active) activeColor.copy(alpha = 0.28f) else Color(0xB32C3038),
+                if (active) activeColor.copy(alpha = 0.28f) else inactiveBackground,
                 RoundedCornerShape(10.dp),
             )
             .clickable(enabled = enabled) { onClick() },
@@ -505,13 +538,22 @@ private fun LocalVideoSurface(videoSurfaces: CallVideoSurfaceProvider, mirror: B
 }
 
 @Composable
-private fun VoiceCallBackdrop(session: ChatyCallSession, callDurationSeconds: Int) {
+private fun VoiceCallBackdrop(
+    session: ChatyCallSession, callDurationSeconds: Int,
+    bundleTokens: com.example.chat.ui.calls.bundles.CallBundleThemeTokens? = null,
+) {
     val theme = LocalThemeConfig.current
+    val bundle = bundleTokens?.bundleId
+    val identity = voiceBundleIdentity(bundle)
     Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.fillMaxSize().background(Color(theme.cardColor)),
+        contentAlignment = if (identity.upperIdentity) Alignment.TopCenter else Alignment.Center,
+        modifier = Modifier.fillMaxSize().background(bundleTokens?.surfaceBackground ?: Color(theme.cardColor)),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                .padding(top = if (identity.upperIdentity) 116.dp else 0.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             CallAvatar(
                 initials = session.remoteAvatarInitials
                     ?: (if (session.remoteDisplayName.isNotEmpty()) {
@@ -520,19 +562,20 @@ private fun VoiceCallBackdrop(session: ChatyCallSession, callDurationSeconds: In
                         "U"
                     }),
                 colorHex = session.remoteAvatarColorHex,
-                size = 110.dp,
+                size = identity.avatarDp.dp,
             )
             Spacer(Modifier.height(16.dp))
             Text(
                 session.remoteDisplayName,
-                color = Color(theme.primaryTextColor),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
+                color = bundleTokens?.primaryText ?: Color(theme.primaryTextColor),
+                fontSize = identity.nameSp.sp,
+                fontWeight = if (identity.lightName) FontWeight.Light else FontWeight.Bold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 statusLabel(session, callDurationSeconds),
-                color = Color(theme.secondaryTextColor),
+                color = bundleTokens?.secondaryText ?: Color(theme.secondaryTextColor),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
             )
@@ -594,3 +637,107 @@ private data class CallControlAction(
     val enabled: Boolean,
     val onClick: () -> Unit,
 )
+
+/** Google Latest production controls: labelled tonal pills grouped above a separate
+ * end-call action. Uses the same capability-checked actions as the media screen. */
+@Composable
+private fun GoogleLatestProductionControls(
+    actions: List<CallControlAction>, availableWidthDp: Int,
+    accent: Color, surface: Color, endColor: Color, onEndCall: () -> Unit,
+) {
+    val columns = googleLatestCallControlColumns(availableWidthDp)
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        actions.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { action ->
+                    Column(
+                        Modifier.weight(1f).height(80.dp)
+                            .clip(RoundedCornerShape(if (action.active) 20.dp else 40.dp))
+                            .background(if (action.active) accent else surface)
+                            .semantics { contentDescription = action.label }
+                            .clickable(enabled = action.enabled, onClick = action.onClick)
+                            .padding(horizontal = 8.dp, vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        val tint = if (action.active) Color.White else Color.White.copy(alpha = if (action.enabled) 1f else 0.4f)
+                        Icon(action.icon, null, tint = tint, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text(action.label, color = tint, fontSize = 12.sp, maxLines = 2,
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        Box(
+            Modifier.width(availableWidthDp.coerceAtMost(144).coerceAtLeast(1).dp).height(64.dp).clip(RoundedCornerShape(32.dp))
+                .background(endColor).semantics { contentDescription = "End call" }
+                .clickable(onClick = onEndCall), contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(32.dp))
+        }
+    }
+}
+
+/** Per-bundle visual grammar on the production action list, never a second call engine.
+ * Unsupported add-call/keypad/hold actions are not manufactured for visual parity. */
+@Composable
+private fun BundleProductionControls(
+    bundleId: com.example.chat.ui.calls.bundles.CallBundleId,
+    actions: List<CallControlAction>, availableWidthDp: Int,
+    accent: Color, surface: Color, endColor: Color, onEndCall: () -> Unit,
+) {
+    val layout = bundleControlLayout(bundleId)
+    val innerWidth = (availableWidthDp - if (layout.panel) 24 else 0).coerceAtLeast(1)
+    val columns = ((innerWidth + 12) / 88).coerceIn(1, layout.columns)
+    val sectionShape = RoundedCornerShape(layout.panelRadiusDp.dp)
+    val panel = if (layout.panel) Modifier.background(surface, sectionShape).padding(12.dp) else Modifier
+    Column(Modifier.fillMaxWidth().then(panel), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(layout.spacingDp.dp)) {
+        if (layout.endFirst) BundleEndAction(endColor, onEndCall, layout.wideEnd, innerWidth)
+        actions.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { action ->
+                    Column(Modifier.weight(1f)
+                        .semantics { contentDescription = action.label }
+                        .clickable(enabled = action.enabled, onClick = action.onClick)
+                        .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
+                        val buttonShape = if (layout.circle) CircleShape else RoundedCornerShape(layout.controlRadiusDp.dp)
+                        val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+                        val fill by androidx.compose.animation.animateColorAsState(
+                            targetValue = if (action.active) accent else if (layout.panel) Color.White.copy(alpha = 0.08f) else surface,
+                            animationSpec = androidx.compose.animation.core.tween(if (reduceMotion) 0 else 140), label = "call-control-state")
+                        Box(Modifier.size(52.dp).clip(buttonShape)
+                            .background(fill),
+                            contentAlignment = Alignment.Center) {
+                            Icon(action.icon, null,
+                                tint = Color.White.copy(alpha = if (action.enabled) 1f else 0.4f),
+                                modifier = Modifier.size(24.dp))
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(action.label, color = Color.White.copy(alpha = if (action.enabled) 1f else 0.4f),
+                            fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        if (!layout.endFirst) BundleEndAction(endColor, onEndCall, layout.wideEnd, innerWidth)
+    }
+}
+
+@Composable
+private fun BundleEndAction(color: Color, onEnd: () -> Unit, wide: Boolean, availableWidthDp: Int) {
+    Box(Modifier.width((if (wide) availableWidthDp.coerceAtMost(280) else 64).coerceAtMost(availableWidthDp).coerceAtLeast(1).dp)
+        .height(64.dp).clip(RoundedCornerShape(32.dp)).background(color)
+        .semantics { contentDescription = "End call" }.clickable(onClick = onEnd),
+        contentAlignment = Alignment.Center) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(28.dp))
+            if (wide) { Spacer(Modifier.width(8.dp)); Text("End call", color = Color.White, maxLines = 1) }
+        }
+    }
+}

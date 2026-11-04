@@ -54,10 +54,15 @@ internal fun CompactAlbumPreview(
                             message, binding, fixedRatio = if (columns == 1) 2f else 1f)
                         if (isCappedTail) {
                             Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0x66000000)),
-                                contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                contentAlignment = androidx.compose.ui.Alignment.TopEnd) {
+                                // Keep the count away from centred loading/error content.
                                 androidx.compose.material3.Text("+$hiddenCount",
-                                    color = androidx.compose.ui.graphics.Color.White,
-                                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
+                                    modifier = Modifier.padding(6.dp)
+                                        .background(androidx.compose.material3.MaterialTheme.colorScheme.surface,
+                                            RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium)
                             }
                         }
                     }

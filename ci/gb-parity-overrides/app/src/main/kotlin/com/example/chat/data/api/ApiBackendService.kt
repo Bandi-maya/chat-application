@@ -116,6 +116,18 @@ class ApiBackendService(
         binaryTransport = OkHttpApiBinaryTransport(),
     )
 
+    private val moderationClient = ApiModerationClient(chatTransport)
+    suspend fun reportMessage(expected: ApiAccountScope, messageId: String, reason: String, details: String): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            moderationClient.report(expected, { authSnapshot() === expected }, messageId, reason, details)
+        }
+    suspend fun setUserBlocked(expected: ApiAccountScope, userId: String, blocked: Boolean) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            moderationClient.block(expected, { authSnapshot() === expected }, userId, blocked)
+        }
+
+    private val accountDeletion = ApiAccountDeletionClient(chatTransport)
+
     val tasksClient = ApiTasksClient(
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
@@ -783,16 +795,17 @@ class ApiBackendService(
      *  notify, then the backend DELETE with errors swallowed. Deleting
      *  oneself signs out (Dart). */
     suspend fun deleteUser(userId: String) {
-        synchronized(chatLock) {
-            _users.removeAll { it.id == userId }
-            _conversations.removeAll { conversation ->
-                conversation.type == ConversationType.direct &&
-                    conversation.participantIds.contains(userId)
+        val expected = authSnapshot()
+        withContext(Dispatchers.IO) { accountDeletion.delete(expected, { authSnapshot() === expected }, userId) }
+        check(withAuthScope(expected) {
+            synchronized(chatLock) {
+                _users.removeAll { it.id == userId }
+                _conversations.removeAll { it.type == ConversationType.direct && it.participantIds.contains(userId) }
             }
-        }
+        }) { "Account changed. Local deletion was not applied." }
         notifyChatListeners()
-        withContext(Dispatchers.IO) { chat.deleteUser(userId) }
-        if (userId == session.currentUser?.id) signOut()
+        // UI owns purge and logout after this verified completion; do not sign out
+        // before its account-local purge or destroy the scope it needs.
     }
 
     /** deleteConversation: local-first removal (conversation + its messages

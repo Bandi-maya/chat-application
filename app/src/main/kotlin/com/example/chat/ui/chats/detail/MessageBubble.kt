@@ -1,5 +1,8 @@
 package com.example.chat.ui.chats.detail
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import kotlinx.coroutines.ensureActive
 
 import androidx.compose.animation.animateColorAsState
@@ -153,6 +156,7 @@ fun ChatMessageBubble(
     modifier: Modifier = Modifier,
     senderName: String? = null,
     showGroupAvatar: Boolean = true,
+    senderCluster: SenderClusterPosition = SenderClusterPosition.SINGLE,
     isSenderAdmin: Boolean = false,
     makeTextSelectable: Boolean = true,
     enableAnimatedEmojis: Boolean = true,
@@ -350,7 +354,8 @@ fun ChatMessageBubble(
         surfaceColor = Color(theme.surfaceColor),
     ) {
         Row(
-            Modifier.testTag("message_bubble").fillMaxWidth().padding(vertical = (3 * theme.density).dp, horizontal = 12.dp),
+            Modifier.testTag("message_bubble").fillMaxWidth().padding(horizontal = 12.dp)
+                .padding(bottom = if (senderCluster == SenderClusterPosition.FIRST || senderCluster == SenderClusterPosition.MIDDLE) 2.dp else 12.dp),
             horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
             verticalAlignment = Alignment.Bottom,
         ) {
@@ -414,6 +419,24 @@ fun ChatMessageBubble(
                             if (isVisualMedia) {
                                 drawRoundRect(Color(bubbleBg), cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()))
                                 drawRoundRect(Color(theme.dividerColor).copy(alpha = 0.45f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()), style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+                            } else if (theme.bubbleStyle == com.example.chat.core.theme.BubbleStyleId.stock &&
+                                message.type == MessageType.text && senderCluster != SenderClusterPosition.SINGLE) {
+                                val outer = 20.dp.toPx()
+                                val inner = 5.dp.toPx()
+                                val top = if (senderCluster == SenderClusterPosition.MIDDLE || senderCluster == SenderClusterPosition.LAST) inner else outer
+                                val bottom = if (senderCluster == SenderClusterPosition.MIDDLE || senderCluster == SenderClusterPosition.FIRST) inner else outer
+                                val path = androidx.compose.ui.graphics.Path().apply {
+                                    addRoundRect(androidx.compose.ui.geometry.RoundRect(
+                                        androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height),
+                                        topLeft = androidx.compose.ui.geometry.CornerRadius(if (isMe) outer else top),
+                                        topRight = androidx.compose.ui.geometry.CornerRadius(if (isMe) top else outer),
+                                        bottomLeft = androidx.compose.ui.geometry.CornerRadius(if (isMe) outer else bottom),
+                                        bottomRight = androidx.compose.ui.geometry.CornerRadius(if (isMe) bottom else outer),
+                                    ))
+                                }
+                                drawPath(path, Color(bubbleBg))
+                                if (!isMe) drawPath(path, Color(argbWithAlpha(theme.accentColor, 0.4)),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = density))
                             } else drawBubble(
                                 styleId = theme.bubbleStyle,
                                 isMe = isMe,
@@ -784,26 +807,25 @@ private fun TaskCardChip(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .background(toggleBg, CircleShape)
-                    .border(2.dp, toggleBorder, CircleShape)
-                    .then(
-                        if (onTaskToggle != null) {
-                            Modifier.clickable { onTaskToggle() }
-                        } else {
-                            Modifier
-                        },
-                    ),
+                modifier = Modifier.size(48.dp).then(
+                    if (onTaskToggle != null) Modifier.clickable(
+                        role = androidx.compose.ui.semantics.Role.Checkbox,
+                        onClickLabel = if (isCompleted) "Mark task incomplete" else "Complete task",
+                        onClick = onTaskToggle,
+                    ).semantics {
+                        contentDescription = "Task completion"
+                        stateDescription = if (isCompleted) "Completed" else "Incomplete"
+                    } else Modifier,
+                ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (isCompleted) {
-                    Icon(
-                        Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp),
-                    )
+                Box(
+                    Modifier.size(22.dp).background(toggleBg, CircleShape)
+                        .border(2.dp, toggleBorder, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isCompleted) Icon(Icons.Rounded.Check, contentDescription = null,
+                        tint = Color.White, modifier = Modifier.size(14.dp))
                 }
             }
             Spacer(Modifier.width(10.dp))
@@ -1071,6 +1093,17 @@ private fun VoiceNoteCard(
             try { player.release() } finally { releasePlaybackLeaseAfterReader() }
         }
     }
+    val voiceLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(voiceLifecycleOwner, player) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                runCatching { if (player.isPlaying) player.pause() }
+                playing = false
+            }
+        }
+        voiceLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { voiceLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     androidx.compose.runtime.LaunchedEffect(playing, playbackSpeed) {
         if (playing && prepared) {
             try {
@@ -1138,6 +1171,10 @@ private fun VoiceNoteCard(
                 }
                 if (completed) { player.seekTo(0); completed = false; positionMs = 0 }
                 try { player.playbackParams = player.playbackParams.setSpeed(playbackSpeed.toFloat()) } catch (_: Exception) {}
+                // A slow prepare can finish after ON_STOP; do not restart hidden audio.
+                check(voiceLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                    "Playback paused while app is in background."
+                }
                 if (binding != null) {
                     check(binding.deliverIfCurrent { player.start(); playing = true }) { "Session changed" }
                 } else { player.start(); playing = true }
@@ -1164,11 +1201,10 @@ private fun VoiceNoteCard(
     ) {
         Box(
             Modifier
-                .size(34.dp)
+                .size(48.dp)
                 .background(playButtonColor ?: accentColor, CircleShape)
-                .pointerInput(attachment.id) {
-                    detectTapGestures(onTap = { toggle() })
-                },
+                .testTag("voice-note-toggle-" + message.id)
+                .clickable(enabled = !loading, role = androidx.compose.ui.semantics.Role.Button, onClickLabel = if (playing) "Pause voice note" else "Play voice note") { toggle() },
             contentAlignment = Alignment.Center,
         ) {
             if (loading) {
@@ -1581,24 +1617,41 @@ private fun SwipeToReplyContainer(
         return
     }
     val density = LocalDensity.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val reply by androidx.compose.runtime.rememberUpdatedState(onSwipeReply)
     val thresholdPx = with(density) { 48.dp.toPx() }
     val maxDragPx = with(density) { 68.dp.toPx() }
     var dragOffset by remember { mutableStateOf(0f) }
-    val animatedOffset by animateFloatAsState(targetValue = dragOffset, label = "swipeReply")
+    var dragging by remember { mutableStateOf(false) }
+    val resistedOffset = SwipeReplyMotionPolicy.offset(dragOffset, thresholdPx, maxDragPx)
+    val animatedOffset by animateFloatAsState(
+        targetValue = resistedOffset,
+        animationSpec = if (dragging || reduceMotion) androidx.compose.animation.core.snap()
+            else androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f),
+        label = "swipeReply",
+    )
     val progress = (animatedOffset / thresholdPx).coerceIn(0f, 1f)
 
     Box(
-        Modifier.pointerInput(onSwipeReply) {
+        Modifier.pointerInput(thresholdPx, maxDragPx, view) {
+            var thresholdHapticSent = false
             detectHorizontalDragGestures(
+                onDragStart = { dragging = true; thresholdHapticSent = false },
                 onDragEnd = {
-                    if (dragOffset >= thresholdPx) onSwipeReply()
+                    if (dragOffset >= thresholdPx) reply?.invoke()
                     dragOffset = 0f
+                    dragging = false
                 },
-                onDragCancel = { dragOffset = 0f },
+                onDragCancel = { dragOffset = 0f; dragging = false },
                 onHorizontalDrag = { change, dragAmount ->
-                    change.consume()
                     if (!(dragOffset <= 0f && dragAmount < 0f)) {
-                        dragOffset = (dragOffset + dragAmount).coerceIn(0f, maxDragPx)
+                        change.consume()
+                        dragOffset = (dragOffset + dragAmount).coerceIn(0f, maxDragPx * 4f)
+                        if (dragOffset >= thresholdPx && !thresholdHapticSent) {
+                            thresholdHapticSent = true
+                            com.example.chat.ui.kit.ChatyHapticsPort.threshold(view)
+                        }
                     }
                 },
             )
@@ -1608,7 +1661,7 @@ private fun SwipeToReplyContainer(
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = with(density) { (animatedOffset * 0.45f - 24f).toDp() })
+                    .offset { androidx.compose.ui.unit.IntOffset((animatedOffset * 0.45f - with(density) { 24.dp.toPx() }).toInt(), 0) }
                     .size(32.dp)
                     .background(surfaceColor.copy(alpha = progress), CircleShape),
                 contentAlignment = Alignment.Center,
@@ -1621,7 +1674,7 @@ private fun SwipeToReplyContainer(
                 )
             }
         }
-        Box(Modifier.offset(x = with(density) { animatedOffset.toDp() }, y = 0.dp)) {
+        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(animatedOffset.toInt(), 0) }) {
             content()
         }
     }

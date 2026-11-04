@@ -133,7 +133,7 @@ fun ChatsHomeScreen(
     securityPreferences: SecurityPreferences = SecurityPreferences(),
     forcedType: ConversationType? = null,
     pageTitle: String? = null,
-    templates: HomeTemplates = defaultHomeTemplates,
+    templates: HomeTemplates = if (com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePreferences.homeStyle)) com.example.chat.ui.chats.home.referenceDefaultHomeTemplates else defaultHomeTemplates,
     presenceFor: (conversationId: String, otherUserId: String) -> HomePresence? = { _, _ -> null },
     isOnline: (String) -> Boolean = { false },
     messagesFor: (String) -> List<ChatMessage> = { emptyList() },
@@ -221,7 +221,10 @@ fun ChatsHomeScreen(
     val homePrefs = homePreferences
     val rawHomeUiStyle = homePrefs.homeStyle.trim().lowercase()
     val homeStyle = com.example.chat.core.preferences.HomePresentationPolicy.listStyle(homePrefs.homeStyle)
-    val spec = HomeStyleSpec.resolve(homeStyle, rawHomeUiStyle)
+    val referenceRows = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle) && templates.chatList.referenceDefault
+    val spec = HomeStyleSpec.resolve(homeStyle, rawHomeUiStyle).let {
+        if (referenceRows) it.copy(showSections = false) else it
+    }
     val searchPlacement = resolveSearchPlacement(homePrefs.searchPlacement, homePrefs.disableSearchBar)
     val searchEnabled = homePrefs.showSearchBar
     val storiesStyle = com.example.chat.core.preferences.HomePresentationPolicy.effectiveStoriesStyle(
@@ -230,9 +233,9 @@ fun ChatsHomeScreen(
     val storyLook = chatyStoryLookFor(storiesStyle)
     val storyShowOnlineRing = storiesStyle != "Minimal"
     val storyCardWrap = storiesStyle == "Card" || storiesStyle == "Card View" || homePrefs.carouselView
-    val showStoriesStrip = com.example.chat.core.preferences.HomePresentationPolicy.showStoriesStrip(
-        homePrefs.separateChatsAndGroups, homePrefs.enableStoriesStrip, spec.storiesFirst,
-    )
+    // User directive: no stories strip on the home screen unless he explicitly
+    // enables it - separation/template no longer force it on.
+    val showStoriesStrip = homePrefs.enableStoriesStrip
     val storyCompact = storiesStyle == "Compact"
     val storyTileWidth = if (storyCardWrap) 74.0 else if (storyCompact) 48.0 else 58.0
     val storyNameFontSize = if (storyCompact) 9.0 else 10.5
@@ -409,8 +412,7 @@ fun ChatsHomeScreen(
         )
     }
 
-    val darkDefault = theme.isDark && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)
-    Scaffold(containerColor = if (darkDefault) Color.Black else Color(theme.backgroundColor)) { padding ->
+    Scaffold(containerColor = Color(theme.backgroundColor)) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             effectiveConnectionBanner?.invoke()
             if (requiresSubscription) {
@@ -470,7 +472,7 @@ fun ChatsHomeScreen(
                             homePrefs = homePrefs,
                             headerStyle = headerStyle,
                             homeStyle = homeStyle,
-                            title = barTitle,
+                            title = if (forcedType != null) pageTitle ?: barTitle else barTitle,
                             identity = identity,
                             isSearchOpen = isSearchOpen,
                             forcedTypeIsSet = forcedType != null,
@@ -535,8 +537,11 @@ fun ChatsHomeScreen(
                     focusRequester = searchFocus,
                 )
             }
-            // P4: iOS collapsing LARGE title.
-            if (!isSelectionMode && pageTitle != null) {
+            // The supplied Default / OLD / iOS headers already own their single title.
+            // Preserve the large-title treatment only for other Home presentations.
+            if (!isSelectionMode && pageTitle != null &&
+                !com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle) &&
+                rawHomeUiStyle !in setOf("ios style", "whatsapp old ui")) {
                 Box(
                     modifier = Modifier
                         .height(((1 - effectiveTitleCollapse) * 44).dp)
@@ -746,7 +751,10 @@ private fun HomeConversationList(
         modifier = Modifier.fillMaxSize(),
         state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = 8.dp, top = 0.dp, end = 8.dp, bottom = 96.dp,
+            start = if (templates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
+            top = 0.dp,
+            end = if (templates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
+            bottom = 96.dp,
         ),
     ) {
         items(
@@ -816,7 +824,8 @@ private fun HomeConversationList(
                     }
                     HomeSwipeActions(
                         enabled = !isSelectionMode,
-                        backgroundColor = Color(theme.backgroundColor),
+                        backgroundColor = com.example.chat.ui.navigation.LocalReferenceContentSurface.current
+                            ?: Color(theme.backgroundColor),
                         leadingActions = if (conversation.type == ConversationType.direct) {
                             listOf(
                                 HomeSwipeAction(

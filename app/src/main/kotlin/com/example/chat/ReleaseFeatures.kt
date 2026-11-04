@@ -28,7 +28,10 @@ object ReleaseFeatures {
     const val CALL_HISTORY = false
 
     /** Blocking contacts. Needs a block-list API. */
-    const val BLOCK_CONTACTS = false
+    const val BLOCK_CONTACTS = true
+
+    /** Client available; server receipt required, unavailable backend surfaces honest failure. */
+    const val UGC_REPORTING = true
 
     /** Developer demo/sandbox actions in the attachment sheet. Never shown to users. */
     const val DEMO_TOOLS = false

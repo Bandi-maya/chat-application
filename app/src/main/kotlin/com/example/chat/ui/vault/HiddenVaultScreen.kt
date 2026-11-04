@@ -2,6 +2,10 @@ package com.example.chat.ui.vault
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -89,6 +93,8 @@ fun HiddenVaultScreen(
     onOpenConversation: (conversationId: String) -> Unit,
     onBack: (() -> Unit)? = null,
 ) {
+    com.example.chat.ui.kit.ProtectSensitiveWindow()
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val view = LocalView.current
     val scope = rememberCoroutineScope()
 
@@ -130,7 +136,7 @@ fun HiddenVaultScreen(
                 // Shake animation and haptic rejection
                 ChatyHapticsPort.error(view) // Dart: HapticFeedback.heavyImpact()
                 shake.snapTo(0f)
-                shake.animateTo(1f, animationSpec = tween(durationMillis = 400))
+                if (!reduceMotion) shake.animateTo(1f, animationSpec = tween(durationMillis = 400))
                 errorMessage = "Incorrect PIN. Try again or use biometrics."
                 enteredPin = ""
             }
@@ -215,10 +221,11 @@ private fun LockScreenView(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(16.dp))
             // Vault icon with ambient glow
             Box(
                 modifier = Modifier
@@ -286,7 +293,7 @@ private fun LockScreenView(
                 )
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(16.dp))
 
             NumericPad(
                 isDark = isDark,
@@ -327,11 +334,13 @@ private fun NumericPad(
                         "bio" -> Box(
                             modifier = Modifier
                                 .size(72.dp)
+                                .testTag("vault-key-" + cell)
                                 .clip(CircleShape)
                                 .background(primary.copy(alpha = 0.12f))
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
+                                    role = Role.Button,
                                     onClick = onBiometric,
                                 ),
                             contentAlignment = Alignment.Center,
@@ -346,6 +355,7 @@ private fun NumericPad(
                         "back" -> Box(
                             modifier = Modifier
                                 .size(72.dp)
+                                .testTag("vault-key-" + cell)
                                 .clip(CircleShape)
                                 .background(
                                     if (isDark) Color.White.copy(alpha = 0.06f)
@@ -354,6 +364,7 @@ private fun NumericPad(
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
+                                    role = Role.Button,
                                     onClick = onBackspace,
                                 ),
                             contentAlignment = Alignment.Center,
@@ -368,6 +379,7 @@ private fun NumericPad(
                         else -> Box(
                             modifier = Modifier
                                 .size(72.dp)
+                                .testTag("vault-key-" + cell)
                                 .clip(CircleShape)
                                 .background(
                                     if (isDark) Color(0xFF1C2128) else Color.White,
@@ -381,6 +393,7 @@ private fun NumericPad(
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
+                                    role = Role.Button,
                                     onClick = { onDigit(cell) },
                                 ),
                             contentAlignment = Alignment.Center,
@@ -471,7 +484,7 @@ private fun UnlockedVaultView(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(lockedConversations, key = { it.id }) { conversation ->
+                items(lockedConversations, key = { it.id }, contentType = { "vault-conversation" }) { conversation ->
                     Card(
                         onClick = { onOpenConversation(conversation.id) },
                         shape = RoundedCornerShape(16.dp),

@@ -15,8 +15,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PersonOff
 import androidx.compose.material.icons.rounded.BubbleChart
-import androidx.compose.material.icons.rounded.CallMade
-import androidx.compose.material.icons.rounded.CallReceived
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.PictureInPicture
 import androidx.compose.material.icons.rounded.RingVolume
@@ -59,14 +57,8 @@ data class CallPresentationState(
 private val audienceOptions = listOf("Everyone", "My Contacts", "My Contacts Except\u2026", "Nobody")
 private const val exceptAudience = "My Contacts Except\u2026"
 
-/**
- * Port of call_settings_screen.dart. Decoupled from the call store and the
- * contacts store via parameters so it does not guess the Calls worker's
- * signatures. Quirks kept: "Excluded Contacts" subtitle is literally
- * " contacts excluded" (the Dart string has no count); the ongoing tile calls
- * the outgoing setter ([onOngoingTemplate] should map to
- * setOutgoingCallTemplate, which persists the ongoing key).
- */
+/** Call settings expose one global bundle choice. Legacy template parameters remain
+ *  source-compatible while their persisted consumers are migrated separately. */
 @Composable
 fun CallSettingsScreen(
     preferences: ChatyPreferencesController,
@@ -85,10 +77,8 @@ fun CallSettingsScreen(
     rememberPreferencesVersion(preferences)
     val colors = LocalAppColors.current
     val privacy = preferences.privacy
-    // 0 none, 1 who-can-call, 2 incoming template, 3 ongoing template, 4 exceptions
+    // 0 none, 1 who-can-call, 4 exceptions (legacy dialog IDs 2/3 are retired).
     var dialog by remember { mutableStateOf(0) }
-
-    fun label(name: String) = templates.firstOrNull { it.name == name }?.label ?: templates.firstOrNull()?.label ?: name
 
     ChatySettingsPage("Calls", "Incoming call privacy, background audio & visual island", onBack = onBack) {
         ChatySettingsSection("Incoming Call Privacy", "Control who is permitted to initiate voice and video calls with you.") {
@@ -111,14 +101,6 @@ fun CallSettingsScreen(
                 trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) },
                 onTap = onOpenCallBundles,
             )
-        }
-        ChatySettingsSection(
-            "Call Screen Style",
-            "Chaty-designed screen layouts. GB WhatsApp customizes call colors (see GB Features) but ships no screen templates.",
-        ) {
-            ChatySettingsTile(title = "Incoming Call Screen", icon = Icons.Rounded.CallReceived, iconColor = colors.primary, subtitle = label(call.incomingCallTemplate), trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = { dialog = 2 })
-            ChatySettingsRowDivider()
-            ChatySettingsTile(title = "Ongoing Call Screen", icon = Icons.Rounded.CallMade, iconColor = colors.primary, subtitle = label(call.ongoingCallTemplate), trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = { dialog = 3 })
         }
         ChatySettingsSection("In-App Call Presentation") {
             ChatySwitchTile(title = "Dynamic Call Island", icon = Icons.Rounded.BubbleChart, iconColor = colors.primary, subtitle = "Display interactive floating capsule when navigating away from active calls.", value = call.dynamicIslandEnabled, onChanged = onDynamicIsland)
@@ -144,24 +126,6 @@ fun CallSettingsScreen(
                 dialog = if (chosen == exceptAudience) 4 else 0
             },
             onDismiss = { if (dialog == 1) dialog = 0 },
-        )
-        2 -> ChatySingleChoiceModal(
-            title = "Incoming Call Screen",
-            description = "Chaty design applied to the incoming call UI.",
-            value = call.incomingCallTemplate,
-            options = templates.map { it.name },
-            labelBuilder = { label(it) },
-            onApply = { onIncomingTemplate(it); dialog = 0 },
-            onDismiss = { dialog = 0 },
-        )
-        3 -> ChatySingleChoiceModal(
-            title = "Ongoing Call Screen",
-            description = "Chaty design applied while a call is active.",
-            value = call.ongoingCallTemplate,
-            options = templates.map { it.name },
-            labelBuilder = { label(it) },
-            onApply = { onOngoingTemplate(it); dialog = 0 },
-            onDismiss = { dialog = 0 },
         )
         4 -> {
             val selected = remember { privacy.whoCanCallMeExceptions.toMutableStateList() }

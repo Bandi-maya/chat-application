@@ -2,6 +2,7 @@ package com.example.chat.ui.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -158,7 +159,7 @@ fun RegisterOrganizationScreen(
 
     Scaffold(containerColor = Color(theme.backgroundColor)) { padding ->
         Box(
-            modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()),
             contentAlignment = Alignment.Center,
         ) {
             Column(

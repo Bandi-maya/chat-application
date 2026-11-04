@@ -45,6 +45,7 @@ fun HomeUiPreview(style: String, theme: ThemeConfig, current: AppNavigationMode,
                 hideTasks = prefs.gbBool("nav_hide_tasks"),
                 hideUpdates = prefs.gbBool("nav_hide_updates") || !com.example.chat.ReleaseFeatures.STATUS_UPDATES,
                 bottomBarStyle = ServiceLocator.appearanceVariantController.bottomBarStyle,
+                oneUiRaisedCenterDock = com.example.chat.ui.navigation.HomePresetNormalizer.oneUiRaisedCenterDockEnabled(style),
                 navigationStyleName = ServiceLocator.appearanceVariantController.navigationStyle),
             screenContent = {
                 ChatsHomeScreen(

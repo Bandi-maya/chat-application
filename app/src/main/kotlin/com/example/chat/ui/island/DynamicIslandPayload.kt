@@ -77,6 +77,11 @@ data class DynamicIslandPayload(
     val isVideo: Boolean = false,
     val isMuted: Boolean = false,
     val isSpeaker: Boolean = false,
+    /** Actual call-state label; null for older/non-call producers. */
+    val callStatusLabel: String? = null,
+    val callShowsDuration: Boolean = true,
+    val onToggleCallMute: (() -> Unit)? = null,
+    val onToggleCallSpeaker: (() -> Unit)? = null,
     val mediaArtist: String? = null,
     val mediaAlbum: String? = null,
     val audioSpeed: String? = "1.0x",

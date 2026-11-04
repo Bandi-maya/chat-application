@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -57,7 +58,12 @@ fun InAppCallPip(
     onTap: () -> Unit,
     onCollapseToIsland: () -> Unit,
     onEndCall: () -> Unit,
+    bundleId: com.example.chat.ui.calls.bundles.CallBundleId? = null,
 ) {
+    val bundleTokens = bundleId?.let { com.example.chat.ui.calls.bundles.CallBundleRegistry.getTokens(it) }
+    val compactBackground = bundleTokens?.cardBackground ?: Color(0xFF141416)
+    val compactAccent = bundleTokens?.primaryAccent ?: Color(0xFF22C55E)
+    val compactCorner = bundleTokens?.cardCornerRadiusDp ?: 20
     BoxWithConstraints(Modifier.fillMaxSize()) {
     // Parent owns cutout/status safety. Measure its available bounds, not the
     // physical display, and clamp during every drag rather than only on release.
@@ -76,8 +82,8 @@ fun InAppCallPip(
             .offset(positionX.dp, positionY.dp)
             .size(PIP_WIDTH.dp, PIP_HEIGHT.dp)
             .background(
-                Color(0xFF141416),
-                RoundedCornerShape(20.dp),
+                compactBackground,
+                RoundedCornerShape(compactCorner.dp),
             )
             .pointerInput(screenW, screenH) {
                 detectDragGestures(
@@ -106,7 +112,7 @@ fun InAppCallPip(
             }
             .clickable { showControls = !showControls },
     ) {
-        if (session.isVideo && !session.isCameraOff && videoSurfaces != null && videoSurfaces.hasRemoteVideo) {
+        if (session.isVideo && videoSurfaces != null && videoSurfaces.hasRemoteVideo) {
             androidx.compose.ui.viewinterop.AndroidView(
                 factory = { context ->
                     org.webrtc.SurfaceViewRenderer(context).apply {
@@ -119,7 +125,7 @@ fun InAppCallPip(
         } else {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize().background(Color(0xFF1E1E24)),
+                modifier = Modifier.fillMaxSize().background(bundleTokens?.surfaceBackground ?: Color(0xFF1E1E24)),
             ) {
                 CallAvatar(
                     initials = session.remoteAvatarInitials
@@ -143,10 +149,10 @@ fun InAppCallPip(
                 .background(Color(0xA6000000), RoundedCornerShape(10.dp))
                 .padding(horizontal = 6.dp, vertical = 3.dp),
         ) {
-            Box(Modifier.size(6.dp).background(Color(0xFF22C55E), CircleShape))
+            Box(Modifier.size(6.dp).background(compactAccent, CircleShape))
             Spacer4()
             Text(
-                formatCallDuration(durationSeconds),
+                compactCallStatus(session.state, durationSeconds),
                 color = Color.White,
                 fontSize = 10.5.sp,
                 fontWeight = FontWeight.Bold,
@@ -155,10 +161,11 @@ fun InAppCallPip(
 
         if (showControls) {
             Box(
-                contentAlignment = Alignment.Center,
+                contentAlignment = Alignment.BottomCenter,
                 modifier = Modifier.fillMaxSize().background(Color(0x8C000000)),
             ) {
-                Row {
+                // Three 48dp action targets cannot fit a 120dp-wide row.
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(onClick = onTap) {
                         Icon(
                             Icons.Rounded.Fullscreen,
@@ -179,7 +186,7 @@ fun InAppCallPip(
                         Icon(
                             Icons.Rounded.CallEnd,
                             contentDescription = "End call",
-                            tint = Color(0xFFEF4444),
+                            tint = bundleTokens?.declineColor ?: Color(0xFFEF4444),
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -193,4 +200,20 @@ fun InAppCallPip(
 @Composable
 private fun Spacer4() {
     androidx.compose.foundation.layout.Spacer(Modifier.width(4.dp))
+}
+
+/** Do not display a connected timer while media is still connecting/reconnecting. */
+internal fun compactCallStatus(state: com.example.chat.data.services.CallSessionState, seconds: Int): String = when (state) {
+    com.example.chat.data.services.CallSessionState.connected -> formatCallDuration(seconds)
+    com.example.chat.data.services.CallSessionState.initiating -> "Preparing call"
+    com.example.chat.data.services.CallSessionState.ringing -> "Ringing"
+    com.example.chat.data.services.CallSessionState.incoming -> "Incoming call"
+    com.example.chat.data.services.CallSessionState.connecting -> "Connecting"
+    com.example.chat.data.services.CallSessionState.reconnecting -> "Reconnecting"
+    com.example.chat.data.services.CallSessionState.busy -> "Busy"
+    com.example.chat.data.services.CallSessionState.missed -> "Missed call"
+    com.example.chat.data.services.CallSessionState.failed -> "Call failed"
+    com.example.chat.data.services.CallSessionState.declined -> "Declined"
+    com.example.chat.data.services.CallSessionState.ended -> "Call ended"
+    com.example.chat.data.services.CallSessionState.idle -> "Preparing call"
 }

@@ -675,6 +675,7 @@ internal fun StatusViewersSheet(
 @Composable
 internal fun StatusAudioPlayer(url: String, name: String, colors: ChatyColors) {
     val player = remember(url) { MediaPlayer() }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     var loading by remember(url) { mutableStateOf(true) }
     var failed by remember(url) { mutableStateOf(false) }
     var playing by remember(url) { mutableStateOf(false) }
@@ -716,12 +717,22 @@ internal fun StatusAudioPlayer(url: String, name: String, colors: ChatyColors) {
             delay(200)
         }
     }
-    DisposableEffect(url) {
-        onDispose { runCatching { player.release() } }
+    DisposableEffect(player, lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, _ ->
+            if (!lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                runCatching { if (player.isPlaying) player.pause() }
+                playing = false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            runCatching { player.release() }
+        }
     }
 
     fun togglePlayback() {
-        if (loading || failed) return
+        if (loading || failed || !lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) return
         try {
             if (playing) {
                 player.pause()

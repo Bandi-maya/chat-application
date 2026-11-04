@@ -1,0 +1,53 @@
+# TESTREF-ONLY reference inspection: installs the user-supplied, Drive-verified
+# GBWhatsApp APK (public Drive file 1u-Q66KSNLA7E67Q-6TybmRRwO83yPLk7,
+# 139123038 bytes) on an isolated emulator and captures every reachable
+# PRE-LOGIN component. No account, phone number, OTP, contacts, or messages.
+# Fires only on a ci/gb-inspect-trigger.txt bump on testref/** branches.
+name: Testref GB reference inspection (temporary branch only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [testref/**]
+    paths:
+      - ci/gb-inspect-trigger.txt
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download supplied GB APK from Drive (public link)
+        run: |
+          set -eu
+          mkdir -p gb-inspect
+          curl -sL -o gb-inspect/gb.apk "https://drive.usercontent.google.com/download?id=1u-Q66KSNLA7E67Q-6TybmRRwO83yPLk7&export=download&confirm=t"
+          SIZE=$(stat -c%s gb-inspect/gb.apk)
+          echo "size=$SIZE"
+          [ "$SIZE" = "139123038" ] || { echo "SIZE MISMATCH - refusing unverified APK"; exit 1; }
+          echo "a28bde66f4b25e30a7bb3cb5433547d14971206c96190ce896140c862137bc73  gb-inspect/gb.apk" | sha256sum -c - | tee screenshots-gb-sha256.txt
+      - name: Static component inventory (aapt badging)
+        run: |
+          mkdir -p screenshots
+          AAPT=$(ls "$ANDROID_HOME/build-tools/"*/aapt | sort -V | tail -1)
+          "$AAPT" dump badging gb-inspect/gb.apk > screenshots/gb-badging.txt || true
+          cp screenshots-gb-sha256.txt screenshots/ || true
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: adb install -r -t gb-inspect/gb.apk && python3 ci/gb-inspect.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: gb-inspect
+          path: screenshots/

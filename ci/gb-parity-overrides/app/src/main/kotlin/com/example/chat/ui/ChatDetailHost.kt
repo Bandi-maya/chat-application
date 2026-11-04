@@ -78,6 +78,15 @@ fun ChatDetailHost(
     /** Dart quick-contact tap: Navigator.pushReplacement(ChatDetailScreen(next.id)). */
     onOpenConversation: (Conversation) -> Unit = {},
 ) {
+    val vaultProtection = ServiceLocator.hiddenVaultController
+    var vaultPrivacyRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(vaultProtection) {
+        val listener: () -> Unit = { vaultPrivacyRevision++ }
+        vaultProtection.addListener(listener)
+        onDispose { vaultProtection.removeListener(listener) }
+    }
+    @Suppress("UNUSED_EXPRESSION") vaultPrivacyRevision
+    com.example.chat.ui.kit.ProtectSensitiveWindow(vaultProtection.isConversationLocked(conversation.id))
     val api = ServiceLocator.apiBackend
     val prefs = ServiceLocator.preferencesController
     val repo = ServiceLocator.conversationsRepository
@@ -194,7 +203,12 @@ fun ChatDetailHost(
     }
     LaunchedEffect(conversation.id, otherId) { refreshConnection() }
     var gateOpen by remember { mutableStateOf(false) }
+    val messageAccountScope = api.authSnapshot()
     var blockConfirm by remember { mutableStateOf(false) }
+    var blockTarget by remember(conversation.id, messageAccountScope) { mutableStateOf<String?>(null) }
+    var reportTarget by remember(conversation.id, messageAccountScope) { mutableStateOf<ChatMessage?>(null) }
+    var safetyBusy by remember { mutableStateOf(false) }
+    var safetyError by remember { mutableStateOf<String?>(null) }
     var forwardMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var taskEditor by remember { mutableStateOf<Triple<Boolean, ChatTask?, String?>?>(null) }
     var taskDetail by remember { mutableStateOf<ChatTask?>(null) }
@@ -297,6 +311,8 @@ fun ChatDetailHost(
     androidx.compose.runtime.key(mediaStamp, conversation.id) {
     ChatDetailScreen(
         conversation = live,
+        ghostModeEnabled = prefs.home.ghostMode,
+        onToggleGhostMode = { prefs.updateHome(prefs.home.copy(ghostMode = !prefs.home.ghostMode)) },
         messages = messages,
         initialMessageId = initialMessageId,
         currentUserId = myId,
@@ -368,7 +384,9 @@ fun ChatDetailHost(
                 api.setConversationLocalState(conversation.id, "muted", !live.isMuted)
         },
         // Blocking needs a block-list API; deferred to the next release (ReleaseFeatures).
-        onBlockContact = if (ReleaseFeatures.BLOCK_CONTACTS && isDirect && otherId != null) ({ blockConfirm = true }) else null,
+        onBlockContact = if (ReleaseFeatures.BLOCK_CONTACTS && isDirect && otherId != null) ({ blockTarget = otherId; safetyError = null; blockConfirm = true }) else null,
+        onReportMessage = { reportTarget = it },
+        onBlockMessageSender = { blockTarget = it; safetyError = null; blockConfirm = true },
         hideDateAndName = conv.hideDateAndName,
         showDeletedContent = privacy.antiDeleteMessages || gbB("yoAntiRevoke", false),
         retainViewOnce = privacy.antiViewOnce || gbB("anti_vw_once", false),
@@ -657,7 +675,7 @@ fun ChatDetailHost(
                     onSetBlocked = { next ->
                         infoBusy = true
                         try {
-                            ServiceLocator.contactRelationships.setBlocked(other.id, next)
+                            api.setUserBlocked(messageAccountScope, other.id, next)
                             infoBlocked = next
                             refreshConnection()
                             infoConnection = ServiceLocator.contactRelationships.connectionStatus(other.id)
@@ -753,26 +771,42 @@ fun ChatDetailHost(
             },
         )
     }
-    if (blockConfirm) {
-        val name = other?.displayName ?: live.title
-        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
-            onDismissRequest = { blockConfirm = false },
-            title = { Text("Block contact?") },
-            text = { Text("$name will no longer be able to send you messages or call you.") },
-            dismissButton = { TextButton(onClick = { blockConfirm = false }) { Text("Cancel") } },
-            confirmButton = {
-                TextButton(onClick = {
-                    blockConfirm = false
-                    scope.launch {
-                        try {
-                            if (otherId != null) ServiceLocator.contactRelationships.setBlocked(otherId, true)
-                            toast("$name was blocked.")
-                        } catch (_: Exception) { toast("Could not block this contact.") }
-                    }
-                }) { Text("Block") }
+    reportTarget?.let { target ->
+        com.example.chat.ui.chats.detail.ReportMessageDialog(
+            onDismiss = { reportTarget = null },
+            onSubmit = { reason, details ->
+                check(api.getMessages(conversation.id).any { it.id == target.id && it.senderId != myId }) { "Message is no longer available." }
+                api.reportMessage(messageAccountScope, target.id, reason, details)
+                api.withAuthScope(messageAccountScope) { toast("Report received by moderation.") }
             },
         )
     }
+    if (blockConfirm && blockTarget != null) {
+        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
+            onDismissRequest = { if (!safetyBusy) blockConfirm = false },
+            title = { Text("Block sender?") },
+            text = { Text(safetyError ?: "Ask the server to stop messages and calls from this user. This takes effect only after server confirmation.") },
+            dismissButton = { TextButton(enabled = !safetyBusy, onClick = { blockConfirm = false }) { Text("Cancel") } },
+            confirmButton = {
+                TextButton(enabled = !safetyBusy, onClick = {
+                    val target = blockTarget ?: return@TextButton
+                    safetyBusy = true; safetyError = null
+                    scope.launch {
+                        try {
+                            api.setUserBlocked(messageAccountScope, target, true)
+                            api.withAuthScope(messageAccountScope) {
+                                if (target == otherId) infoBlocked = true
+                                blockConfirm = false; toast("User blocked.")
+                            }
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                        catch (failure: Exception) { safetyError = failure.message ?: "Block was not confirmed." }
+                        finally { safetyBusy = false }
+                    }
+                }) { Text(if (safetyBusy) "Blocking..." else "Block") }
+            },
+        )
+    }
+
     forwardMessage?.let { fm ->
         // Dart _openForwardSheet (chat_detail_screen.dart:2337-2519): sectioned targets
         // (ForwardTargets), 5/250 limit, and the full-envelope send - text, type and

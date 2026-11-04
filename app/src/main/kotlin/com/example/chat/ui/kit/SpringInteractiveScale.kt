@@ -6,6 +6,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -31,33 +32,42 @@ val ElasticOutEasing = Easing { t ->
 }
 private val EaseOutCubic = CubicBezierEasing(0.215f, 0.61f, 0.355f, 1f)
 
-/**
- * Port of lib/core/design_system/spring_interactive_scale.dart: on pointer down scales to
- * [scaleDownFactor] over 140ms easeOutCubic (+ selection haptic), on release/cancel reverses with
- * elasticOut. The pointer is only observed (not consumed) so inner clickables still receive taps.
- * UNCOMPILED (Compose).
+/** Pointer feedback only: nested clickables keep ownership of action semantics.
+ * Physical-time spring is interruptible; no per-frame movement or refresh-rate forcing.
  */
 fun Modifier.springInteractiveScale(
     scaleDownFactor: Float = 0.95f,
     enableHaptic: Boolean = true,
 ): Modifier = composed {
     val view = androidx.compose.ui.platform.LocalView.current
-    val progress = remember { Animatable(0f) } // controller value 0..1
+    val reduceMotion = rememberChatyReduceMotion()
+    val scale = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
-    val reversing = remember { androidx.compose.runtime.mutableStateOf(false) }
-    val scaleValue = progress.value.let { c ->
-        // forward uses easeOutCubic, reverse uses elasticOut over controller value
-        1f + (scaleDownFactor - 1f) * (if (reversing.value) ElasticOutEasing.transform(c) else EaseOutCubic.transform(c))
+    val pressedScale = scaleDownFactor.coerceIn(0.8f, 1f)
+    androidx.compose.runtime.LaunchedEffect(reduceMotion) {
+        if (reduceMotion) scale.snapTo(1f)
     }
     this
-        .pointerInput(Unit) {
-            awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                if (enableHaptic) ChatyHapticsPort.selection(view)
-                scope.launch { reversing.value = false; progress.animateTo(1f, tween(140, easing = LinearEasing)) }
-                waitForUpOrCancellation(pass = PointerEventPass.Initial)
-                scope.launch { reversing.value = true; progress.animateTo(0f, tween(140, easing = LinearEasing)) }
+        .pointerInput(reduceMotion, pressedScale, enableHaptic, view) {
+            var animation: kotlinx.coroutines.Job? = null
+            try {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    if (enableHaptic) ChatyHapticsPort.selection(view)
+                    animation?.cancel()
+                    if (!reduceMotion) animation = scope.launch {
+                        scale.animateTo(pressedScale, spring(dampingRatio = 0.82f, stiffness = 380f))
+                    }
+                    waitForUpOrCancellation(pass = PointerEventPass.Initial)
+                    animation?.cancel()
+                    if (!reduceMotion) animation = scope.launch {
+                        scale.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 380f))
+                    }
+                }
+            } finally {
+                animation?.cancel()
+                scope.launch { scale.snapTo(1f) }
             }
         }
-        .scale(scaleValue)
+        .scale(if (reduceMotion) 1f else scale.value)
 }

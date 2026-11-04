@@ -1,6 +1,9 @@
 package com.example.chat.ui.theme
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Shapes
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -127,6 +130,14 @@ fun ChatyTheme(config: ThemeConfig, content: @Composable () -> Unit) {
         LocalAppColors provides appColors,
         LocalChatColors provides chatColors,
     ) {
-        MaterialTheme(colorScheme = scheme, typography = com.example.chat.ui.core.theme.ChatyTypography.base(config.fontScale), content = content)
+        // User asked for modal corner radius 10 ("10px"; implemented as 10dp pending
+        // unit confirmation). Material3 AlertDialog and ModalBottomSheet defaults read
+        // Shapes.extraLarge.
+        MaterialTheme(
+            colorScheme = scheme,
+            typography = com.example.chat.ui.core.theme.ChatyTypography.base(config.fontScale),
+            shapes = Shapes(extraLarge = RoundedCornerShape(10.dp)),
+            content = content,
+        )
     }
 }

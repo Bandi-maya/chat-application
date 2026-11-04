@@ -264,7 +264,7 @@ fun SettingsRootScreen(
                             }
                         }
                         Box(
-                            Modifier.align(Alignment.TopEnd).padding(10.dp).size(40.dp).clip(CircleShape)
+                            Modifier.align(Alignment.TopEnd).padding(10.dp).size(48.dp).clip(CircleShape)
                                 .background(colors.surface.copy(alpha = 0.92f)).clickable { pickTarget = "banner" },
                             contentAlignment = Alignment.Center,
                         ) { Icon(Icons.Outlined.Wallpaper, "Change account banner", Modifier.size(19.dp), tint = colors.foreground) }

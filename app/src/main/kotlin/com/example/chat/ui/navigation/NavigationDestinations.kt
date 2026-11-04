@@ -77,6 +77,14 @@ object NavigationCatalog {
         for (id in catalog) {
             if (id !in ordered) ordered.add(id)
         }
+        // User directive: Groups always sits directly after Chats, never down by
+        // Settings, regardless of template ordering.
+        val groupsIdx = ordered.indexOf(ChatyNavigationDestinationIds.groups)
+        val chatsIdx = ordered.indexOf(ChatyNavigationDestinationIds.chats)
+        if (groupsIdx >= 0 && chatsIdx >= 0 && groupsIdx != chatsIdx + 1) {
+            ordered.removeAt(groupsIdx)
+            ordered.add(ordered.indexOf(ChatyNavigationDestinationIds.chats) + 1, ChatyNavigationDestinationIds.groups)
+        }
         return ordered
     }
 

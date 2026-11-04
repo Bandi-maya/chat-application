@@ -90,6 +90,7 @@ fun ConversationRow(
 ) {
     val rowRadius = theme.cornerRadius.coerceIn(0.0, 24.0)
     val tileRadius = if (cardRows) (rowRadius + 2).coerceIn(0.0, 26.0) else rowRadius
+    val referenceRows = chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)
     val effectiveDensity = density * chatListDensityFactor(chatList.density)
     val textSizeScale = (homePrefs.screenTextSize / 17.0).coerceIn(0.7, 1.5)
 
@@ -140,7 +141,7 @@ fun ConversationRow(
         else -> Color.Transparent
     }
 
-    val avatarSize = 50f * effectiveDensity.toFloat()
+    val avatarSize = (if (referenceRows) 48f else 50f) * effectiveDensity.toFloat()
     val avatarShape = if (homePrefs.avatarShape == "circle") chatList.avatarShape else homePrefs.avatarShape
     val subtitleActive = presence?.isTyping == true || presence?.isRecording == true
 
@@ -200,7 +201,7 @@ fun ConversationRow(
                         }
                     }
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(if (referenceRows) 8.dp else 12.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -352,10 +353,10 @@ fun ConversationRow(
         if (chatList.showDivider && !homePrefs.hideChatsDivider) {
             Box(
                 Modifier
-                    .padding(start = 76.dp, end = 16.dp)
+                    .padding(start = if (referenceRows) 70.dp else 76.dp, end = 16.dp)
                     .fillMaxWidth()
                     .height(0.5.dp)
-                    .background(Color(argbWithAlpha(theme.cardColor, 0.55))),
+                    .background(Color(theme.dividerColor)),
             )
         }
     }

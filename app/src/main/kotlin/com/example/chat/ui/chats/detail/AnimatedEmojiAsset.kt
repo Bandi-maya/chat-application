@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -742,11 +743,32 @@ fun ChatyAnimatedEmojiAsset(
     size: Float,
     repeat: Boolean,
 ) {
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val inspection = androidx.compose.ui.platform.LocalInspectionMode.current
+    if (reduceMotion || inspection) {
+        // No remote/font readiness dependency or continuous animation in static mode.
+        Box(Modifier.size(size.dp), contentAlignment = Alignment.Center) {
+            Text(unicode, fontSize = (size * 0.82f).sp, lineHeight = (size * 0.82f).sp, maxLines = 1)
+        }
+        return
+    }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var foreground by androidx.compose.runtime.remember(lifecycleOwner) {
+        androidx.compose.runtime.mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
+    }
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, _ ->
+            foreground = lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val composition by rememberLottieComposition(emojiLottieSpecResolver(notoId))
     val comp = composition
     if (comp != null) {
         val state = com.airbnb.lottie.compose.animateLottieCompositionAsState(
             composition = comp,
+            isPlaying = foreground,
             iterations = if (repeat) {
                 com.airbnb.lottie.compose.LottieConstants.IterateForever
             } else {

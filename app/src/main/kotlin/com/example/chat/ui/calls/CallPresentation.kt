@@ -104,12 +104,15 @@ class CallPresentationPreferencesStore(
 
     private val writeMutex = Mutex()
     private var initializeStarted = false
+    private val initializationComplete = kotlinx.coroutines.CompletableDeferred<Unit>()
 
     /** Dart initialize(): one-time guarded load. */
+    @Synchronized
     fun initialize() {
         if (initializeStarted) return
         initializeStarted = true
         scope.launch {
+            try {
             value = CallPresentationPreferences(
                 dynamicIslandEnabled = storage.getBool(DYNAMIC_ISLAND_KEY) ?: true,
                 pictureInPictureEnabled = storage.getBool(PICTURE_IN_PICTURE_KEY) ?: true,
@@ -119,7 +122,12 @@ class CallPresentationPreferencesStore(
                 callExperienceBundleId = storage.getString(CALL_EXPERIENCE_BUNDLE_KEY) ?: "chaty_default",
             )
             isInitialized = true
+            initializationComplete.complete(Unit)
             notifyListeners()
+            } catch (failure: Throwable) {
+                initializationComplete.completeExceptionally(failure)
+                throw failure
+            }
         }
     }
 
@@ -159,7 +167,7 @@ class CallPresentationPreferencesStore(
         update = { it.copy(ongoingCallTemplate = template) },
     )
 
-    /** Atomically selects and persists one of the six Call Experience Bundles. */
+    /** Atomically selects and persists the global Call Experience Bundle. */
     fun setCallExperienceBundle(bundleId: String) = setString(
         key = CALL_EXPERIENCE_BUNDLE_KEY,
         template = bundleId,
@@ -175,6 +183,9 @@ class CallPresentationPreferencesStore(
     ) {
         initialize()
         scope.launch {
+            // A selection made during cold restore must not be overwritten by
+            // a late initial storage read. Writes start only after restore.
+            initializationComplete.await()
             writeMutex.withLock {
                 if (read(value) == template) return@withLock
                 val saved = storage.putString(key, template)
@@ -195,6 +206,9 @@ class CallPresentationPreferencesStore(
     ) {
         initialize()
         scope.launch {
+            // A selection made during cold restore must not be overwritten by
+            // a late initial storage read. Writes start only after restore.
+            initializationComplete.await()
             writeMutex.withLock {
                 if (read(value) == enabled) return@withLock
                 val saved = storage.putBool(key, enabled)
@@ -466,4 +480,3 @@ class CallPresentationController(
             private set
     }
 }
-

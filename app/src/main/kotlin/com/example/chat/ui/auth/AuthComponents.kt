@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,6 +16,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,15 +55,15 @@ import com.example.chat.ui.theme.LocalAppColors
 
 private fun c(argb: Long): Color = Color(argb)
 
-/** Circular back button (AuthBackButton -> ChatyBackButton, size 34/chevron 24). */
+/**48dp clickable accessibility target around a24dp decorative chevron. */
 @Composable
 fun AuthBackButton(onClick: () -> Unit) {
     val colors = LocalAppColors.current
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-        IconButton(onClick = onClick, modifier = Modifier.size(34.dp)) {
+        IconButton(onClick = onClick, modifier = Modifier.size(48.dp).testTag("auth-back").semantics { contentDescription = "Back" }) {
             Icon(
                 Icons.Rounded.ChevronLeft,
-                contentDescription = "Back",
+                contentDescription = null,
                 tint = colors.foreground,
                 modifier = Modifier.size(24.dp),
             )
@@ -79,6 +87,7 @@ fun AuthTextField(
     suffixIcon: (@Composable () -> Unit)? = null,
 ) {
     val colors = LocalAppColors.current
+    val focus = LocalFocusManager.current
     Column(modifier = modifier) {
         Text(
             label,
@@ -90,7 +99,9 @@ fun AuthTextField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("auth-field-" + label.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-'))
+                .semantics { contentDescription = label },
+            label = { Text(label) },
             placeholder = {
                 Text(
                     hintText,
@@ -99,7 +110,8 @@ fun AuthTextField(
                 )
             },
             visualTransformation = if (obscureText) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Next),
+            keyboardActions = KeyboardActions(onNext = { if (!focus.moveFocus(FocusDirection.Next)) focus.clearFocus() }),
             isError = error != null,
             supportingText = error?.let { { Text(it, color = c(theme.dangerColor), fontSize = 12.sp) } },
             leadingIcon = prefixIcon,
@@ -132,7 +144,7 @@ fun AuthPrimaryButton(
     Button(
         onClick = onClick,
         enabled = !isLoading,
-        modifier = Modifier.fillMaxWidth().height(52.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = c(theme.accentColor),
@@ -160,7 +172,7 @@ fun AuthSecondaryButton(text: String, theme: ThemeConfig, onClick: () -> Unit) {
     val colors = LocalAppColors.current
     OutlinedButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(52.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(
             1.5.dp,

@@ -274,10 +274,13 @@ fun CallContactPickerScreen(
                     letterSpacing = (-0.3).sp,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = { isDialpad = !isDialpad }) {
+                IconButton(onClick = { isDialpad = !isDialpad },
+                    modifier = Modifier.size(48.dp).semantics(mergeDescendants = true) {
+                        contentDescription = if (isDialpad) "Show contacts" else "Open dialpad"
+                    }) {
                     Icon(
                         if (isDialpad) Icons.Rounded.Contacts else Icons.Rounded.Dialpad,
-                        contentDescription = if (isDialpad) "Show contacts" else "Open dialpad",
+                        contentDescription = null,
                         tint = Color(theme.accentColor),
                         modifier = Modifier.size(24.dp),
                     )

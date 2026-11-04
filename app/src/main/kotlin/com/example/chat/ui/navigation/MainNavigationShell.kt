@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +62,8 @@ data class NavigationShellPrefs(
     val pagerTransition3d: String = "Default",
     /** appearance.bottomBarStyle (default 'Floating Pill'). */
     val bottomBarStyle: String = "Floating Pill",
+    /** Explicit One UI pick renders the raised-centre scrolling dock in the bottom shell. */
+    val oneUiRaisedCenterDock: Boolean = false,
     /** appearance.navigation style name; the rail index derives through
      *  the canonical AppearanceVariantController.navigationStyles
      *  indexOf clamp, exactly like the Dart controller. */
@@ -112,6 +115,7 @@ fun MainNavigationShell(
     previewOnly: Boolean = false,
     /** Read-only picker thumbnails reveal the selected drawer; normal app previews stay closed. */
     previewMenusOpen: Boolean = false,
+    rootHeaderActions: @Composable () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
 
@@ -195,6 +199,16 @@ fun MainNavigationShell(
     }
     val activeDestinationId = allDestinationIds.getOrElse(effectiveIndex) { ChatyNavigationDestinationIds.chats }
 
+    // Swipe-driven chrome: while the pager moves, the shell presentation
+    // (header ownership, rounded content surface, dock highlight, FAB) follows
+    // the page the gesture is landing on, not the last settled selection.
+    // Before this, the destination page painted flat mid-swipe (shellOwnsHeading
+    // false, rounded surface off) and the dock/FAB snapped only when the
+    // settledPage effect ran. Selection state itself still updates on
+    // settledPage below; history/back semantics are unchanged.
+    val presentationIndex = if (previewOnly) effectiveIndex else pagerState.targetPage
+    val presentationDestinationId = allDestinationIds.getOrElse(presentationIndex) { activeDestinationId }
+
     @Composable
     fun pageContent() {
         if (previewOnly) {
@@ -205,14 +219,23 @@ fun MainNavigationShell(
             state = pagerState,
             userScrollEnabled = !previewOnly,
             modifier = Modifier.fillMaxSize(),
+            // User directive ("smooth" tab swipes): precompose the adjacent page so a
+            // swipe never waits on first composition, and lower the snap threshold so a
+            // short deliberate fling changes the page instead of snapping back.
+            beyondViewportPageCount = 1,
+            flingBehavior = androidx.compose.foundation.pager.PagerDefaults.flingBehavior(
+                state = pagerState,
+                snapPositionalThreshold = 0.2f,
+            ),
         ) { index ->
             val destinationId = allDestinationIds.getOrElse(index) { "destination-$index" }
-            val rawOffset = (pagerState.currentPage - index) + pagerState.currentPageOffsetFraction
-            val delta = (-rawOffset).coerceIn(-1f, 1f)
+            // The transition reads the pager offset inside its graphicsLayer
+            // blocks (deferred): scroll frames re-run only the layer pass
+            // instead of recomposing the whole page content every frame.
             Box(
                 Modifier
                     .fillMaxSize()
-                    .pagerTransition(prefs.pagerTransition3d, delta),
+                    .pagerTransition(if (prefs.animationsDisabled) "Default" else prefs.pagerTransition3d, pagerState, index),
             ) {
                 screenContent(destinationId)
             }
@@ -230,7 +253,7 @@ fun MainNavigationShell(
         }
     }
 
-    val selectedPrimaryIndex = primaryIds.indexOf(activeDestinationId)
+    val selectedPrimaryIndex = primaryIds.indexOf(presentationDestinationId)
     val bottomNavSelectedIndex = if (selectedPrimaryIndex >= 0) selectedPrimaryIndex else primaryIds.size
 
     val homeHeaderTabsState = androidx.compose.runtime.remember { HomeHeaderTabsState() }
@@ -253,13 +276,14 @@ fun MainNavigationShell(
                 colors = colors,
                 template = template,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
-                activeDestinationId = activeDestinationId,
+                selectedIndex = presentationIndex,
+                activeDestinationId = presentationDestinationId,
+                rootHeaderActions = rootHeaderActions,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
                 homeHeaderTabsSlot = homeHeaderTabsSlot,
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = {
-                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides activeDestinationId) {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides presentationDestinationId) {
                         pageContent()
                     }
                 },
@@ -267,33 +291,33 @@ fun MainNavigationShell(
             navMode == AppNavigationMode.floatingIslandRail -> FloatingIslandRailShell(
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 userInitials = currentUser?.avatarInitials?.ifEmpty { "CU" } ?: "CU",
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = { pageContent() },
             )
             navMode == AppNavigationMode.perspective3DDrawer -> PerspectiveDrawerShell(
                 initialOpen = previewOnly && previewMenusOpen,
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 animationsDisabled = prefs.animationsDisabled,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = { pageContent() },
             )
             navMode == AppNavigationMode.modernSideMenu -> ModernSideMenuShell(
                 initialOpen = previewOnly && previewMenusOpen,
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 currentUser = currentUser,
                 myNameOverride = myNameOverride,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = {
-                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides activeDestinationId) {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalDestinationTitlePresentation provides presentationDestinationId) {
                         pageContent()
                     }
                 },
@@ -302,10 +326,10 @@ fun MainNavigationShell(
                 initialOpen = previewOnly && previewMenusOpen,
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 animationsDisabled = prefs.animationsDisabled,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                fab = { fab(presentationDestinationId) },
                 content = { pageContent() },
             )
             navMode in setOf(
@@ -316,13 +340,16 @@ fun MainNavigationShell(
                 AppNavigationMode.basicTabStyle,
                 AppNavigationMode.gestureTabs,
             ) -> PresetNavigationShell(
+                referenceDefaultPresentation = prefs.homeStyle?.let(com.example.chat.core.preferences.HomePresentationPolicy::isDefault) ?: false,
+                rootHeaderActions = rootHeaderActions,
                 animationsDisabled = prefs.animationsDisabled,
                 mode = navMode,
                 colors = colors,
                 navItemIds = allDestinationIds,
-                selectedIndex = effectiveIndex,
+                selectedIndex = presentationIndex,
                 onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                fab = { fab(activeDestinationId) },
+                onCenterAction = onCenterAction,
+                fab = { fab(presentationDestinationId) },
                 content = { pageContent() },
             )
             else -> {
@@ -335,11 +362,11 @@ fun MainNavigationShell(
                     RailShell(
                         colors = colors,
                         navItemIds = allDestinationIds,
-                        selectedIndex = effectiveIndex,
+                        selectedIndex = presentationIndex,
                         appearanceNavigationIndex = appearanceNavigationIndex,
                         maxWidth = maxWidth,
                         onSelect = { idx -> selectRootDestination(idx, allDestinationIds.getOrNull(idx)) },
-                        fab = { fab(activeDestinationId) },
+                        fab = { fab(presentationDestinationId) },
                         content = { pageContent() },
                     )
                 } else {
@@ -366,7 +393,8 @@ fun MainNavigationShell(
                             }
                         },
                         onCenterAction = onCenterAction,
-                        fab = { fab(activeDestinationId) },
+                        raisedCenterScrollDock = prefs.oneUiRaisedCenterDock,
+                        fab = { fab(presentationDestinationId) },
                         content = { pageContent() },
                     )
                 }
@@ -502,6 +530,136 @@ fun Modifier.pagerTransition(transition: String, delta: Float): Modifier = when 
         translationX = -delta * size.width * 0.5f
     }
     else -> this
+}
+
+fun Modifier.pagerTransition(transition: String, pagerState: PagerState, page: Int): Modifier {
+    if (transition == "Default") return this
+    // Deferred offset read: sampled inside each graphicsLayer block, so pager
+    // scroll frames invalidate only the layer properties, not composition.
+    fun liveDelta(): Float = ((page - pagerState.currentPage) - pagerState.currentPageOffsetFraction).coerceIn(-1f, 1f)
+    return when (transition) {
+    "Cube 3D" -> graphicsLayer {
+        val delta = liveDelta()
+        transformOrigin = TransformOrigin(if (delta >= 0f) 0f else 1f, 0.5f)
+        cameraDistance = 16f
+        rotationY = delta * 0.62f * 180f / Math.PI.toFloat()
+    }
+    "Accordion Fold" -> graphicsLayer {
+        val delta = liveDelta()
+        transformOrigin = TransformOrigin(if (delta >= 0f) 0f else 1f, 0.5f)
+        cameraDistance = 16f
+        rotationY = delta * 0.28f * 180f / Math.PI.toFloat()
+        scaleX = 1f - abs(delta) * 0.025f
+    }
+    "Card Flip" -> graphicsLayer {
+        val delta = liveDelta()
+        transformOrigin = TransformOrigin(if (delta >= 0f) 1f else 0f, 0.5f)
+        cameraDistance = 14f
+        rotationY = delta * 90f
+        alpha = (1f - abs(delta) * 0.18f).coerceIn(0f, 1f)
+    }
+    "Depth Zoom" -> graphicsLayer {
+        val delta = liveDelta()
+        translationX = delta * 18f
+        val scale = (1f - abs(delta) * 0.09f).coerceIn(0.88f, 1f)
+        scaleX = scale
+        scaleY = scale
+        alpha = (1f - abs(delta) * 0.12f).coerceIn(0f, 1f)
+    }
+    "Stack Rotate" -> graphicsLayer {
+        val delta = liveDelta()
+        rotationZ = delta * 0.045f * 180f / Math.PI.toFloat()
+        val scale = (1f - abs(delta) * 0.045f).coerceIn(0.92f, 1f)
+        scaleX = scale
+        scaleY = scale
+    }
+    // ── GB-reference transformer names (approximations, see header comment) ──
+    "Accordion" -> graphicsLayer {
+        val delta = liveDelta()
+        transformOrigin = TransformOrigin(if (delta >= 0f) 0f else 1f, 0.5f)
+        scaleX = if (delta < 0f) 1f + delta else 1f - delta
+    }
+    "Background To Foreground" -> graphicsLayer {
+        val delta = liveDelta()
+        val scale = 1f - abs(delta) * 0.5f
+        scaleX = scale; scaleY = scale
+        translationX = delta * size.width * 0.5f
+    }
+    "Cube In" -> graphicsLayer {
+        val delta = liveDelta()
+        transformOrigin = TransformOrigin(if (delta >= 0f) 0f else 1f, 0.5f)
+        cameraDistance = 16f
+        rotationY = delta * 90f
+        translationX = -delta * size.width * 0.25f
+    }
+    "Depth Page" -> graphicsLayer {
+        val delta = liveDelta()
+        if (delta <= 0f) {
+            alpha = 1f
+        } else {
+            val scale = (1f - abs(delta)).coerceIn(0.75f, 1f)
+            scaleX = scale; scaleY = scale
+            alpha = 1f - delta
+            translationX = -delta * size.width
+        }
+    }
+    "Draw From Back" -> graphicsLayer {
+        val delta = liveDelta()
+        val scale = 0.5f + 0.5f * (1f - abs(delta))
+        scaleX = scale; scaleY = scale
+        rotationZ = -30f * delta
+        alpha = (1f - abs(delta) * 0.5f).coerceIn(0f, 1f)
+    }
+    "Flip Horizontal" -> graphicsLayer {
+        val delta = liveDelta()
+        cameraDistance = 16f
+        rotationY = 180f * delta
+        alpha = if (abs(delta) > 0.5f) 0f else 1f
+    }
+    "Flip Vertical" -> graphicsLayer {
+        val delta = liveDelta()
+        cameraDistance = 16f
+        rotationX = 180f * delta
+        alpha = if (abs(delta) > 0.5f) 0f else 1f
+    }
+    "Foreground To Background" -> graphicsLayer {
+        val delta = liveDelta()
+        val scale = 1f - abs(delta) * 0.5f
+        scaleX = scale; scaleY = scale
+        translationX = -delta * size.width * 0.5f
+    }
+    "Tablet" -> graphicsLayer {
+        val delta = liveDelta()
+        transformOrigin = TransformOrigin(if (delta >= 0f) 0f else 1f, 0.5f)
+        cameraDistance = 16f
+        rotationY = 30f * delta
+        translationX = -delta * size.width * 0.25f
+    }
+    "Rotate Down" -> graphicsLayer {
+        val delta = liveDelta()
+        transformOrigin = TransformOrigin(0.5f, 1f)
+        rotationZ = -15f * delta
+        alpha = (1f - abs(delta)).coerceIn(0f, 1f)
+    }
+    "Rotate Up" -> graphicsLayer {
+        val delta = liveDelta()
+        transformOrigin = TransformOrigin(0.5f, 1f)
+        rotationZ = 15f * delta
+        alpha = (1f - abs(delta)).coerceIn(0f, 1f)
+    }
+    "Stack" -> graphicsLayer {
+        val delta = liveDelta()
+        translationX = -delta * size.width
+    }
+    "Zoom Out Slide" -> graphicsLayer {
+        val delta = liveDelta()
+        val scale = (1f - abs(delta)).coerceIn(0.85f, 1f)
+        scaleX = scale; scaleY = scale
+        alpha = (0.5f + (1f - abs(delta)) * 0.5f).coerceIn(0.5f, 1f)
+        translationX = -delta * size.width * 0.5f
+    }
+        else -> this
+    }
 }
 
 /** Port of _navDestinationIcon: the themed registry ChatyIcon whenever the

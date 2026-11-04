@@ -1,0 +1,96 @@
+# TESTREF-ONLY parallel validation: TWO emulator jobs running SIMULTANEOUSLY on
+# separate runners, both against the SAME verified synthetic-runtime-apk-pair
+# from a previous successful build (no product recompile).
+# Fires only on a ci/capture-parallel-trigger.txt bump on testref/** branches.
+# The first whitespace-separated token of that file is the source run id.
+# No Telegram, no product changes, no kotlin/main effect.
+name: Testref parallel capture (temporary branch only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [testref/**]
+    paths:
+      - ci/capture-parallel-trigger.txt
+jobs:
+  motion:
+    # 20-row fixture instrumentation with screenrecord WHILE the test gestures:
+    # real collapse/expand motion + destination transitions for frame parity.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve source run id from trigger file
+        run: |
+          set -eu
+          RUN_ID=$(awk 'NF{print $1; exit}' ci/capture-parallel-trigger.txt)
+          case "$RUN_ID" in (''|*[!0-9]*) echo "invalid run id in trigger file"; exit 1;; esac
+          echo "CAPTURE_PAIR_RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: synthetic-runtime-apk-pair
+          path: runtime-apks
+          run-id: ${{ env.CAPTURE_PAIR_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify immutable isolated pair
+        run: cd runtime-apks && sha256sum -c SHA256SUMS
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: python3 ci/layout-capture-motion.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: layout-capture-motion
+          path: screenshots/
+  stable:
+    # Settled final-screen capture: themes, navigation, force-stop/reopen
+    # persistence per style; drawer affordances only (never app-bar overflow).
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve source run id from trigger file
+        run: |
+          set -eu
+          RUN_ID=$(awk 'NF{print $1; exit}' ci/capture-parallel-trigger.txt)
+          case "$RUN_ID" in (''|*[!0-9]*) echo "invalid run id in trigger file"; exit 1;; esac
+          echo "CAPTURE_PAIR_RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: synthetic-runtime-apk-pair
+          path: runtime-apks
+          run-id: ${{ env.CAPTURE_PAIR_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify immutable isolated pair
+        run: cd runtime-apks && sha256sum -c SHA256SUMS
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: python3 ci/layout-capture-stable.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: layout-capture-stable
+          path: screenshots/

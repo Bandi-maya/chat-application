@@ -26,7 +26,7 @@ import com.example.chat.data.services.CallSessionState
 import com.example.chat.ui.settings.CallContactOption
 
 /**
- * Interactive preview and atomic selection screen for the Six Call Experience Bundles.
+ * Interactive preview and atomic selection screen for all Call Experience Bundles.
  * Accessible from: Settings -> Calls -> Call Experience Bundles
  */
 @Composable
@@ -90,7 +90,7 @@ fun CallExperienceBundlePickerScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            items(CallBundleId.all) { bundle ->
+            items(CallBundleId.all, key = { it.id }) { bundle ->
                 val isSelected = bundle.id == selectedId
                 val tokens = remember(bundle) { CallBundleRegistry.getTokens(bundle) }
 
@@ -205,7 +205,7 @@ fun CallExperienceBundlePickerScreen(
 }
 
 /**
- * Interactive accurate Live Preview Screen of the selected bundle across all supported states.
+ * Preview of production 1:1 rendering plus explicitly labelled group concept fixtures.
  */
 @Composable
 fun CallBundleLivePreviewScreen(
@@ -226,7 +226,7 @@ fun CallBundleLivePreviewScreen(
             isVideo = true,
             isOutgoing = false,
             state = CallSessionState.connected,
-            startedAt = java.time.Instant.now(),
+            startedAt = java.time.Instant.EPOCH,
         )
     }
 
@@ -249,8 +249,13 @@ fun CallBundleLivePreviewScreen(
         )
     }
 
+    var previewMuted by remember(bundleId) { mutableStateOf(false) }
+    var previewCameraOff by remember(bundleId) { mutableStateOf(false) }
+    var previewFrontCamera by remember(bundleId) { mutableStateOf(true) }
+    var previewSharing by remember(bundleId) { mutableStateOf(false) }
+    var previewRoute by remember(bundleId) { mutableStateOf(com.example.chat.data.services.AudioRouteType.speaker) }
     var invitedIds by remember { mutableStateOf(setOf<String>()) }
-    var isExpandedCard by remember { mutableStateOf(false) }
+    var previewSpeakerFocused by remember(bundleId) { mutableStateOf(true) }
 
     Scaffold(
         topBar = {
@@ -292,9 +297,13 @@ fun CallBundleLivePreviewScreen(
                     ) {
                         Tab(selected = previewTab == 0, onClick = { previewTab = 0 }, text = { Text("Incoming") })
                         Tab(selected = previewTab == 1, onClick = { previewTab = 1 }, text = { Text("Active 1:1") })
-                        Tab(selected = previewTab == 2, onClick = { previewTab = 2 }, text = { Text("Group Video") })
-                        Tab(selected = previewTab == 3, onClick = { previewTab = 3 }, text = { Text("Invite Sheet") })
-                        Tab(selected = previewTab == 4, onClick = { previewTab = 4 }, text = { Text("Call Cards (Ref 3)") })
+                        Tab(selected = previewTab == 2, onClick = { previewTab = 2 }, text = { Text("Group concept") })
+                        Tab(selected = previewTab == 3, onClick = { previewTab = 3 }, text = { Text("Invite concept") })
+                        Tab(selected = previewTab == 4, onClick = { previewTab = 4 }, text = { Text("Production PiP") })
+                        Tab(selected = previewTab == 5, onClick = { previewTab = 5 }, text = { Text("Outgoing") })
+                        Tab(selected = previewTab == 6, onClick = { previewTab = 6 }, text = { Text("Connecting") })
+                        Tab(selected = previewTab == 7, onClick = { previewTab = 7 }, text = { Text("Reconnecting") })
+                        Tab(selected = previewTab == 8, onClick = { previewTab = 8 }, text = { Text("Active video") })
                     }
                 }
             }
@@ -308,32 +317,45 @@ fun CallBundleLivePreviewScreen(
             when (previewTab) {
                 0 -> BundleIncomingCallView(
                     bundleId = bundleId,
-                    session = mockSession,
+                    session = mockSession.copy(state = CallSessionState.incoming),
                     onAccept = { previewTab = 1 },
                     onDecline = onClose,
                 )
-                1 -> BundleOngoingCallView(
-                    bundleId = bundleId,
-                    session = mockSession,
-                    callDurationSeconds = 142,
-                    isMuted = false,
-                    isSpeaker = true,
-                    isCameraOn = true,
-                    onToggleMute = {},
-                    onToggleSpeaker = {},
-                    onToggleCamera = {},
-                    onSwitchCamera = {},
-                    onEndCall = onClose,
-                    onInviteParticipant = { previewTab = 3 },
-                    onMinimize = {},
-                )
+                1, 5, 6, 7, 8 -> {
+                    val state = when (previewTab) {
+                        5 -> CallSessionState.ringing
+                        6 -> CallSessionState.connecting
+                        7 -> CallSessionState.reconnecting
+                        else -> CallSessionState.connected
+                    }
+                    val presentation = resolveCallBundlePresentation(bundleId.id, state)
+                    val previewSession = mockSession.copy(
+                        state = state, isVideo = previewTab == 8, isOutgoing = previewTab == 5,
+                        isMuted = previewMuted, isCameraOff = previewCameraOff,
+                        isFrontCamera = previewFrontCamera, isSharingScreen = previewSharing,
+                        audioRoute = previewRoute, isDemo = true,
+                    )
+                    com.example.chat.ui.calls.OngoingCallScreen(
+                        session = previewSession,
+                        callDurationSeconds = if (presentation.showConnectedDuration) 142 else 0,
+                        hasLocalMedia = false, videoSurfaces = null, setupError = null,
+                        template = presentation.template, bundleId = presentation.bundleId,
+                        pictureInPictureEnabled = false, autoHideControls = false, observeNativePip = false,
+                        onBack = onClose, onSessionGone = onClose, onEndCall = onClose,
+                        onToggleMute = { previewMuted = !previewMuted },
+                        onToggleCamera = { previewCameraOff = !previewCameraOff },
+                        onSwitchCamera = { previewFrontCamera = !previewFrontCamera },
+                        onToggleScreenShare = { previewSharing = !previewSharing },
+                        onToggleAudioRoute = { previewRoute = it }, onEnterNativePip = onClose,
+                    )
+                }
                 2 -> BundleGroupMeetingView(
                     bundleId = bundleId,
                     meetingTitle = "Weekly Sync",
                     durationSeconds = 240,
                     participants = mockParticipants,
-                    isSpeakerFocused = true,
-                    onToggleSpeakerFocus = {},
+                    isSpeakerFocused = previewSpeakerFocused,
+                    onToggleSpeakerFocus = { previewSpeakerFocused = !previewSpeakerFocused },
                     onInviteClicked = { previewTab = 3 },
                     onLeaveMeeting = onClose,
                 )
@@ -346,39 +368,24 @@ fun CallBundleLivePreviewScreen(
                     },
                     onClose = { previewTab = 2 },
                 )
-                4 -> Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF0F172A))
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Reference 3 Card Presentations",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = "Tap the card below to toggle compact vs expanded presentation",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 13.sp,
-                        )
-                        Spacer(Modifier.height(28.dp))
-                        BundleCompactCallCard(
-                            bundleId = bundleId,
-                            session = mockSession,
-                            isExpanded = isExpandedCard,
-                            onToggleExpand = { isExpandedCard = !isExpandedCard },
-                            onAccept = { previewTab = 1 },
-                            onDecline = onClose,
-                        )
-                    }
-                }
+                4 -> com.example.chat.ui.calls.InAppCallPip(
+                    bundleId = bundleId,
+                    session = mockSession.copy(state = CallSessionState.connected),
+                    videoSurfaces = null,
+                    durationSeconds = 142,
+                    onTap = { previewTab = 8 },
+                    onCollapseToIsland = { previewTab = 1 },
+                    onEndCall = onClose,
+                )
+            }
+            if (previewTab == 2 || previewTab == 3) {
+                Text(
+                    text = "Concept fixture only: group calling is not available in the current runtime.",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.BottomCenter).background(Color(0xFF1E1E24)).padding(8.dp),
+                )
             }
         }
     }
 }
-

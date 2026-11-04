@@ -291,7 +291,7 @@ fun CollapsedIslandView(
 
                 // Trailing element.
                 when {
-                    isCall -> if (p != null && p.durationSeconds > 0) { // Dart: p?.durationSeconds != null && p!.durationSeconds > 0
+                    isCall -> if (p != null && p.durationSeconds > 0 && p.callShowsDuration) { // Dart: p?.durationSeconds != null && p!.durationSeconds > 0
                         Text(
                             islandFormatTime(p.durationSeconds),
                             color = Color(0xFF22C55E),
@@ -776,7 +776,7 @@ fun ExpandedCallView(
                     if (isIncoming) {
                         "Incoming ${if (payload.isVideo) "Video" else "Audio"} Call…"
                     } else {
-                        "Ongoing Call • ${islandFormatTime(payload.durationSeconds)}"
+                        payload.callStatusLabel ?: "Ongoing Call • ${islandFormatTime(payload.durationSeconds)}"
                     },
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 12.sp,
@@ -815,7 +815,7 @@ fun ExpandedCallView(
                     label = if (payload.isMuted) "Unmute" else "Mute",
                 ) {
                     ChatyHapticsPort.light(view)
-                    payload.onTap?.invoke()
+                    (payload.onToggleCallMute ?: payload.onTap)?.invoke()
                 }
                 CallActionButton(
                     kind = if (payload.isSpeaker) "speaker" else "earpiece",
@@ -823,7 +823,7 @@ fun ExpandedCallView(
                     label = "Speaker",
                 ) {
                     ChatyHapticsPort.light(view)
-                    payload.onTap?.invoke()
+                    (payload.onToggleCallSpeaker ?: payload.onTap)?.invoke()
                 }
                 CallActionButton(
                     kind = "callEnd",

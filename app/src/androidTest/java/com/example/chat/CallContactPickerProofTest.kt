@@ -57,7 +57,7 @@ class CallContactPickerProofTest {
             contact("c02", "Rohan Iyer"),
             contact("c03", "Meera Nair"),
         )
-        val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+        val scenario = ActivityScenario.launch(MediaFixtureActivity::class.java)
         scenario.onActivity { activity ->
             activity.setContent {
                 ChatyTheme(ThemePresets.whatsappIosLight) {
@@ -84,8 +84,14 @@ class CallContactPickerProofTest {
         toggle.click()
         assertTrue("dialpad mode did not open", dev.wait(Until.hasObject(By.desc("Show contacts")), 5000))
         shot("call-contact-picker-dialpad")
-        dev.findObject(By.desc("Show contacts")).click()
-        assertTrue("contacts mode did not return", dev.wait(Until.hasObject(By.desc("Open dialpad")), 5000))
+        val contactsToggle = dev.wait(Until.findObject(By.desc("Show contacts").clickable(true)),5000)
+        assertNotNull("Clickable contacts toggle missing",contactsToggle)
+        dev.waitForIdle()
+        contactsToggle!!.click()
+        val returned = dev.wait(Until.hasObject(By.desc("Open dialpad").clickable(true)),5000)
+        shot("call-contact-picker-after-return-click")
+        assertTrue("contacts mode did not return", returned)
+        assertTrue("Contacts title must return",dev.hasObject(By.text("Contacts")))
         scenario.close()
     }
     private fun incomingSession(name: String) = ChatyCallSession(
@@ -99,7 +105,12 @@ class CallContactPickerProofTest {
     )
 
     private fun swipeFrom(desc: String, dx: Int, dy: Int) {
-        val obj = dev.findObject(By.desc(desc)) ?: throw AssertionError("control '$desc' not found")
+        val obj = dev.wait(Until.findObject(By.desc(desc)), 8000) ?: run {
+            shot("call-control-missing")
+            val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+            dev.dumpWindowHierarchy(File(dir, "call-control-missing.xml"))
+            throw AssertionError("control '$desc' not found after mounted-target wait")
+        }
         // Gesture must start on the actual target, not the unrelated display center.
         val bounds = obj.visibleBounds
         val x = bounds.centerX()
@@ -124,7 +135,7 @@ class CallContactPickerProofTest {
     ) {
         val accepted = java.util.concurrent.atomic.AtomicBoolean(false)
         val declined = java.util.concurrent.atomic.AtomicBoolean(false)
-        val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+        val scenario = ActivityScenario.launch(MediaFixtureActivity::class.java)
         try {
             scenario.onActivity { activity ->
                 activity.setContent {
@@ -164,24 +175,79 @@ class CallContactPickerProofTest {
             Thread.sleep(900)
             assertFalse("$tag: small drag must not accept", accepted.get())
             assertFalse("$tag: small drag must not decline", declined.get())
+            if (bundle == CallBundleId.NEXTCLOUD_TALK) {
+                swipeFrom(controlDesc, 30, 0)
+                dev.waitForIdle(2000)
+                Thread.sleep(900)
+                assertFalse("$tag: horizontal wiggle must not accept", accepted.get())
+                assertFalse("$tag: horizontal wiggle must not decline", declined.get())
+                dev.findObject(By.desc(controlDesc)).click()
+                dev.waitForIdle(2000)
+                assertTrue("$tag: true tap must still accept", accepted.get())
+                assertFalse("$tag: true tap must not decline", declined.get())
+                shot("bundle-nextcloud-tap-after-wiggles")
+            }
         } finally {
             scenario.close()
         }
     }
 
+    /** Real Samsung tap targets expose accessibility descriptions and callbacks. */
+    @Test
+    fun samsungReferenceTapButtonsFireRealCallbacks() {
+        val accepted = java.util.concurrent.atomic.AtomicInteger()
+        val declined = java.util.concurrent.atomic.AtomicInteger()
+        ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
+            scenario.onActivity { activity -> activity.setContent {
+                ChatyTheme(ThemePresets.monochromeDark) {
+                    BundleIncomingCallView(CallBundleId.SAMSUNG_ONE_UI, incomingSession("Synthetic caller"),
+                        onAccept = { accepted.incrementAndGet() }, onDecline = { declined.incrementAndGet() })
+                }
+            } }
+            val answer = dev.wait(Until.findObject(By.desc("Answer call")), 5000) ?: throw AssertionError("Answer tap target missing")
+            answer.click(); ins.waitForIdleSync()
+            assertEquals(1, accepted.get()); assertEquals(0, declined.get())
+            val decline = dev.wait(Until.findObject(By.desc("Decline call")), 5000) ?: throw AssertionError("Decline tap target missing")
+            decline.click(); ins.waitForIdleSync()
+            assertEquals(1, accepted.get()); assertEquals(1, declined.get())
+            shot("samsung-reference-tap-buttons")
+        }
+    }
+
+    @Test fun horizontalReferencePucksCancelAndCommit() {
+        runGestureCase("google-latest-reference", CallBundleId.GOOGLE_PHONE_LATEST,
+            controlDesc = "Answer or decline puck", acceptDelta = 430 to 0, declineDelta = -430 to 0)
+    }
+
+    @Test fun sharedIncomingBannerUsesSameCallbacks() {
+        val accepted = java.util.concurrent.atomic.AtomicInteger()
+        val declined = java.util.concurrent.atomic.AtomicInteger()
+        ActivityScenario.launch(MediaFixtureActivity::class.java).use { scenario ->
+            scenario.onActivity { activity -> activity.setContent {
+                ChatyTheme(ThemePresets.monochromeDark) {
+                    BundleIncomingCallView(CallBundleId.APPLE_IOS, incomingSession("Synthetic caller"),
+                        onAccept = { accepted.incrementAndGet() }, onDecline = { declined.incrementAndGet() }, banner = true)
+                }
+            } }
+            dev.wait(Until.findObject(By.text("Answer")), 5000)?.click() ?: throw AssertionError("Banner Answer missing")
+            ins.waitForIdleSync(); assertEquals(1, accepted.get())
+            dev.findObject(By.text("Decline")).click(); ins.waitForIdleSync(); assertEquals(1, declined.get())
+            shot("shared-incoming-banner-reference")
+        }
+    }
+
+    @Test
+    fun verticalPuckResetsAfterSuccessBeforeOppositeAndSmallDrag() {
+        runGestureCase(
+            "vertical-reset-regression", CallBundleId.AZURE_RING_VERTICAL,
+            controlDesc = "Azure ring answer or decline puck",
+            acceptDelta = 0 to 430, declineDelta = 0 to -430,
+        )
+    }
+
     @Test
     fun bundleIncomingReferenceGesturesFireRealCallbacks() {
-        // Samsung One UI: drag the action circle OUT of its halo.
-        runGestureCase(
-            "samsung_one_ui", CallBundleId.SAMSUNG_ONE_UI,
-            controlDesc = "Answer call", acceptDelta = 420 to 0,
-            declineDelta = -420 to 0, declineDesc = "Decline call",
-        )
-        // Google Phone Latest: drag the center puck right = answer, left = decline.
-        runGestureCase(
-            "google_phone_latest", CallBundleId.GOOGLE_PHONE_LATEST,
-            controlDesc = "Answer or decline puck", acceptDelta = 430 to 0, declineDelta = -430 to 0,
-        )
+        // Samsung is now separately tested as reference-approved TAP controls.
         // Azure Ring Vertical: drag the ring down = answer, up = decline.
         runGestureCase(
             "azure_ring_vertical", CallBundleId.AZURE_RING_VERTICAL,
@@ -198,6 +264,44 @@ class CallContactPickerProofTest {
             controlDesc = "Accept call", acceptDelta = 0 to -430,
             declineDelta = null, declineDesc = null,
         )
+    }
+
+    @Test
+    fun googleLatestHorizontalPuckHasCorrectSideAndSingleFire() {
+        for (answer in listOf(true, false)) {
+            val accepted = java.util.concurrent.atomic.AtomicInteger(0)
+            val declined = java.util.concurrent.atomic.AtomicInteger(0)
+            val scenario = ActivityScenario.launch(MediaFixtureActivity::class.java)
+            try {
+                scenario.onActivity { activity ->
+                    activity.setContent {
+                        ChatyTheme(ThemePresets.whatsappIosLight) {
+                            val pending = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                            BundleIncomingCallView(CallBundleId.GOOGLE_PHONE_LATEST,
+                                incomingSession("Synthetic Caller"),
+                                onAccept = { if (!pending.value) { pending.value = true; accepted.incrementAndGet() } },
+                                onDecline = { if (!pending.value) { pending.value = true; declined.incrementAndGet() } },
+                                actionPending = pending.value)
+                        }
+                    }
+                }
+                val accept = dev.wait(Until.findObject(By.text("Answer")), 8000)
+                val decline = dev.wait(Until.findObject(By.text("Decline")), 8000)
+                assertNotNull(accept)
+                assertNotNull(decline)
+                assertTrue("Decline stays left of Answer", decline.visibleBounds.centerX() < accept.visibleBounds.centerX())
+                assertTrue("Horizontal puck is present", dev.wait(Until.hasObject(By.desc("Answer or decline puck")), 8000))
+                shot("google-latest-horizontal-puck-single-fire")
+                // Labels establish side layout but are not tap actions. Drive real puck.
+                repeat(2) {
+                    swipeFrom("Answer or decline puck", if (answer) 430 else -430, 0)
+                    dev.waitForIdle(2000)
+                    Thread.sleep(600) // settle/reset completes; pending still blocks repeat
+                }
+                assertEquals(if (answer) 1 else 0, accepted.get())
+                assertEquals(if (answer) 0 else 1, declined.get())
+            } finally { scenario.close() }
+        }
     }
 
     /**
@@ -245,7 +349,7 @@ class CallContactPickerProofTest {
 
             // Route exactly like GlobalCallHost: fromId(prefs) -> BundleIncomingCallView.
             val accepted = java.util.concurrent.atomic.AtomicBoolean(false)
-            val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+            val scenario = ActivityScenario.launch(MediaFixtureActivity::class.java)
             try {
                 scenario.onActivity { activity ->
                     activity.setContent {
@@ -263,7 +367,9 @@ class CallContactPickerProofTest {
                     "persisted id must route to the Mono Chevron incoming view",
                     dev.wait(Until.hasObject(By.desc("Mono chevron answer or decline puck")), 8000),
                 )
+                assertEquals("Isolated fixture remains resumed", androidx.lifecycle.Lifecycle.State.RESUMED, scenario.state)
                 shot("bundle-applied-mono-chevron")
+                assertTrue("Mounted Mono view remains after capture", dev.wait(Until.hasObject(By.desc("Mono chevron answer or decline puck")), 8000))
                 swipeFrom("Mono chevron answer or decline puck", 0, 430)
                 dev.waitForIdle(3000)
                 Thread.sleep(1200)
@@ -291,21 +397,44 @@ class CallContactPickerProofTest {
     fun pickerSelectionAppliesAndRoutesLiveDemoIncomingCall() {
         ins.uiAutomation.grantRuntimePermission(ins.targetContext.packageName, android.Manifest.permission.POST_NOTIFICATIONS)
         val appCtx = ins.targetContext
-        val scope = kotlinx.coroutines.CoroutineScope(
-            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
-        )
-        val store = CallPresentationPreferencesStore(AndroidCallPresentationPrefsStorage(appCtx), scope)
-        store.initialize()
-        var deadline = System.currentTimeMillis() + 8000
-        while (!store.isInitialized) {
-            if (System.currentTimeMillis() > deadline) fail("store did not initialize")
-            Thread.sleep(50)
-        }
-        val original = store.value.callExperienceBundleId
+        var store: CallPresentationPreferencesStore? = null
+        var original: String? = null
         try {
             val launch = appCtx.packageManager.getLaunchIntentForPackage(appCtx.packageName)!!
             appCtx.startActivity(launch)
+            val api = com.example.chat.ServiceLocator.apiBackend
+            assertTrue("isolated QA profile must not contain a real account", !api.isAuthenticated || api.isDemoSession)
+            if (!api.isDemoSession) {
+                assertTrue("welcome never appeared", dev.wait(Until.hasObject(By.textContains("Welcome")), 30000))
+                dev.findObject(By.text("Log In")).click()
+                assertTrue("demo card never appeared", dev.wait(Until.hasObject(By.textContains("Try the demo")), 10000))
+                dev.findObject(By.textContains("Try the demo")).click()
+                if (dev.wait(Until.hasObject(By.text("Enable App Lock?")), 5000)) {
+                    dev.findObject(By.text("Not now")).click()
+                }
+                if (dev.wait(Until.hasObject(By.text("Not Now")), 4000)) {
+                    dev.findObject(By.text("Not Now")).click()
+                }
+                // Release notes can cover a successfully loaded demo home.
+                // Dismiss only the identified existing modal via its real UI.
+                if (dev.wait(Until.hasObject(By.text("Chaty changelog")), 5000)) {
+                    val close = dev.wait(Until.findObject(By.text("Close")), 5000)
+                    assertNotNull("changelog Close action missing", close)
+                    close.click()
+                    assertTrue("changelog did not close", dev.wait(Until.gone(By.text("Chaty changelog")), 5000))
+                }
+                assertTrue("demo home never appeared", dev.wait(Until.hasObject(By.textContains("Aisha (sample)")), 15000))
+            }
+            assertTrue("only the offline demo may be used", api.isDemoSession)
             assertTrue("app shell visible", dev.wait(Until.hasObject(By.text("Chats")), 20000))
+            val liveStore = com.example.chat.ServiceLocator.callPresentationPrefs
+            store = liveStore
+            var deadline = System.currentTimeMillis() + 8000
+            while (!liveStore.isInitialized) {
+                if (System.currentTimeMillis() > deadline) fail("live store did not initialize")
+                Thread.sleep(50)
+            }
+            original = liveStore.value.callExperienceBundleId
 
             var settingsEntry = dev.wait(Until.findObject(By.text("Settings")), 8000)
             if (settingsEntry == null) settingsEntry = dev.wait(Until.findObject(By.desc("Settings")), 4000)
@@ -313,13 +442,18 @@ class CallContactPickerProofTest {
             settingsEntry.click()
             dev.waitForIdle(3000)
 
-            var callsRow = dev.wait(Until.findObject(By.text("Calls")), 8000)
-            if (callsRow == null) {
-                dev.swipe(540, 1600, 540, 700, 40)
-                callsRow = dev.wait(Until.findObject(By.text("Calls")), 5000)
+            // Root settings calls the row Call Settings. Calls is the bottom-nav destination.
+            var callsRow = dev.wait(Until.findObject(By.text("Call Settings")), 3000)
+            repeat(8) {
+                if (callsRow == null) {
+                    dev.swipe(dev.displayWidth / 2, dev.displayHeight * 3 / 4,
+                        dev.displayWidth / 2, dev.displayHeight / 3, 40)
+                    callsRow = dev.wait(Until.findObject(By.text("Call Settings")), 1500)
+                }
             }
-            assertNotNull("Calls settings row not found", callsRow)
-            callsRow.click()
+            shot("bundle-live-demo-call-settings-route")
+            assertNotNull("Call Settings row not found in Settings", callsRow)
+            callsRow!!.click()
             dev.waitForIdle(3000)
 
             val tile = dev.wait(Until.findObject(By.text("Selected Call Bundle")), 8000)
@@ -327,14 +461,21 @@ class CallContactPickerProofTest {
             tile.click()
             dev.waitForIdle(3000)
 
-            val row = dev.wait(Until.findObject(By.text("Mono Chevron Dark")), 8000)
+            var row = dev.wait(Until.findObject(By.text("Mono Chevron Dark")), 2000)
+            repeat(10) {
+                if (row == null) {
+                    dev.swipe(dev.displayWidth/2, dev.displayHeight*3/4, dev.displayWidth/2, dev.displayHeight/3, 40)
+                    row = dev.wait(Until.findObject(By.text("Mono Chevron Dark")),1500)
+                }
+            }
+            shot("bundle-picker-mono-visible-before-apply")
             assertNotNull("Mono Chevron Dark option missing from picker", row)
-            row.click()
+            row!!.click()
             dev.waitForIdle(3000)
             shot("bundle-picker-applied-mono-chevron")
 
             deadline = System.currentTimeMillis() + 8000
-            while (store.value.callExperienceBundleId != "mono_chevron_dark") {
+            while (liveStore.value.callExperienceBundleId != "mono_chevron_dark") {
                 if (System.currentTimeMillis() > deadline) fail("picker Apply did not persist mono_chevron_dark")
                 Thread.sleep(100)
             }
@@ -353,13 +494,30 @@ class CallContactPickerProofTest {
 
             swipeFrom("Mono chevron answer or decline puck", 0, -430)
             deadline = System.currentTimeMillis() + 8000
-            while (calls.currentSession != null) {
-                if (System.currentTimeMillis() > deadline) fail("demo session not cleared after decline gesture")
+            val declinedCallId = calls.currentSession?.callId
+            while (calls.currentSession?.state != com.example.chat.data.services.CallSessionState.declined) {
+                if (System.currentTimeMillis() > deadline) fail("demo session did not reach declined after gesture: ${calls.currentSession?.state}")
                 Thread.sleep(100)
             }
+            assertNotNull("Declined demo keeps its terminal record until next session", declinedCallId)
+            assertEquals(declinedCallId, calls.currentSession?.callId)
+            assertTrue("Decline must remove rendered incoming control", dev.wait(Until.gone(By.desc("Mono chevron answer or decline puck")), 5000))
+            assertFalse("Declined call must not remain active", calls.hasActiveSession)
+            shot("bundle-live-demo-declined-state-and-dismissal")
+        } catch (failure: Throwable) {
+            // Preserve the exact window at any entry/navigation assertion failure.
+            try { shot("bundle-live-demo-failure") } catch (_: Throwable) {}
+            try {
+                val dir = File(appCtx.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+                dev.dumpWindowHierarchy(File(dir, "bundle-live-demo-failure.xml"))
+            } catch (_: Throwable) {}
+            throw failure
         } finally {
-            store.setCallExperienceBundle(original)
-            Thread.sleep(500)
+            val prior = original
+            if (prior != null && com.example.chat.ServiceLocator.apiBackend.isDemoSession) {
+                store?.setCallExperienceBundle(prior)
+                Thread.sleep(500)
+            }
         }
     }
 }

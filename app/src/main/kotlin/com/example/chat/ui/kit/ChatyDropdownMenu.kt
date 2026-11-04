@@ -1,6 +1,7 @@
 package com.example.chat.ui.kit
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -28,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -55,11 +61,17 @@ val LocalReferenceLayoutPresentation = androidx.compose.runtime.staticCompositio
  * Intrinsic width prevents weighted menu labels from expanding to the full popup constraint.
  * Foundation handles scrolling and Popup handles Back/outside dismissal.
  */
+/** Session-scoped scroll memory for menus that opt in via rememberKey: reopening
+ *  lands on the same option area instead of the top (user directive: reopen from
+ *  the last used option, not from the start). */
+private val chatyMenuScrollMemory = HashMap<String, Int>()
+
 @Composable
 fun ChatyDropdownMenu(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    rememberKey: String? = null,
     shape: Shape = ChatyModalShape,
     containerColor: Color = LocalAppColors.current.surfaceElevated,
     border: BorderStroke? = null,
@@ -78,7 +90,17 @@ fun ChatyDropdownMenu(
     val maxMenuWidth = (configuration.screenWidthDp.dp - 16.dp).coerceAtLeast(1.dp)
     val maxMenuHeight = (configuration.screenHeightDp.dp * 0.8f).coerceAtLeast(1.dp)
     val margin = with(LocalDensity.current) { 8.dp.roundToPx() }
-    val position = remember(margin) { ChatyMenuPositionProvider(margin) }
+    // User directive: the menu scales/fades out from the tapped anchor, not a
+    // fixed corner. The position provider reports where the anchor's centre falls
+    // inside the placed popup; that point becomes the transform origin.
+    var menuTransformOrigin by remember { mutableStateOf(TransformOrigin.Center) }
+    val position = remember(margin) {
+        ChatyMenuPositionProvider(margin) { ox, oy -> menuTransformOrigin = TransformOrigin(ox, oy) }
+    }
+    val menuScrollState = remember(rememberKey) { ScrollState(rememberKey?.let { chatyMenuScrollMemory[it] } ?: 0) }
+    if (rememberKey != null) {
+        LaunchedEffect(menuScrollState.value) { chatyMenuScrollMemory[rememberKey] = menuScrollState.value }
+    }
     Popup(
         popupPositionProvider = position,
         onDismissRequest = onDismissRequest,
@@ -87,9 +109,9 @@ fun ChatyDropdownMenu(
         androidx.compose.animation.AnimatedVisibility(
             visibleState = menuVisibility,
             enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(presentation.menuEnterMs)) +
-                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(presentation.menuEnterMs), initialScale = 0.96f),
+                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(presentation.menuEnterMs), initialScale = 0.96f, transformOrigin = menuTransformOrigin),
             exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(presentation.menuExitMs)) +
-                androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(presentation.menuExitMs), targetScale = 0.98f),
+                androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(presentation.menuExitMs), targetScale = 0.98f, transformOrigin = menuTransformOrigin),
         ) {
         Column(
             modifier.shadow(12.dp, effectiveShape).clip(effectiveShape)
@@ -98,7 +120,7 @@ fun ChatyDropdownMenu(
                 .widthIn(max = maxMenuWidth)
                 .width(IntrinsicSize.Max)
                 .heightIn(max = maxMenuHeight)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(menuScrollState)
                 .padding(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) { content() }
@@ -136,7 +158,10 @@ fun ChatyDropdownMenuItem(
 }
 
 /** Keeps menus on screen and flips above the anchor when there is no room below. */
-internal class ChatyMenuPositionProvider(private val margin: Int) : PopupPositionProvider {
+internal class ChatyMenuPositionProvider(
+    private val margin: Int,
+    private val onOrigin: ((Float, Float) -> Unit)? = null,
+) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -150,6 +175,14 @@ internal class ChatyMenuPositionProvider(private val margin: Int) : PopupPositio
         val below = anchorBounds.bottom + margin
         val preferredY = if (below + popupContentSize.height <= windowSize.height - margin) below
             else anchorBounds.top - popupContentSize.height - margin
-        return IntOffset(preferredX.coerceIn(margin, maxX), preferredY.coerceIn(margin, maxY))
+        val placed = IntOffset(preferredX.coerceIn(margin, maxX), preferredY.coerceIn(margin, maxY))
+        if (onOrigin != null && popupContentSize.width > 0 && popupContentSize.height > 0) {
+            val anchorCenterX = (anchorBounds.left + anchorBounds.right) / 2f
+            val originX = ((anchorCenterX - placed.x) / popupContentSize.width).coerceIn(0f, 1f)
+            // Below the anchor the menu grows downward from it; above, upward.
+            val originY = if (placed.y >= anchorBounds.bottom) 0f else 1f
+            onOrigin(originX, originY)
+        }
+        return placed
     }
 }

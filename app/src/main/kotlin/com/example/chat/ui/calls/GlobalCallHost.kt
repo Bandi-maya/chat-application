@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -53,51 +51,6 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
                 android.widget.Toast.makeText(hostContext, failureMessage, android.widget.Toast.LENGTH_SHORT).show()
             }, action = action)
         }
-    }
-    var requestedScreenShareCallId by remember { mutableStateOf<String?>(null) }
-    val screenSharePermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        val expectedCallId = requestedScreenShareCallId
-        requestedScreenShareCallId = null
-        val current = service.currentSession
-        if (result.resultCode != android.app.Activity.RESULT_OK || result.data == null) {
-            android.widget.Toast.makeText(hostContext, "Screen sharing was not started. Permission was cancelled.", android.widget.Toast.LENGTH_SHORT).show()
-        } else if (
-            expectedCallId == null || current?.callId != expectedCallId ||
-            current.state != CallSessionState.connected || !current.isVideo || !service.hasLocalMedia
-        ) {
-            android.widget.Toast.makeText(hostContext, "The call changed before screen sharing could start.", android.widget.Toast.LENGTH_SHORT).show()
-        } else {
-            val media = service.activeMedia as? com.example.chat.data.services.WebRtcCallMediaController
-            if (media == null) {
-                android.widget.Toast.makeText(hostContext, "Screen sharing is unavailable for this call session.", android.widget.Toast.LENGTH_SHORT).show()
-            } else {
-                media.setScreenCapturePermission(result.data!!)
-                callAction(expectedCallId, "Unable to start screen sharing. Check the call connection and try again.") {
-                    service.toggleScreenShare()
-                }
-            }
-        }
-    }
-    fun requestOrStopScreenShare(callId: String, currentlySharing: Boolean) {
-        val current = service.currentSession
-        if (current?.callId != callId || current.state != CallSessionState.connected || !current.isVideo || !service.hasLocalMedia) {
-            android.widget.Toast.makeText(hostContext, "Screen sharing is available only after a video call is connected.", android.widget.Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (currentlySharing) {
-            callAction(callId, "Unable to stop screen sharing.") { service.toggleScreenShare() }
-            return
-        }
-        val manager = hostContext.getSystemService(android.content.Context.MEDIA_PROJECTION_SERVICE)
-            as? android.media.projection.MediaProjectionManager
-        if (manager == null) {
-            android.widget.Toast.makeText(hostContext, "Screen sharing is not supported on this device.", android.widget.Toast.LENGTH_SHORT).show()
-            return
-        }
-        requestedScreenShareCallId = callId
-        screenSharePermissionLauncher.launch(manager.createScreenCaptureIntent())
     }
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(service, presentation) {
@@ -152,6 +105,13 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
                     timestamp = java.time.Instant.now(),
                     durationSeconds = service.callDurationSeconds,
                     isVideo = cs.isVideo,
+                    isMuted = cs.isMuted,
+                    callStatusLabel = compactCallStatus(cs.state, service.callDurationSeconds),
+                    callShowsDuration = cs.state == CallSessionState.connected,
+                    onToggleCallMute = { callAction(cs.callId, "Unable to change microphone state.") { service.toggleMute() } },
+                    onToggleCallSpeaker = { callAction(cs.callId, "Unable to change audio route.") {
+                        service.setAudioRoute(if (cs.audioRoute == AudioRouteType.speaker) AudioRouteType.earpiece else AudioRouteType.speaker)
+                    } },
                     isSpeaker = cs.audioRoute == AudioRouteType.speaker,
                     onTap = { if (cs.isVideo) presentation.expandFromIsland() else presentation.showFullScreen() },
                     onAcceptCall = { callAction(cs.callId, "Unable to accept the call. Check microphone and camera permissions.") { service.acceptCall() } },
@@ -167,19 +127,39 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
     }
     val session = service.currentSession ?: return
     val prefs = prefsStore.value
-    val activeBundle = remember(prefs.callExperienceBundleId) {
-        com.example.chat.ui.calls.bundles.CallBundleId.fromId(prefs.callExperienceBundleId)
+    val bundlePresentation = remember(prefs.callExperienceBundleId, session.state) {
+        com.example.chat.ui.calls.bundles.resolveCallBundlePresentation(prefs.callExperienceBundleId, session.state)
     }
+    val activeBundle = bundlePresentation.bundleId
 
-    if (session.state == CallSessionState.incoming) {
+    val incomingGate = remember(session.callId) { IncomingCallActionGate() }
+    var incomingActionPending by remember(session.callId) { mutableStateOf(false) }
+    var incomingBanner by remember(session.callId) { mutableStateOf(false) }
+    fun incomingAction(action: suspend () -> Unit) {
+        if (service.currentSession?.state != CallSessionState.incoming || !incomingGate.tryEnter()) return
+        incomingActionPending = true
+        scope.launch {
+            try {
+                if (service.currentSession?.callId != session.callId) return@launch
+                runCallAction(onFailure = {
+                    android.widget.Toast.makeText(hostContext, "Unable to update the call. Check microphone and camera permissions.", android.widget.Toast.LENGTH_SHORT).show()
+                }, action = action)
+            } finally { incomingGate.complete(); incomingActionPending = false }
+        }
+    }
+    if (bundlePresentation.incoming) {
         com.example.chat.ui.calls.bundles.BundleIncomingCallView(
             bundleId = activeBundle,
             session = session,
-            onAccept = {
+            actionPending = incomingActionPending,
+            banner = incomingBanner,
+            onExpand = { incomingBanner = false },
+            onMinimize = { incomingBanner = true },
+            onAccept = { incomingAction {
                 presentation.showFullScreen()
-                callAction(session.callId, "Unable to accept the call. Check microphone and camera permissions.") { service.acceptCall() }
-            },
-            onDecline = { callAction(session.callId, "Unable to decline the call.") { service.declineCall() } },
+                service.acceptCall()
+            } },
+            onDecline = { incomingAction { service.declineCall() } },
         )
         return
     }
@@ -195,7 +175,8 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             hasLocalMedia = service.hasLocalMedia,
             videoSurfaces = surfaces,
             setupError = null,
-            template = CallScreenTemplate.fromName(prefs.ongoingCallTemplate),
+            template = bundlePresentation.template,
+            bundleId = activeBundle,
             pictureInPictureEnabled = prefs.pictureInPictureEnabled,
             onBack = { presentation.minimizeToPipOrIsland() },
             onSessionGone = {
@@ -206,17 +187,17 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             onToggleMute = { service.toggleMute() },
             onToggleCamera = { service.toggleCamera() },
             onSwitchCamera = { callAction(session.callId, "Unable to switch camera.") { service.switchCamera() } },
-            onToggleScreenShare = { requestOrStopScreenShare(session.callId, session.isSharingScreen) },
+            onToggleScreenShare = { callAction(session.callId, "Unable to change screen sharing.") { service.toggleScreenShare() } },
             onToggleAudioRoute = { route: AudioRouteType -> callAction(session.callId, "Choose Bluetooth or a headset through the system audio controls.") { service.setAudioRoute(route) } },
             onEnterNativePip = {
                 // Dart _enterNativePip: settings gate, then system PiP, else a message.
                 if (!prefs.pictureInPictureEnabled) {
                     android.widget.Toast.makeText(hostContext, "Picture-in-picture is disabled in Call settings.", android.widget.Toast.LENGTH_SHORT).show()
                 } else {
-                    val activity = generateSequence(hostContext) { (it as? android.content.ContextWrapper)?.baseContext }
-                        .firstOrNull { it is android.app.Activity } as? android.app.Activity
-                    val entered = activity != null && ServiceLocator.nativeCallPip.enter(activity)
-                    if (!entered) android.widget.Toast.makeText(hostContext, "Picture-in-picture is unavailable.", android.widget.Toast.LENGTH_SHORT).show()
+                    // Whole-Activity PiP is not safe until the captured-account/call
+                    // privacy surface is installed and its lifecycle proof passes.
+                    // Keep the existing in-app call view rather than exposing routes.
+                    presentation.minimizeToPipOrIsland()
                 }
             },
         )
@@ -229,6 +210,7 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
         // paint full-bleed and apply system-bar padding to their own content.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
         InAppCallPip(
+            bundleId = activeBundle,
             session = session,
             videoSurfaces = surfaces,
             durationSeconds = service.callDurationSeconds,
