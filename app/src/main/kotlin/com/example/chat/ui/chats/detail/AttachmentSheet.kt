@@ -65,7 +65,7 @@ private val gradientTask = listOf(Color(0xFF00BFA5), Color(0xFF00897B))
 private val gradientLargeFile = listOf(Color(0xFF2563EB), Color(0xFF1D4ED8))
 
 enum class AttachmentAction { image, video, document, audio, location, contact, poll, task,
-    largeFile, demoDocument, demoAudio, demoCall, demoTask, demoLocation }
+    chatyDirect, largeFile, demoDocument, demoAudio, demoCall, demoTask, demoLocation }
 
 private data class AttachmentItem(
     val icon: ImageVector,
@@ -87,6 +87,7 @@ fun AttachmentSheetContent(
     val items = listOfNotNull(
         AttachmentItem(Icons.Rounded.PhotoLibrary, "Gallery", gradientGallery, AttachmentAction.image),
         AttachmentItem(Icons.Rounded.Videocam, "Video", gradientVideo, AttachmentAction.video),
+        AttachmentItem(Icons.Rounded.Send, "Chaty Direct", gradientLargeFile, AttachmentAction.chatyDirect),
         AttachmentItem(Icons.Rounded.InsertDriveFile, "Large file", gradientLargeFile, AttachmentAction.largeFile),
         AttachmentItem(Icons.Rounded.InsertDriveFile, "Document", gradientDocument, AttachmentAction.document),
         AttachmentItem(Icons.Rounded.GraphicEq, "Audio", gradientAudio, AttachmentAction.audio),
