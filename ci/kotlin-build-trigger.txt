@@ -1,2 +1,3 @@
-combined-call-stage5-direct-preflight 2026-11-04
-fix-sha256 70cee04d33ff158a7c608630958765fd7be3d925b45dbd1419333343eb65ed93
+combined-call-stages6-11-direct-preserved 2026-11-04
+stages6-10-sha256 cff6bf2cb8eb793f2796f858d8d5cc35e2097dbb85ebc99f3c229b20fa63b215
+stage11-test-sha256 f9972429525dd682582252d9c3371d297bcf7d87ab2c735d1be31aa165311f9f
