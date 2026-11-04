@@ -10,7 +10,7 @@ limitation instead of a collapse defect.
 """
 import json, pathlib, subprocess, time, xml.etree.ElementTree as ET, re
 out = pathlib.Path('screenshots'); out.mkdir(exist_ok=True)
-pkg = 'com.logybyte.chat'
+pkg = 'com.logybyte.chaty'
 def adb(*args, input=None, check=True):
     return subprocess.run(['adb', *args], input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60, check=check).stdout
 
@@ -126,7 +126,7 @@ def fixture_pass():
     time.sleep(2)
     subprocess.run(['adb', 'shell', 'am', 'instrument', '-w', '-e', 'class',
                     'com.example.chat.ReferenceLayoutRuntimeProofTest#configuredRealRootShowsRowsScrollAndPreservesSelectedPresentation',
-                    'com.logybyte.chat.test/androidx.test.runner.AndroidJUnitRunner'],
+                    'com.logybyte.chaty.test/androidx.test.runner.AndroidJUnitRunner'],
                    stdout=open(out / 'fixture-instrument-output.txt', 'wb'), stderr=subprocess.STDOUT,
                    timeout=300, check=False)
     subprocess.run(['adb', 'shell', 'pkill', '-2', 'screenrecord'], timeout=15, check=False,
@@ -134,7 +134,7 @@ def fixture_pass():
     time.sleep(2)
     subprocess.run(['adb', 'pull', '/sdcard/fixture-pass.mp4', str(out / 'fixture-pass.mp4')],
                    timeout=60, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    subprocess.run(['adb', 'pull', '/sdcard/Android/data/com.logybyte.chat/files/screenshots/', str(out / 'fixture')],
+    subprocess.run(['adb', 'pull', '/sdcard/Android/data/com.logybyte.chaty/files/screenshots/', str(out / 'fixture')],
                    timeout=60, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     for scale in ('window_animation_scale', 'transition_animation_scale', 'animator_duration_scale'):
         adb('shell', 'settings', 'put', 'global', scale, '0.0')
