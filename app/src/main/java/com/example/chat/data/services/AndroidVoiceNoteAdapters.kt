@@ -50,19 +50,27 @@ class AndroidVoiceRecorderPort(
             @Suppress("DEPRECATION")
             MediaRecorder()
         }
-        next.setAudioSource(MediaRecorder.AudioSource.MIC)
-        next.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-        next.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-        next.setAudioSamplingRate(config.sampleRate)
-        next.setAudioEncodingBitRate(config.bitRate)
-        next.setAudioChannels(config.numChannels)
-        next.setOutputFile(path)
-        next.prepare()
-        // Deviation: MediaRecorder exposes no audio session id, so AGC/NS/AEC effects from the Dart RecordConfig
-        // cannot be attached here; the capture uses the platform defaults for the MIC source.
-        next.start()
-        recorder = next
-        lastPath = path
+        try {
+            next.setAudioSource(MediaRecorder.AudioSource.MIC)
+            next.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            next.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            next.setAudioSamplingRate(config.sampleRate)
+            next.setAudioEncodingBitRate(config.bitRate)
+            next.setAudioChannels(config.numChannels)
+            next.setOutputFile(path)
+            next.prepare()
+            // Deviation: MediaRecorder exposes no audio session id, so AGC/NS/AEC effects from the Dart RecordConfig
+            // cannot be attached here; the capture uses the platform defaults for the MIC source.
+            next.start()
+            recorder = next
+            lastPath = path
+        } catch (error: Throwable) {
+            // prepare/start can fail before ownership is installed in recorder.
+            // Release that local native object too; preserve the original failure.
+            runCatching { next.reset() }
+            runCatching { next.release() }
+            throw error
+        }
     }
 
     /** record stop(): the plugin returns the path even for very short
@@ -71,15 +79,17 @@ class AndroidVoiceRecorderPort(
      *  controller's 1s floor owns the too-short policy). */
     override suspend fun stop(): String? {
         val current = recorder ?: return lastPath
-        try {
-            current.stop()
-        } catch (_: RuntimeException) {
-            // Too-short capture: keep the staged path like the plugin does.
-        }
-        current.reset()
-        releaseAudioFx()
-        current.release()
         recorder = null
+        try {
+            try {
+                current.stop()
+            } catch (_: RuntimeException) {
+                // Too-short capture: keep the staged path like the plugin does.
+            }
+        } finally {
+            runCatching { current.reset() }
+            try { releaseAudioFx() } finally { current.release() }
+        }
         return lastPath
     }
 
@@ -105,14 +115,10 @@ class AndroidVoiceRecorderPort(
 
     private fun releaseQuietly() {
         val current = recorder ?: return
-        try {
-            current.stop()
-        } catch (_: RuntimeException) {
-        }
-        current.reset()
-        releaseAudioFx()
-        current.release()
         recorder = null
+        runCatching { current.stop() }
+        runCatching { current.reset() }
+        try { releaseAudioFx() } finally { runCatching { current.release() } }
     }
 }
 
