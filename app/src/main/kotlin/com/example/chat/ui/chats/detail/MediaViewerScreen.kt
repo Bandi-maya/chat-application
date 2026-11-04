@@ -161,10 +161,26 @@ fun MediaViewerScreen(
         }
     }
 
+    val mediaLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var mediaForeground by remember(mediaLifecycleOwner) {
+        mutableStateOf(mediaLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
+    }
+    DisposableEffect(mediaLifecycleOwner, videoView) {
+        val reader = videoView
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            mediaForeground = mediaLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                runCatching { reader?.pause() }
+                isPlaying = false
+            }
+        }
+        mediaLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { mediaLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     // Poll playback position/state (Dart controller value listener).
-    LaunchedEffect(videoView, videoReady) {
+    LaunchedEffect(videoView, videoReady, mediaForeground) {
         val vv = videoView
-        if (vv == null || !videoReady) return@LaunchedEffect
+        if (vv == null || !videoReady || !mediaForeground) return@LaunchedEffect
         while (true) {
             positionMs = vv.currentPosition
             bufferedPct = vv.bufferPercentage
@@ -236,7 +252,7 @@ fun MediaViewerScreen(
     // Dart _toggleVideo.
     fun toggleVideo() {
         val vv = videoView ?: return
-        if (!videoReady) return
+        if (!videoReady || !mediaLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) return
         if (vv.isPlaying) vv.pause() else {
             val start = { vv.start() }
             val accepted = deliverPlayback?.invoke(start) ?: if (ownedActions) false else { start(); true }
