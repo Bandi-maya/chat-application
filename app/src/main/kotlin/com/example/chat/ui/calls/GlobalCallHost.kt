@@ -246,6 +246,7 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
         // paint full-bleed and apply system-bar padding to their own content.
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
         InAppCallPip(
+            bundleId = activeBundle,
             session = session,
             videoSurfaces = surfaces,
             durationSeconds = service.callDurationSeconds,
