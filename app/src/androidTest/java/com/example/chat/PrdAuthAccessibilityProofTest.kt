@@ -45,12 +45,14 @@ class PrdAuthAccessibilityProofTest {
                     CompositionLocalProvider(LocalDensity provides Density(density, 2f)) {
                         ChatyTheme(ThemePresets.monochromeDark) {
                             val value = androidx.compose.runtime.remember { mutableStateOf("") }
+                            androidx.compose.material3.Surface(color = androidx.compose.material3.MaterialTheme.colorScheme.background) {
                             Column(Modifier.width(280.dp)) {
                                 AuthBackButton { back.incrementAndGet() }
                                 AuthTextField("Email", "name@example.invalid", ThemePresets.monochromeDark,
                                     value.value, { value.value = it; entered.set(it) })
                                 AuthPrimaryButton("Continue with this account", ThemePresets.monochromeDark,
                                     { submit.incrementAndGet() })
+                            }
                             }
                         }
                     }
@@ -69,8 +71,11 @@ class PrdAuthAccessibilityProofTest {
             assertTrue("Back height must be at least48dp", bounds.height() + 1 >= 48f * pixelsPerDp)
             backNode.click()
             assertTrue("Email accessibility label missing", device.wait(Until.hasObject(By.desc("Email")), 5000))
-            val field = device.findObject(By.clazz("android.widget.EditText").desc("Email"))
-                ?: throw AssertionError("Labelled editable Email field missing")
+            val field = device.findObject(By.clazz("android.widget.EditText").textContains("Email"))
+                ?: device.findObject(By.clazz("android.widget.EditText").desc("Email"))
+                ?: device.findObject(By.clazz("android.widget.EditText").hasDescendant(By.text("Email")))
+                ?: device.findObject(By.clazz("android.widget.EditText").hasDescendant(By.desc("Email")))
+                ?: throw AssertionError("Native labelled editable Email field missing")
             field.text = "test@example.invalid"
             device.waitForIdle()
             device.pressBack() // dismiss the keyboard, not the fixture
