@@ -116,6 +116,16 @@ class ApiBackendService(
         binaryTransport = OkHttpApiBinaryTransport(),
     )
 
+    private val moderationClient = ApiModerationClient(chatTransport)
+    suspend fun reportMessage(expected: ApiAccountScope, messageId: String, reason: String, details: String): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            moderationClient.report(expected, { authSnapshot() === expected }, messageId, reason, details)
+        }
+    suspend fun setUserBlocked(expected: ApiAccountScope, userId: String, blocked: Boolean) =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            moderationClient.block(expected, { authSnapshot() === expected }, userId, blocked)
+        }
+
     val tasksClient = ApiTasksClient(
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
