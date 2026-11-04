@@ -177,11 +177,6 @@ class CallContactPickerProofTest {
             controlDesc = "Answer call", acceptDelta = 420 to 0,
             declineDelta = -420 to 0, declineDesc = "Decline call",
         )
-        // Google Phone Latest: drag the center puck right = answer, left = decline.
-        runGestureCase(
-            "google_phone_latest", CallBundleId.GOOGLE_PHONE_LATEST,
-            controlDesc = "Answer or decline puck", acceptDelta = 430 to 0, declineDelta = -430 to 0,
-        )
         // Azure Ring Vertical: drag the ring down = answer, up = decline.
         runGestureCase(
             "azure_ring_vertical", CallBundleId.AZURE_RING_VERTICAL,
@@ -198,6 +193,41 @@ class CallContactPickerProofTest {
             controlDesc = "Accept call", acceptDelta = 0 to -430,
             declineDelta = null, declineDesc = null,
         )
+    }
+
+    @Test
+    fun googleLatestSeparateActionsHaveCorrectSideAndSingleFire() {
+        for (answer in listOf(true, false)) {
+            val accepted = java.util.concurrent.atomic.AtomicInteger(0)
+            val declined = java.util.concurrent.atomic.AtomicInteger(0)
+            val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+            try {
+                scenario.onActivity { activity ->
+                    activity.setContent {
+                        ChatyTheme(ThemePresets.whatsappIosLight) {
+                            val pending = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                            BundleIncomingCallView(CallBundleId.GOOGLE_PHONE_LATEST,
+                                incomingSession("Synthetic Caller"),
+                                onAccept = { if (!pending.value) { pending.value = true; accepted.incrementAndGet() } },
+                                onDecline = { if (!pending.value) { pending.value = true; declined.incrementAndGet() } },
+                                actionPending = pending.value)
+                        }
+                    }
+                }
+                val accept = dev.wait(Until.findObject(By.text("Answer")), 8000)
+                val decline = dev.wait(Until.findObject(By.text("Decline")), 8000)
+                assertNotNull(accept)
+                assertNotNull(decline)
+                assertTrue("Decline stays left of Answer", decline.visibleBounds.centerX() < accept.visibleBounds.centerX())
+                shot("google-latest-separate-actions")
+                val target = if (answer) accept else decline
+                val bounds = target.visibleBounds
+                repeat(2) { dev.click(bounds.centerX(), bounds.centerY()) }
+                dev.waitForIdle(2000)
+                assertEquals(if (answer) 1 else 0, accepted.get())
+                assertEquals(if (answer) 0 else 1, declined.get())
+            } finally { scenario.close() }
+        }
     }
 
     /**
