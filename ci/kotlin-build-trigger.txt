@@ -1,1 +1,1 @@
-A-N strict follow-up: scoped Mono picker scroll, clickable48dp contacts toggle, native Email label+matching editability, actual FLAG_SECURE state polling. No weakened assertion; fresh guarded layout capture. No Direct/attachment/icon changes.
+Strict fixture correction plus call-reference v2. Read-back source7687bca9670b0f0f24afbaa8776a3e1d9d172e17. Demo retained declined terminal contract; auth IME hide without Back; reference tap,puck,banner callbacks. No kotlin merge or APK before full gates.
