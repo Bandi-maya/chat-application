@@ -1156,8 +1156,6 @@ jobs:
           fi
 
   capture:
-    # Scoped diagnostic rebuild: capture verdict retained from preceding run.
-    if: false
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 25
