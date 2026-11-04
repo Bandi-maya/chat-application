@@ -181,6 +181,15 @@ class CallContactPickerProofTest {
     }
 
     @Test
+    fun verticalPuckResetsAfterSuccessBeforeOppositeAndSmallDrag() {
+        runGestureCase(
+            "vertical-reset-regression", CallBundleId.AZURE_RING_VERTICAL,
+            controlDesc = "Azure ring answer or decline puck",
+            acceptDelta = 0 to 430, declineDelta = 0 to -430,
+        )
+    }
+
+    @Test
     fun bundleIncomingReferenceGesturesFireRealCallbacks() {
         // Samsung One UI: drag the action circle OUT of its halo.
         runGestureCase(
@@ -349,6 +358,14 @@ class CallContactPickerProofTest {
                 }
                 if (dev.wait(Until.hasObject(By.text("Not Now")), 4000)) {
                     dev.findObject(By.text("Not Now")).click()
+                }
+                // Release notes can cover a successfully loaded demo home.
+                // Dismiss only the identified existing modal via its real UI.
+                if (dev.wait(Until.hasObject(By.text("Chaty changelog")), 5000)) {
+                    val close = dev.wait(Until.findObject(By.text("Close")), 5000)
+                    assertNotNull("changelog Close action missing", close)
+                    close.click()
+                    assertTrue("changelog did not close", dev.wait(Until.gone(By.text("Chaty changelog")), 5000))
                 }
                 assertTrue("demo home never appeared", dev.wait(Until.hasObject(By.textContains("Aisha (sample)")), 15000))
             }
