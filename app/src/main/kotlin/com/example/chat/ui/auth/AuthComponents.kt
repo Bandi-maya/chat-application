@@ -55,15 +55,15 @@ import com.example.chat.ui.theme.LocalAppColors
 
 private fun c(argb: Long): Color = Color(argb)
 
-/** Circular back button (AuthBackButton -> ChatyBackButton, size 34/chevron 24). */
+/**48dp clickable accessibility target around a24dp decorative chevron. */
 @Composable
 fun AuthBackButton(onClick: () -> Unit) {
     val colors = LocalAppColors.current
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-        IconButton(onClick = onClick, modifier = Modifier.size(48.dp).testTag("auth-back")) {
+        IconButton(onClick = onClick, modifier = Modifier.size(48.dp).testTag("auth-back").semantics { contentDescription = "Back" }) {
             Icon(
                 Icons.Rounded.ChevronLeft,
-                contentDescription = "Back",
+                contentDescription = null,
                 tint = colors.foreground,
                 modifier = Modifier.size(24.dp),
             )
