@@ -120,19 +120,35 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
     }
     val session = service.currentSession ?: return
     val prefs = prefsStore.value
-    val activeBundle = remember(prefs.callExperienceBundleId) {
-        com.example.chat.ui.calls.bundles.CallBundleId.fromId(prefs.callExperienceBundleId)
+    val bundlePresentation = remember(prefs.callExperienceBundleId, session.state) {
+        com.example.chat.ui.calls.bundles.resolveCallBundlePresentation(prefs.callExperienceBundleId, session.state)
     }
+    val activeBundle = bundlePresentation.bundleId
 
-    if (session.state == CallSessionState.incoming) {
+    val incomingGate = remember(session.callId) { IncomingCallActionGate() }
+    var incomingActionPending by remember(session.callId) { mutableStateOf(false) }
+    fun incomingAction(action: suspend () -> Unit) {
+        if (service.currentSession?.state != CallSessionState.incoming || !incomingGate.tryEnter()) return
+        incomingActionPending = true
+        scope.launch {
+            try {
+                if (service.currentSession?.callId != session.callId) return@launch
+                runCallAction(onFailure = {
+                    android.widget.Toast.makeText(hostContext, "Unable to update the call. Check microphone and camera permissions.", android.widget.Toast.LENGTH_SHORT).show()
+                }, action = action)
+            } finally { incomingGate.complete(); incomingActionPending = false }
+        }
+    }
+    if (bundlePresentation.incoming) {
         com.example.chat.ui.calls.bundles.BundleIncomingCallView(
             bundleId = activeBundle,
             session = session,
-            onAccept = {
+            actionPending = incomingActionPending,
+            onAccept = { incomingAction {
                 presentation.showFullScreen()
-                callAction(session.callId, "Unable to accept the call. Check microphone and camera permissions.") { service.acceptCall() }
-            },
-            onDecline = { callAction(session.callId, "Unable to decline the call.") { service.declineCall() } },
+                service.acceptCall()
+            } },
+            onDecline = { incomingAction { service.declineCall() } },
         )
         return
     }
@@ -148,7 +164,8 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             hasLocalMedia = service.hasLocalMedia,
             videoSurfaces = surfaces,
             setupError = null,
-            template = CallScreenTemplate.fromName(prefs.ongoingCallTemplate),
+            template = bundlePresentation.template,
+            bundleId = activeBundle,
             pictureInPictureEnabled = prefs.pictureInPictureEnabled,
             onBack = { presentation.minimizeToPipOrIsland() },
             onSessionGone = {
