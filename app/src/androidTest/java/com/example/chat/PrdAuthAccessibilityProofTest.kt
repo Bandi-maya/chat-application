@@ -58,6 +58,12 @@ class PrdAuthAccessibilityProofTest {
             }
             assertTrue("Back action missing", device.wait(Until.hasObject(By.desc("Back")), 10000))
             val backNode = device.findObject(By.desc("Back")) ?: throw AssertionError("Back action missing")
+            device.waitForIdle()
+            val diagnostics = File(inst.targetContext.getExternalFilesDir(null), "screenshots")
+            diagnostics.mkdirs()
+            device.takeScreenshot(File(diagnostics, "prd-auth-before-target-assertion.png"))
+            device.dumpWindowHierarchy(File(diagnostics, "prd-auth-before-target-assertion.xml"))
+            assertTrue("Back must expose the clickable target", backNode.isClickable)
             val bounds = backNode.visibleBounds
             assertTrue("Back width must be at least48dp", bounds.width() + 1 >= 48f * pixelsPerDp)
             assertTrue("Back height must be at least48dp", bounds.height() + 1 >= 48f * pixelsPerDp)
