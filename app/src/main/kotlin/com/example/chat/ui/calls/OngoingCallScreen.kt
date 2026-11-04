@@ -364,6 +364,13 @@ fun OngoingCallScreen(
                         onToggleAudioRoute(if (session.audioRoute == AudioRouteType.speaker) AudioRouteType.earpiece else AudioRouteType.speaker)
                     })
                 }
+                if (bundleId == com.example.chat.ui.calls.bundles.CallBundleId.GOOGLE_PHONE_LATEST) {
+                    GoogleLatestProductionControls(
+                        actions = actions, availableWidthDp = maxWidth.value.toInt(),
+                        accent = callAccent, surface = controlBackground,
+                        endColor = endCallColor, onEndCall = onEndCall,
+                    )
+                } else {
                 val compact = maxWidth < 116.dp
                 val shownCount = if (compact) 0 else visibleCallActionCount(maxWidth.value.toInt(), actions.size)
                 val controls: @Composable () -> Unit = {
@@ -398,6 +405,7 @@ fun OngoingCallScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)) { controls() }
                 else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically) { controls() }
+                }
             }
         }
     }
@@ -608,3 +616,46 @@ private data class CallControlAction(
     val enabled: Boolean,
     val onClick: () -> Unit,
 )
+
+/** Google Latest production controls: labelled tonal pills grouped above a separate
+ * end-call action. Uses the same capability-checked actions as the media screen. */
+@Composable
+private fun GoogleLatestProductionControls(
+    actions: List<CallControlAction>, availableWidthDp: Int,
+    accent: Color, surface: Color, endColor: Color, onEndCall: () -> Unit,
+) {
+    val columns = googleLatestCallControlColumns(availableWidthDp)
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        actions.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { action ->
+                    Column(
+                        Modifier.weight(1f).height(80.dp)
+                            .clip(RoundedCornerShape(if (action.active) 20.dp else 40.dp))
+                            .background(if (action.active) accent else surface)
+                            .semantics { contentDescription = action.label }
+                            .clickable(enabled = action.enabled, onClick = action.onClick)
+                            .padding(horizontal = 8.dp, vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        val tint = if (action.active) Color.White else Color.White.copy(alpha = if (action.enabled) 1f else 0.4f)
+                        Icon(action.icon, null, tint = tint, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text(action.label, color = tint, fontSize = 12.sp, maxLines = 2,
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        Box(
+            Modifier.width(availableWidthDp.coerceAtMost(144).coerceAtLeast(1).dp).height(64.dp).clip(RoundedCornerShape(32.dp))
+                .background(endColor).semantics { contentDescription = "End call" }
+                .clickable(onClick = onEndCall), contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(32.dp))
+        }
+    }
+}
