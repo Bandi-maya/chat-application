@@ -370,6 +370,12 @@ fun OngoingCallScreen(
                         accent = callAccent, surface = controlBackground,
                         endColor = endCallColor, onEndCall = onEndCall,
                     )
+                } else if (bundleId != null && bundleId != com.example.chat.ui.calls.bundles.CallBundleId.CHATY_DEFAULT) {
+                    BundleProductionControls(
+                        bundleId = bundleId, actions = actions,
+                        availableWidthDp = maxWidth.value.toInt(), accent = callAccent,
+                        surface = controlBackground, endColor = endCallColor, onEndCall = onEndCall,
+                    )
                 } else {
                 val compact = maxWidth < 116.dp
                 val shownCount = if (compact) 0 else visibleCallActionCount(maxWidth.value.toInt(), actions.size)
@@ -656,6 +662,63 @@ private fun GoogleLatestProductionControls(
                 .clickable(onClick = onEndCall), contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(32.dp))
+        }
+    }
+}
+
+/** Per-bundle visual grammar on the production action list, never a second call engine.
+ * Unsupported add-call/keypad/hold actions are not manufactured for visual parity. */
+@Composable
+private fun BundleProductionControls(
+    bundleId: com.example.chat.ui.calls.bundles.CallBundleId,
+    actions: List<CallControlAction>, availableWidthDp: Int,
+    accent: Color, surface: Color, endColor: Color, onEndCall: () -> Unit,
+) {
+    val layout = bundleControlLayout(bundleId)
+    val innerWidth = (availableWidthDp - if (layout.panel) 24 else 0).coerceAtLeast(1)
+    val columns = ((innerWidth + 12) / 88).coerceIn(1, layout.columns)
+    val sectionShape = RoundedCornerShape(layout.panelRadiusDp.dp)
+    val panel = if (layout.panel) Modifier.background(surface, sectionShape).padding(12.dp) else Modifier
+    Column(Modifier.fillMaxWidth().then(panel), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(layout.spacingDp.dp)) {
+        if (layout.endFirst) BundleEndAction(endColor, onEndCall, layout.wideEnd, innerWidth)
+        actions.chunked(columns).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { action ->
+                    Column(Modifier.weight(1f)
+                        .semantics { contentDescription = action.label }
+                        .clickable(enabled = action.enabled, onClick = action.onClick)
+                        .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
+                        val buttonShape = if (layout.circle) CircleShape else RoundedCornerShape(layout.controlRadiusDp.dp)
+                        Box(Modifier.size(52.dp).clip(buttonShape)
+                            .background(if (action.active) accent else if (layout.panel) Color.White.copy(alpha = 0.08f) else surface),
+                            contentAlignment = Alignment.Center) {
+                            Icon(action.icon, null,
+                                tint = Color.White.copy(alpha = if (action.enabled) 1f else 0.4f),
+                                modifier = Modifier.size(24.dp))
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(action.label, color = Color.White.copy(alpha = if (action.enabled) 1f else 0.4f),
+                            fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        if (!layout.endFirst) BundleEndAction(endColor, onEndCall, layout.wideEnd, innerWidth)
+    }
+}
+
+@Composable
+private fun BundleEndAction(color: Color, onEnd: () -> Unit, wide: Boolean, availableWidthDp: Int) {
+    Box(Modifier.width((if (wide) availableWidthDp.coerceAtMost(280) else 64).coerceAtMost(availableWidthDp).coerceAtLeast(1).dp)
+        .height(64.dp).clip(RoundedCornerShape(32.dp)).background(color)
+        .semantics { contentDescription = "End call" }.clickable(onClick = onEnd),
+        contentAlignment = Alignment.Center) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(28.dp))
+            if (wide) { Spacer(Modifier.width(8.dp)); Text("End call", color = Color.White, maxLines = 1) }
         }
     }
 }
