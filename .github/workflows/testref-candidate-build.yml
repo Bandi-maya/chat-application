@@ -251,6 +251,10 @@ jobs:
             app/src/test/java/com/example/chat/ui/media/MediaLibraryServiceHardeningTest.kt
       - name: Call bundle source contracts
         run: python3 ci/tests/test_call_bundle_settings_contract.py -v
+      - name: PDF identity and native parser contracts
+        run: |
+          python3 ci/tests/test_application_identity_contract.py -v
+          python3 ci/tests/test_native_alignment.py -v
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
       - uses: actions/setup-java@v4
@@ -305,6 +309,17 @@ jobs:
           fi
       - name: Build debug APK (compile verification)
         run: gradle :app:assembleDebug --no-daemon
+      - name: Final APK native alignment audit
+        id: alignment
+        continue-on-error: true
+        run: python3 ci/verify-native-alignment.py app/build/outputs/apk/debug/app-debug.apk --output native-alignment.json
+      - name: Preserve native alignment audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-alignment-audit
+          path: native-alignment.json
+          if-no-files-found: warn
       - name: APK info
         if: always()
         run: |
