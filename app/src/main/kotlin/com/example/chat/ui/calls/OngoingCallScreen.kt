@@ -706,8 +706,12 @@ private fun BundleProductionControls(
                         .padding(vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         val buttonShape = if (layout.circle) CircleShape else RoundedCornerShape(layout.controlRadiusDp.dp)
+                        val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+                        val fill by androidx.compose.animation.animateColorAsState(
+                            targetValue = if (action.active) accent else if (layout.panel) Color.White.copy(alpha = 0.08f) else surface,
+                            animationSpec = androidx.compose.animation.core.tween(if (reduceMotion) 0 else 140), label = "call-control-state")
                         Box(Modifier.size(52.dp).clip(buttonShape)
-                            .background(if (action.active) accent else if (layout.panel) Color.White.copy(alpha = 0.08f) else surface),
+                            .background(fill),
                             contentAlignment = Alignment.Center) {
                             Icon(action.icon, null,
                                 tint = Color.White.copy(alpha = if (action.enabled) 1f else 0.4f),
