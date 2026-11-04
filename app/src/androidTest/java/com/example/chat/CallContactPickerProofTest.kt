@@ -164,6 +164,18 @@ class CallContactPickerProofTest {
             Thread.sleep(900)
             assertFalse("$tag: small drag must not accept", accepted.get())
             assertFalse("$tag: small drag must not decline", declined.get())
+            if (bundle == CallBundleId.NEXTCLOUD_TALK) {
+                swipeFrom(controlDesc, 30, 0)
+                dev.waitForIdle(2000)
+                Thread.sleep(900)
+                assertFalse("$tag: horizontal wiggle must not accept", accepted.get())
+                assertFalse("$tag: horizontal wiggle must not decline", declined.get())
+                dev.findObject(By.desc(controlDesc)).click()
+                dev.waitForIdle(2000)
+                assertTrue("$tag: true tap must still accept", accepted.get())
+                assertFalse("$tag: true tap must not decline", declined.get())
+                shot("bundle-nextcloud-tap-after-wiggles")
+            }
         } finally {
             scenario.close()
         }
@@ -386,13 +398,18 @@ class CallContactPickerProofTest {
             settingsEntry.click()
             dev.waitForIdle(3000)
 
-            var callsRow = dev.wait(Until.findObject(By.text("Calls")), 8000)
-            if (callsRow == null) {
-                dev.swipe(540, 1600, 540, 700, 40)
-                callsRow = dev.wait(Until.findObject(By.text("Calls")), 5000)
+            // Root settings calls the row Call Settings. Calls is the bottom-nav destination.
+            var callsRow = dev.wait(Until.findObject(By.text("Call Settings")), 3000)
+            repeat(8) {
+                if (callsRow == null) {
+                    dev.swipe(dev.displayWidth / 2, dev.displayHeight * 3 / 4,
+                        dev.displayWidth / 2, dev.displayHeight / 3, 40)
+                    callsRow = dev.wait(Until.findObject(By.text("Call Settings")), 1500)
+                }
             }
-            assertNotNull("Calls settings row not found", callsRow)
-            callsRow.click()
+            shot("bundle-live-demo-call-settings-route")
+            assertNotNull("Call Settings row not found in Settings", callsRow)
+            callsRow!!.click()
             dev.waitForIdle(3000)
 
             val tile = dev.wait(Until.findObject(By.text("Selected Call Bundle")), 8000)
