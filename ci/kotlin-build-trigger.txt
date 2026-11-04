@@ -1,1 +1,1 @@
-A-N strict-proof corrections only: labelled48dp auth Back parent; Call Settings fixture route; true-tap recognizer prevents Nextcloud small-drag false accept. Added wiggle/true-tap regression, preserves thresholds/assertions. No Direct Phase1 changes. Compile and JVM gate strict device proof.
+A-N strict follow-up: scoped Mono picker scroll, clickable48dp contacts toggle, native Email label+matching editability, actual FLAG_SECURE state polling. No weakened assertion; fresh guarded layout capture. No Direct/attachment/icon changes.
