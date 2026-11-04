@@ -319,6 +319,17 @@ jobs:
               p=pathlib.Path(n);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
           print('STAGE11','f9972429525dd682582252d9c3371d297bcf7d87ab2c735d1be31aa165311f9f')
           PYSTAGE11
+      - name: Apply bounded signal DrawScope compiler correction
+        run: |
+          python3 - <<'PYCFIX'
+          import pathlib,hashlib,base64,zipfile,io
+          raw=base64.b64decode(pathlib.Path('call12-compilefix.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='6e895fc25a5e69b02271389c4c6e255424ccbf506c5fb39d453ce047db801666'
+          z=zipfile.ZipFile(io.BytesIO(raw));assert z.namelist()==['app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionUi.kt']
+          p=pathlib.Path('app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionUi.kt');assert hashlib.sha256(p.read_bytes()).hexdigest()=='24ef9217597cf54a609f4e31b8e366d90f063446ed8d75ec30173252ec873d5b'
+          data=z.read('app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionUi.kt');assert hashlib.sha256(data).hexdigest()=='504dd97b96bf1174c912d962f9892290e5a78d25fc4f260f3368ebc104d90183';p.write_bytes(data)
+          print('SIGNAL-COMPILE-FIX','504dd97b96bf1174c912d962f9892290e5a78d25fc4f260f3368ebc104d90183')
+          PYCFIX
       - name: Call bundle source contracts
         run: python3 ci/tests/test_call_bundle_settings_contract.py -v
       - name: PDF identity and native parser contracts
@@ -1133,6 +1144,17 @@ jobs:
               p=pathlib.Path(n);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
           print('STAGE11','f9972429525dd682582252d9c3371d297bcf7d87ab2c735d1be31aa165311f9f')
           PYSTAGE11
+      - name: Apply bounded signal DrawScope compiler correction
+        run: |
+          python3 - <<'PYCFIX'
+          import pathlib,hashlib,base64,zipfile,io
+          raw=base64.b64decode(pathlib.Path('call12-compilefix.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='6e895fc25a5e69b02271389c4c6e255424ccbf506c5fb39d453ce047db801666'
+          z=zipfile.ZipFile(io.BytesIO(raw));assert z.namelist()==['app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionUi.kt']
+          p=pathlib.Path('app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionUi.kt');assert hashlib.sha256(p.read_bytes()).hexdigest()=='24ef9217597cf54a609f4e31b8e366d90f063446ed8d75ec30173252ec873d5b'
+          data=z.read('app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionUi.kt');assert hashlib.sha256(data).hexdigest()=='504dd97b96bf1174c912d962f9892290e5a78d25fc4f260f3368ebc104d90183';p.write_bytes(data)
+          print('SIGNAL-COMPILE-FIX','504dd97b96bf1174c912d962f9892290e5a78d25fc4f260f3368ebc104d90183')
+          PYCFIX
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair
@@ -1222,6 +1244,17 @@ jobs:
               p=pathlib.Path(n);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
           print('STAGE11','f9972429525dd682582252d9c3371d297bcf7d87ab2c735d1be31aa165311f9f')
           PYSTAGE11
+      - name: Apply bounded signal DrawScope compiler correction
+        run: |
+          python3 - <<'PYCFIX'
+          import pathlib,hashlib,base64,zipfile,io
+          raw=base64.b64decode(pathlib.Path('call12-compilefix.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='6e895fc25a5e69b02271389c4c6e255424ccbf506c5fb39d453ce047db801666'
+          z=zipfile.ZipFile(io.BytesIO(raw));assert z.namelist()==['app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionUi.kt']
+          p=pathlib.Path('app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionUi.kt');assert hashlib.sha256(p.read_bytes()).hexdigest()=='24ef9217597cf54a609f4e31b8e366d90f063446ed8d75ec30173252ec873d5b'
+          data=z.read('app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionUi.kt');assert hashlib.sha256(data).hexdigest()=='504dd97b96bf1174c912d962f9892290e5a78d25fc4f260f3368ebc104d90183';p.write_bytes(data)
+          print('SIGNAL-COMPILE-FIX','504dd97b96bf1174c912d962f9892290e5a78d25fc4f260f3368ebc104d90183')
+          PYCFIX
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair
