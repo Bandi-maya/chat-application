@@ -346,6 +346,20 @@ jobs:
               p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
           print('UI-BATCH-ABF','3450ab4cec5bc20e812660b7cfd132958a62f9695f89123a2745909654af45d8','files',len(expected))
           PYABF
+      - name: Apply reviewed JVM contracts incoming UI and participant colors
+        run: |
+          python3 - <<'PYNEXT'
+          import pathlib,hashlib,base64,zipfile,io
+          raw=base64.b64decode(pathlib.Path('next-reviewed-ui-tests.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='78556ab07803d18b4f6506884612861f8d7e7657f23f37babc32ec1f2d7fb7c5'
+          expected={'app/src/test/java/com/example/chat/CallRedesignSourceContractTest.kt': 'ae8561630ca8dac10f327a38ff69a84476bc6052db587800c96aec12e1fa1155', 'app/src/test/java/com/example/chat/CallSignalingParityTest.kt': 'fc7f8c1ee61617bad2731243537616686f2042a4ddcb33024f9e45e8c3e9ab83', 'app/src/test/java/com/example/chat/ui/calls/CallPreferenceInitializationOrderTest.kt': 'f3489d261ce63adf7f6c9108b74e8b5ec9a7d81a88d93ade7bcf986903d7e2f0', 'app/src/test/java/com/example/chat/ui/calls/bundles/CallBundlePresentationPolicyTest.kt': 'be5e12fb076a0404df34e7bac5554b12f49a0e58989ab369609f4ec8b0f1839c', 'app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt': 'd6f609ee2841f9178434bd26bc6e64337d620e965d532d63b745ca4ecd17e641', 'app/src/test/java/com/example/chat/IncomingSpecificationUiContractTest.kt': 'c32ec319f85dbbdf79ba1ce3388461afd92cbc7ea52af054546c4b2295b76035', 'docs/INCOMING_SPEC_MAPPING_AND_LIMITS.md': 'e1d71cfd7e2fd2d8de0abb8bd7b3c7d9c0c9dee959e2a528d9bb417338d358d0', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt': 'e0535359a278781633cedfdbe9fb0cca22363b85896eca3e6f5cef9da5e9b031', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/ParticipantColorPolicy.kt': '06da8b4c0dbdf831e9d0ad5facc3f7ee92347e4dfe723eb1dab25e849b70aa37', 'app/src/test/java/com/example/chat/ParticipantColorPolicyTest.kt': '85f59902962a943af6761d98c795a8f4b2419b5699ceace5745493e8911f333e'}
+          z=zipfile.ZipFile(io.BytesIO(raw));assert set(z.namelist())==set(expected)
+          for n in z.namelist():
+              q=pathlib.PurePosixPath(n);assert not q.is_absolute() and '..' not in q.parts
+              data=z.read(n);assert hashlib.sha256(data).hexdigest()==expected[n]
+              p=pathlib.Path(n);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+          print('NEXT-REVIEWED-UI-TESTS','78556ab07803d18b4f6506884612861f8d7e7657f23f37babc32ec1f2d7fb7c5','files',len(expected))
+          PYNEXT
       - name: Call bundle source contracts
         run: python3 ci/tests/test_call_bundle_settings_contract.py -v
       - name: PDF identity and native parser contracts
@@ -1187,6 +1201,20 @@ jobs:
               p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
           print('UI-BATCH-ABF','3450ab4cec5bc20e812660b7cfd132958a62f9695f89123a2745909654af45d8','files',len(expected))
           PYABF
+      - name: Apply reviewed JVM contracts incoming UI and participant colors
+        run: |
+          python3 - <<'PYNEXT'
+          import pathlib,hashlib,base64,zipfile,io
+          raw=base64.b64decode(pathlib.Path('next-reviewed-ui-tests.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='78556ab07803d18b4f6506884612861f8d7e7657f23f37babc32ec1f2d7fb7c5'
+          expected={'app/src/test/java/com/example/chat/CallRedesignSourceContractTest.kt': 'ae8561630ca8dac10f327a38ff69a84476bc6052db587800c96aec12e1fa1155', 'app/src/test/java/com/example/chat/CallSignalingParityTest.kt': 'fc7f8c1ee61617bad2731243537616686f2042a4ddcb33024f9e45e8c3e9ab83', 'app/src/test/java/com/example/chat/ui/calls/CallPreferenceInitializationOrderTest.kt': 'f3489d261ce63adf7f6c9108b74e8b5ec9a7d81a88d93ade7bcf986903d7e2f0', 'app/src/test/java/com/example/chat/ui/calls/bundles/CallBundlePresentationPolicyTest.kt': 'be5e12fb076a0404df34e7bac5554b12f49a0e58989ab369609f4ec8b0f1839c', 'app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt': 'd6f609ee2841f9178434bd26bc6e64337d620e965d532d63b745ca4ecd17e641', 'app/src/test/java/com/example/chat/IncomingSpecificationUiContractTest.kt': 'c32ec319f85dbbdf79ba1ce3388461afd92cbc7ea52af054546c4b2295b76035', 'docs/INCOMING_SPEC_MAPPING_AND_LIMITS.md': 'e1d71cfd7e2fd2d8de0abb8bd7b3c7d9c0c9dee959e2a528d9bb417338d358d0', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt': 'e0535359a278781633cedfdbe9fb0cca22363b85896eca3e6f5cef9da5e9b031', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/ParticipantColorPolicy.kt': '06da8b4c0dbdf831e9d0ad5facc3f7ee92347e4dfe723eb1dab25e849b70aa37', 'app/src/test/java/com/example/chat/ParticipantColorPolicyTest.kt': '85f59902962a943af6761d98c795a8f4b2419b5699ceace5745493e8911f333e'}
+          z=zipfile.ZipFile(io.BytesIO(raw));assert set(z.namelist())==set(expected)
+          for n in z.namelist():
+              q=pathlib.PurePosixPath(n);assert not q.is_absolute() and '..' not in q.parts
+              data=z.read(n);assert hashlib.sha256(data).hexdigest()==expected[n]
+              p=pathlib.Path(n);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+          print('NEXT-REVIEWED-UI-TESTS','78556ab07803d18b4f6506884612861f8d7e7657f23f37babc32ec1f2d7fb7c5','files',len(expected))
+          PYNEXT
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair
@@ -1303,6 +1331,20 @@ jobs:
               p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
           print('UI-BATCH-ABF','3450ab4cec5bc20e812660b7cfd132958a62f9695f89123a2745909654af45d8','files',len(expected))
           PYABF
+      - name: Apply reviewed JVM contracts incoming UI and participant colors
+        run: |
+          python3 - <<'PYNEXT'
+          import pathlib,hashlib,base64,zipfile,io
+          raw=base64.b64decode(pathlib.Path('next-reviewed-ui-tests.b64').read_text().strip(),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='78556ab07803d18b4f6506884612861f8d7e7657f23f37babc32ec1f2d7fb7c5'
+          expected={'app/src/test/java/com/example/chat/CallRedesignSourceContractTest.kt': 'ae8561630ca8dac10f327a38ff69a84476bc6052db587800c96aec12e1fa1155', 'app/src/test/java/com/example/chat/CallSignalingParityTest.kt': 'fc7f8c1ee61617bad2731243537616686f2042a4ddcb33024f9e45e8c3e9ab83', 'app/src/test/java/com/example/chat/ui/calls/CallPreferenceInitializationOrderTest.kt': 'f3489d261ce63adf7f6c9108b74e8b5ec9a7d81a88d93ade7bcf986903d7e2f0', 'app/src/test/java/com/example/chat/ui/calls/bundles/CallBundlePresentationPolicyTest.kt': 'be5e12fb076a0404df34e7bac5554b12f49a0e58989ab369609f4ec8b0f1839c', 'app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt': 'd6f609ee2841f9178434bd26bc6e64337d620e965d532d63b745ca4ecd17e641', 'app/src/test/java/com/example/chat/IncomingSpecificationUiContractTest.kt': 'c32ec319f85dbbdf79ba1ce3388461afd92cbc7ea52af054546c4b2295b76035', 'docs/INCOMING_SPEC_MAPPING_AND_LIMITS.md': 'e1d71cfd7e2fd2d8de0abb8bd7b3c7d9c0c9dee959e2a528d9bb417338d358d0', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt': 'e0535359a278781633cedfdbe9fb0cca22363b85896eca3e6f5cef9da5e9b031', 'app/src/main/kotlin/com/example/chat/ui/chats/detail/ParticipantColorPolicy.kt': '06da8b4c0dbdf831e9d0ad5facc3f7ee92347e4dfe723eb1dab25e849b70aa37', 'app/src/test/java/com/example/chat/ParticipantColorPolicyTest.kt': '85f59902962a943af6761d98c795a8f4b2419b5699ceace5745493e8911f333e'}
+          z=zipfile.ZipFile(io.BytesIO(raw));assert set(z.namelist())==set(expected)
+          for n in z.namelist():
+              q=pathlib.PurePosixPath(n);assert not q.is_absolute() and '..' not in q.parts
+              data=z.read(n);assert hashlib.sha256(data).hexdigest()==expected[n]
+              p=pathlib.Path(n);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
+          print('NEXT-REVIEWED-UI-TESTS','78556ab07803d18b4f6506884612861f8d7e7657f23f37babc32ec1f2d7fb7c5','files',len(expected))
+          PYNEXT
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair
