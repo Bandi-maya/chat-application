@@ -1,5 +1,8 @@
 package com.example.chat.ui.chats.detail
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import kotlinx.coroutines.ensureActive
 
 import androidx.compose.animation.animateColorAsState
@@ -771,26 +774,25 @@ private fun TaskCardChip(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .background(toggleBg, CircleShape)
-                    .border(2.dp, toggleBorder, CircleShape)
-                    .then(
-                        if (onTaskToggle != null) {
-                            Modifier.clickable { onTaskToggle() }
-                        } else {
-                            Modifier
-                        },
-                    ),
+                modifier = Modifier.size(48.dp).then(
+                    if (onTaskToggle != null) Modifier.clickable(
+                        role = androidx.compose.ui.semantics.Role.Checkbox,
+                        onClickLabel = if (isCompleted) "Mark task incomplete" else "Complete task",
+                        onClick = onTaskToggle,
+                    ).semantics {
+                        contentDescription = "Task completion"
+                        stateDescription = if (isCompleted) "Completed" else "Incomplete"
+                    } else Modifier,
+                ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (isCompleted) {
-                    Icon(
-                        Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp),
-                    )
+                Box(
+                    Modifier.size(22.dp).background(toggleBg, CircleShape)
+                        .border(2.dp, toggleBorder, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isCompleted) Icon(Icons.Rounded.Check, contentDescription = null,
+                        tint = Color.White, modifier = Modifier.size(14.dp))
                 }
             }
             Spacer(Modifier.width(10.dp))
@@ -1458,24 +1460,41 @@ private fun SwipeToReplyContainer(
         return
     }
     val density = LocalDensity.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val reply by androidx.compose.runtime.rememberUpdatedState(onSwipeReply)
     val thresholdPx = with(density) { 48.dp.toPx() }
     val maxDragPx = with(density) { 68.dp.toPx() }
     var dragOffset by remember { mutableStateOf(0f) }
-    val animatedOffset by animateFloatAsState(targetValue = dragOffset, label = "swipeReply")
+    var dragging by remember { mutableStateOf(false) }
+    val resistedOffset = SwipeReplyMotionPolicy.offset(dragOffset, thresholdPx, maxDragPx)
+    val animatedOffset by animateFloatAsState(
+        targetValue = resistedOffset,
+        animationSpec = if (dragging || reduceMotion) androidx.compose.animation.core.snap()
+            else androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f),
+        label = "swipeReply",
+    )
     val progress = (animatedOffset / thresholdPx).coerceIn(0f, 1f)
 
     Box(
-        Modifier.pointerInput(onSwipeReply) {
+        Modifier.pointerInput(thresholdPx, maxDragPx, view) {
+            var thresholdHapticSent = false
             detectHorizontalDragGestures(
+                onDragStart = { dragging = true; thresholdHapticSent = false },
                 onDragEnd = {
-                    if (dragOffset >= thresholdPx) onSwipeReply()
+                    if (dragOffset >= thresholdPx) reply?.invoke()
                     dragOffset = 0f
+                    dragging = false
                 },
-                onDragCancel = { dragOffset = 0f },
+                onDragCancel = { dragOffset = 0f; dragging = false },
                 onHorizontalDrag = { change, dragAmount ->
-                    change.consume()
                     if (!(dragOffset <= 0f && dragAmount < 0f)) {
-                        dragOffset = (dragOffset + dragAmount).coerceIn(0f, maxDragPx)
+                        change.consume()
+                        dragOffset = (dragOffset + dragAmount).coerceIn(0f, maxDragPx * 4f)
+                        if (dragOffset >= thresholdPx && !thresholdHapticSent) {
+                            thresholdHapticSent = true
+                            com.example.chat.ui.kit.ChatyHapticsPort.threshold(view)
+                        }
                     }
                 },
             )
@@ -1485,7 +1504,7 @@ private fun SwipeToReplyContainer(
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = with(density) { (animatedOffset * 0.45f - 24f).toDp() })
+                    .offset { androidx.compose.ui.unit.IntOffset((animatedOffset * 0.45f - with(density) { 24.dp.toPx() }).toInt(), 0) }
                     .size(32.dp)
                     .background(surfaceColor.copy(alpha = progress), CircleShape),
                 contentAlignment = Alignment.Center,
@@ -1498,7 +1517,7 @@ private fun SwipeToReplyContainer(
                 )
             }
         }
-        Box(Modifier.offset(x = with(density) { animatedOffset.toDp() }, y = 0.dp)) {
+        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(animatedOffset.toInt(), 0) }) {
             content()
         }
     }
