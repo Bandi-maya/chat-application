@@ -1,7 +1,7 @@
 """Strict isolated test execution. No live backend or real contacts."""
 import pathlib,subprocess,sys
 out=pathlib.Path('call-proof');out.mkdir(exist_ok=True)
-pkg='com.logybyte.chat'
+pkg='com.logybyte.chaty'
 def adb(*args):
  return subprocess.run(['adb',*args],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=900).stdout
 failure=False
