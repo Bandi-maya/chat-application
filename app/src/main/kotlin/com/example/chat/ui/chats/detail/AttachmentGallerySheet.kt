@@ -98,9 +98,7 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
                 if (onDirectSendImages != null) Button(onClick = { onDirectSendImages(selected.toList()) }) { Text("Send (${selected.size})") }
             }
         }
-        TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = { onAction(AttachmentAction.chatyDirect) }) {
-            Text("Chaty Direct · Original image/video")
-        }
+
         if (!canRead && fixtureItems == null) {
             Text("Choose photos with Browse, or allow gallery access to see recent photos here.", color = foreground,
                 modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
@@ -111,7 +109,8 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
         if (secondReference) {
             val capsules = listOf(Triple("Gallery", Icons.Rounded.PhotoLibrary, AttachmentAction.image),
                 Triple("Camera", Icons.Rounded.PhotoCamera, null), Triple("Location", Icons.Rounded.LocationOn, AttachmentAction.location),
-                Triple("Contact", Icons.Rounded.Person, AttachmentAction.contact), Triple("Document", Icons.Rounded.InsertDriveFile, AttachmentAction.document),
+                Triple("Contact", Icons.Rounded.Person, AttachmentAction.contact),
+                Triple("Chaty Direct", Icons.Rounded.Send, AttachmentAction.chatyDirect), Triple("Document", Icons.Rounded.InsertDriveFile, AttachmentAction.document),
                 Triple("Poll", Icons.Rounded.Poll, AttachmentAction.poll), Triple("Audio", Icons.Rounded.GraphicEq, AttachmentAction.audio),
                 Triple("Voice note", Icons.Rounded.Mic, null))
             // Wrap at large fonts rather than forcing four clipped labels into a narrow viewport.
@@ -165,6 +164,7 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
             val actions = listOf(Triple("Gallery", Icons.Rounded.PhotoLibrary, AttachmentAction.image),
                 Triple("File", Icons.Rounded.InsertDriveFile, AttachmentAction.document), Triple("Location", Icons.Rounded.LocationOn, AttachmentAction.location),
                 Triple("Poll", Icons.Rounded.Poll, AttachmentAction.poll), Triple("Contact", Icons.Rounded.Person, AttachmentAction.contact),
+                Triple("Chaty Direct", Icons.Rounded.Send, AttachmentAction.chatyDirect),
                 Triple("Audio", Icons.Rounded.GraphicEq, AttachmentAction.audio), Triple("Video", Icons.Rounded.Videocam, AttachmentAction.video),
                 Triple("Task", Icons.Rounded.TaskAlt, AttachmentAction.task))
             for ((label, icon, action) in actions) Column(Modifier.widthIn(min = 76.dp).clickable { if (action == AttachmentAction.image) reload++ else onAction(action) }
