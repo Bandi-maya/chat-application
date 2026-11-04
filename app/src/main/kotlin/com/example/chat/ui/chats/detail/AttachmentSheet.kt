@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PinDrop
 import androidx.compose.material.icons.rounded.Poll
 import androidx.compose.material.icons.rounded.Science
-import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
@@ -88,7 +87,6 @@ fun AttachmentSheetContent(
     val items = listOfNotNull(
         AttachmentItem(Icons.Rounded.PhotoLibrary, "Gallery", gradientGallery, AttachmentAction.image),
         AttachmentItem(Icons.Rounded.Videocam, "Video", gradientVideo, AttachmentAction.video),
-        AttachmentItem(Icons.Rounded.Send, "Chaty Direct", gradientLargeFile, AttachmentAction.chatyDirect),
         AttachmentItem(Icons.Rounded.InsertDriveFile, "Large file", gradientLargeFile, AttachmentAction.largeFile),
         AttachmentItem(Icons.Rounded.InsertDriveFile, "Document", gradientDocument, AttachmentAction.document),
         AttachmentItem(Icons.Rounded.GraphicEq, "Audio", gradientAudio, AttachmentAction.audio),
