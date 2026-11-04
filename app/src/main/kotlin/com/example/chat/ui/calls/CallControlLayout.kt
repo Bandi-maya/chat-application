@@ -30,3 +30,20 @@ internal fun bundleControlLayout(bundle: com.example.chat.ui.calls.bundles.CallB
         com.example.chat.ui.calls.bundles.CallBundleId.GOOGLE_PHONE_LATEST -> BundleControlLayout(3, false, true, 28, 40, 12, true)
         com.example.chat.ui.calls.bundles.CallBundleId.CHATY_DEFAULT -> BundleControlLayout(3, false, true, 24, 10, 12, false)
     }
+
+internal data class VoiceBundleIdentity(
+    val avatarDp: Int, val nameSp: Int, val upperIdentity: Boolean, val lightName: Boolean = false,
+)
+
+internal fun voiceBundleIdentity(bundle: com.example.chat.ui.calls.bundles.CallBundleId?): VoiceBundleIdentity =
+    when (bundle) {
+        com.example.chat.ui.calls.bundles.CallBundleId.APPLE_IOS -> VoiceBundleIdentity(88, 30, true)
+        com.example.chat.ui.calls.bundles.CallBundleId.SAMSUNG_ONE_UI -> VoiceBundleIdentity(96, 28, true)
+        com.example.chat.ui.calls.bundles.CallBundleId.GOOGLE_PHONE_LATEST -> VoiceBundleIdentity(120, 32, true)
+        com.example.chat.ui.calls.bundles.CallBundleId.GOOGLE_PHONE_CLASSIC -> VoiceBundleIdentity(88, 24, true)
+        com.example.chat.ui.calls.bundles.CallBundleId.VIVO_IQOO -> VoiceBundleIdentity(100, 26, true)
+        com.example.chat.ui.calls.bundles.CallBundleId.AZURE_RING_VERTICAL -> VoiceBundleIdentity(80, 34, true, true)
+        com.example.chat.ui.calls.bundles.CallBundleId.MONO_CHEVRON_DARK -> VoiceBundleIdentity(72, 26, true)
+        com.example.chat.ui.calls.bundles.CallBundleId.NEXTCLOUD_TALK -> VoiceBundleIdentity(96, 22, false)
+        else -> VoiceBundleIdentity(110, 24, false)
+    }
