@@ -225,6 +225,8 @@ fun ChatDetailScreen(
     onWallpaperSelected: ((String) -> Unit)? = null,
     onOpenAppearance: (() -> Unit)? = null,
     onToggleMute: (() -> Unit)? = null,
+    ghostModeEnabled: Boolean = false,
+    onToggleGhostMode: (() -> Unit)? = null,
     onBlockContact: (() -> Unit)? = null,
     onReportMessage: (ChatMessage) -> Unit = {},
     onBlockMessageSender: (String) -> Unit = {},
@@ -371,6 +373,7 @@ fun ChatDetailScreen(
     // Selection and menus do not change projection or tile geometry. Group identity comes from
     // the validated album envelope, never adjacency or timestamps.
     val timelineRows = com.example.chat.ui.chats.detail.mediaTimelineRows(messages)
+    val senderClusters = com.example.chat.ui.chats.detail.SenderClusterPolicy.forRows(timelineRows, java.time.ZoneId.systemDefault())
     fun selectionUnit(messageId: String): Set<String> =
         com.example.chat.ui.chats.detail.AlbumSelectionPolicy.unit(timelineRows, messageId)
     fun toggleSelectionUnit(messageId: String) {
@@ -740,6 +743,7 @@ fun ChatDetailScreen(
         }
         Box(Modifier.weight(1f)) {
     Scaffold(
+        modifier = Modifier.testTag("chat-screen-root"),
         containerColor = Color(theme.backgroundColor),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -797,6 +801,8 @@ fun ChatDetailScreen(
                     },
                     onOpenAppearance = onOpenAppearance,
                     onToggleMute = onToggleMute,
+                    ghostModeEnabled = ghostModeEnabled,
+                    onToggleGhostMode = onToggleGhostMode,
                     onBlockContact = onBlockContact,
                     onClearConversation = {
                         chatMenuOpen = false
@@ -889,6 +895,7 @@ fun ChatDetailScreen(
                                 null
                             },
                             showGroupAvatar = showGroupAvatar,
+                            senderCluster = senderClusters[rowIndex],
                             isSenderAdmin = conversation.isGroup &&
                                 conversation.adminIds.contains(message.senderId),
                             makeTextSelectable = convPrefs.makeTextSelectable,
@@ -1533,6 +1540,8 @@ private fun ConversationHeader(
     onOpenWallpaperPicker: () -> Unit,
     onOpenAppearance: (() -> Unit)?,
     onToggleMute: (() -> Unit)?,
+    ghostModeEnabled: Boolean,
+    onToggleGhostMode: (() -> Unit)?,
     onBlockContact: (() -> Unit)?,
     onClearConversation: () -> Unit,
 ) {
@@ -1666,7 +1675,7 @@ private fun ConversationHeader(
             }
         }
         Box {
-            IconButton(onClick = { onMenuOpenChange(true) }) {
+            IconButton(modifier = Modifier.testTag("chat-options"), onClick = { onMenuOpenChange(true) }) {
                 Icon(
                     Icons.Rounded.MoreVert,
                     contentDescription = "Chat options",
@@ -1694,6 +1703,13 @@ private fun ConversationHeader(
                         text = { Text("Search") },
                         onClick = onSearch,
                     )
+                    if (onToggleGhostMode != null) {
+                        DropdownMenuItem(
+                            modifier = Modifier.testTag("chat-ghost-toggle"),
+                            text = { Text(if (ghostModeEnabled) "Turn off Ghost mode" else "Turn on Ghost mode") },
+                            onClick = { onMenuOpenChange(false); onToggleGhostMode() },
+                        )
+                    }
                     if (onToggleMute != null) {
                         DropdownMenuItem(
                             leadingIcon = { Icon(if (conversation.isMuted) Icons.Outlined.Notifications else Icons.Outlined.NotificationsOff, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
