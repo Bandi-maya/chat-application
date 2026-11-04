@@ -84,8 +84,14 @@ class CallContactPickerProofTest {
         toggle.click()
         assertTrue("dialpad mode did not open", dev.wait(Until.hasObject(By.desc("Show contacts")), 5000))
         shot("call-contact-picker-dialpad")
-        dev.findObject(By.desc("Show contacts")).click()
-        assertTrue("contacts mode did not return", dev.wait(Until.hasObject(By.desc("Open dialpad")), 5000))
+        val contactsToggle = dev.wait(Until.findObject(By.desc("Show contacts").clickable(true)),5000)
+        assertNotNull("Clickable contacts toggle missing",contactsToggle)
+        dev.waitForIdle()
+        contactsToggle!!.click()
+        val returned = dev.wait(Until.hasObject(By.desc("Open dialpad").clickable(true)),5000)
+        shot("call-contact-picker-after-return-click")
+        assertTrue("contacts mode did not return", returned)
+        assertTrue("Contacts title must return",dev.hasObject(By.text("Contacts")))
         scenario.close()
     }
     private fun incomingSession(name: String) = ChatyCallSession(
@@ -417,9 +423,16 @@ class CallContactPickerProofTest {
             tile.click()
             dev.waitForIdle(3000)
 
-            val row = dev.wait(Until.findObject(By.text("Mono Chevron Dark")), 8000)
+            var row = dev.wait(Until.findObject(By.text("Mono Chevron Dark")), 2000)
+            repeat(10) {
+                if (row == null) {
+                    dev.swipe(dev.displayWidth/2, dev.displayHeight*3/4, dev.displayWidth/2, dev.displayHeight/3, 40)
+                    row = dev.wait(Until.findObject(By.text("Mono Chevron Dark")),1500)
+                }
+            }
+            shot("bundle-picker-mono-visible-before-apply")
             assertNotNull("Mono Chevron Dark option missing from picker", row)
-            row.click()
+            row!!.click()
             dev.waitForIdle(3000)
             shot("bundle-picker-applied-mono-chevron")
 
