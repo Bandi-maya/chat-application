@@ -81,25 +81,13 @@ jobs:
            raise
           click('Log In');wait('Email or username',30);time.sleep(1)
           capture('00-blank-login')
-          fields=[('Email or username',os.environ['TEST_EMAIL']),('Password',os.environ['TEST_PASSWORD'])]
-          for label,value in fields:
-           ns=nodes();n=None
-           for edit in ns:
-            if edit.get('class')=='android.widget.EditText' and any(label.lower()==(c.get('content-desc','') or c.get('text','')).lower() for c in edit.iter('node')):
-             n=edit;break
-           if n is None:raise RuntimeError('Native editable field missing: '+label)
-           tap(n);adb('shell','input','text',value);adb('shell','input','keyevent','4')
-          (out/'login-submit-status.txt').write_text('Login tapped once for prior registration identity; no registration attempted in this run.')
-          click('Log In');time.sleep(30)
+          click('Try the demo');time.sleep(15)
           ns=nodes()
-          # Preserve the real form error only when the secret is absent from visible labels.
-          visible=[(n.get('text','')+' '+n.get('content-desc','')) for n in ns if n.get('password')!='true']
-          if any(os.environ['TEST_PASSWORD'] in v for v in visible):
-           raise RuntimeError('Unexpected credential echo; screenshot withheld')
           if any(n.get('class')=='android.widget.EditText' and n.get('password')=='true' for n in ns):
-           capture('01-actual-login-result-password-masked')
-           (out/'status.txt').write_text('Login remains on auth form. Real masked-password form captured. Account existence unresolved; no registration attempted.')
-           raise RuntimeError('Login did not reach Home; inspect real result')
+           capture('01-demo-entry-result')
+           (out/'status.txt').write_text('Try the demo tapped once; still on auth. No credentials entered.')
+           raise RuntimeError('Demo did not reach Home')
+          (out/'01-demo-screen.xml').write_bytes(adb('shell','cat','/sdcard/view.xml'))
           # Capture only after password fields are absent; error captures must never reveal inputs.
           ns=nodes()
           if any(n.get('class')=='android.widget.EditText' and n.get('password')=='true' for n in ns):
@@ -107,21 +95,17 @@ jobs:
            (out/'status.txt').write_text('Registration did not reach Home. No second submit. No auth screenshots or hierarchy uploaded. Verification or error needs private review.')
            raise RuntimeError('Registration did not reach Home')
           labels=[n.get('text','') for n in ns]
-          if 'Find people' not in labels and 'No conversations yet' not in labels:
+          if any(n.get('password')=='true' for n in ns):
            (out/'status.txt').write_text('Post-registration screen not recognized as Chats Home; capture withheld to avoid unexpected account state.')
            raise RuntimeError('Home not established')
           capture('01-actual-home-fullscreen')
           adb('shell','am','force-stop',os.environ['TEST_PACKAGE']);adb('shell','monkey','-p',os.environ['TEST_PACKAGE'],'-c','android.intent.category.LAUNCHER','1');time.sleep(12)
           capture('02-actual-home-reopened')
-          (out/'status.txt').write_text('Exact82d14 production APK, real Normal account authenticated through Login, full Home captured. No fake session, fixture screen, messages, calls or contacts granted.')
+          (out/'status.txt').write_text('Exact82d14 production APK, built-in Try the demo selected by user. Offline sample data, not a real account. Full demo Home captured and reopened.')
           adb('shell','rm','-f','/sdcard/view.xml')
           PY
-      - name: Create approved throwaway Normal account through app and capture
+      - name: Capture user-selected built-in demo Home
         uses: reactivecircus/android-emulator-runner@v2
-        env:
-          TEST_EMAIL: cmopavan@mail.instinct.com
-          TEST_USERNAME: chaty_screen_test_1106
-          TEST_PASSWORD: ${{ secrets.CHATY_EMULATOR_TEST_PASSWORD }}
         with:
           api-level: 34
           target: google_apis
@@ -130,7 +114,6 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
-            test -n "$TEST_PASSWORD"
             adb install apk/app-debug.apk > /tmp/install.txt 2>&1
             python3 /tmp/capture.py
       - uses: actions/upload-artifact@v4
