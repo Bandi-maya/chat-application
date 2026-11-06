@@ -34,6 +34,7 @@ class PostgrestRpcClient(
                 }
                 .post(body)
                 .build()
+            com.example.chat.data.demo.DemoMode.requireRealBackend()
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {

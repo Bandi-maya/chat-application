@@ -1,6 +1,5 @@
 package com.example.chat.ui.chats.detail
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
@@ -24,20 +23,15 @@ internal fun CompactMediaAlbum(
     onOpen: (ChatMessage, Rect?) -> Unit, onMenu: (ChatMessage, Rect?) -> Unit,
     onReply: (ChatMessage) -> Unit = {}, onReact: ((ChatMessage) -> Unit)? = null,
 ) {
-    // Cap visible tiles at 4 (2x2); larger albums keep every message in the row for
-    // the viewer and show a +N scrim on the last visible tile.
-    val visible = if (messages.size > 4) messages.take(4) else messages
-    val hiddenCount = messages.size - visible.size
     Column(Modifier.widthIn(max = 300.dp).fillMaxWidth().clip(RoundedCornerShape(9.dp)),
         verticalArrangement = Arrangement.spacedBy(2.dp)) {
         var start = 0
-        for (columns in mediaAlbumColumns(visible.size)) {
-            val members = visible.subList(start, start + columns)
+        for (columns in mediaAlbumColumns(messages.size)) {
+            val members = messages.subList(start, start + columns)
             start += columns
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 for (message in members) key(message.id) {
                     var bounds by remember { mutableStateOf<Rect?>(null) }
-                    val isCappedTail = hiddenCount > 0 && message.id == visible.last().id
                     Box(Modifier.weight(1f).aspectRatio(if (columns == 1) 2f else 1f)
                         .onGloballyPositioned { bounds = it.boundsInWindow() }
                         .semantics { contentDescription = "Album photo ${messages.indexOf(message) + 1} of ${messages.size}" }
@@ -52,14 +46,6 @@ internal fun CompactMediaAlbum(
                         }) {
                         MediaAttachmentPreview(message.attachment!!, remoteImage, resolveUrl, null, false,
                             message, binding, fixedRatio = if (columns == 1) 2f else 1f)
-                        if (isCappedTail) {
-                            Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0x66000000)),
-                                contentAlignment = androidx.compose.ui.Alignment.Center) {
-                                androidx.compose.material3.Text("+$hiddenCount",
-                                    color = androidx.compose.ui.graphics.Color.White,
-                                    style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
-                            }
-                        }
                     }
                 }
             }

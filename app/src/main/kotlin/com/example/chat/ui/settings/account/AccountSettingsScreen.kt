@@ -84,7 +84,6 @@ data class AccountUserInfo(
     val avatarUrl: String?,
 )
 
-private val DangerRed = Color(0xFFFF5252) // Colors.redAccent
 
 /** Port of lib/features/settings/account/account_settings_screen.dart.
  *
@@ -146,11 +145,11 @@ fun AccountSettingsScreen(
                                 showLogoutDialog = true
                             } catch (e: Exception) {
                                 isDeleting = false
-                                snack("Failed to delete account: $e", DangerRed)
+                                snack("Failed to delete account: $e", colors.error)
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.error),
                 ) { Text("Delete Permanently") }
             },
             dismissButton = {
@@ -269,7 +268,7 @@ fun AccountSettingsScreen(
                     )
                     ChatySettingsTile(
                         icon = Icons.Rounded.DeleteForever,
-                        iconColor = DangerRed,
+                        iconColor = colors.error,
                         title = "Delete Account",
                         subtitle = "Permanently delete your profile and account data",
                         enabled = !isDeleting,
@@ -296,21 +295,21 @@ private fun AccountAvatar(user: AccountUserInfo, color: Color, sizeDp: Int) {
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                placeholder = { AvatarInitials(user.avatarInitials, sizeDp) },
-                error = { AvatarInitials(user.avatarInitials, sizeDp) },
+                placeholder = { AvatarInitials(user.avatarInitials, sizeDp, color) },
+                error = { AvatarInitials(user.avatarInitials, sizeDp, color) },
             )
         } else {
-            AvatarInitials(user.avatarInitials, sizeDp)
+            AvatarInitials(user.avatarInitials, sizeDp, color)
         }
     }
 }
 
 @Composable
-private fun AvatarInitials(initials: String, sizeDp: Int) {
+private fun AvatarInitials(initials: String, sizeDp: Int, bg: Color) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
             initials,
-            color = Color.White,
+            color = com.example.chat.ui.kit.chatyReadableOn(bg, Color.White, Color.Black),
             fontSize = (sizeDp * 0.4).sp,
             fontWeight = FontWeight.Bold,
         )
@@ -326,6 +325,7 @@ private fun WorkspaceRegistrationToggle(
     snack: (String, Color?) -> Unit,
     accentColor: Color,
 ) {
+    val colors = LocalAppColors.current
     var loading by remember { mutableStateOf(false) }
     var allowRegistration by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
@@ -372,11 +372,11 @@ private fun WorkspaceRegistrationToggle(
                         )
                     } else {
                         loading = false
-                        snack("Failed to update registration settings. Admin rights required.", DangerRed)
+                        snack("Failed to update registration settings. Admin rights required.", colors.error)
                     }
                 } catch (e: Exception) {
                     loading = false
-                    snack("Error: ${(e.message ?: e.toString()).removePrefix("Exception: ")}", DangerRed)
+                    snack("Error: ${(e.message ?: e.toString()).removePrefix("Exception: ")}", colors.error)
                 }
             }
         },
@@ -423,7 +423,7 @@ private fun EditProfileSheet(
                 avatarUrl = newUrl
                 snack("Profile photo updated!", colors.accent)
             } catch (e: Exception) {
-                snack("Failed to upload photo: ${(e.message ?: e.toString()).removePrefix("Exception: ")}", DangerRed)
+                snack("Failed to upload photo: ${(e.message ?: e.toString()).removePrefix("Exception: ")}", colors.error)
             } finally {
                 isUploadingPhoto = false
             }
@@ -543,7 +543,7 @@ private fun EditProfileSheet(
                             onDismiss()
                             snack("Profile updated successfully!", colors.accent)
                         } catch (e: Exception) {
-                            snack("Failed to update: ${(e.message ?: e.toString()).removePrefix("Exception: ")}", DangerRed)
+                            snack("Failed to update: ${(e.message ?: e.toString()).removePrefix("Exception: ")}", colors.error)
                         } finally {
                             isSaving = false
                         }

@@ -8,6 +8,8 @@ package com.example.chat
  * paths are deployed and covered by integration tests.
  */
 object ReleaseFeatures {
+    // Legal acceptance remains off pending owner-reviewed final policy.
+    const val LEGAL_ACCEPTANCE_GATE = false
     /** Status / stories ("Updates" tab, camera centre action). Needs a status API. */
     const val STATUS_UPDATES = false
 

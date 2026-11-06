@@ -542,7 +542,7 @@ private fun SampleConversationRow(t: ThemeConfig, a: HeaderPreviewArgs) {
     }
     ConversationRow(
         conversation = convo, theme = t, homePrefs = HomePreferences(homeStyle = a.homeStyle, tabBubbleStyle = a.tabBubbleStyle),
-        chatList = defaultHomeTemplates.chatList, density = spec.tileDensity, isDark = t.isDark,
+        chatList = com.example.chat.ui.chats.home.resolveHomeTemplates(com.example.chat.ServiceLocator.templateController.config, com.example.chat.core.preferences.HomePresentationPolicy.isDefault(a.homeStyle), com.example.chat.ServiceLocator.templateController.chatList).chatList, density = spec.tileDensity, isDark = t.isDark,
         cardRows = spec.cardRows, isTelegramRows = a.homeStyle.trim().lowercase() == "telegram style",
         displayTitle = convo.title, presence = HomePresence(isOnline = true), currentUserId = "me",
         lastOwnMessageState = DeliveryState.read, selected = false, locked = false, elapsedTime = false,

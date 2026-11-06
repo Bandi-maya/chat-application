@@ -1,0 +1,3 @@
+fluent_animated/<hex>.webp: Fluent Emoji Animated by Microsoft, MIT, https://github.com/microsoft/fluentui-emoji-animated (LICENSE: "Copyright (c) Microsoft Corporation"). Animated PNG (256px) converted to animated WebP 160px (quality 70, loop forever), 49 of the 50 iOS-set emoji (U+1F611 has no entry in the repo metadata).
+openmoji/<HEX>.png: OpenMoji, CC BY-SA 4.0, https://openmoji.org, color 618px PNG resized to 256px, 50 emoji (same set). Static.
+Destination in app: app/src/main/assets/emoji/fluent_animated/ and app/src/main/assets/emoji/openmoji/

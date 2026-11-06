@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,17 +69,23 @@ fun HeaderTabStyleSheet(
             item {
                 androidx.compose.foundation.layout.Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     HomeUiStyles.tabBubbleStyles.forEach { s ->
-                        ChatyPreviewRadioRow(s, s == tabDraft, { tabDraft = s }, preview = { TabChipPreview(s) })
+                        ChatyPreviewRadioRow(s, s == tabDraft, { tabDraft = s }, preview = { TabChipPreview(s) { tabDraft = s } })
                     }
                 }
             }
             item { SectionLabel("3D pager / slider effect") }
-            item {
-                androidx.compose.foundation.layout.Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    HomeUiStyles.pager3dStyles.forEach { s ->
-                        ChatyPreviewRadioRow(s, s == pagerDraft, { pagerDraft = s }, preview = { PagerPreview(s) })
-                    }
+            // One LazyColumn item per row (not a single monolithic group item): with the
+            // extended 18-style list a single group item grows taller than the viewport,
+            // which breaks both lazy composition and scroll-to-row reachability.
+            items(
+                count = HomeUiStyles.pager3dStyles.size,
+                key = { i -> "pager_" + HomeUiStyles.pager3dStyles[i] },
+            ) { i ->
+                val s = HomeUiStyles.pager3dStyles[i]
+                androidx.compose.foundation.layout.Column(Modifier.selectableGroup()) {
+                    ChatyPreviewRadioRow(s, s == pagerDraft, { pagerDraft = s }, preview = { PagerPreview(s) })
                 }
+                androidx.compose.foundation.layout.Spacer(Modifier.height(10.dp))
             }
             item { androidx.compose.foundation.layout.Spacer(Modifier.height(6.dp)) }
         }
@@ -98,13 +106,13 @@ private fun SectionLabel(text: String) {
  * motif (radius, fill, outline, glow, segmenting) is exactly what the home screen draws.
  */
 @Composable
-private fun TabChipPreview(style: String) {
+private fun TabChipPreview(style: String, onSelect: () -> Unit) {
     val vw = 150.dp
-    val vh = 36.dp
+    val vh = 48.dp // HomeFilterChips = 3dp top + 32dp chip + 8dp bottom padding; 36dp clipped the labels
     androidx.compose.foundation.layout.BoxWithConstraints {
         val avail = if (constraints.hasBoundedWidth) maxWidth else vw
         val scale = (avail.value / vw.value).coerceAtMost(1f)
-        Box(Modifier.size(vw * scale, vh * scale)) {
+        Box(Modifier.size(vw * scale, vh * scale).clearAndSetSemantics { }) {
             Box(
                 Modifier.requiredSize(vw, vh).graphicsLayer {
                     scaleX = scale; scaleY = scale; transformOrigin = TransformOrigin(0f, 0f)
@@ -112,6 +120,11 @@ private fun TabChipPreview(style: String) {
             ) {
                 HomeFilterChips(LocalThemeConfig.current, style, listOf("All", "Unread"), "All") {}
             }
+            // The preview displays the real chips, but tapping it selects its containing draft row.
+            Box(Modifier.matchParentSize().clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null, onClick = onSelect,
+            ))
         }
     }
 }

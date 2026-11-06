@@ -14,6 +14,7 @@ import com.example.chat.ui.chats.home.displayConversationTitle
 import com.example.chat.ui.chats.home.effectiveHomeHeaderStyle
 import com.example.chat.ui.chats.home.filterHomeConversations
 import com.example.chat.ui.chats.home.homeFilters
+import com.example.chat.ui.chats.home.homeIdentityName
 import com.example.chat.ui.chats.home.resolveSearchPlacement
 import java.time.Instant
 import java.time.ZoneId
@@ -107,8 +108,8 @@ class HomeEntriesParityTest {
     // ---- filter chips ----
 
     @Test fun filterChipSets() {
-        assertEquals(listOf("All", "Unread", "Groups", "Direct", "Vault"), homeFilters(null))
-        assertEquals(listOf("All", "Unread", "Vault"), homeFilters(ConversationType.group))
+        assertEquals(listOf("All", "Unread", "Groups", "Direct"), homeFilters(null))
+        assertEquals(listOf("All", "Unread"), homeFilters(ConversationType.group))
     }
 
     // ---- build() where() chain ----
@@ -309,11 +310,24 @@ class HomeEntriesParityTest {
     // ---- compact bar title ----
 
     @Test fun compactBarTitleRules() {
-        // Classic with no page title is 'WhatsApp'.
+        // Classic (WhatsApp OLD UI) shows the user's identity or the app name, never a hard-coded "WhatsApp".
         assertEquals(
-            "WhatsApp",
+            "Pavan",
             compactBarTitle("Classic", HomeHeaderStyle.prominentIdentity, null, true, "", "Pavan", "pavan", true),
         )
+        assertEquals(
+            "Boss",
+            compactBarTitle("Classic", HomeHeaderStyle.prominentIdentity, null, true, "Boss", "Pavan", "pavan", true),
+        )
+        assertEquals(
+            "Chaty",
+            compactBarTitle("Classic", HomeHeaderStyle.prominentIdentity, null, false, "Boss", "Pavan", "pavan", true),
+        )
+        // The settings preview calls the same function.
+        assertEquals("Boss", homeIdentityName(true, "Boss", "Pavan", "pavan"))
+        assertEquals("pavan", homeIdentityName(true, "", "Chaty User", "pavan"))
+        assertEquals("Chaty", homeIdentityName(true, "", "", ""))
+        assertEquals("Chaty", homeIdentityName(false, "Boss", "Pavan", "pavan"))
         // Placeholder names fall back to username.
         assertEquals(
             "pavan",

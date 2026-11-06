@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ class DrawerNarrowLayoutProofTest {
         val inst = InstrumentationRegistry.getInstrumentation()
         val device = UiDevice.getInstance(inst)
         val scenario = ActivityScenario.launch(ChatFixtureActivity::class.java)
+        var stage = "launch"
         try {
             for (perspective in listOf(false, true)) {
                 scenario.onActivity { activity ->
@@ -44,7 +47,9 @@ class DrawerNarrowLayoutProofTest {
                             CompositionLocalProvider(LocalDensity provides Density(density, 2f)) {
                                 var selected by remember(perspective) { mutableStateOf(0) }
                                 val ids = listOf("chats", "updates", "calls", "tasks", "settings")
-                                Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+                                Column(Modifier.fillMaxSize().safeDrawingPadding().semantics {
+                                    contentDescription = "Drawer fixture generation ${if (perspective) "perspective" else "modern"}"
+                                }) {
                                     Box(Modifier.width(200.dp).height(200.dp).background(ChatyColors(config).surface)) {
                                         if (perspective) PerspectiveDrawerShell(
                                             colors = ChatyColors(config), navItemIds = ids, selectedIndex = selected,
@@ -62,29 +67,49 @@ class DrawerNarrowLayoutProofTest {
                         }
                     }
                 }
-                assertTrue(device.wait(Until.hasObject(By.desc("Open menu")), 10000))
-                device.findObject(By.desc("Open menu")).click()
+                stage = "${if (perspective) "perspective" else "modern"}: open menu"
+                val fixtureDescription = "Drawer fixture generation ${if (perspective) "perspective" else "modern"}"
+                assertTrue("Current drawer fixture committed", device.wait(Until.hasObject(By.desc(fixtureDescription)), 10000))
                 device.waitForIdle()
-                val scroll = device.findObject(By.scrollable(true)) ?: throw AssertionError("Menu must scroll")
-                var target = device.findObject(By.text("Settings"))
+                assertTrue(device.wait(Until.hasObject(By.desc("Open menu")), 10000))
+                device.wait(Until.findObject(By.desc("Open menu")), 3000)!!.click()
+                device.waitForIdle()
+                stage = "${if (perspective) "perspective" else "modern"}: reach last destination"
+                assertTrue("Menu must scroll", device.wait(Until.hasObject(By.scrollable(true)), 3000))
                 repeat(12) {
-                    if (target == null) {
-                        scroll.scroll(androidx.test.uiautomator.Direction.DOWN, 0.7f)
-                        target = device.findObject(By.text("Settings"))
+                    if (!device.hasObject(By.text("Settings"))) {
+                        // Scrolling recomposes the drawer. Never reuse a UiObject2
+                        // from a previous hierarchy generation or screenshot.
+                        val liveScroll = device.wait(Until.findObject(By.scrollable(true)), 3000)
+                            ?: throw AssertionError("Menu scroll surface disappeared")
+                        liveScroll.scroll(androidx.test.uiautomator.Direction.DOWN, 0.7f)
+                        device.waitForIdle()
                     }
                 }
-                val item = target ?: throw AssertionError("Last destination unreachable")
+                assertTrue("Last destination unreachable", device.wait(Until.hasObject(By.text("Settings")), 3000))
                 val screenshot = inst.uiAutomation.takeScreenshot() ?: throw AssertionError("No screenshot")
                 val file = File(inst.targetContext.getExternalFilesDir(null), "screenshots/drawer-narrow-${if (perspective) "perspective" else "modern"}.png")
                 file.parentFile?.mkdirs()
                 FileOutputStream(file).use { screenshot.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 screenshot.recycle()
-                item.click()
+                stage = "${if (perspective) "perspective" else "modern"}: select settings"
+                val liveItem = device.wait(Until.findObject(By.text("Settings")), 3000)
+                    ?: throw AssertionError("Last destination disappeared before click")
+                liveItem.click() // Single action: do not retry failed navigation.
                 assertTrue(device.wait(Until.hasObject(By.text("Result: settings")), 5000))
-                device.findObject(By.desc("Open menu")).click()
+                stage = "${if (perspective) "perspective" else "modern"}: reopen and Back"
+                device.wait(Until.findObject(By.desc("Open menu")), 3000)!!.click()
+                device.waitForIdle()
                 device.pressBack()
                 assertTrue(device.wait(Until.hasObject(By.desc("Open menu")), 5000))
             }
+        } catch (failure: Throwable) {
+            val dir = File(inst.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+            android.util.Log.e("DrawerNarrowProof", "Failure stage=$stage", failure)
+            File(dir, "drawer-failure-stage.txt").writeText(stage)
+            runCatching { device.takeScreenshot(File(dir, "drawer-failure.png")) }
+            runCatching { device.dumpWindowHierarchy(File(dir, "drawer-failure.xml")) }
+            throw failure
         } finally { scenario.close() }
     }
 }

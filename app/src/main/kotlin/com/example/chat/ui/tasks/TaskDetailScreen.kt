@@ -19,13 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.History
@@ -33,7 +33,8 @@ import androidx.compose.material.icons.rounded.Label
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PersonOutline
 import androidx.compose.material.icons.rounded.Replay
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.rounded.Update
+import com.example.chat.ui.kit.ChatyActionButton
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -84,7 +85,7 @@ fun TaskDetailScreen(
     onBack: () -> Unit,
     onEditTask: (ChatTask) -> Unit,
 ) {
-    var currentTask by remember(task.id) { mutableStateOf(task) }
+    var currentTask by remember(task) { mutableStateOf(task) }
     var confirmDelete by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -112,10 +113,21 @@ fun TaskDetailScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Task Details") },
-                navigationIcon = { AuthBackButton(onClick = onBack) },
+                // AuthBackButton wraps itself in fillMaxWidth(), which in the TopAppBar navigation slot leaves the title zero width.
+                // Use a fixed-size chevron button instead (same icon, size and tint).
+                navigationIcon = {
+                    IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            Icons.Rounded.ChevronLeft,
+                            contentDescription = "Back",
+                            tint = colors.foreground,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = { onEditTask(currentTask) }) {
-                        Icon(Icons.Rounded.Edit, contentDescription = "Edit Task")
+                        Icon(Icons.Rounded.Update, contentDescription = "Edit Task")
                     }
                     var menuOpen by remember { mutableStateOf(false) }
                     Box {
@@ -124,13 +136,8 @@ fun TaskDetailScreen(
                         }
                         DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
-                                text = { Text("Edit Task") },
-                                leadingIcon = { Icon(Icons.Rounded.Edit, "Edit task", modifier = Modifier.size(20.dp)) },
-                                onClick = { menuOpen = false; onEditTask(currentTask) },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Delete Task", color = Color(0xFFF44336)) },
-                                leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = Color(0xFFF44336), modifier = Modifier.size(20.dp)) },
+                                text = { Text("Delete Task", color = colors.error) },
+                                leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = colors.error, modifier = Modifier.size(20.dp)) },
                                 onClick = { menuOpen = false; confirmDelete = true },
                             )
                         }
@@ -208,7 +215,7 @@ fun TaskDetailScreen(
                 }
                 Spacer(Modifier.height(16.dp))
                 Row {
-                    Button(
+                    ChatyActionButton(
                         onClick = {
                             updateStatus(
                                 if (currentTask.status == TaskStatus.completed) TaskStatus.inbox
@@ -225,10 +232,6 @@ fun TaskDetailScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(if (currentTask.status == TaskStatus.completed) "Reopen Task" else "Mark Completed")
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    IconButton(onClick = { onEditTask(currentTask) }) {
-                        Icon(Icons.Rounded.Edit, contentDescription = "Edit Task")
                     }
                 }
             }

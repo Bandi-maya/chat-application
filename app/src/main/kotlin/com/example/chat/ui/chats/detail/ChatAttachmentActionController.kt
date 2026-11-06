@@ -13,6 +13,9 @@ data class PickedFile(
     val mimeType: String? = null,
 )
 
+/** Submission is not delivery confirmation and never authorizes local-file deletion. */
+enum class CapturedPhotoSubmission { Submitted, Failed }
+
 /** Dart _PollDraft. */
 data class PollDraft(
     val question: String,
@@ -29,13 +32,9 @@ data class PollDraft(
          *  at least two non-blank options (extra options are dropped). */
         fun normalized(question: String, options: List<String>, allowMultiple: Boolean): PollDraft? {
             val q = question.trim()
-            if (q.isEmpty() || q.length > QUESTION_MAX_LENGTH) return null
-            val opts = options.asSequence()
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .toList()
-            if (opts.size !in MIN_OPTIONS..MAX_OPTIONS) return null
-            if (opts.any { it.length > OPTION_MAX_LENGTH }) return null
+            val opts = options.map { it.trim() }.filter { it.isNotEmpty() }
+            if (q.isEmpty() || q.length > QUESTION_MAX_LENGTH || opts.size !in MIN_OPTIONS..MAX_OPTIONS ||
+                opts.any { it.length > OPTION_MAX_LENGTH }) return null
             return PollDraft(q, opts, allowMultiple)
         }
     }
@@ -185,7 +184,7 @@ class ChatAttachmentActionController(
         require(files.isNotEmpty()) { "Choose an attachment first." }
         val limit = if (type == "image") imageShareLimit().coerceIn(1, 100) else 1
         require(files.size <= limit) { "Your configured send limit is $limit." }
-        val albumId = if (type == "image" && !viewOnce && files.size >= 2) java.util.UUID.randomUUID().toString() else null
+        val albumId = if (type == "image" && files.size > 1 && !viewOnce) java.util.UUID.randomUUID().toString() else null
         for ((index, file) in files.withIndex()) {
             val attachment = backend.upload(type, file)
             backend.sendMessage(
@@ -336,19 +335,35 @@ class ChatAttachmentActionController(
         effectId: String,
         effectIntensity: Double,
         onSent: suspend () -> Unit = {},
-    ) {
+        isStillCurrent: () -> Boolean = { true },
+    ): CapturedPhotoSubmission {
         try {
+            kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.let { if (!it.isActive) throw kotlinx.coroutines.CancellationException("Photo submission cancelled") }
+            if (!isStillCurrent()) return CapturedPhotoSubmission.Failed
             val attachment = backend.upload("image", PickedFile(name = path.substringAfterLast('/'), path = path))
+            kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.let { if (!it.isActive) throw kotlinx.coroutines.CancellationException("Photo submission cancelled") }
+            if (!isStillCurrent()) return CapturedPhotoSubmission.Failed
             backend.sendMessage(
                 caption,
                 MessageType.image,
                 attachment,
                 mapOf("effect" to effectId, "effect_intensity" to effectIntensity.toString()),
             )
-            onSent()
-        } catch (error: Throwable) {
-            toast("Could not send photo. ${error.message ?: error}")
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            if (isStillCurrent()) toast("Could not send photo. ${error.message ?: error}")
+            return CapturedPhotoSubmission.Failed
         }
+        kotlinx.coroutines.currentCoroutineContext().let { context ->
+            context[kotlinx.coroutines.Job]?.let { if (!it.isActive) throw kotlinx.coroutines.CancellationException("Photo submission cancelled") }
+        }
+        // UI observer failure cannot reclassify an already-submitted message as an upload failure.
+        if (isStillCurrent()) {
+            try { onSent() } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { /* Observer failure is not a failed submission or retry request. */ }
+        }
+        return CapturedPhotoSubmission.Submitted
     }
 
     /** Explicit video submission, not delivery confirmation. Unit backend

@@ -12,12 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.CloudOff
-import androidx.compose.material.icons.rounded.SignalWifiOff
-import androidx.compose.material.icons.rounded.Wifi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -28,12 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import com.example.chat.ui.icons.ChatyIcon
+import com.example.chat.ui.icons.ChatyIconId
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
@@ -54,9 +48,7 @@ internal val connectionWeak = Color(0xFFF59E0B)
 internal val connectionPoor = Color(0xFFEF4444)
 internal val connectionOffline = Color(0xFF71717A)
 
-/** Exact port of lib/ui/core/connection/connection_health_indicator.dart:
- *  3 ascending bars (38% / 68% / 100% heights), dimmed inactive bars, and a
- *  diagonal strike-through slash for the offline state. */
+/** Pack-aware signal glyph, strength tint/mask and offline state decoration. */
 @Composable
 fun ConnectionHealthIndicator(
     health: ConnectionHealth,
@@ -106,44 +98,23 @@ private fun ConnectionHealthBars(
         ConnectionHealth.offline -> 0
     }
     val isOffline = health == ConnectionHealth.offline
-    Box(
-        modifier
-            .size(size)
-            .semantics { contentDescription = semanticLabel }
-            .drawBehind {
-                val barCount = 3
-                val spacing = this.size.width * 0.15f
-                val barWidth = (this.size.width - spacing * (barCount - 1)) / barCount
-                val heights = floatArrayOf(
-                    this.size.height * 0.38f,
-                    this.size.height * 0.68f,
-                    this.size.height * 1.00f,
-                )
-                val radius = barWidth * 0.45f
-                for (i in 0 until barCount) {
-                    val x = i * (barWidth + spacing)
-                    val h = heights[i]
-                    val y = this.size.height - h
-                    val path = Path().apply {
-                        addRoundRect(RoundRect(Rect(x, y, x + barWidth, y + h), CornerRadius(radius, radius)))
-                    }
-                    drawPath(
-                        path,
-                        color = if (!isOffline && i < activeBars) activeColor
-                        else activeColor.copy(alpha = 0.25f),
-                    )
-                }
-                if (isOffline) {
-                    drawLine(
-                        color = activeColor,
-                        start = Offset(this.size.width * 0.1f, this.size.height * 0.9f),
-                        end = Offset(this.size.width * 0.9f, this.size.height * 0.1f),
-                        strokeWidth = max(1.4f, this.size.width * 0.08f),
-                        cap = StrokeCap.Round,
-                    )
-                }
-            },
-    )
+    Box(modifier.size(size).semantics { contentDescription = semanticLabel }) {
+        ChatyIcon(ChatyIconId.signal, size = size, color = activeColor.copy(alpha = 0.25f))
+        if (!isOffline) {
+            ChatyIcon(ChatyIconId.signal, size = size, color = activeColor,
+                modifier = Modifier.drawWithContent {
+                    clipRect(right = this.size.width * activeBars / 3f) { this@drawWithContent.drawContent() }
+                })
+        } else {
+            // State decoration, not a replacement glyph: selected-pack signal remains visible.
+            Box(Modifier.size(size).drawBehind {
+                drawLine(activeColor, Offset(this.size.width * 0.1f, this.size.height * 0.9f),
+                    Offset(this.size.width * 0.9f, this.size.height * 0.1f),
+                    strokeWidth = max(1.4f, this.size.width * 0.08f), cap = StrokeCap.Round)
+            })
+        }
+    }
+
 }
 
 /** Exact port of lib/ui/core/connection/global_connection_banner.dart: a
@@ -219,16 +190,9 @@ fun GlobalConnectionBanner(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                when (icon) {
-                    BannerIcon.CheckCircle -> Icons.Rounded.CheckCircle
-                    BannerIcon.Wifi -> Icons.Rounded.Wifi
-                    BannerIcon.CloudOff -> Icons.Rounded.CloudOff
-                    BannerIcon.SignalWifiOff -> Icons.Rounded.SignalWifiOff
-                },
-                contentDescription = null,
-                tint = fgColor,
-                modifier = Modifier.size(16.dp),
+            ChatyIcon(
+                if (icon == BannerIcon.CheckCircle) ChatyIconId.check else ChatyIconId.signal,
+                color = fgColor, size = 16.dp,
             )
             Spacer(Modifier.width(8.dp))
             Text(

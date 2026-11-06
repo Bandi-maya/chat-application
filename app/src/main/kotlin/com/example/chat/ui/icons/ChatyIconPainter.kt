@@ -15,7 +15,15 @@ enum class ChatyIconThemeId(val title: String, val description: String) {
     technicalBlueprint("Technical Blueprint", "Engineered CAD schematic linework with corner ticks and datum crosshairs."),
     sculptedVolume("Sculpted Volume", "Multi-planar dimensional facets implying depth via overlapping planes."),
     expressiveInk("Expressive Ink", "Dynamic brush-pen calligraphy with high-contrast pressure stroke rhythm."),
-    signalLanguage("Signal Language", "Telecommunication radar motifs with concentric broadcast pulse waves.");
+    signalLanguage("Signal Language", "Telecommunication radar motifs with concentric broadcast pulse waves."),
+    // Bundled vector families use ChatyAssetIcons, never procedural substitute art.
+    // ChatyIconPackCatalog owns availability and visible adaptation provenance.
+    hugeiconsFree("Hugeicons Free", "Free open-source Hugeicons rounded stroke set (MIT)."),
+    majesticonsLine("Majesticons Line", "Free open-source Majesticons line set (MIT)."),
+    majesticonsSolid("Majesticons Solid", "Free open-source Majesticons solid set (MIT)."),
+    pikaiconsStroke("Pikaicons Stroke", "Free open-source Pikaicons stroke set (MIT, @pikaicons/core-free)."),
+    pikaiconsSolid("Pikaicons Solid", "Free open-source Pikaicons solid set (MIT, @pikaicons/core-free)."),
+    phosphorRegular("Phosphor Regular", "Open-source Phosphor regular weight (MIT).");
 
     companion object {
         private val strip = Regex("[\\s_\\-]+")
@@ -23,7 +31,7 @@ enum class ChatyIconThemeId(val title: String, val description: String) {
 
         /** Resolves stored preference strings, including legacy aliases. */
         fun fromString(value: String?): ChatyIconThemeId {
-            if (value == null) return chatySigil
+            if (value == null) return hugeiconsFree
             val normalized = norm(value)
             when (normalized) {
                 "chatyorbit", "orbit" -> return chatySigil
@@ -37,7 +45,8 @@ enum class ChatyIconThemeId(val title: String, val description: String) {
                 "prismedge" -> return origamiGeometry
             }
             for (theme in values()) {
-                if (normalized == norm(theme.name) || normalized == norm(theme.title)) return theme
+                if (normalized == norm(theme.name) || normalized == norm(theme.title))
+                    return if (ChatyIconPackCatalog.isSelectable(theme)) theme else chatySigil
             }
             return chatySigil
         }
@@ -52,6 +61,9 @@ enum class ChatyIconId {
 /** Port of _ChatyIconVectorPainter. Pure drawing against IconCanvas so it is JVM-testable. */
 object ChatyIconPainter {
     fun paint(canvas: IconCanvas, sizeWidth: Double, icon: ChatyIconId, theme: ChatyIconThemeId, iconColor: Color) {
+        // Asset themes are drawn by ChatyIcon's VectorDrawable route, never procedural substitutes.
+        if (ChatyIconPackCatalog.isAssetPack(theme)) return
+        if (ChatyThemeStyles.paint(canvas, sizeWidth, icon, theme, iconColor)) return
         val s = sizeWidth
         val scale = s / 24.0
         canvas.save()

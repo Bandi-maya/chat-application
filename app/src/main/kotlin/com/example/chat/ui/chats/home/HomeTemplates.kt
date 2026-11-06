@@ -17,6 +17,7 @@ data class ChatListTemplate(
     val showPresenceBadge: Boolean = true,
     val showDivider: Boolean = true,
     val itemHeight: Double = 72.0,
+    val referenceDefault: Boolean = false,
 )
 
 data class HomeTemplates(
@@ -45,3 +46,8 @@ fun chatListDensityFactor(density: ChatListDensity): Double = when (density) {
     ChatListDensity.regular -> 1.0
     ChatListDensity.comfortable -> 1.08
 }
+
+/** Supplied Default reference geometry; selected only at the uncustomized row baseline. */
+val referenceDefaultHomeTemplates = defaultHomeTemplates.copy(chatList = defaultHomeTemplates.chatList.copy(
+    density = ChatListDensity.regular, showDivider = true, itemHeight = 72.0, referenceDefault = true,
+))

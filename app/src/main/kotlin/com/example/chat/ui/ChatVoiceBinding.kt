@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.rounded.LooksOne
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
@@ -95,6 +96,10 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var ui by remember(conversationId) { mutableStateOf(VoiceUiState()) }
+    // GB/stock parity: view-once toggle for voice notes, chosen in the locked
+    // recording UI before send; lives outside VoiceUiState because the session
+    // overwrites that state on every tick.
+    var voiceViewOnce by remember(conversationId) { mutableStateOf(false) }
     val note = remember(conversationId) {
         VoiceNoteController(
             conversationId = conversationId,
@@ -131,7 +136,13 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
                 }
             },
             sendAudioMessage = { attachment ->
-                ServiceLocator.apiBackend.sendMessage(conversationId, "", MessageType.audio, attachment)
+                ServiceLocator.apiBackend.sendMessage(
+                    conversationId,
+                    "",
+                    MessageType.audio,
+                    attachment,
+                    extraMetadata = if (voiceViewOnce) mapOf("view_once" to true) else null,
+                )
             },
             recordConfig = {
                 val uplink = ServiceLocator.networkMonitor.state.value.upstreamKbps
@@ -166,7 +177,10 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
             scope = scope,
             setRecordingIndicator = { v -> ServiceLocator.apiBackend.sendRecording(conversationId, v) },
             clearTyping = clearTyping,
-            onSent = { afterSend() },
+            onSent = {
+                voiceViewOnce = false
+                afterSend()
+            },
             showError = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
             onState = { ui = it },
         )
@@ -200,9 +214,14 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
                     VoiceRecordingCard(
                         state = ui,
                         levels = levels,
-                        onDelete = session::cancelVoice,
+                        onDelete = {
+                            voiceViewOnce = false
+                            session.cancelVoice()
+                        },
                         onPause = session::togglePause,
                         onSend = session::finishVoice,
+                        viewOnce = voiceViewOnce,
+                        onToggleViewOnce = { voiceViewOnce = !voiceViewOnce },
                     )
                 }
             }
@@ -220,6 +239,8 @@ private fun VoiceRecordingCard(
     onDelete: () -> Unit,
     onPause: () -> Unit,
     onSend: () -> Unit,
+    viewOnce: Boolean = false,
+    onToggleViewOnce: () -> Unit = {},
 ) {
     val theme = ServiceLocator.themeController.globalTheme
     val accent = Color(theme.accentColor)
@@ -240,6 +261,21 @@ private fun VoiceRecordingCard(
                 Button(onClick = onPause, enabled = !state.busy, modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(26.dp)) {
                     Icon(if (state.paused) Icons.Default.PlayArrow else Icons.Default.Pause, if (state.paused) "Resume recording" else "Pause recording")
                     Text(if (state.paused) "Resume" else "Pause")
+                }
+                // GB/stock view-once toggle for the voice note about to be sent.
+                IconButton(
+                    onClick = onToggleViewOnce,
+                    enabled = !state.busy,
+                    modifier = Modifier.size(52.dp).background(
+                        if (viewOnce) accent else Color(theme.cardColor),
+                        CircleShape,
+                    ),
+                ) {
+                    Icon(
+                        Icons.Rounded.LooksOne,
+                        if (viewOnce) "View once on. The voice message plays once." else "Send as view once voice message",
+                        tint = if (viewOnce) Color(theme.onAccentColor) else foreground,
+                    )
                 }
                 IconButton(onClick = onSend, enabled = !state.busy, modifier = Modifier.size(52.dp).background(accent, CircleShape)) {
                     Icon(Icons.Default.Send, "Send recording", tint = Color(theme.onAccentColor))

@@ -115,7 +115,394 @@ class CallContactPickerProofTest {
         val bounds = obj.visibleBounds
         val x = bounds.centerX()
         val y = bounds.centerY()
-        dev.swipe(x, y, x + dx, y + dy, 60)
+        val endX = x + dx
+        val endY = y + dy
+        val metrics = ins.targetContext.resources.displayMetrics
+        val diagnostic = "control=$desc bounds=$bounds start=($x,$y) end=($endX,$endY) " +
+            "deltaPx=($dx,$dy) distancePx=${kotlin.math.hypot(dx.toDouble(), dy.toDouble())} " +
+            "density=${metrics.density} densityDpi=${metrics.densityDpi} " +
+            "deltaDp=(${dx / metrics.density},${dy / metrics.density}) " +
+            "display=${dev.displayWidth}x${dev.displayHeight} steps=60"
+        val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        File(dir, "call-gesture-injection.txt").appendText("$diagnostic\n")
+        android.util.Log.i("CallGestureProof", diagnostic)
+        assertTrue("Gesture start outside screen: $diagnostic",
+            x in 0 until dev.displayWidth && y in 0 until dev.displayHeight)
+        assertTrue("Gesture endpoint outside screen: $diagnostic",
+            endX in 0 until dev.displayWidth && endY in 0 until dev.displayHeight)
+        val injected = dev.swipe(x, y, endX, endY, 60)
+        File(dir, "call-gesture-injection.txt").appendText("injected=$injected\n")
+        assertTrue("UiDevice gesture injection failed: $diagnostic", injected)
+    }
+
+    /**
+     * Readiness gate: inject the reference drag only while the input subsystem
+     * is quiet. InputReader reconfigurations and StylusManager device-change
+     * bursts (virtio_input_multi_touch re-enumeration) are coincident evidence
+     * around some misses, not proven OS stream cancellation: run 41901570247 had
+     * a miss with no in-window churn at all. A unique marker is logged, then after
+     * a short quiet window the
+     * device log (read via shell) must show no device-change event after that
+     * marker. Bounded to ~10s; if the churn never settles the drive proceeds and
+     * the fact is recorded. Diagnostics only - no retry, no assertion change.
+     */
+    private fun awaitQuietInput(tag: String, what: String) {
+        val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        val deadline = System.currentTimeMillis() + 10_000
+        var check = 0
+        while (true) {
+            check++
+            val marker = "CallGestureProof-quiet-$tag-$check-${System.nanoTime()}"
+            android.util.Log.i("CallGestureProof", marker)
+            Thread.sleep(800) // quiet window
+            val noisy = try {
+                // UiDevice.executeShellCommand does not interpret pipes: a piped
+                // command passed "|" to logcat, which exited with a usage error, so
+                // the dump was empty and this gate passed instantly on every check.
+                // Raw tail-bounded dump, filtered in Kotlin below.
+                val dump = dev.executeShellCommand("logcat -d -v brief -t 5000")
+                if (!dump.contains(marker)) null else {
+                    val afterMarker = dump.substringAfterLast(marker)
+                    afterMarker.contains("Reconfiguring input devices") ||
+                        afterMarker.contains("Stylus InputDevice changed")
+                }
+            } catch (e: Exception) {
+                null
+            }
+            if (noisy == null) {
+                File(dir, "call-gesture-injection.txt").appendText("$tag: $what input quiet unknown at check $check (missing marker or logcat error)\n")
+            }
+            if (noisy == false) {
+                File(dir, "call-gesture-injection.txt").appendText("$tag: $what input quiet after $check check(s)" + "\n")
+                return
+            }
+            if (System.currentTimeMillis() > deadline) {
+                val note = "$tag: $what input ${if (noisy == null) "quiet unknown" else "NOT quiet"} after ${check} checks; injecting anyway"
+                android.util.Log.w("CallGestureProof", note)
+                File(dir, "call-gesture-injection.txt").appendText(note + "\n")
+                return
+            }
+        }
+    }
+
+    /**
+     * Single real drag, bracketed by start/end markers in logcat. After the drive,
+     * whether a device-change event fell inside THIS drive's window is recorded to
+     * call-gesture-injection.txt. In-window churn is coincident evidence only, not
+     * proof of OS stream cancellation (run 41901570247 publisher note): it raises
+     * the suspicion, it does not close the diagnosis. Never re-drives: the caller's
+     * assertion stands alone.
+     */
+    /** Handle for the concurrent settle witness; see startSettleWitness. */
+    private class SettleWitness(
+        val maxOffset: java.util.concurrent.atomic.AtomicInteger,
+        val stop: java.util.concurrent.atomic.AtomicBoolean,
+        val thread: Thread,
+    )
+
+    /**
+     * Settle witness, concurrent: a background thread samples the puck node's
+     * bounds DURING the injection. A nonzero offset shows the drag moved the
+     * node; a zero offset is NOT proof the stream was never admitted, because
+     * a11y reads can stall behind injection (zero was recorded on drives that
+     * passed, runs 41879111168 and 41901570247). Diagnostics only - the
+     * caller's assertion is unchanged.
+     */
+    private fun startSettleWitness(desc: String): SettleWitness {
+        val restBounds = try { dev.findObject(By.desc(desc))?.visibleBounds } catch (e: Exception) { null }
+        val maxOffset = java.util.concurrent.atomic.AtomicInteger(-1)
+        val witnessing = java.util.concurrent.atomic.AtomicBoolean(true)
+        val thread = kotlin.concurrent.thread(isDaemon = true) {
+            while (witnessing.get()) {
+                val now = try { dev.findObject(By.desc(desc))?.visibleBounds } catch (e: Exception) { null }
+                if (restBounds != null && now != null) {
+                    val off = kotlin.math.abs(now.top - restBounds.top) + kotlin.math.abs(now.left - restBounds.left)
+                    if (off > maxOffset.get()) maxOffset.set(off)
+                }
+                Thread.sleep(120)
+            }
+        }
+        return SettleWitness(maxOffset, witnessing, thread)
+    }
+
+    private fun stopSettleWitness(witness: SettleWitness) {
+        witness.stop.set(false)
+        witness.thread.join(3000)
+    }
+
+    /**
+     * In-window input-device churn between two logcat markers. Same pipe bug as
+     * the quiet gate: "|" made logcat exit with a usage error, so
+     * in-window-device-change was always recorded false. Raw tail-bounded dump,
+     * filtered by the substring checks below. Coincident evidence only, not
+     * proof of OS stream cancellation (run 41901570247 publisher note).
+     */
+    private fun inWindowDeviceChange(startMarker: String, endMarker: String): String {
+        return try {
+            val dump = dev.executeShellCommand("logcat -d -v brief -t 5000")
+            val startIndex = dump.lastIndexOf(startMarker)
+            val endIndex = dump.indexOf(endMarker, (startIndex + startMarker.length).coerceAtLeast(0))
+            if (startIndex < 0 || endIndex < 0) "unknown" else {
+                val inWindow = dump.substring(startIndex + startMarker.length, endIndex)
+                (inWindow.contains("Reconfiguring input devices") ||
+                    inWindow.contains("Stylus InputDevice changed")).toString()
+            }
+        } catch (e: Exception) {
+            "unknown"
+        }
+    }
+
+    /**
+     * The hold-start MotionEvent train shared by the post-swipe diagnostic and
+     * the controlled hold-start case: DOWN, hold 400ms like a real finger
+     * settling on the puck, then 6 slow first MOVEs over the first quarter of
+     * the drag, then a steady remainder, then UP. Events go through
+     * ins.uiAutomation.injectInputEvent, the same injection path UiDevice.swipe
+     * uses internally (InteractionController). Returns the train error (null on
+     * clean completion) and the count of rejected events. Never leaves a
+     * pointer down: an interrupted train ends in ACTION_CANCEL.
+     */
+    private fun injectHoldStartTrain(x: Float, y: Float, delta: Pair<Int, Int>): Pair<String?, Int> {
+        val endX = x + delta.first
+        val endY = y + delta.second
+        val downTime = android.os.SystemClock.uptimeMillis()
+        var failedInjects = 0
+        fun inject(action: Int, px: Float, py: Float): Boolean {
+            val ev = android.view.MotionEvent.obtain(
+                downTime, android.os.SystemClock.uptimeMillis(), action, px, py, 0,
+            )
+            ev.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            try {
+                val acceptedByUiAutomation = ins.uiAutomation.injectInputEvent(ev, true)
+                if (!acceptedByUiAutomation) failedInjects++
+                return acceptedByUiAutomation
+            } finally {
+                ev.recycle()
+            }
+        }
+        var upSent = false
+        var error: String? = null
+        try {
+            inject(android.view.MotionEvent.ACTION_DOWN, x, y)
+            Thread.sleep(400)
+            for (i in 1..6) {
+                inject(
+                    android.view.MotionEvent.ACTION_MOVE,
+                    x + delta.first * (0.25f * i / 6), y + delta.second * (0.25f * i / 6),
+                )
+                Thread.sleep(80)
+            }
+            for (i in 1..50) {
+                inject(
+                    android.view.MotionEvent.ACTION_MOVE,
+                    x + delta.first * (0.25f + 0.75f * i / 50), y + delta.second * (0.25f + 0.75f * i / 50),
+                )
+                Thread.sleep(20)
+            }
+            // upSent is set only when the UP was actually accepted, so a rejected UP
+            // still triggers the finally ACTION_CANCEL below.
+            upSent = inject(android.view.MotionEvent.ACTION_UP, endX, endY)
+        } catch (e: Exception) {
+            error = e.javaClass.simpleName + ": " + (e.message ?: "")
+        } finally {
+            // Never leave a pointer down if the train was interrupted.
+            if (!upSent) {
+                try {
+                    inject(android.view.MotionEvent.ACTION_CANCEL, endX, endY)
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return error to failedInjects
+    }
+
+    /**
+     * Interactivity gate: inject only while the fixture window holds input focus.
+     * Four runs (41851643303, 41861366491, 41870523872, 41879111168) each swallowed
+     * exactly one early drive after a scenario teardown: the OS delivered the full
+     * DOWN..UP trajectory (TouchInteractionService saw both endpoints) yet the
+     * concurrent settle witness read 0; admission was not established.
+     * An a11y node being queryable does not imply the window has input focus, and
+     * teardown leaves disposed input channels and in-flight transitions. Poll
+     * mCurrentFocus for this package; bounded to ~10s, result recorded. If focus
+     * never reaches the app, fail with the last mCurrentFocus line - no retry, no
+     * silent inject-anyway, no assertion change beyond this explicit failure.
+     * Hypothesis under test, not an established root cause: run 41879111168's log
+     * also shows witness 0 on drives that passed, so witness 0 does not prove the
+     * stream was never admitted; this gate tells the two cases apart.
+     */
+    private fun awaitWindowFocus(tag: String, what: String, scenario: ActivityScenario<*>? = null) {
+        val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        // Lifecycle prep only: bring the scenario activity back to RESUMED if it
+        // was backgrounded. This is NOT proof of window foreground - the gate below
+        // is the only focus verdict, and the run-41926221980 packet showed the
+        // fixture fully visible while a stale lastANR focus line was misread (the
+        // parser fix below is the real repair for that run). No dialog dismissal
+        // here: an app ANR must never be hidden by a test (existing preflight
+        // guard), and no artifact pixel showed a dialog during gesture cases.
+        // The gate itself is unchanged: it polls mCurrentFocus and fails honestly.
+        if (scenario != null && scenario.state != androidx.lifecycle.Lifecycle.State.RESUMED) {
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            val frontNote = "$tag: $what fixture activity moved back to RESUMED before focus gate"
+            android.util.Log.i("CallGestureProof", frontNote)
+            File(dir, "call-gesture-injection.txt").appendText(frontNote + "\n")
+        }
+        val deadline = System.currentTimeMillis() + 10_000
+        var checks = 0
+        var focused = false
+        var focusDump = ""
+        var focusLines: List<String> = emptyList()
+        while (System.currentTimeMillis() < deadline) {
+            checks++
+            // Focus lives in the DISPLAYS section, not the windows section.
+            // Plain "dumpsys window" prints the LAST ANR snapshot BEFORE the live
+            // sections (AOSP android14 WMS default dump calls dumpLastANRLocked
+            // first): run 41926221980's firstOrNull read a stale NexusLauncher
+            // ANR line while the fixture held live focus. "dumpsys window windows"
+            // omits lastANR but prints no focus fields at all on this build (run
+            // 41948559243 raw dumps: only mTopFocusedDisplayId). "dumpsys window
+            // displays" calls mRoot.dumpDisplayContents directly - no lastANR -
+            // and DisplayContent.dump prints mCurrentFocus/mFocusedApp (AOSP
+            // android14 DisplayContent ~3619). All mCurrentFocus lines (one per
+            // display) are collected; no blind first/last selection. No pipe:
+            // "|" goes to dumpsys as an argument (run 41891946713). If the field
+            // is absent the gate fails below: unknown is not focused.
+            focusDump = try {
+                dev.executeShellCommand("dumpsys window displays")
+            } catch (e: Exception) {
+                ""
+            }
+            focusLines = focusDump.lineSequence()
+                .map { it.trim() }
+                .filter { it.startsWith("mCurrentFocus") }
+                .toList()
+            if (focusLines.any { it.contains(ins.targetContext.packageName) }) {
+                focused = true
+                break
+            }
+            Thread.sleep(250)
+        }
+        val note = "$tag: $what window focus " + (if (focused) "on app after $checks check(s)" else "NOT on app after $checks checks")
+        android.util.Log.i("CallGestureProof", note)
+        File(dir, "call-gesture-injection.txt").appendText(note + "\n")
+        if (!focused) {
+            // Persist the full raw dumps so a parser question never has to be
+            // re-litigated from a single extracted line (nobody can run adb):
+            // the window-displays dump the gate read, plus the activity record.
+            val dumpName = "call-gesture-focus-dump-" + tag.replace(Regex("[^A-Za-z0-9-]"), "-") + ".txt"
+            val activitiesName = "call-gesture-activities-dump-" + tag.replace(Regex("[^A-Za-z0-9-]"), "-") + ".txt"
+            try {
+                File(dir, dumpName).writeText(focusDump)
+            } catch (_: Exception) {
+            }
+            val activitiesDump = try {
+                dev.executeShellCommand("dumpsys activity activities")
+            } catch (e: Exception) {
+                "(dumpsys activity activities failed: " + (e.message ?: "") + ")"
+            }
+            try {
+                File(dir, activitiesName).writeText(activitiesDump)
+            } catch (_: Exception) {
+            }
+            throw AssertionError(
+                "$tag: $what window focus never reached " + ins.targetContext.packageName +
+                    " after $checks checks (~10s); mCurrentFocus line(s): " +
+                    (if (focusLines.isEmpty()) "(no mCurrentFocus line in dumpsys window displays output - unknown, failing closed)" else focusLines.joinToString(" | ")) +
+                    "; full raw dumps saved to " + dumpName + " and " + activitiesName,
+            )
+        }
+    }
+
+    private fun driveGesture(tag: String, desc: String, delta: Pair<Int, Int>, what: String, scenario: ActivityScenario<*>? = null) {
+        awaitWindowFocus(tag, what, scenario)
+        awaitQuietInput(tag, what)
+        val startMarker = "CallGestureProof-drive-start-$tag-${System.nanoTime()}"
+        android.util.Log.i("CallGestureProof", startMarker)
+        // Settle witness, concurrent: a background thread samples the puck node's
+        // bounds DURING the injection. A nonzero offset shows the drag moved the
+        // node; a zero offset is NOT proof the stream was never admitted, because
+        // a11y reads can stall behind injection (zero was recorded on drives that
+        // passed, runs 41879111168 and 41901570247). Diagnostics only - the
+        // caller's assertion is unchanged.
+        val settleWitness = startSettleWitness(desc)
+        val endMarker = "CallGestureProof-drive-end-$tag-${System.nanoTime()}"
+        try {
+            swipeFrom(desc, delta.first, delta.second)
+        } finally {
+            android.util.Log.i("CallGestureProof", endMarker)
+            stopSettleWitness(settleWitness)
+        }
+        dev.waitForIdle(3000)
+        Thread.sleep(1200)
+        val inWindowChange = inWindowDeviceChange(startMarker, endMarker)
+        val note = "$tag: $what single drive complete; in-window-device-change=$inWindowChange; settle-witness-max-offset-px=${settleWitness.maxOffset.get()}"
+        android.util.Log.i("CallGestureProof", note)
+        val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        File(dir, "call-gesture-injection.txt").appendText(note + "\n")
+    }
+
+    /**
+     * Diagnostic only - never asserted. Drives the same drag as an explicit
+     * MotionEvent train via ins.uiAutomation.injectInputEvent, the same injection
+     * path UiDevice.swipe uses internally (InteractionController), but with a
+     * press-hold after DOWN and slow first MOVEs: the working hypothesis for the
+     * vertical-puck misses (run 41901570247 azure answer: focus on app, quiet
+     * input, no in-window churn, full DOWN..UP delivered, no callback) is that
+     * UiDevice.swipe's instant first move differs from a real hold-then-drag.
+     * The outcome is recorded as shape-holdstart next to the swipe shape's outcome;
+     * assertions stay bound to the swipe shape alone (no retry-to-pass).
+     */
+    private fun driveHoldStartDiagnostic(
+        tag: String,
+        desc: String,
+        delta: Pair<Int, Int>,
+        what: String,
+        fired: java.util.concurrent.atomic.AtomicBoolean,
+    ): Boolean {
+        val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        fun note(text: String) {
+            android.util.Log.i("CallGestureProof", text)
+            File(dir, "call-gesture-injection.txt").appendText(text + "\n")
+        }
+        // The whole diagnostic is exception-safe: a failure anywhere in it (target
+        // lookup, idle waits, sleeps, logging) must never mask the original swipe
+        // verdict, so the body is wrapped and any throw is recorded, not rethrown.
+        try {
+        val obj = dev.wait(Until.findObject(By.desc(desc)), 4000)
+        if (obj == null) {
+            note("$tag: $what shape-holdstart=target-missing (diagnostic only, never asserted)")
+            return false
+        }
+        val b = obj.visibleBounds
+        val x = b.centerX().toFloat()
+        val y = b.centerY().toFloat()
+        dev.waitForIdle(2000)
+        // DOWN, hold 400ms like a real finger settling on the puck, then 6 slow
+        // first MOVEs over the first quarter of the drag, then a steady remainder.
+        val (trainError, trainFailedInjects) = injectHoldStartTrain(x, y, delta)
+        val error: String? = trainError
+        val failedInjects = trainFailedInjects
+        dev.waitForIdle(2000)
+        Thread.sleep(900)
+        val result = fired.get()
+        val classification = when {
+            error != null -> "error($error)"
+            failedInjects > 0 -> "injection-failed($failedInjects events)"
+            else -> result.toString()
+        }
+        note(
+            "$tag: $what shape-holdstart=$classification " +
+                "(diagnostic only, post-swipe on the same fixture state - not a fresh scenario; " +
+                "hold 400ms, 6x80ms slow start, 50x20ms; never asserted)",
+        )
+        return result && error == null && failedInjects == 0
+        } catch (e: Exception) {
+            try {
+                note("$tag: $what shape-holdstart=error(" + e.javaClass.simpleName + ": " + (e.message ?: "") + ") (diagnostic only, never asserted)")
+            } catch (_: Exception) {
+            }
+            return false
+        }
     }
 
     /**
@@ -152,19 +539,40 @@ class CallContactPickerProofTest {
             assertTrue("$tag: control '$controlDesc' missing", dev.wait(Until.hasObject(By.desc(controlDesc)), 8000))
             shot("bundle-incoming-$tag")
 
-            swipeFrom(controlDesc, acceptDelta.first, acceptDelta.second)
-            dev.waitForIdle(3000)
-            Thread.sleep(1200)
-            assertTrue("$tag: reference answer motion did not fire onAccept", accepted.get())
-            assertFalse("$tag: answer motion must not fire onDecline", declined.get())
-
+            // Both callback flags are latched immediately after each original swipe;
+            // assertions below read only these snapshots, never the shared atomics
+            // after the diagnostics have run.
+            driveGesture(tag, controlDesc, acceptDelta, "answer motion", scenario)
+            val swipeAnswer = accepted.get()
+            val swipeAnswerOpposite = declined.get()
+            var swipeDecline: Boolean? = null
+            var swipeDeclineOpposite: Boolean? = null
             if (declineDelta != null) {
                 accepted.set(false); declined.set(false)
-                swipeFrom(declineDesc ?: controlDesc, declineDelta.first, declineDelta.second)
-                dev.waitForIdle(3000)
-                Thread.sleep(1200)
-                assertTrue("$tag: reference decline motion did not fire onDecline", declined.get())
-                assertFalse("$tag: decline motion must not fire onAccept", accepted.get())
+                driveGesture(tag, declineDesc ?: controlDesc, declineDelta, "decline motion", scenario)
+                swipeDecline = declined.get()
+                swipeDeclineOpposite = accepted.get()
+            }
+            // The latched swipe outcomes are logged BEFORE any diagnostic runs.
+            val dirShapes = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+            val shapeNote = "$tag: shape-swipe answer=$swipeAnswer opposite=$swipeAnswerOpposite" +
+                if (declineDelta != null) " decline=$swipeDecline opposite=$swipeDeclineOpposite" else ""
+            android.util.Log.i("CallGestureProof", shapeNote)
+            File(dirShapes, "call-gesture-injection.txt").appendText(shapeNote + "\n")
+            // Diagnostics run after BOTH original swipes of the case so a committing
+            // hold-start drive cannot change the state the decline swipe starts from.
+            // Diagnostic only - recorded, never asserted (no retry-to-pass).
+            accepted.set(false); declined.set(false)
+            driveHoldStartDiagnostic(tag, controlDesc, acceptDelta, "answer motion", accepted)
+            if (declineDelta != null) {
+                accepted.set(false); declined.set(false)
+                driveHoldStartDiagnostic(tag, declineDesc ?: controlDesc, declineDelta, "decline motion", declined)
+            }
+            assertTrue("$tag: reference answer motion did not fire onAccept", swipeAnswer)
+            assertFalse("$tag: answer motion must not fire onDecline", swipeAnswerOpposite)
+            if (declineDelta != null) {
+                assertTrue("$tag: reference decline motion did not fire onDecline", swipeDecline == true)
+                assertFalse("$tag: decline motion must not fire onAccept", swipeDeclineOpposite == true)
             }
 
             // Negative control: a small wiggle snaps back and triggers nothing.
@@ -187,9 +595,134 @@ class CallContactPickerProofTest {
                 assertFalse("$tag: true tap must not decline", declined.get())
                 shot("bundle-nextcloud-tap-after-wiggles")
             }
+        } catch (failure: Throwable) {
+            // Preserve the failing window, not just the screenshot before injection.
+            // Diagnostic only: no retries, relaxed thresholds or removed callback assertions.
+            try { shot("bundle-incoming-$tag-failure") } catch (_: Throwable) {}
+            try {
+                val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+                dev.dumpWindowHierarchy(File(dir, "bundle-incoming-$tag-failure.xml"))
+            } catch (_: Throwable) {}
+            throw failure
         } finally {
             scenario.close()
         }
+    }
+
+    /**
+     * Controlled hold-start case (publisher request after run 41953943371): the
+     * post-swipe hold-start diagnostic passed on the same fixture ~13s after two
+     * failed swipes, which is uncontrolled evidence - not a fresh scenario, not
+     * a first drive. This case drives the SAME hold-start train (identical
+     * timings via injectHoldStartTrain) as the FIRST gesture on a FRESH
+     * scenario, behind the same focus and quiet-input gates as the swipe cases,
+     * and ASSERTS the outcome independently. The original UiDevice.swipe case
+     * (vertical-reset-regression / azure_ring_vertical) stays asserted and
+     * unchanged: no silent replacement, no rescue retry, no assertion
+     * weakening. The comparison between the two shapes on fresh state is the
+     * controlled experiment for the first-drive vertical-puck miss: run
+     * 41953943371's answer miss is unexplained by recorded churn (first
+     * InputReader reconfig landed 0.72s AFTER the drive ended) and is not an
+     * immediate-launch race (drive started ~3.25s after the fixture settled);
+     * the decline miss only coincided with Stylus reconfig (47.834-48.017) -
+     * coincident evidence, not proof of OS cancellation.
+     */
+    private fun runHoldStartControlledCase(
+        tag: String,
+        bundle: CallBundleId,
+        controlDesc: String,
+        acceptDelta: Pair<Int, Int>,
+        declineDelta: Pair<Int, Int>,
+    ) {
+        val accepted = java.util.concurrent.atomic.AtomicBoolean(false)
+        val declined = java.util.concurrent.atomic.AtomicBoolean(false)
+        val scenario = ActivityScenario.launch(MediaFixtureActivity::class.java)
+        try {
+            scenario.onActivity { activity ->
+                activity.setContent {
+                    ChatyTheme(ThemePresets.whatsappIosLight) {
+                        BundleIncomingCallView(
+                            bundleId = bundle,
+                            session = incomingSession("Gesture Caller"),
+                            onAccept = { accepted.set(true) },
+                            onDecline = { declined.set(true) },
+                        )
+                    }
+                }
+            }
+            assertTrue("$tag: control '$controlDesc' missing", dev.wait(Until.hasObject(By.desc(controlDesc)), 8000))
+            // Both callback flags are latched immediately after each controlled
+            // drive; assertions read only these snapshots.
+            val holdAnswer = driveHoldStartControlled(tag, controlDesc, acceptDelta, "answer motion", accepted, scenario)
+            val holdAnswerOpposite = declined.get()
+            accepted.set(false); declined.set(false)
+            val holdDecline = driveHoldStartControlled(tag, controlDesc, declineDelta, "decline motion", declined, scenario)
+            val holdDeclineOpposite = accepted.get()
+            assertTrue("$tag: controlled hold-start answer motion did not fire onAccept", holdAnswer)
+            assertFalse("$tag: controlled hold-start answer motion must not fire onDecline", holdAnswerOpposite)
+            assertTrue("$tag: controlled hold-start decline motion did not fire onDecline", holdDecline)
+            assertFalse("$tag: controlled hold-start decline motion must not fire onAccept", holdDeclineOpposite)
+        } catch (failure: Throwable) {
+            // Preserve the failing window, not just the screenshot before injection.
+            try { shot("bundle-incoming-$tag-failure") } catch (_: Throwable) {}
+            try {
+                val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+                dev.dumpWindowHierarchy(File(dir, "bundle-incoming-$tag-failure.xml"))
+            } catch (_: Throwable) {}
+            throw failure
+        } finally {
+            scenario.close()
+        }
+    }
+
+    /**
+     * One asserted hold-start drive on fresh fixture state: same gates
+     * (window focus, quiet input) and same evidence (settle witness, in-window
+     * device-change window) as driveGesture, but the injection is the shared
+     * hold-start train. Train errors and rejected events fail the case
+     * explicitly; the callback verdict is returned for the caller to latch and
+     * assert. No retries.
+     */
+    private fun driveHoldStartControlled(
+        tag: String,
+        desc: String,
+        delta: Pair<Int, Int>,
+        what: String,
+        fired: java.util.concurrent.atomic.AtomicBoolean,
+        scenario: ActivityScenario<*>? = null,
+    ): Boolean {
+        val dir = File(ins.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+        awaitWindowFocus(tag, what, scenario)
+        awaitQuietInput(tag, what)
+        val obj = dev.wait(Until.findObject(By.desc(desc)), 4000)
+            ?: throw AssertionError("$tag: $what controlled hold-start target '$desc' missing")
+        val b = obj.visibleBounds
+        val startMarker = "CallGestureProof-drive-start-$tag-${System.nanoTime()}"
+        android.util.Log.i("CallGestureProof", startMarker)
+        val settleWitness = startSettleWitness(desc)
+        val endMarker = "CallGestureProof-drive-end-$tag-${System.nanoTime()}"
+        val (error, failedInjects) = try {
+            injectHoldStartTrain(b.centerX().toFloat(), b.centerY().toFloat(), delta)
+        } finally {
+            android.util.Log.i("CallGestureProof", endMarker)
+            stopSettleWitness(settleWitness)
+        }
+        dev.waitForIdle(3000)
+        Thread.sleep(1200)
+        val inWindowChange = inWindowDeviceChange(startMarker, endMarker)
+        val result = fired.get()
+        val classification = when {
+            error != null -> "error($error)"
+            failedInjects > 0 -> "injection-failed($failedInjects events)"
+            else -> result.toString()
+        }
+        val note = "$tag: $what controlled hold-start drive complete; in-window-device-change=$inWindowChange" +
+            "; settle-witness-max-offset-px=${settleWitness.maxOffset.get()}; shape-holdstart-controlled=$classification"
+        android.util.Log.i("CallGestureProof", note)
+        File(dir, "call-gesture-injection.txt").appendText(note + "\n")
+        if (error != null) throw AssertionError("$tag: $what controlled hold-start train errored: $error")
+        if (failedInjects > 0) throw AssertionError("$tag: $what controlled hold-start train had $failedInjects rejected event(s)")
+        return result
     }
 
     /** Real Samsung tap targets expose accessibility descriptions and callbacks. */
@@ -234,6 +767,15 @@ class CallContactPickerProofTest {
             dev.findObject(By.text("Decline")).click(); ins.waitForIdleSync(); assertEquals(1, declined.get())
             shot("shared-incoming-banner-reference")
         }
+    }
+
+    @Test
+    fun verticalHoldStartControlledFiresRealCallbacks() {
+        runHoldStartControlledCase(
+            "vertical-holdstart-controlled", CallBundleId.AZURE_RING_VERTICAL,
+            controlDesc = "Azure ring answer or decline puck",
+            acceptDelta = 0 to 430, declineDelta = 0 to -430,
+        )
     }
 
     @Test
@@ -370,9 +912,10 @@ class CallContactPickerProofTest {
                 assertEquals("Isolated fixture remains resumed", androidx.lifecycle.Lifecycle.State.RESUMED, scenario.state)
                 shot("bundle-applied-mono-chevron")
                 assertTrue("Mounted Mono view remains after capture", dev.wait(Until.hasObject(By.desc("Mono chevron answer or decline puck")), 8000))
-                swipeFrom("Mono chevron answer or decline puck", 0, 430)
-                dev.waitForIdle(3000)
-                Thread.sleep(1200)
+                // Same gated + witnessed drive path as the other gesture cases: this
+                // drive is the first injection of the whole class run and failed
+                // ungated in run 41901570247 with no readiness evidence recorded.
+                driveGesture("applied-bundle-routed", "Mono chevron answer or decline puck", 0 to 430, "answer motion", scenario)
                 assertTrue("routed view's answer gesture must fire onAccept", accepted.get())
             } finally {
                 scenario.close()
@@ -381,6 +924,40 @@ class CallContactPickerProofTest {
             store.setCallExperienceBundle(original)
             Thread.sleep(500)
         }
+    }
+
+    /**
+     * First-launch modals ("Enable App Lock?" over "Chaty changelog" over the demo
+     * home) are dismissed via their real UI only. Two rounds: either modal can be
+     * on top of the other, and a later one can appear after the earlier is closed.
+     */
+    private fun dismissFirstLaunchModals() {
+        repeat(2) {
+            if (dev.wait(Until.hasObject(By.text("Enable App Lock?")), 3000)) {
+                val notNow = dev.wait(Until.findObject(By.text("Not now")), 3000)
+                    ?: dev.wait(Until.findObject(By.text("Not Now")), 3000)
+                assertNotNull("App Lock dismiss action missing", notNow)
+                notNow.click()
+            }
+            if (dev.wait(Until.hasObject(By.text("Chaty changelog")), 3000)) {
+                val close = dev.wait(Until.findObject(By.text("Close")), 5000)
+                assertNotNull("changelog Close action missing", close)
+                close.click()
+                assertTrue("changelog did not close", dev.wait(Until.gone(By.text("Chaty changelog")), 5000))
+            }
+        }
+    }
+
+    /**
+     * The committed SettingsRootScreen exposes each row title as plain text, but a
+     * merged-summary row would expose it in the tile's contentDescription instead.
+     * Accept either exposure; the row must still exist and be opened via its real UI.
+     */
+    private fun findSettingsRow(label: String, timeoutMs: Long): androidx.test.uiautomator.UiObject2? {
+        dev.wait(Until.findObject(By.text(label)), timeoutMs)?.let { return it }
+        dev.wait(Until.findObject(By.desc(label)), 1000)?.let { return it }
+        dev.wait(Until.findObject(By.descContains(label)), 1000)?.let { return it }
+        return dev.wait(Until.findObject(By.textContains(label)), 1000)
     }
 
     /**
@@ -409,23 +986,17 @@ class CallContactPickerProofTest {
                 dev.findObject(By.text("Log In")).click()
                 assertTrue("demo card never appeared", dev.wait(Until.hasObject(By.textContains("Try the demo")), 10000))
                 dev.findObject(By.textContains("Try the demo")).click()
-                if (dev.wait(Until.hasObject(By.text("Enable App Lock?")), 5000)) {
-                    dev.findObject(By.text("Not now")).click()
-                }
-                if (dev.wait(Until.hasObject(By.text("Not Now")), 4000)) {
-                    dev.findObject(By.text("Not Now")).click()
-                }
-                // Release notes can cover a successfully loaded demo home.
-                // Dismiss only the identified existing modal via its real UI.
-                if (dev.wait(Until.hasObject(By.text("Chaty changelog")), 5000)) {
-                    val close = dev.wait(Until.findObject(By.text("Close")), 5000)
-                    assertNotNull("changelog Close action missing", close)
-                    close.click()
-                    assertTrue("changelog did not close", dev.wait(Until.gone(By.text("Chaty changelog")), 5000))
-                }
-                assertTrue("demo home never appeared", dev.wait(Until.hasObject(By.textContains("Aisha (sample)")), 15000))
+                dismissFirstLaunchModals()
             }
             assertTrue("only the offline demo may be used", api.isDemoSession)
+            // The modals are raised by app launch, not by demo sign-in: a version bump
+            // re-raises the changelog on the already-demo path too, stacked under the
+            // App Lock prompt over the home (run 41901570247 pixel + failure XML).
+            dismissFirstLaunchModals()
+            // ConversationRow exposes a summary, not child text. Check the exact sample
+            // identity in both fresh and already-demo paths, never just the Chats tab.
+            assertTrue("offline sample identity must remain visible",
+                dev.wait(Until.hasObject(By.descStartsWith("Aisha (sample),")), 15000))
             assertTrue("app shell visible", dev.wait(Until.hasObject(By.text("Chats")), 20000))
             val liveStore = com.example.chat.ServiceLocator.callPresentationPrefs
             store = liveStore
@@ -443,12 +1014,17 @@ class CallContactPickerProofTest {
             dev.waitForIdle(3000)
 
             // Root settings calls the row Call Settings. Calls is the bottom-nav destination.
-            var callsRow = dev.wait(Until.findObject(By.text("Call Settings")), 3000)
-            repeat(8) {
+            var callsRow = findSettingsRow("Call Settings", 3000)
+            repeat(12) {
                 if (callsRow == null) {
-                    dev.swipe(dev.displayWidth / 2, dev.displayHeight * 3 / 4,
-                        dev.displayWidth / 2, dev.displayHeight / 3, 40)
-                    callsRow = dev.wait(Until.findObject(By.text("Call Settings")), 1500)
+                    // Short drag: the old 3/4 -> 1/3 swipe flung the list, and a fling
+                    // can carry the viewport past a row without it ever resting on
+                    // screen (the red run's hierarchy dump shows the list already at
+                    // its bottom). Short drifts keep resting viewports overlapping.
+                    dev.swipe(dev.displayWidth / 2, dev.displayHeight * 2 / 3,
+                        dev.displayWidth / 2, dev.displayHeight / 2, 30)
+                    dev.waitForIdle(1500)
+                    callsRow = findSettingsRow("Call Settings", 1500)
                 }
             }
             shot("bundle-live-demo-call-settings-route")
@@ -473,6 +1049,17 @@ class CallContactPickerProofTest {
             row!!.click()
             dev.waitForIdle(3000)
             shot("bundle-picker-applied-mono-chevron")
+
+            // Apply now opens a scope dialog (Calls only / Messages only / Both). This
+            // proof exercises the call-experience path, so it picks Calls only. If the
+            // dialog is absent the apply was direct; the persistence loop below is the
+            // assertion either way.
+            if (dev.wait(Until.hasObject(By.textContains("Choose which layouts to change")), 5000)) {
+                val callsOnly = dev.wait(Until.findObject(By.text("Calls only")), 5000)
+                assertNotNull("scope dialog missing its Calls only option", callsOnly)
+                callsOnly!!.click()
+                dev.waitForIdle(2000)
+            }
 
             deadline = System.currentTimeMillis() + 8000
             while (liveStore.value.callExperienceBundleId != "mono_chevron_dark") {

@@ -17,19 +17,57 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-/** Exact port of bakeEffectIntoFile in camera_capture_screen.dart.
+/** Full-resolution color transform. Original stays read-only; memory pressure refuses
+ * the transform rather than silently reducing resolution. No denoise/detail recovery claim.
  *
- *  Pipeline: decode with target width 1440 -> draw onto same-size canvas with
- *  ColorFilter.matrix(lerped) -> stage PNG -> re-encode JPEG quality 90 ->
- *  delete staged PNG (best effort) -> return JPEG path (PNG path on failure).
- *
- *  Native deviations (documented):
- *  - Flutter instantiateImageCodec(targetWidth: 1440) decodes to the nearest
- *    supported sample size; Android BitmapFactory uses inSampleSize then an
- *    exact aspect-preserving scale to width 1440. Output pixels equivalent.
- *  - flutter_image_compress.compressAndGetFile(quality 90) maps to
- *    Bitmap.compress(JPEG, 90). */
+ * shaderKey effects render here on the capture path: "pixelate" (original
+ * nearest-neighbor resample, every API) and "segment_*" (MediaPipe selfie
+ * segmenter mask composites via SegmentationBridge). Segmentation fails open:
+ * a missing mask returns applied=false and the unfiltered image, so callers
+ * can drop the effect tag instead of claiming a filter that never rendered. */
 object ImageFxBaker {
+
+    /** Bake result: the output path plus whether the effect truly rendered. */
+    data class BakedEffect(val path: String, val applied: Boolean)
+
+    /** Pre-bake decision for one photo capture. Pure and JVM-testable; the
+     *  capture screen and its tests share this exact contract:
+     *   - story + colorMatrix: bake (stories carry no metadata channel), tag kept;
+     *   - chat + colorMatrix: NO bake - the look travels as message metadata and
+     *     receivers render it (matrix contract unchanged, nothing double-applies);
+     *   - shader effects (pixelate, segment_*): bake in EVERY photo mode because
+     *     no receiver-side renderer exists, and the tag clears to none so the
+     *     sent message never re-applies what is already in the pixels;
+     *   - any failed bake (applied=false): tag clears to none - fail-open never
+     *     claims an unrendered filter. */
+    data class CaptureEffectPlan(
+        val bake: Boolean,
+        /** Metadata tag after a successful bake: shader pixels carry the look,
+         *  so the tag clears to none (never a double-apply downstream). */
+        val tagOnSuccess: String,
+        val intensityOnSuccess: Double,
+    )
+
+    fun resolveCaptureEffectPlan(
+        storyMode: Boolean,
+        effectId: String,
+        hasRenderPath: Boolean,
+        isShaderEffect: Boolean,
+        intensity: Double,
+    ): CaptureEffectPlan {
+        val bake = effectId != "none" && hasRenderPath && (storyMode || isShaderEffect)
+        return CaptureEffectPlan(
+            bake = bake,
+            tagOnSuccess = if (isShaderEffect) "none" else effectId,
+            intensityOnSuccess = if (isShaderEffect) 1.0 else intensity,
+        )
+    }
+
+    /** Tag after the bake outcome: fail-open never claims an unrendered filter. */
+    fun tagAfterBake(plan: CaptureEffectPlan, applied: Boolean, currentId: String, currentIntensity: Double): Pair<String, Double> =
+        if (!plan.bake) currentId to currentIntensity
+        else if (!applied) "none" to 1.0
+        else plan.tagOnSuccess to plan.intensityOnSuccess
 
     /** Matrix lerp shared with the engine (identity -> target by intensity). */
     fun lerpedMatrix(effect: ChatyCameraEffect, intensity: Double): FloatArray {
@@ -43,75 +81,55 @@ object ImageFxBaker {
         path: String,
         effect: ChatyCameraEffect,
         intensity: Double,
-    ): String = withContext(Dispatchers.IO) {
+        onCreated: (File) -> Unit = {},
+    ): BakedEffect = withContext(Dispatchers.IO) {
         val matrix = lerpedMatrix(effect, intensity)
 
-        // Decode downsampled toward 1440px width, then exact-scale.
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(path, bounds)
-        var sample = 1
-        while (bounds.outWidth / (sample * 2) >= 1440) sample *= 2
-        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        val decoded = BitmapFactory.decodeFile(path, opts)
-            ?: throw IllegalStateException("decode failed: $path")
-        val targetW = 1440
-        val image = if (decoded.width > targetW) {
-            val h = (decoded.height.toLong() * targetW / decoded.width).toInt()
-            Bitmap.createScaledBitmap(decoded, targetW, h, true).also {
-                if (it !== decoded) decoded.recycle()
-            }
-        } else decoded
-
-        val rendered = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(rendered)
-        if (effect.shaderKey != null && effect.shaderKey.startsWith("segment_")) {
-            // Segmented background effects: person-confidence mask from the
-            // MediaPipe selfie segmenter, then blur or replace the background.
-            // Fails open: no mask -> the photo saves unfiltered, never corrupt.
-            val mask = SegmentationBridge(context).let { bridge ->
-                try {
+        val image = InlineDocumentProcessor.loadUpright(path, preview = false)
+        var rendered: Bitmap? = null
+        var output: File? = null
+        var applied = true
+        try {
+            val result = Bitmap.createBitmap(image.width,image.height,Bitmap.Config.ARGB_8888)
+            rendered=result
+            val canvas = Canvas(result)
+            if (effect.shaderKey != null && effect.shaderKey.startsWith("segment_")) {
+                // Person mask from the MediaPipe selfie segmenter; fail open.
+                val bridge = SegmentationBridge(context)
+                val mask = try {
                     bridge.personMask(image)
                 } finally {
                     bridge.dispose()
                 }
-            }
-            if (mask == null) {
-                canvas.drawBitmap(image, 0f, 0f, Paint())
+                if (mask == null) {
+                    applied = false
+                    canvas.drawBitmap(image,0f,0f,Paint())
+                } else {
+                    drawSegmentedBackground(canvas, image, mask, effect.shaderKey, intensity)
+                    mask.recycle()
+                }
+            } else if (effect.shaderKey == "pixelate") {
+                // Original pixelate bake: downscale to the block grid, upscale
+                // with nearest-neighbor (filterBitmap = false). Every API level.
+                val blocks = pixelateBlocks(intensity).toInt().coerceIn(2, 512)
+                val longSide = maxOf(image.width, image.height)
+                val scale = blocks.toFloat() / longSide.toFloat()
+                val smallW = maxOf(1, (image.width * scale).toInt())
+                val smallH = maxOf(1, (image.height * scale).toInt())
+                val small = Bitmap.createScaledBitmap(image, smallW, smallH, false)
+                val pixelPaint = Paint().apply { isFilterBitmap = false }
+                canvas.drawBitmap(small, null, Rect(0, 0, image.width, image.height), pixelPaint)
+                small.recycle()
             } else {
-                drawSegmentedBackground(canvas, image, mask, effect.shaderKey, intensity)
+                canvas.drawBitmap(image,0f,0f,Paint().apply { colorFilter=ColorMatrixColorFilter(ColorMatrix(matrix)) })
             }
-        } else if (effect.shaderKey == "pixelate") {
-            // Original pixelate bake: downscale to the block grid, upscale with
-            // nearest-neighbor (filterBitmap = false). Works on every API level.
-            val blocks = pixelateBlocks(intensity).toInt().coerceIn(2, 512)
-            val longSide = maxOf(image.width, image.height)
-            val scale = blocks.toFloat() / longSide.toFloat()
-            val smallW = maxOf(1, (image.width * scale).toInt())
-            val smallH = maxOf(1, (image.height * scale).toInt())
-            val small = Bitmap.createScaledBitmap(image, smallW, smallH, false)
-            val pixelPaint = Paint().apply { isFilterBitmap = false }
-            canvas.drawBitmap(small, null, Rect(0, 0, image.width, image.height), pixelPaint)
-            small.recycle()
-        } else {
-            val paint = Paint().apply {
-                colorFilter = ColorMatrixColorFilter(ColorMatrix(matrix))
-            }
-            canvas.drawBitmap(image, 0f, 0f, paint)
-        }
-        image.recycle()
-
-        val temp = context.cacheDir
-        val staged = File(temp, "chaty_fx_${System.currentTimeMillis()}.png")
-        FileOutputStream(staged).use { rendered.compress(Bitmap.CompressFormat.PNG, 100, it) }
-
-        val out = File(temp, "chaty_fx_${System.currentTimeMillis()}.jpg")
-        val ok = try {
-            FileOutputStream(out).use { rendered.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-            true
-        } catch (_: Exception) { false }
-        rendered.recycle()
-        try { staged.delete() } catch (_: Exception) { /* best effort, mirrors Dart catchError */ }
-        if (ok) out.absolutePath else staged.absolutePath
+            val file = File.createTempFile("chaty_fx_", ".jpg", context.cacheDir)
+            output=file
+            file.outputStream().use { check(result.compress(Bitmap.CompressFormat.JPEG,98,it)) }
+            onCreated(file)
+            BakedEffect(file.absolutePath, applied)
+        } catch(t:Throwable) { output?.delete();throw t }
+        finally { rendered?.recycle();image.recycle() }
     }
 
     /** Person-sharp / background-treated composite driven by the confidence mask. */

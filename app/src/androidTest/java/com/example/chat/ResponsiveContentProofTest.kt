@@ -81,9 +81,23 @@ class ResponsiveContentProofTest {
             assertTrue("PIN field fits window", bounds.left >= 0 && bounds.right <= device.displayWidth)
             assertTrue("PIN hit height >=48dp", bounds.height() >= 48 * inst.targetContext.resources.displayMetrics.density)
             capture("30-pin-narrow-large-font")
+            field.click()
+            assertTrue("PIN input focused", device.wait(Until.hasObject(By.clazz("android.widget.EditText").focused(true)), 3000))
             field.setText("12") // Synthetic incomplete input must never save.
-            device.pressBack() // Hide IME; does not change credentials.
-            val continueButton = device.findObject(By.text("Continue")) ?: throw AssertionError("Continue missing")
+            var imeVisible = false
+            scenario.onActivity { activity ->
+                val insets = androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)
+                imeVisible = insets?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+            }
+            if (imeVisible) device.pressBack() // Only dismiss an IME known to be visible.
+            device.waitForIdle()
+            if (!device.wait(Until.hasObject(By.text("Continue")), 3000)) {
+                val dir = File(inst.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+                capture("30a-pin-continue-missing")
+                device.dumpWindowHierarchy(File(dir, "pin-continue-missing.xml"))
+            }
+            val continueButton = device.wait(Until.findObject(By.text("Continue")), 3000)
+                ?: throw AssertionError("Continue missing after focused PIN input; IMEwasVisible=$imeVisible")
             continueButton.click()
             assertTrue(device.wait(Until.hasObject(By.text("Enter all 6 digits.")), 3000))
             assertEquals("No credential writes from incomplete input", 0, writes.get())

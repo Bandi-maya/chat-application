@@ -171,6 +171,41 @@ class ApiChatClient(
         }
     }
 
+    /** Account-bound send: base URL, tenant and token come ONLY from [expected], used for the primary POST and the
+     *  404 retry. [isCurrent] (pure check) runs before each request and before the confirmed message is returned.
+     *  Stale scope throws [ApiScopeChangedException] (the caller must not fall back to another channel or publish).
+     *  Other failures keep the existing contract: null = not confirmed. */
+    fun sendMessage(expected: ApiAccountScope, isCurrent: () -> Boolean, roomId: String, content: String): ChatMessage? {
+        val authToken = expected.token?.takeIf { it.isNotBlank() && !expected.userId.isNullOrBlank() } ?: return null
+        val base = expected.baseUrl.trimEnd('/')
+        val headers = mapOf("Authorization" to "Bearer $authToken", "x-tenant-id" to expected.tenantId, "Content-Type" to "application/json")
+        val payload = JSONObject().put("content", content).toString()
+        var response: Pair<Int, String>
+        try {
+            if (!isCurrent()) throw ApiScopeChangedException()
+            response = transport.execute("POST", "$base/chat/rooms/$roomId/messages", headers, payload)
+            if (!isCurrent()) throw ApiScopeChangedException()          // no 404 retry under a stale scope
+            if (response.first == 404) {
+                response = transport.execute("POST", "$base/api/v1/chat/rooms/$roomId/messages", headers, payload)
+            }
+        } catch (e: ApiScopeChangedException) {
+            throw e
+        } catch (_: Exception) {
+            if (!isCurrent()) throw ApiScopeChangedException()          // a failure after a switch is a switch, not "retry via WS"
+            return null
+        }
+        if (!isCurrent()) throw ApiScopeChangedException()
+        return try {
+            if (response.first != 200) return null
+            val body = JSONObject(response.second)
+            val raw = if (body.has("data") && !body.isNull("data")) body.get("data") else body
+            if (raw !is JSONObject) return null
+            ChatMessage.fromApi(deepMap(raw))
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** editMessage: PUT /chat/rooms/<id>/messages/<msgId> {content} (+ fallback). */
     fun editMessage(roomId: String, messageId: String, newText: String) {
         if (token() == null) return

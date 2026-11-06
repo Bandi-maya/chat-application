@@ -32,6 +32,7 @@ import kotlin.math.sin
 @Composable
 fun CameraGlyph(kind: String, color: Color, size: Dp = 24.dp) {
     val iconId = when (kind) {
+        "settings" -> ChatyIconId.settings
         "gallery" -> ChatyIconId.gallery
         "flip" -> ChatyIconId.cameraFlip
         "flash" -> ChatyIconId.cameraFlashOn
@@ -58,13 +59,29 @@ fun CameraGlyph(kind: String, color: Color, size: Dp = 24.dp) {
                         lineTo(24f, 13f); lineTo(17f, 13f); close()
                     }, color)
                 }
-                "filters" -> {
-                    drawCircle(color, 3f, Offset(11f, 21f))
-                    drawCircle(color, 2.3f, Offset(22f, 12f))
+                "flash_auto" -> {
                     drawPath(Path().apply {
-                        moveTo(16f, 2f); lineTo(18f, 8f); lineTo(24f, 10f); lineTo(18f, 12f)
-                        lineTo(16f, 18f); lineTo(14f, 12f); lineTo(8f, 10f); lineTo(14f, 8f); close()
-                    }, color, style = line)
+                        moveTo(18f, 3f); lineTo(8f, 17f); lineTo(15f, 17f); lineTo(13f, 29f)
+                        lineTo(24f, 13f); lineTo(17f, 13f); close()
+                    }, color)
+                    // Small "A" badge marks the auto state (GB flash indicator).
+                    drawLine(color, Offset(21f, 29f), Offset(23.5f, 22f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+                    drawLine(color, Offset(23.5f, 22f), Offset(26f, 29f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+                    drawLine(color, Offset(21.9f, 26.6f), Offset(25.1f, 26.6f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+                }
+                "filters" -> {
+                    // Original geometry: familiar three-circle color-filter affordance.
+                    drawCircle(color,7f,Offset(12f,12f),style=line)
+                    drawCircle(color,7f,Offset(21f,12f),style=line)
+                    drawCircle(color,7f,Offset(16.5f,21f),style=line)
+                }
+                "browse_grid" -> {
+                    // 2x2 rounded tiles: the lens-browser affordance. Original
+                    // geometry, no Material icon dependency.
+                    drawRoundRect(color, Offset(5f, 5f), Size(9f, 9f), CornerRadius(2.5f, 2.5f), style = line)
+                    drawRoundRect(color, Offset(18f, 5f), Size(9f, 9f), CornerRadius(2.5f, 2.5f), style = line)
+                    drawRoundRect(color, Offset(5f, 18f), Size(9f, 9f), CornerRadius(2.5f, 2.5f), style = line)
+                    drawRoundRect(color, Offset(18f, 18f), Size(9f, 9f), CornerRadius(2.5f, 2.5f), style = line)
                 }
                 "camera" -> {
                     drawRoundRect(color, Offset(3f, 9f), Size(26f, 19f), CornerRadius(4f, 4f), style = line)

@@ -45,10 +45,9 @@ class ChatyApplication : Application() {
         // thread into the controller's own scope before AppRoot reads it.
         ServiceLocator.appScope.launch {
             ServiceLocator.themeController.init()
-            // main.dart: TemplateController.init(runtime), then reapply template-owned
-            // layout tokens so a slower theme read cannot overwrite them.
-            ServiceLocator.templateController.init(ServiceLocator.templateRuntime)
-            ServiceLocator.templateController.synchronizeThemeAndNavigation(ServiceLocator.templateRuntime)
+            // Restore template configuration without replacing the user's saved Home layout.
+            // Theme init is already awaited; only an explicit template Apply changes presentation.
+            ServiceLocator.templateController.init(ServiceLocator.templateRuntime, restorePresentation = false)
         }
         ProcessLifecycleOwner.get().lifecycle.addObserver(foregroundObserver)
     }

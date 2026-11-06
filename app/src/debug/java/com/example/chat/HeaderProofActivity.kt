@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import com.example.chat.ui.theme.ChatyTheme
 class HeaderProofActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyCalls = 0 // the sheet's only commit path is onApply, so 0 means nothing was ever committed
         val dark = intent.getBooleanExtra(EXTRA_DARK, false)
         val screen = intent.getStringExtra(EXTRA_SCREEN) ?: SCREEN_SHEET
         val theme = ThemePresets.getSystemDefaultTheme(platformIsLight = !dark)
@@ -46,6 +48,9 @@ class HeaderProofActivity : ComponentActivity() {
                         val w = intent.getIntExtra(EXTRA_WIDTH_DP, 320)
                         val base = androidx.compose.ui.platform.LocalDensity.current
                         var sel by remember { mutableStateOf(0) }
+                        val stripScroll = androidx.compose.foundation.rememberScrollState()
+                        var lastTarget by remember { mutableStateOf("none") }
+                        var scrollLog by remember { mutableStateOf("none") }
                         androidx.compose.runtime.CompositionLocalProvider(
                             androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(base.density, fs),
                         ) {
@@ -53,11 +58,19 @@ class HeaderProofActivity : ComponentActivity() {
                                 com.example.chat.ui.navigation.HomeHeaderTabsBar(
                                     com.example.chat.ui.core.theme.ChatyColors(theme),
                                     listOf("chats", "updates", "calls", "tasks", "settings"), sel, 48f, { sel = it },
+                                    scroll = stripScroll, onScrollTarget = { t, m -> lastTarget = "$t/$m" },
+                                    onScrollLog = { scrollLog = (scrollLog + ";" + it).takeLast(300) },
                                 )
                             }
                         }
-                        Text("Tab: $sel", Modifier.padding(top = 120.dp))
-                        Text("External select", Modifier.padding(top = 200.dp).clickable { sel = 4 })
+                        // Probe texts sit in their own column below the strip. Next18: they were stacked in the same centered Box
+                        // and overlapped the strip and each other, so the "Tab: N" node was missing from the UiAutomator tree
+                        // while the tab itself reported selected=true.
+                        Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 48.dp)) {
+                            Text("Tab: $sel")
+                            Text("Scroll: ${stripScroll.value}/${stripScroll.maxValue} lastTarget=$lastTarget log=$scrollLog")
+                            Text("External select", Modifier.clickable { sel = 4 }.padding(vertical = 12.dp))
+                        }
                     } else if (screen == SCREEN_SWITCH) {
                         var on by remember { mutableStateOf(false) }
                         var taps by remember { mutableStateOf(0) }
@@ -75,7 +88,7 @@ class HeaderProofActivity : ComponentActivity() {
                         var applies by remember { mutableStateOf(0) }
                         if (open) HeaderTabStyleSheet(
                             tabStyle = tab, pagerStyle = pager, onDismiss = { open = false },
-                            onApply = { t, p -> tab = t; pager = p; applies++; open = false },
+                            onApply = { t, p -> applyCalls++; tab = t; pager = p; applies++; open = false },
                         ) else Text("Saved: $tab|$pager|$applies")
                     }
                 }
@@ -84,6 +97,9 @@ class HeaderProofActivity : ComponentActivity() {
     }
 
     companion object {
+        /** Number of times the sheet invoked onApply in this activity instance (in-process seam for the no-commit proof;
+         *  the "Saved:" text only exists once the sheet is closed). */
+        @Volatile var applyCalls = 0
         const val EXTRA_DARK = "dark"
         const val EXTRA_SCREEN = "screen"
         const val SCREEN_SHEET = "sheet"

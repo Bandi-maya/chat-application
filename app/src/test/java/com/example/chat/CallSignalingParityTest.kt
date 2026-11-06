@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -148,6 +149,7 @@ class CallSignalingParityTest {
         media: FakeMediaController = FakeMediaController(),
         records: MutableList<CallRecord> = mutableListOf(),
         lowData: Boolean = false,
+        clock: () -> Long = { 0L },
     ): CallSignalingService = CallSignalingService(
         scope = scope,
         currentUserId = { userId },
@@ -158,6 +160,7 @@ class CallSignalingParityTest {
         mediaFactory = { media },
         callRecordSink = { records.add(it) },
         lowDataUsageEnabled = { lowData },
+        monotonicMillis = clock,
     )
 
     // ── initiateCall guards (Dart initiateCall) ──────────────────────────
@@ -493,6 +496,45 @@ class CallSignalingParityTest {
     }
 
     @Test
+    fun `stale notification decline cannot decline another incoming call`() = runTest {
+        val sender = FakeSignalSender()
+        val service = newService(backgroundScope, sender = sender)
+        service.handleRemoteSignal(mapOf("signal_type" to "offer", "call_id" to "current-B",
+            "caller_id" to "peer", "sdp" to "offer"))
+        val before = service.currentSession
+        service.declineCall(expectedCallId = "stale-A")
+        assertEquals(before, service.currentSession)
+        assertFalse(sender.sent.any { it.data["signal_type"] == "decline" })
+        service.declineCall(expectedCallId = "current-B")
+        assertEquals(CallSessionState.declined, service.currentSession!!.state)
+        assertEquals("current-B", sender.sent.single { it.data["signal_type"] == "decline" }.data["call_id"])
+        service.declineCall(expectedCallId = "current-B")
+        assertEquals(1, sender.sent.count { it.data["signal_type"] == "decline" })
+    }
+
+    @Test
+    fun `second offer during connected voice or video returns busy without disturbing original`() = runTest {
+        for (video in listOf(false, true)) {
+            val sender = FakeSignalSender()
+            val media = FakeMediaController()
+            val service = newService(backgroundScope, sender = sender, media = media)
+            service.initiateCall("peer", "Peer", isVideo = video)
+            media.onConnectionState?.invoke(CallTransportState.connected)
+            val original = service.currentSession!!
+            assertEquals(CallSessionState.connected, original.state)
+            service.handleRemoteSignal(mapOf("signal_type" to "offer", "call_id" to "second-$video",
+                "caller_id" to "other", "sdp" to "other-offer", "is_video" to !video))
+            assertEquals(original, service.currentSession)
+            assertFalse(media.disposed)
+            val busy = sender.sent.single { it.data["signal_type"] == "busy" }
+            assertEquals("other", busy.targetUserId)
+            assertEquals("second-$video", busy.data["call_id"])
+            assertEquals("already_in_call", busy.data["reason"])
+            assertFalse(sender.sent.any { it.data["signal_type"] == "decline" || it.data["signal_type"] == "hangup" })
+        }
+    }
+
+    @Test
     fun `remote busy marks outgoing call busy and logs once`() = runTest {
         val sender = FakeSignalSender()
         val records = mutableListOf<CallRecord>()
@@ -586,11 +628,31 @@ class CallSignalingParityTest {
     }
 
     @Test
-    fun `sendCallReaction stays unsupported like Dart`() = runTest {
-        val service = newService(backgroundScope)
-        org.junit.Assert.assertThrows(UnsupportedOperationException::class.java) {
-            service.sendCallReaction("👍")
-        }
+    fun `sendCallReaction uses bounded local workflow without unsupported peer delivery`() = runTest {
+        val sender = FakeSignalSender()
+        val media = FakeMediaController()
+        val service = newService(backgroundScope, sender = sender, media = media,
+            clock = { testScheduler.currentTime })
+        service.sendCallReaction("👍")
+        assertNull(service.callReaction) // No active session: no effect.
+        assertTrue(sender.sent.isEmpty())
+        service.initiateCall("peer", "Peer", isVideo = false)
+        media.onConnectionState?.invoke(CallTransportState.connected)
+        assertEquals(CallSessionState.connected, service.currentSession!!.state)
+        service.sendCallReaction("<script>")
+        assertNull(service.callReaction)
+        service.sendCallReaction("👍")
+        val reaction = service.callReaction!!
+        assertEquals("👍", reaction.emoji)
+        assertFalse(reaction.fromPeer)
+        assertFalse(reaction.deliveredToPeer)
+        assertTrue(reaction.id.isNotBlank())
+        service.sendCallReaction("👏")
+        assertEquals("Rate limit retains the first reaction", reaction.id, service.callReaction!!.id)
+        assertFalse(sender.sent.any { it.data["signal_type"] == "call_reaction" })
+        advanceTimeBy(4001)
+        runCurrent()
+        assertNull("Local reaction expires", service.callReaction)
     }
 
     // ── demo calls ───────────────────────────────────────────────────────

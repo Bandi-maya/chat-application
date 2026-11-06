@@ -1,10 +1,13 @@
 package com.example.chat
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.chat.data.api.ApiAuthSession
+import com.example.chat.data.api.ApiAuthSnapshot
 import com.example.chat.data.api.ApiBackendService
 import com.example.chat.data.api.ApiHttpTransport
 import com.example.chat.data.api.ApiRealtimeClient
@@ -32,8 +35,21 @@ class ChatMainThreadRegressionTest {
 
     @Test fun sendLoadAndIncomingNotifyOnUiThread() = runBlocking {
         val ctx = ApplicationProvider.getApplicationContext<Context>()
+        val sharedAuth = ctx.getSharedPreferences("chaty_api_backend", Context.MODE_PRIVATE)
+        val priorToken = sharedAuth.getString("api_hub_token", null)
+        val priorUser = sharedAuth.getString("api_hub_user", null)
+        // Keep the real service/session persistence path, but isolate its storage namespace.
+        // applicationContext must remain this wrapper: the service deliberately asks for it.
+        val fixturePrefsName = "chaty_thread_proof_" + java.util.UUID.randomUUID().toString()
+        val isolatedContext = object : ContextWrapper(ctx) {
+            override fun getApplicationContext(): Context = this
+            override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
+                super.getSharedPreferences(if(name == "chaty_api_backend") fixturePrefsName else name, mode)
+        }
+        var bodyFailure: Throwable? = null
+        try {
         val calls = mutableListOf<String>()
-        val service = ApiBackendService(ctx, ApiHttpTransport { method, _, _, body ->
+        val service = ApiBackendService(isolatedContext, ApiHttpTransport { method, _, _, body ->
             check(Looper.myLooper() != Looper.getMainLooper()) { "REST called on UI thread" }
             synchronized(calls) { calls.add(method) }
             if (method == "POST") {
@@ -48,8 +64,11 @@ class ChatMainThreadRegressionTest {
                 lastMessageText = "", lastMessageTime = Instant.now(), lastMessageSenderId = "fixture-peer"),
         )
         val session = field(service, "session") as ApiAuthSession
-        // Isolated service instance, no initialize() and hence no realtime connect.
-        session.javaClass.getDeclaredField("token").apply { isAccessible = true }.set(session, "fixture-token")
+        // Isolated service AND session storage, no initialize() and hence no realtime connect.
+        // ApiAuthSession keeps token+user+generation in one immutable state; token is a getter.
+        session.adopt(com.example.chat.data.api.ApiAuthResult(
+            "fixture-token", com.example.chat.data.api.ApiUserProfile("fixture-me", "fixture-me", "Synthetic fixture", "SF"),
+        ))
         val notified = CountDownLatch(1)
         service.addListener {
             assertEquals(Looper.getMainLooper(), Looper.myLooper())
@@ -75,5 +94,26 @@ class ChatMainThreadRegressionTest {
         }
         assertTrue("incoming refresh reaches UI observer", incomingObserved.await(5, TimeUnit.SECONDS))
         assertEquals(listOf("POST", "GET"), calls)
+        } catch (error: Throwable) {
+            bodyFailure = error
+            throw error
+        } finally {
+            // Label-only failures: never print auth values, and never mask the test body's failure.
+            val cleanupFailures = mutableListOf<Throwable>()
+            try {
+                if (!ctx.deleteSharedPreferences(fixturePrefsName)) cleanupFailures.add(AssertionError("Fixture storage cleanup failed"))
+            } catch (_: Throwable) { cleanupFailures.add(AssertionError("Fixture storage cleanup threw")) }
+            try {
+                if (priorToken != sharedAuth.getString("api_hub_token", null)) cleanupFailures.add(AssertionError("Shared auth token changed"))
+                if (priorUser != sharedAuth.getString("api_hub_user", null)) cleanupFailures.add(AssertionError("Shared auth user changed"))
+            } catch (_: Throwable) { cleanupFailures.add(AssertionError("Shared auth isolation check failed")) }
+            val original = bodyFailure
+            if (original != null) cleanupFailures.forEach { original.addSuppressed(it) }
+            else if (cleanupFailures.isNotEmpty()) {
+                val first = cleanupFailures.first()
+                cleanupFailures.drop(1).forEach { first.addSuppressed(it) }
+                throw first
+            }
+        }
     }
 }

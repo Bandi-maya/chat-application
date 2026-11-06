@@ -1,5 +1,8 @@
 package com.example.chat.ui.kit
 
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.role
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,6 +32,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -60,12 +69,15 @@ fun <T> MorphingSegmentedControl(
     val textActive = activeTextColor ?: Color(theme.onAccentColor)
     val textInactive = inactiveTextColor ?: Color(theme.secondaryTextColor)
 
+    // Minimum segment hit area is 48dp: with the 4dp vertical bar padding on each side the
+    // bar is never shorter than 56dp, and each segment fills the bar's inner height.
+    val barHeight = height.coerceAtLeast(56f)
     Row(
         Modifier
             .fillMaxWidth()
-            .height(height.dp)
-            .background(Color(theme.cardColor), RoundedCornerShape((height / 2).dp))
-            .border(1.dp, appColors.borderSubtle, RoundedCornerShape((height / 2).dp))
+            .height(barHeight.dp)
+            .background(Color(theme.cardColor), RoundedCornerShape((barHeight / 2).dp))
+            .border(1.dp, appColors.borderSubtle, RoundedCornerShape((barHeight / 2).dp))
             .padding(4.dp)
             .horizontalScroll(rememberScrollState()),
     ) {
@@ -80,8 +92,21 @@ fun <T> MorphingSegmentedControl(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .springInteractiveScale()
-                    .clip(RoundedCornerShape((height / 2).dp))
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape((barHeight / 2).dp))
                     .background(pillBg)
+                    // One node carries label, selection and the single click action (no
+                    // cross-node merging; the camera mode tabs use the same pattern).
+                    // text (not only contentDescription) so label queries and TalkBack
+                    // both read it. Role.Tab because Compose exposes Selected as
+                    // AccessibilityNodeInfo.isSelected only for tabs; Role.Button maps
+                    // it to isChecked instead.
+                    .clearAndSetSemantics {
+                        text = AnnotatedString(item.label)
+                        selected = isSelected
+                        role = Role.Tab
+                        onClick(null) { if (!isSelected) onSelected(item.value); true }
+                    }
                     .clickable { if (!isSelected) onSelected(item.value) }
                     .padding(horizontal = 14.dp, vertical = 6.dp),
             ) {

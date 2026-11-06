@@ -33,6 +33,7 @@ class ApiDeviceTokenClient(
 
     fun registerDeviceToken(fcmToken: String, deviceType: String = "android") {
         val bearer = token()?.takeIf { it.isNotBlank() } ?: return
+        if (com.example.chat.data.demo.DemoMode.active || bearer == com.example.chat.data.demo.DemoMode.TOKEN) return
         val safeToken = safeFcmToken(fcmToken) ?: return
         val safeDeviceType = deviceType.takeIf { it in setOf("android", "ios", "web") } ?: return
         val base = restApiBaseUrl().trimEnd('/')
@@ -59,6 +60,7 @@ class ApiDeviceTokenClient(
     /** Port of ApiBackendService.unregisterDeviceToken. */
     fun unregisterDeviceToken(fcmToken: String) {
         val bearer = token()?.takeIf { it.isNotBlank() } ?: return
+        if (com.example.chat.data.demo.DemoMode.active || bearer == com.example.chat.data.demo.DemoMode.TOKEN) return
         val safeToken = safeFcmToken(fcmToken) ?: return
         if (bearer.isNullOrBlank()) return
         val base = restApiBaseUrl().trimEnd('/')

@@ -1,0 +1,5 @@
+Fluent Emoji Animated - Copyright (c) Microsoft Corporation. MIT License (full text in LICENSE-FluentEmojiAnimated-MIT.txt). Source: https://github.com/microsoft/fluentui-emoji-animated
+Modification: animated PNG (256px) converted to animated WebP, resized to 160px, lossy quality 70. 49 emoji.
+
+OpenMoji - All emojis designed by OpenMoji, the open-source emoji and icon project, https://openmoji.org/ . License: CC BY-SA 4.0 https://creativecommons.org/licenses/by-sa/4.0/ (full legal code in LICENSE-CC-BY-SA-4.0.txt). Attribution suggestion taken from https://github.com/hfg-gmuend/openmoji README.
+Modification: color 618px PNG resized to 256px (no other change). 50 emoji.

@@ -34,11 +34,11 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.PushPin as OutlinedPushPin
 import androidx.compose.material.icons.rounded.Videocam
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
+import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
@@ -55,9 +56,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.preferences.HomePresetNormalizer
+import com.example.chat.ui.effects.listEntrance
 import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.HomePreferences
@@ -131,7 +134,7 @@ fun ChatsHomeScreen(
     securityPreferences: SecurityPreferences = SecurityPreferences(),
     forcedType: ConversationType? = null,
     pageTitle: String? = null,
-    templates: HomeTemplates = defaultHomeTemplates,
+    templates: HomeTemplates = if (com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePreferences.homeStyle)) com.example.chat.ui.chats.home.referenceDefaultHomeTemplates else defaultHomeTemplates,
     presenceFor: (conversationId: String, otherUserId: String) -> HomePresence? = { _, _ -> null },
     isOnline: (String) -> Boolean = { false },
     messagesFor: (String) -> List<ChatMessage> = { emptyList() },
@@ -164,7 +167,8 @@ fun ChatsHomeScreen(
     connectionBanner: (@Composable () -> Unit)? = null,
     headerBottom: (@Composable () -> Unit)? = null,
 ) {
-    val theme = LocalThemeConfig.current
+    val bundleTemplates = com.example.chat.ui.chats.bundles.messageBundleHome(templates)
+    val theme = com.example.chat.ui.chats.bundles.messageBundleTheme(LocalThemeConfig.current)
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val searchFocus = remember { FocusRequester() }
@@ -218,15 +222,22 @@ fun ChatsHomeScreen(
     // ---- build() derivations, in the Dart source's order ----
     val homePrefs = homePreferences
     val rawHomeUiStyle = homePrefs.homeStyle.trim().lowercase()
-    val homeStyle = HomePresetNormalizer.homeStyle(homePrefs.homeStyle)
-    val spec = HomeStyleSpec.resolve(homeStyle, rawHomeUiStyle)
+    val homeStyle = com.example.chat.core.preferences.HomePresentationPolicy.listStyle(homePrefs.homeStyle)
+    val referenceRows = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle) && bundleTemplates.chatList.referenceDefault
+    val spec = HomeStyleSpec.resolve(homeStyle, rawHomeUiStyle).let {
+        if (referenceRows) it.copy(showSections = false) else it
+    }
     val searchPlacement = resolveSearchPlacement(homePrefs.searchPlacement, homePrefs.disableSearchBar)
     val searchEnabled = homePrefs.showSearchBar
-    val storiesStyle = homePrefs.storiesStyle
+    val storiesStyle = com.example.chat.core.preferences.HomePresentationPolicy.effectiveStoriesStyle(
+        homePrefs.separateChatsAndGroups, homePrefs.storiesStyle,
+    )
     val storyLook = chatyStoryLookFor(storiesStyle)
     val storyShowOnlineRing = storiesStyle != "Minimal"
     val storyCardWrap = storiesStyle == "Card" || storiesStyle == "Card View" || homePrefs.carouselView
-    val showStoriesStrip = homePrefs.enableStoriesStrip || spec.storiesFirst
+    // User directive: no stories strip on the home screen unless he explicitly
+    // enables it - separation/template no longer force it on.
+    val showStoriesStrip = homePrefs.enableStoriesStrip
     val storyCompact = storiesStyle == "Compact"
     val storyTileWidth = if (storyCardWrap) 74.0 else if (storyCompact) 48.0 else 58.0
     val storyNameFontSize = if (storyCompact) 9.0 else 10.5
@@ -241,7 +252,7 @@ fun ChatsHomeScreen(
     )
     val filters = homeFilters(forcedType)
 
-    val headerStyle = effectiveHomeHeaderStyle(rawHomeUiStyle, homeStyle, templates.headerStyle)
+    val headerStyle = effectiveHomeHeaderStyle(rawHomeUiStyle, homeStyle, bundleTemplates.headerStyle)
 
     // P4 large-title collapse: 0 expanded -> 1 collapsed, driven by the
     // primary list's vertical scroll only.
@@ -388,17 +399,22 @@ fun ChatsHomeScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val number = messageNumberText.trim()
-                    showMessageNumber = false
-                    messageNumberText = ""
-                    if (number.isNotEmpty()) nav.onMessageNumber(number)
-                }) { Text("Chat", fontWeight = FontWeight.W700) }
+                ChatyTextButton(
+                    onClick = {
+                        val number = messageNumberText.trim()
+                        showMessageNumber = false
+                        messageNumberText = ""
+                        if (number.isNotEmpty()) nav.onMessageNumber(number)
+                    },
+                    label = "Chat",
+                    fontWeight = FontWeight.W700,
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showMessageNumber = false; messageNumberText = "" }) {
-                    Text("Cancel")
-                }
+                ChatyTextButton(
+                    onClick = { showMessageNumber = false; messageNumberText = "" },
+                    label = "Cancel",
+                )
             },
         )
     }
@@ -463,7 +479,7 @@ fun ChatsHomeScreen(
                             homePrefs = homePrefs,
                             headerStyle = headerStyle,
                             homeStyle = homeStyle,
-                            title = barTitle,
+                            title = if (forcedType != null) pageTitle ?: barTitle else barTitle,
                             identity = identity,
                             isSearchOpen = isSearchOpen,
                             forcedTypeIsSet = forcedType != null,
@@ -504,6 +520,7 @@ fun ChatsHomeScreen(
                                     onSnack("Marked all chats as read")
                                 },
                                 onMessageANumber = { showMessageNumber = true },
+                                onOpenArchived = { showArchived = true },
                             )
                         }
                     }
@@ -528,11 +545,16 @@ fun ChatsHomeScreen(
                     focusRequester = searchFocus,
                 )
             }
-            // P4: iOS collapsing LARGE title.
-            if (!isSelectionMode && pageTitle != null) {
+            // The supplied Default / OLD / iOS headers already own their single title.
+            // Preserve the large-title treatment only for other Home presentations.
+            if (!isSelectionMode && pageTitle != null &&
+                !com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle) &&
+                rawHomeUiStyle !in setOf("ios style", "whatsapp old ui")) {
                 Box(
                     modifier = Modifier
-                        .height(((1 - effectiveTitleCollapse) * 44).dp)
+                        // Collapse drives height to exactly 0; the expanded height scales
+                        // with font scale (sp->dp) so large text is never pinned to 44dp.
+                        .height(with(LocalDensity.current) { (44f * theme.fontScale.toFloat()).sp.toDp() } * (1 - effectiveTitleCollapse))
                         .alpha(1 - effectiveTitleCollapse),
                 ) {
                     Text(
@@ -559,144 +581,150 @@ fun ChatsHomeScreen(
                     )
                 }
             }
-            if (!isSelectionMode) {
-                if (searchEnabled && searchPlacement == "Header action" && isSearchOpen) {
-                    HomeSearchField(
-                        theme = theme,
-                        value = searchQuery,
-                        onValueChange = { value ->
-                            searchQuery = value
-                            scope.launch {
-                                if (verifySecretPhrase(value)) {
-                                    searchQuery = ""
-                                    isSearchOpen = false
-                                    nav.onOpenLockedVault()
-                                }
-                            }
-                        },
-                        hint = if (forcedType == ConversationType.group) "Search groups…" else "Search chats and messages…",
-                        focusRequester = searchFocus,
-                    )
-                }
-                if (showStoriesStrip && !spec.storiesHidden && forcedType != ConversationType.group) {
-                    StoryStrip(
-                        contacts = contacts,
-                        theme = theme,
-                        look = storyLook,
-                        stripHeight = chatyStoryStripHeight(storyLook, spec.storiesHeight),
-                        storiesAvatar = spec.storiesAvatar,
-                        storiesStyle = storiesStyle,
-                        storyCardWrap = storyCardWrap,
-                        storyShowOnlineRing = storyShowOnlineRing,
-                        storyCompact = storyCompact,
-                        storyTileWidth = storyTileWidth,
-                        storyNameFontSize = storyNameFontSize,
-                        isOnline = isOnline,
-                    )
-                }
-                if (searchEnabled && searchPlacement == "Above chat filters") {
-                    HomeSearchField(
-                        theme = theme,
-                        value = searchQuery,
-                        onValueChange = { value ->
-                            searchQuery = value
-                            // Dart _homeSearchField is shared by all placements: onChanged runs
-                            // _checkSecretSearchPhrase everywhere, so this placement unlocks too.
-                            scope.launch {
-                                if (verifySecretPhrase(value)) {
-                                    searchQuery = ""
-                                    isSearchOpen = false
-                                    nav.onOpenLockedVault()
-                                }
-                            }
-                        },
-                        hint = if (forcedType == ConversationType.group) "Search groups…" else "Search chats and messages…",
-                        focusRequester = searchFocus,
-                    )
-                }
-                if (spec.showFilters && !homePrefs.hideChatSortList) {
-                    HomeFilterChips(
-                        theme = theme,
-                        tabBubbleStyle = homePrefs.tabBubbleStyle,
-                        filters = filters,
-                        selectedFilter = selectedFilter,
-                        onSelect = { filter ->
-                            // Same fail-closed wrap as the other vault
-                            // entries (source relies on destination auth).
-                            if (filter == "Vault") onRequestVaultAuth { nav.onOpenLockedVault() } else selectedFilter = filter
-                        },
-                    )
-                }
-            }
-            if (visibleConversations.isEmpty()) {
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    EmptyChatsState(
-                        theme = theme,
-                        isGroups = forcedType == ConversationType.group,
-                        onSearch = nav.onOpenGlobalSearch,
-                    )
-                }
-            } else {
-                BoxWithConstraints(Modifier.weight(1f)) {
-                    val listContent: @Composable () -> Unit = {
-                        HomeConversationList(
-                            entries = entries,
+            val defaultPanel = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)
+            com.example.chat.ui.navigation.ReferenceLayoutContentSurface(
+                rounded = defaultPanel, isDark = theme.isDark, lightSurface = Color(theme.surfaceColor),
+                surfaceOverride = preferencesController?.universal?.listBackgroundColor?.let(::Color),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) {
+            Column(Modifier.fillMaxSize()) {
+                if (!isSelectionMode) {
+                    if (searchEnabled && searchPlacement == "Header action" && isSearchOpen) {
+                        HomeSearchField(
                             theme = theme,
-                            homePrefs = homePrefs,
-                            spec = spec,
-                            templates = templates,
-                            currentUserId = currentUserId,
-                            contacts = contacts,
-                            selectedIds = selectedIds,
-                            isSelectionMode = isSelectionMode,
-                            presenceFor = presenceFor,
-                            messagesFor = messagesFor,
-                            gbBool = gbBool,
-                            gbColor = gbColor,
-                            isConversationLocked = isConversationLocked,
-                            onOpenArchived = { onOpenArchived(); showArchived = true },
-                            onRowTap = { handleConversationTap(it) },
-                            onRowLongPress = { conversation ->
-                                selectedIds = if (selectedIds.contains(conversation.id)) {
-                                    selectedIds - conversation.id
-                                } else {
-                                    selectedIds + conversation.id
+                            value = searchQuery,
+                            onValueChange = { value ->
+                                searchQuery = value
+                                scope.launch {
+                                    if (verifySecretPhrase(value)) {
+                                        searchQuery = ""
+                                        isSearchOpen = false
+                                        nav.onOpenLockedVault()
+                                    }
                                 }
                             },
-                            onTogglePin = onTogglePin,
-                            onToggleMute = onToggleMute,
-                            onToggleArchive = onToggleArchive,
-                            onStartCall = onStartCall,
-                            listState = listState,
+                            hint = if (forcedType == ConversationType.group) "Search groups…" else "Search chats and messages…",
+                            focusRequester = searchFocus,
                         )
                     }
-                    // 'Tablet Split View': list + quick pane on wide layouts;
-                    // narrow layouts fall back to the single column.
-                    if (spec.splitView && maxWidth >= 640.dp) {
-                        Row {
-                            Box(Modifier.width(360.dp)) { listContent() }
-                            // VerticalDivider(width: 1, color: surfaceColor)
-                            Spacer(
-                                Modifier
-                                    .width(1.dp)
-                                    .fillMaxHeight()
-                                    .background(Color(theme.surfaceColor)),
-                            )
-                            Box(Modifier.weight(1f)) {
-                                SplitQuickPane(
-                                    theme = theme,
-                                    pinned = conversations.filter { it.isPinned && !it.isArchived },
-                                    groups = conversations.filter {
-                                        it.type == ConversationType.group && !it.isArchived
-                                    },
-                                    onOpen = { handleConversationTap(it) },
-                                )
-                            }
-                        }
-                    } else {
-                        listContent()
+                    if (showStoriesStrip && (!spec.storiesHidden || homePrefs.separateChatsAndGroups) && forcedType != ConversationType.group) {
+                        StoryStrip(
+                            contacts = contacts,
+                            theme = theme,
+                            look = storyLook,
+                            stripHeight = chatyStoryStripHeight(storyLook, spec.storiesHeight),
+                            storiesAvatar = spec.storiesAvatar,
+                            storiesStyle = storiesStyle,
+                            storyCardWrap = storyCardWrap,
+                            storyShowOnlineRing = storyShowOnlineRing,
+                            storyCompact = storyCompact,
+                            storyTileWidth = storyTileWidth,
+                            storyNameFontSize = storyNameFontSize,
+                            isOnline = isOnline,
+                        )
+                    }
+                    if (searchEnabled && searchPlacement == "Above chat filters") {
+                        HomeSearchField(
+                            theme = theme,
+                            value = searchQuery,
+                            onValueChange = { value ->
+                                searchQuery = value
+                                // Dart _homeSearchField is shared by all placements: onChanged runs
+                                // _checkSecretSearchPhrase everywhere, so this placement unlocks too.
+                                scope.launch {
+                                    if (verifySecretPhrase(value)) {
+                                        searchQuery = ""
+                                        isSearchOpen = false
+                                        nav.onOpenLockedVault()
+                                    }
+                                }
+                            },
+                            hint = if (forcedType == ConversationType.group) "Search groups…" else "Search chats and messages…",
+                            focusRequester = searchFocus,
+                        )
+                    }
+                    if (spec.showFilters && !homePrefs.hideChatSortList) {
+                        HomeFilterChips(
+                            theme = theme,
+                            tabBubbleStyle = homePrefs.tabBubbleStyle,
+                            filters = filters,
+                            selectedFilter = selectedFilter,
+                            onSelect = { filter -> selectedFilter = filter },
+                        )
                     }
                 }
+                if (visibleConversations.isEmpty()) {
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        EmptyChatsState(
+                            theme = theme,
+                            isGroups = forcedType == ConversationType.group,
+                            onSearch = nav.onOpenGlobalSearch,
+                        )
+                    }
+                } else {
+                    BoxWithConstraints(Modifier.weight(1f)) {
+                        val listContent: @Composable () -> Unit = {
+                            HomeConversationList(
+                                listAnimation = preferencesController?.effects?.homeListAnimation ?: "Standard",
+                                entries = entries,
+                                theme = theme,
+                                homePrefs = homePrefs,
+                                spec = spec,
+                                bundleTemplates = bundleTemplates,
+                                currentUserId = currentUserId,
+                                contacts = contacts,
+                                selectedIds = selectedIds,
+                                isSelectionMode = isSelectionMode,
+                                presenceFor = presenceFor,
+                                messagesFor = messagesFor,
+                                gbBool = gbBool,
+                                gbColor = gbColor,
+                                isConversationLocked = isConversationLocked,
+                                onOpenArchived = { onOpenArchived(); showArchived = true },
+                                onRowTap = { handleConversationTap(it) },
+                                onRowLongPress = { conversation ->
+                                    selectedIds = if (selectedIds.contains(conversation.id)) {
+                                        selectedIds - conversation.id
+                                    } else {
+                                        selectedIds + conversation.id
+                                    }
+                                },
+                                onTogglePin = onTogglePin,
+                                onToggleMute = onToggleMute,
+                                onToggleArchive = onToggleArchive,
+                                onStartCall = onStartCall,
+                                listState = listState,
+                            )
+                        }
+                        // 'Tablet Split View': list + quick pane on wide layouts;
+                        // narrow layouts fall back to the single column.
+                        if (spec.splitView && maxWidth >= 640.dp) {
+                            Row {
+                                Box(Modifier.width(360.dp)) { listContent() }
+                                // VerticalDivider(width: 1, color: surfaceColor)
+                                Spacer(
+                                    Modifier
+                                        .width(1.dp)
+                                        .fillMaxHeight()
+                                        .background(Color(theme.surfaceColor)),
+                                )
+                                Box(Modifier.weight(1f)) {
+                                    SplitQuickPane(
+                                        theme = theme,
+                                        pinned = conversations.filter { it.isPinned && !it.isArchived },
+                                        groups = conversations.filter {
+                                            it.type == ConversationType.group && !it.isArchived
+                                        },
+                                        onOpen = { handleConversationTap(it) },
+                                    )
+                                }
+                            }
+                        } else {
+                            listContent()
+                        }
+                    }
+                }
+            }
             }
         }
     }
@@ -705,11 +733,12 @@ fun ChatsHomeScreen(
 /** _conversationsList: sections, archived entry and swipe-wrapped rows. */
 @Composable
 private fun HomeConversationList(
+    listAnimation: String = "Standard",
     entries: List<HomeEntry>,
     theme: com.example.chat.core.theme.ThemeConfig,
     homePrefs: HomePreferences,
     spec: HomeStyleSpec,
-    templates: HomeTemplates,
+    bundleTemplates: HomeTemplates,
     currentUserId: String,
     contacts: List<UserProfile>,
     selectedIds: Set<String>,
@@ -729,9 +758,13 @@ private fun HomeConversationList(
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
     LazyColumn(
+        modifier = Modifier.fillMaxSize(),
         state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = 8.dp, top = 0.dp, end = 8.dp, bottom = 96.dp,
+            start = if (bundleTemplates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
+            top = 0.dp,
+            end = if (bundleTemplates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
+            bottom = 96.dp,
         ),
     ) {
         items(
@@ -744,6 +777,12 @@ private fun HomeConversationList(
                 }
             },
         ) { index ->
+            val entranceKey = when (val entry = entries[index]) {
+                is HomeEntry.Section -> "section_${entry.label}"
+                is HomeEntry.Archived -> "archived_entry"
+                is HomeEntry.Item -> entry.conversation.id
+            }
+            Box(Modifier.listEntrance(listAnimation, entranceKey)) {
             when (val entry = entries[index]) {
                 is HomeEntry.Archived -> {
                     // _archivedTile
@@ -795,7 +834,8 @@ private fun HomeConversationList(
                     }
                     HomeSwipeActions(
                         enabled = !isSelectionMode,
-                        backgroundColor = Color(theme.backgroundColor),
+                        backgroundColor = com.example.chat.ui.navigation.LocalReferenceContentSurface.current
+                            ?: Color(theme.backgroundColor),
                         leadingActions = if (conversation.type == ConversationType.direct) {
                             listOf(
                                 HomeSwipeAction(
@@ -824,7 +864,7 @@ private fun HomeConversationList(
                             HomeSwipeAction(
                                 icon = if (conversation.isMuted) Icons.Rounded.NotificationsActive else Icons.Rounded.NotificationsOff,
                                 label = if (conversation.isMuted) "Unmute" else "Mute",
-                                color = Color(0xFFF59E0B),
+                                color = com.example.chat.ui.core.theme.ChatyColors(theme).warning,
                                 onTriggered = { onToggleMute(conversation.id) },
                             ),
                             HomeSwipeAction(
@@ -839,10 +879,10 @@ private fun HomeConversationList(
                             conversation = conversation,
                             theme = theme,
                             homePrefs = homePrefs,
-                            chatList = templates.chatList,
+                            chatList = bundleTemplates.chatList,
                             density = spec.tileDensity,
                             isDark = theme.isDark,
-                            cardRows = spec.cardRows,
+                            cardRows = spec.cardRows && !com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle),
                             isTelegramRows = rawIsTelegram(homePrefs.homeStyle),
                             displayTitle = displayConversationTitle(
                                 conversation,
@@ -868,6 +908,7 @@ private fun HomeConversationList(
                         )
                     }
                 }
+            }
             }
         }
     }

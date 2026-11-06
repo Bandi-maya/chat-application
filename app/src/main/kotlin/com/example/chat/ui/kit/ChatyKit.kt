@@ -7,8 +7,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,9 +50,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,7 +88,9 @@ fun rememberChatySelectionHaptic(): () -> Unit {
     return { ChatyHapticsPort.selection(view) }
 }
 
-/** ChatyBackButton: 34dp circle, surfaceSecondary fill, 0.8dp border, chevron_left 24, press scale 0.92. */
+/** ChatyBackButton: 48dp touch target around the 34dp visual circle (surfaceSecondary fill,
+ *  0.8dp border, chevron_left 24, press scale 0.92). The whole target is clickable and
+ *  exposes Button semantics; the visual keeps its original size. */
 @Composable
 fun ChatyBackButton(
     onPressed: () -> Unit,
@@ -93,14 +99,37 @@ fun ChatyBackButton(
 ) {
     val colors = LocalAppColors.current
     val haptic = rememberChatySelectionHaptic()
-    var pressed by remember { mutableStateOf(false) }
+    // indication = null keeps the custom press-scale look; the press state drives the same
+    // 0.92 scale as before.
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         if (pressed) ChatyMotionTokens.ACTIVE_ICON_SCALE else 1f,
         tween(ChatyMotionTokens.INSTANT_MS, easing = ChatyMotionTokens.enter),
         label = "backScale",
     )
+    // One node carries label, role and the single click action: clearAndSetSemantics
+    // collapses the 48dp target and its children into one "Back" node (same proven
+    // pattern as CameraCaptureModeButton) - a contentDescription left on the inner Icon
+    // surfaces as a separate, non-clickable node. clickable below keeps pointer,
+    // keyboard/d-pad and press-scale behavior; its own semantics are cleared, so exactly
+    // one click action and one haptic path exist.
     Box(
-        modifier.size(44.dp),
+        modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .clearAndSetSemantics {
+                contentDescription = "Back"
+                role = Role.Button
+                onClick(null) { haptic(); onPressed(); true }
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+            ) {
+                haptic()
+                onPressed()
+            },
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -109,23 +138,10 @@ fun ChatyBackButton(
                 .size(size.dp)
                 .clip(CircleShape)
                 .background(colors.surfaceSecondary, CircleShape)
-                .border(0.8.dp, colors.border, CircleShape)
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onPress = {
-                            pressed = true
-                            val released = tryAwaitRelease()
-                            pressed = false
-                            if (released) {
-                                haptic()
-                                onPressed()
-                            }
-                        },
-                    )
-                },
+                .border(0.8.dp, colors.border, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground, modifier = Modifier.size(24.dp))
+            Icon(Icons.Rounded.ChevronLeft, contentDescription = null, tint = colors.foreground, modifier = Modifier.size(24.dp))
         }
     }
 }

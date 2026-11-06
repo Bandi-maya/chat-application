@@ -2,6 +2,7 @@ package com.example.chat
 
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.ParcelFileDescriptor
 import android.provider.Settings
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -14,7 +15,6 @@ import java.io.FileOutputStream
 import java.util.concurrent.CopyOnWriteArrayList
 import org.junit.After
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,14 +34,24 @@ class SingleEmojiLoopProofTest {
 
     private val json = """{"v":"5.7.0","fr":30,"ip":0,"op":30,"w":100,"h":100,"nm":"loop","ddd":0,"assets":[],"layers":[{"ddd":0,"ind":1,"ty":4,"nm":"s","sr":1,"ks":{"o":{"a":0,"k":100},"r":{"a":1,"k":[{"t":0,"s":[0],"i":{"x":[0.5],"y":[1]},"o":{"x":[0.5],"y":[0]}},{"t":30,"s":[360]}]},"p":{"a":0,"k":[50,50,0]},"a":{"a":0,"k":[0,0,0]},"s":{"a":0,"k":[100,100,100]}},"ao":0,"shapes":[{"ty":"gr","it":[{"ty":"rc","d":1,"s":{"a":0,"k":[60,30]},"p":{"a":0,"k":[0,0]},"r":{"a":0,"k":4}},{"ty":"fl","c":{"a":0,"k":[1,0.6,0,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100}}]}],"ip":0,"op":30,"st":0,"bm":0}]}"""
 
+    private var savedScale: String = "1.0"
+
+    private fun sh(cmd: String): String =
+        ParcelFileDescriptor.AutoCloseInputStream(inst.uiAutomation.executeShellCommand(cmd)).use { it.readBytes().decodeToString().trim() }
+
     @Before fun setUp() {
+        // CI emulators commonly run with animations off; the loop proof needs production animation ON
+        // (reduce-motion behavior itself is by design a static glyph). Force 1.0 for this test only and restore after.
+        savedScale = sh("settings get global animator_duration_scale").let { if (it == "null" || it.isBlank()) "1.0" else it }
+        sh("settings put global animator_duration_scale 1.0")
         val scale = Settings.Global.getFloat(inst.targetContext.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
-        assumeTrue("animator scale 0 disables animation by design", scale != 0f)
+        assertTrue("could not enable animator scale (got $scale); proof cannot run", scale != 0f)
         emojiLottieSpecResolver = { LottieCompositionSpec.JsonString(json) }
         emojiLoopObserver = { _, p, i -> samples.add(Sample(System.nanoTime(), p, i)) }
     }
 
     @After fun tearDown() {
+        sh("settings put global animator_duration_scale $savedScale")
         emojiLottieSpecResolver = originalResolver
         emojiLoopObserver = null
     }

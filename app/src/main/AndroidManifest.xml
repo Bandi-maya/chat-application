@@ -61,6 +61,12 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="chaty" android:host="reset-password" />
             </intent-filter>
+            <!-- Static launcher shortcuts (res/xml/shortcuts.xml). MainActivity forwards
+                 EXTRA_SHORTCUT_ACTION to LauncherShortcutRouter; AppRoot consumes it only
+                 after the auth/app-lock gate. Ignored harmlessly on API 24 (minSdk). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- Launcher icon variants: all disabled by default, MainActivity stays the installed (bird) launcher entry. -->

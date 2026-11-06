@@ -76,8 +76,16 @@ class OverflowSizingProofTest {
                 device.findObject(more).click()
                 assertTrue("Real menu opens: $screen", device.wait(Until.hasObject(By.text(firstLabel)), 5000))
                 var surface = device.findObject(By.text(firstLabel))
-                while (surface != null && !surface.isScrollable) surface = surface.parent
-                assertTrue("Real popup exposes scroll surface: $screen", surface != null)
+                // A fitting Compose verticalScroll exposes a ScrollView with
+                // scrollable=false. Identify its geometry without requiring overflow;
+                // the 30-item synthetic tests independently require real scrolling.
+                while (surface != null && surface.className != "android.widget.ScrollView") surface = surface.parent
+                if (surface == null) {
+                    val dir = File(inst.targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+                    device.takeScreenshot(File(dir, "overflow-real-$screen-no-scroll.png"))
+                    device.dumpWindowHierarchy(File(dir, "overflow-real-$screen-no-scroll.xml"))
+                }
+                assertTrue("Real popup exposes ScrollView surface: $screen", surface != null)
                 val bounds = surface!!.visibleBounds
                 val safe = safeBounds(scenario)
                 assertInsideSafeWindow(bounds, safe, "Real $screen popup")
@@ -124,7 +132,7 @@ class OverflowSizingProofTest {
                         Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopEnd) {
                             if (isOpen) ChatyDropdownMenu(
                                 expanded = true, onDismissRequest = { isOpen = false },
-                                modifier = Modifier.semantics { contentDescription = "Overflow test surface" },
+                                modifier = Modifier.semantics { contentDescription = "Overflow test surface $phase" },
                             ) {
                                 labels.forEach { label -> ChatyDropdownMenuItem(
                                     text = { Text(label) },
@@ -134,7 +142,8 @@ class OverflowSizingProofTest {
                         }
                     }
                 } }
-                assertTrue(device.wait(Until.hasObject(By.desc("Overflow test surface")), 10000))
+                assertTrue(device.wait(Until.hasObject(By.desc("Overflow test surface $generation")), 10000))
+                assertTrue("Current popup content commits", device.wait(Until.hasObject(By.text(labels.first())), 5000))
                 device.waitForIdle()
             }
             fun capture(name: String) {
@@ -146,16 +155,18 @@ class OverflowSizingProofTest {
                 image.recycle()
             }
             show(listOf("Short"))
-            val shortWidth = device.findObject(By.desc("Overflow test surface")).visibleBounds.width()
+            val shortWidth = device.findObject(By.desc("Overflow test surface $generation")).visibleBounds.width()
             capture("25-overflow-short")
             show((1..30).map { if (it == 1) "Message Scheduler" else "Action $it" })
-            val menu = device.findObject(By.desc("Overflow test surface")).visibleBounds
+            val menu = device.findObject(By.desc("Overflow test surface $generation")).visibleBounds
             android.util.Log.i("OverflowSizingProof", "Synthetic shortWidth=$shortWidth longBounds=$menu screen=${device.displayWidth}x${device.displayHeight}")
             val safe = safeBounds(scenario)
             assertInsideSafeWindow(menu, safe, "Synthetic popup")
             val config = inst.targetContext.resources.configuration
             val density = inst.targetContext.resources.displayMetrics.density
-            assertTrue("Content determines width", menu.width() > shortWidth)
+            capture("26-overflow-long-before-width-assert")
+            device.dumpWindowHierarchy(File(inst.targetContext.getExternalFilesDir(null), "screenshots/overflow-width-before-assert.xml"))
+            assertTrue("Content determines width: short=$shortWidth long=${menu.width()}", menu.width() > shortWidth)
             assertTrue("Popup remains within device width", menu.left >= 0 && menu.right <= device.displayWidth)
             assertTrue("Popup remains within device height", menu.top >= 0 && menu.bottom <= device.displayHeight)
             assertTrue("Popup height capped at 80%", menu.height() <= config.screenHeightDp * density * 0.8f + 2f)
@@ -169,11 +180,11 @@ class OverflowSizingProofTest {
             assertTrue("Last action reachable by scroll", device.wait(Until.hasObject(By.text("Action 30")), 3000))
             capture("27-overflow-last-action")
             device.findObject(By.text("Action 30")).click()
-            assertTrue("Action dismisses popup", device.wait(Until.gone(By.desc("Overflow test surface")), 3000))
+            assertTrue("Action dismisses popup", device.wait(Until.gone(By.desc("Overflow test surface $generation")), 3000))
             assertEquals("One callback", 1, picks.get())
             show(listOf("Back dismiss"))
             device.pressBack()
-            assertTrue("Back dismissal preserved", device.wait(Until.gone(By.desc("Overflow test surface")), 3000))
+            assertTrue("Back dismissal preserved", device.wait(Until.gone(By.desc("Overflow test surface $generation")), 3000))
         }
     }
 }

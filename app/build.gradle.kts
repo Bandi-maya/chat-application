@@ -12,7 +12,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-// Notifications and incoming call alerts use Chaty's authenticated custom WebSocket.
+// Notifications and call alerts use Chaty's authenticated custom WebSocket; no FCM transport.
 
 // Only public client routing keys are read. Never embed credentials in these values.
 val routingKeys = setOf("REST_API_BASE_URL", "TENANT_ID", "WEBSOCKET_URL")
@@ -52,14 +52,36 @@ android {
         buildConfigField("String", "CHATY_PLAY_STORE_URL", "\"" + playStoreUrl.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
     }
 
+    signingConfigs {
+        create("chaty") {
+            // Stable release identity for com.logybyte.chat (user-directed 2026-10-29).
+            // CI materializes the keystore from the CHATY_KEYSTORE_B64 repo secret into
+            // ci/keystore/chaty-release.jks (gitignored); the offline backup lives in the
+            // user's vault. Fail closed: an absent keystore or password fails
+            // validateSigning* at assemble time - never an ephemeral fallback.
+            val ksPath = providers.gradleProperty("CHATY_KEYSTORE_PATH")
+                .orElse(providers.environmentVariable("CHATY_KEYSTORE_PATH"))
+                .orElse("ci/keystore/chaty-release.jks")
+                .get()
+            storeFile = rootProject.file(ksPath)
+            keyAlias = "chaty"
+            storePassword = providers.gradleProperty("CHATY_KEYSTORE_PASSWORD")
+                .orElse(providers.environmentVariable("CHATY_KEYSTORE_PASSWORD"))
+                .orNull.orEmpty()
+            keyPassword = storePassword
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs["chaty"]
         }
         debug {
             isMinifyEnabled = false
+            // Debug uses Android default debug keystore; release signing remains unchanged.
         }
     }
 
@@ -114,12 +136,13 @@ dependencies {
     // barcode (same decode engine mobile_scanner uses on Android). All free,
     // on-device. Availability verified 200 on Maven Central / Google Maven.
     implementation("com.google.zxing:core:3.5.3")
-    implementation("androidx.camera:camera-camera2:1.4.1")
-    implementation("androidx.camera:camera-lifecycle:1.4.1")
-    implementation("androidx.camera:camera-view:1.4.1")
-    implementation("androidx.camera:camera-video:1.4.1")
-    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
-    implementation("com.google.firebase:firebase-messaging:24.1.0")
+    implementation("androidx.camera:camera-camera2:1.6.2")
+    implementation("androidx.camera:camera-core:1.6.2")
+    implementation("androidx.camera:camera-extensions:1.6.2")
+    implementation("androidx.camera:camera-lifecycle:1.6.2")
+    implementation("androidx.camera:camera-view:1.6.2")
+    implementation("androidx.camera:camera-video:1.6.2")
+    implementation("androidx.camera:camera-effects:1.6.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha07")

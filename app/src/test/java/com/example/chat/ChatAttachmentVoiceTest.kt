@@ -303,6 +303,19 @@ class ChatAttachmentVoiceTest {
         )
     }
 
+    @Test fun reviewedAlbumHasOneBatchAndFirstCaptionOnly() = runBlocking {
+        val backend = FakeBackend()
+        val controller = newController(backend, mutableListOf())
+        controller.sendReviewedMedia(listOf(PickedFile("one.png", bytes = byteArrayOf(1)), PickedFile("two.png", bytes = byteArrayOf(2))), "image", "Caption", false)
+        val first = backend.sends[0][3] as Map<*, *>
+        val second = backend.sends[1][3] as Map<*, *>
+        assertEquals(first["chaty_album_id"], second["chaty_album_id"])
+        assertEquals(0, first["chaty_album_index"]); assertEquals(1, second["chaty_album_index"])
+        assertEquals(2, first["chaty_album_count"])
+        assertEquals("Caption", backend.sends[0][0]); assertEquals("", backend.sends[1][0])
+        Unit
+    }
+
     @Test fun locationSendsStructuredPayload() = runBlocking {
         val backend = FakeBackend()
         val toasts = mutableListOf<String>()
@@ -419,7 +432,7 @@ class ChatAttachmentVoiceTest {
         val toasts = mutableListOf<String>()
         var sentCalled = false
         val c = newController(backend, toasts)
-        c.sendCapturedPhoto("/cache/cap.jpg", "hi", "vivid", 0.8) { sentCalled = true }
+        c.sendCapturedPhoto("/cache/cap.jpg", "hi", "vivid", 0.8, onSent = { sentCalled = true })
         assertEquals("hi", backend.sends[0][0])
         assertEquals(MessageType.image, backend.sends[0][1])
         assertEquals(mapOf("effect" to "vivid", "effect_intensity" to "0.8"), backend.sends[0][3])

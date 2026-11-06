@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,9 +24,10 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Verified
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import com.example.chat.ui.kit.ChatyActionButton
+import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -171,7 +173,7 @@ fun GlobalSearchScreen(
         // progress/clear action.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 6.dp),
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
@@ -301,10 +303,13 @@ fun GlobalSearchScreen(
                                 fontSize = 12.5.sp,
                             )
                             Spacer(Modifier.height(12.dp))
-                            androidx.compose.material3.TextButton(onClick = {
-                                query = ""
-                                queueSearch("")
-                            }) { Text("Clear search") }
+                            ChatyTextButton(
+                                onClick = {
+                                    query = ""
+                                    queueSearch("")
+                                },
+                                label = "Clear search",
+                            )
                         }
                     }
                 }
@@ -377,10 +382,9 @@ private fun UserTile(
             )
         }
         Spacer(Modifier.width(8.dp))
-        Button(
+        ChatyActionButton(
             onClick = onMessage,
-            modifier = Modifier.width(90.dp).height(34.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+            modifier = Modifier.width(90.dp),
         ) {
             if (isOpeningChat) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)

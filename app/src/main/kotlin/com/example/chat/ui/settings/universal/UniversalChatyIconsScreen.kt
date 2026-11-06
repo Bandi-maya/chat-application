@@ -301,7 +301,7 @@ fun UniversalChatyIconsScreen(
                                 fontSize = 15.sp,
                                 fontWeight = if (isSelected) FontWeight.W800 else FontWeight.W600,
                             )
-                            if (itemTheme == ChatyIconThemeId.chatySigil) {
+                            if (itemTheme == ChatyIconThemeId.hugeiconsFree) {
                                 Spacer(Modifier.width(6.dp))
                                 Text(
                                     "Default",
@@ -525,7 +525,7 @@ fun UniversalChatyIconsScreen(
     if (showThemeSelector) {
         com.example.chat.ui.kit.ChatySingleChoiceModal(
             title = if (resetTheme) "Reset icons" else "Select icons", value = activeTheme,
-            options = if (resetTheme) listOf(ChatyIconThemeId.chatySigil) else ChatyIconThemeId.entries.filter(ChatyIconPackCatalog::isSelectable),
+            options = if (resetTheme) listOf(ChatyIconThemeId.hugeiconsFree) else ChatyIconThemeId.entries.filter(ChatyIconPackCatalog::isSelectable),
             labelBuilder = { it.title }, onDismiss = { showThemeSelector = false },
             onApply = { chosen -> applyTheme(chosen); showThemeSelector = false },
             previewBuilder = { theme ->

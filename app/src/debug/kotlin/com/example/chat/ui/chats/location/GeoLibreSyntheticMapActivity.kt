@@ -83,6 +83,9 @@ class GeoLibreSyntheticMapActivity : Activity() {
         setContentView(content)
     }
 
+    /** Instrumentation-only network fault seam; no device network or permission changes. */
+    fun setTileRequestsBlockedForTest(blocked: Boolean) { blockTiles = blocked }
+
     private fun closeMap() {
         val previous = map
         map = null

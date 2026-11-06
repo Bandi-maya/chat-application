@@ -4,6 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 
 /** Exercises the actual production composable and assets, no account/backend/GPS fixture APIs. */
 class GeoLibreProductionRouteProofActivity : ComponentActivity() {
@@ -13,6 +16,8 @@ class GeoLibreProductionRouteProofActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, intent.getFloatExtra("syntheticFontScale", 1f))) {
                 MapViewerScreen(
                     context = this,
                     accountId = "synthetic-map-owner",
@@ -24,6 +29,7 @@ class GeoLibreProductionRouteProofActivity : ComponentActivity() {
                     currentLocationEnabled = false,
                     onMapReady = { mapReady = true },
                 )
+                }
             }
         }
     }

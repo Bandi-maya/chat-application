@@ -73,8 +73,9 @@ internal fun PerspectiveDrawerShell(
     onSelect: (Int) -> Unit,
     fab: @Composable () -> Unit,
     content: @Composable () -> Unit,
+    initialOpen: Boolean = false,
 ) {
-    var open by remember { mutableStateOf(false) }
+    var open by remember { mutableStateOf(initialOpen) }
     val progress by animateFloatAsState(
         targetValue = if (open) 1f else 0f,
         animationSpec = tween(if (animationsDisabled) 0 else 280),
@@ -192,6 +193,9 @@ internal fun CurvedRadialDrawerShell(
 ) {
     var menuOpen by remember { mutableStateOf(initialOpen) }
     var page by remember { mutableStateOf(0) }
+    // Read in composition so the semantics modifier receives a new immutable
+    // label with the same state that selects the visible Menu/X glyph.
+    val triggerLabel = if (menuOpen) "Close navigation menu" else "Open navigation menu"
     val progress by animateFloatAsState(
         targetValue = if (menuOpen) 1f else 0f,
         animationSpec = tween(if (animationsDisabled) 0 else 190),
@@ -203,6 +207,9 @@ internal fun CurvedRadialDrawerShell(
         Modifier.fillMaxSize().background(colors.background)
             .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.safeDrawing)
             .clipToBounds(),
+        // Coordinates below are physical-left offsets, including in RTL.
+        // A relative TopStart parent would right-align the small controls first.
+        contentAlignment = androidx.compose.ui.AbsoluteAlignment.TopLeft,
     ) {
             // Content and FAB share the same consumed inset parent as the trigger.
             // Padding changes measured content bounds, unlike a floating overlay.
@@ -223,7 +230,7 @@ internal fun CurvedRadialDrawerShell(
             val half = RadialMenuGeometry.targetSize / 2f
             // Keep the fan on ordinary phones; compact windows use a reachable list.
             val canOpen = geometry.radius >= 160f
-            if (menuOpen && canOpen) {
+            if ((menuOpen || progress > 0f) && canOpen) {
                 Box(Modifier.fillMaxSize().clickable(
                     indication = null,
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -240,6 +247,10 @@ internal fun CurvedRadialDrawerShell(
                     val point = visibleGeometry.centers[localIndex]
                     val index = firstIndex + localIndex
                     val selected = index == selectedIndex
+                    // A page replaces destination identities, not only the glyph.
+                    // Fresh semantics nodes prevent a previous page's labels from
+                    // surviving while the visible page/callbacks have changed.
+                    androidx.compose.runtime.key(id) {
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.absoluteOffset(x = (point.x - half).dp, y = (point.y - half).dp)
@@ -253,12 +264,28 @@ internal fun CurvedRadialDrawerShell(
                                 contentDescription = NavigationCatalog.labelFor(id)
                                 this.selected = selected
                             }
-                            .clickable(role = androidx.compose.ui.semantics.Role.Tab) {
+                            .clickable(enabled = menuOpen, role = androidx.compose.ui.semantics.Role.Tab) {
                                 onSelect(index)
                                 menuOpen = false
                             },
                     ) {
                         NavDestinationIcon(id, size = 24, tint = colors.primary)
+                    }
+                    // User directive: the selected radial destination also shows its
+                    // label, under the circle.
+                    if (selected) {
+                        Text(
+                            NavigationCatalog.labelFor(id),
+                            color = colors.foreground,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.absoluteOffset(x = (point.x - half - 28).dp, y = (point.y + half + 3).dp)
+                                .width((RadialMenuGeometry.targetSize + 56).dp)
+                                .graphicsLayer { alpha = progress },
+                        )
+                    }
                     }
                 }
                 if (pageCount > 1) {
@@ -268,9 +295,11 @@ internal fun CurvedRadialDrawerShell(
                             x = (geometry.anchor.x + geometry.radius * 0.35f - half).dp,
                             y = (geometry.anchor.y + geometry.radius * 0.35f - half).dp,
                         ).size(56.dp).clip(CircleShape).background(colors.surface)
-                            .clickable(onClickLabel = "Next navigation items") { page = (currentPage + 1) % pageCount },
+                            .clickable(enabled = menuOpen, onClickLabel = "Next navigation items") { page = (currentPage + 1) % pageCount },
                     ) {
-                        Text("${currentPage + 1}/$pageCount", color = colors.foreground, fontSize = 12.sp)
+                        androidx.compose.runtime.key(currentPage, pageCount) {
+                            Text("${currentPage + 1}/$pageCount", color = colors.foreground, fontSize = 12.sp)
+                        }
                     }
                 }
             } else if (menuOpen) {
@@ -282,17 +311,24 @@ internal fun CurvedRadialDrawerShell(
                         .verticalScroll(rememberScrollState()),
                 ) {
                     navItemIds.forEachIndexed { index, id ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                        // In a compact window give text the whole width instead of
+                        // reserving a permanent icon lane that can orphan letters.
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                                .semantics(mergeDescendants = true) { this.selected = index == selectedIndex }
+                                .background(if (index == selectedIndex) colors.primary.copy(alpha = 0.12f) else Color.Transparent)
                                 .clickable(role = androidx.compose.ui.semantics.Role.Tab) {
                                     onSelect(index)
                                     menuOpen = false
-                                }.padding(horizontal = 16.dp),
+                                }.padding(horizontal = 8.dp, vertical = 8.dp),
                         ) {
                             NavDestinationIcon(id, size = 24, tint = colors.primary)
-                            Spacer(Modifier.width(12.dp))
-                            Text(NavigationCatalog.labelFor(id), color = colors.foreground)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                NavigationCatalog.labelFor(id), color = colors.foreground,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            )
                         }
                     }
                 }
@@ -303,14 +339,18 @@ internal fun CurvedRadialDrawerShell(
                 modifier = Modifier.absoluteOffset(x = (geometry.anchor.x - half).dp, y = (geometry.anchor.y - half).dp)
                     .size(RadialMenuGeometry.targetSize.dp)
                     .shadow(4.dp, CircleShape).clip(CircleShape).background(colors.surface)
-                    .clickable(onClickLabel = if (menuOpen) "Close navigation menu" else "Open navigation menu") {
+                    // Label the actual 56dp interactive target, not the 24dp glyph.
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = triggerLabel
+                    }
+                    .clickable(onClickLabel = triggerLabel) {
                         menuOpen = !menuOpen
                         page = 0
                     },
             ) {
                 Icon(
                     if (menuOpen) Icons.Rounded.Close else Icons.Rounded.Menu,
-                    contentDescription = if (menuOpen) "Close navigation menu" else "Open navigation menu",
+                    contentDescription = null,
                     tint = colors.foreground,
                     modifier = Modifier.size(24.dp),
                 )

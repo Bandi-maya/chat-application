@@ -24,7 +24,7 @@ internal suspend fun trimMediaCopy(context: Context, source: String, startMs: Lo
     try { return withContext(Dispatchers.IO) {
     require(startMs >= 0 && endMs > startMs) { "End must be after start." }
     val extractor = MediaExtractor()
-    val out = outputFile ?: File(context.cacheDir, "chaty_trimmed-${java.util.UUID.randomUUID()}.${if (video) "mp4" else "m4a"}")
+    val out = outputFile ?: File(context.cacheDir, "chaty-outgoing-trimmed-${java.util.UUID.randomUUID()}.${if (video) "mp4" else "m4a"}")
     // Dictated files are created/owned by EditSession. Never point this at an original.
     require(out.canonicalPath != runCatching { File(Uri.parse(source).path.orEmpty()).canonicalPath }.getOrNull()) { "Output cannot overwrite the source." }
     pendingOutput = out

@@ -3,6 +3,7 @@ package com.example.chat.ui.calls
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
@@ -25,12 +26,14 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CallEnd
+import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.Cameraswitch
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
@@ -49,6 +52,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -60,6 +64,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
@@ -120,13 +129,21 @@ fun OngoingCallScreen(
     autoHideControls: Boolean = true,
     bundleId: com.example.chat.ui.calls.bundles.CallBundleId? = null,
     observeNativePip: Boolean = true,
+    onCallTools: (() -> Unit)? = null,
+    callToolsStatus: String? = null,
+    reactionText: String? = null,
+    onRequestVideo: (() -> Unit)? = null,
+    onReturnToAudio: (() -> Unit)? = null,
+    videoUpgradeStatus: String = "Video upgrade pending server and peer support",
 ) {
     val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val theme = LocalThemeConfig.current
-    val bundleTokens = bundleId?.let { com.example.chat.ui.calls.bundles.CallBundleRegistry.getTokens(it) }
-    val callAccent = bundleTokens?.primaryAccent ?: Color(theme.accentColor)
-    val endCallColor = bundleTokens?.declineColor ?: Color(theme.dangerColor)
-    val controlBackground = bundleTokens?.cardBackground ?: Color(0xB32C3038)
+    val bundleTokens = bundleId?.let { themedCallBundle(it) }
+    val iosLayout = bundleId == com.example.chat.ui.calls.bundles.CallBundleId.APPLE_IOS ||
+        bundleId == com.example.chat.ui.calls.bundles.CallBundleId.CHATY_DEFAULT
+    val callAccent = com.example.chat.ui.theme.LocalAppColors.current.accent
+    val endCallColor = com.example.chat.ui.theme.LocalAppColors.current.error
+    val controlBackground = Color(theme.cardColor)
     var controlsVisible by remember { mutableStateOf(true) }
     var focusMode by remember { mutableStateOf(false) }
     var localPipOffsetX by remember { mutableStateOf(20f) }
@@ -144,8 +161,8 @@ fun OngoingCallScreen(
     }
 
     // Dart _startAutoHideTimer: controls hide after 5s unless focus mode.
-    LaunchedEffect(controlsVisible, focusMode, autoHideControls) {
-        if (autoHideControls && controlsVisible && !focusMode) {
+    LaunchedEffect(controlsVisible, focusMode, autoHideControls, session?.isVideo) {
+        if (session?.isVideo == true && autoHideControls && controlsVisible && !focusMode) {
             delay(5000)
             controlsVisible = false
         }
@@ -153,7 +170,7 @@ fun OngoingCallScreen(
 
     if (session == null) {
         LaunchedEffect(Unit) { onSessionGone() }
-        Scaffold(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing), contentWindowInsets = WindowInsets(0, 0, 0, 0), containerColor = Color.Black) { padding ->
+        Scaffold(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing), contentWindowInsets = WindowInsets(0, 0, 0, 0), containerColor = callBackdrop()) { padding ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxSize().padding(padding).padding(28.dp),
@@ -166,20 +183,24 @@ fun OngoingCallScreen(
                     modifier = Modifier.size(42.dp),
                 )
                 Spacer(Modifier.height(12.dp))
-                Text("Call unavailable", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Call unavailable", color = callForeground(), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(5.dp))
                 Text(
                     setupError ?: "This call session is no longer available.",
-                    color = Color(0xB3FFFFFF),
+                    color = callSecondary(),
                     fontSize = 13.sp,
                 )
                 Spacer(Modifier.height(14.dp))
-                Text(
-                    "Close",
-                    color = Color(theme.accentColor),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable { onBack() },
-                )
+                TextButton(
+                    onClick = onBack,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
+                    Text(
+                        "Close",
+                        color = Color(theme.accentColor),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
         }
         return
@@ -192,19 +213,23 @@ fun OngoingCallScreen(
         }
     }
     val isActive = session.isActive
-    Scaffold(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing), contentWindowInsets = WindowInsets(0, 0, 0, 0), containerColor = Color.Black) { padding ->
+    Scaffold(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing), contentWindowInsets = WindowInsets(0, 0, 0, 0), containerColor = callBackdrop()) { padding ->
         Box(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .clickable {
-                    controlsVisible = !controlsVisible
+                    if (session.isVideo) controlsVisible = !controlsVisible
                 },
         ) {
             if (session.isVideo) {
                 RemoteVideoSurface(session, videoSurfaces, callDurationSeconds)
             } else {
-                VoiceCallBackdrop(session, callDurationSeconds, bundleTokens)
+                if (iosLayout) {
+                    val colors = com.example.chat.ui.theme.LocalAppColors.current
+                    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(colors.background, colors.accent.copy(alpha = 0.22f), colors.surfaceSecondary, colors.background))))
+                } else VoiceCallBackdrop(session, callDurationSeconds, bundleTokens)
             }
 
             // Draggable local preview PiP (Dart _localPipOffset, 120x160).
@@ -216,7 +241,7 @@ fun OngoingCallScreen(
                     modifier = Modifier
                         .offset(localPipOffsetX.dp, localPipOffsetY.dp)
                         .size(120.dp, 160.dp)
-                        .background(Color.Black, RoundedCornerShape(16.dp))
+                        .background(callBackdrop(), RoundedCornerShape(16.dp))
                         .pointerInput(screenW, screenH) {
                             detectDragGestures { change, dragAmount ->
                                 change.consume()
@@ -234,25 +259,28 @@ fun OngoingCallScreen(
                             Icon(
                                 Icons.Rounded.VideocamOff,
                                 contentDescription = null,
-                                tint = Color(0xA6FFFFFF),
+                                tint = callSecondary(),
                             )
                         }
                     }
-                    Box(
-                        contentAlignment = Alignment.Center,
+                    IconButton(
+                        onClick = onSwitchCamera,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(6.dp)
-                            .size(32.dp)
-                            .background(Color(0x9E000000), CircleShape)
-                            .clickable { onSwitchCamera() },
+                            .size(48.dp),
                     ) {
-                        Icon(
-                            Icons.Rounded.Cameraswitch,
-                            contentDescription = "Switch camera",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp),
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(32.dp).background(callSurface(), CircleShape),
+                        ) {
+                            Icon(
+                                Icons.Rounded.Cameraswitch,
+                                contentDescription = "Switch camera",
+                                tint = callForeground(),
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -267,7 +295,7 @@ fun OngoingCallScreen(
                 ) {
                     Text(
                         if (session.state == CallSessionState.busy) "User is on another call (Busy)" else setupError ?: "The media connection failed.",
-                        color = Color.White,
+                        color = com.example.chat.ui.theme.LocalAppColors.current.onError,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
@@ -279,7 +307,7 @@ fun OngoingCallScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset(y = topOffset)
-                    .then(topPanelDecoration(template))
+                    .then(if (iosLayout && !session.isVideo) Modifier else topPanelDecoration(template))
                     .then(topPanelPadding(template)),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -287,28 +315,43 @@ fun OngoingCallScreen(
                         Icon(
                             Icons.Rounded.ChevronLeft,
                             contentDescription = "Back",
-                            tint = Color.White,
+                            tint = callForeground(),
                         )
                     }
+                    BoxWithConstraints(Modifier.weight(1f)) {
+                    val headerMaxWidth = maxWidth
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(
                             session.remoteDisplayName,
-                            color = Color.White,
-                            fontSize = 17.sp,
+                            color = callForeground(),
+                            // The header middle is ~99dp wide at a 220dp window (run
+                            // 41879111168 XML), under the 116.dp compact threshold the
+                            // controls already use below. The existing 13.sp secondary
+                            // size keeps a long word on one line so maxLines = 2 wraps
+                            // at the word boundary instead of breaking inside the word.
+                            fontSize = if (iosLayout && !session.isVideo) 26.sp
+                                else if (headerMaxWidth < 116.dp) 13.sp else 17.sp,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 1,
+                            // Two lines everywhere: narrow widths wrap instead of
+                            // truncating to a stub; one line when the name fits.
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
                             statusLabel(session, callDurationSeconds),
-                            color = Color(0xB8FFFFFF),
-                            fontSize = 13.sp,
+                            color = callSecondary(),
+                            fontSize = if (iosLayout && !session.isVideo) 16.sp else 13.sp,
                             fontWeight = FontWeight.Medium,
                         )
+                    }
+                    }
+                    if (onCallTools != null && !(iosLayout && !session.isVideo)) {
+                        IconButton(onClick = onCallTools) { Icon(Icons.Rounded.MoreHoriz, "Call tools", tint = callForeground()) }
                     }
                     if (session.isVideo) {
                         IconButton(
@@ -318,7 +361,7 @@ fun OngoingCallScreen(
                             Icon(
                                 Icons.Rounded.PictureInPicture,
                                 contentDescription = "Picture-in-picture",
-                                tint = Color.White,
+                                tint = callForeground(),
                             )
                         }
                     }
@@ -327,7 +370,7 @@ fun OngoingCallScreen(
                             Icon(
                                 Icons.Rounded.AutoAwesome,
                                 contentDescription = "Call filter",
-                                tint = Color.White,
+                                tint = callForeground(),
                             )
                         }
                     }
@@ -335,20 +378,26 @@ fun OngoingCallScreen(
                         Icon(
                             if (focusMode) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen,
                             contentDescription = if (focusMode) "Exit focus mode" else "Focus mode",
-                            tint = Color.White,
+                            tint = callForeground(),
                         )
                     }
                 }
             }
 
+            if (callToolsStatus != null || reactionText != null) {
+                Column(Modifier.align(Alignment.Center).background(callSurface(), RoundedCornerShape(24.dp)).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    callToolsStatus?.let { Text(it, color = callForeground()) }
+                    reactionText?.let { Text(it, color = callForeground(), fontSize = 24.sp) }
+                }
+            }
             // Bottom control bar.
-            val bottomOffset by animateDpAsState(if (controlsVisible) 0.dp else 150.dp, animationSpec = if (reduceMotion) snap() else tween(220), label = "bottomPanel")
+            val bottomOffset by animateDpAsState(if (controlsVisible || !session.isVideo) 0.dp else 150.dp, animationSpec = if (reduceMotion) snap() else tween(220), label = "bottomPanel")
             BoxWithConstraints(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.48f).dp)
+                    .heightIn(max = (LocalConfiguration.current.screenHeightDp * if (session.isVideo) 0.48f else 0.65f).dp)
                     .verticalScroll(rememberScrollState())
                     .offset(y = bottomOffset)
-                    .then(bottomPanelDecoration(template))
+                    .then(if (iosLayout && !session.isVideo) Modifier else bottomPanelDecoration(template))
                     .then(bottomPanelPadding(template)),
             ) {
                 var showMore by remember { mutableStateOf(false) }
@@ -357,6 +406,7 @@ fun OngoingCallScreen(
                         if (session.isMuted) Icons.Rounded.MicOff else Icons.Rounded.Mic,
                         session.isMuted, hasLocalMedia || session.isDemo, onToggleMute))
                     if (session.isVideo) {
+                        if (onReturnToAudio != null) add(CallControlAction("Return to audio", Icons.Rounded.Call, false, true, onReturnToAudio))
                         add(CallControlAction(if (session.isCameraOff) "Camera on" else "Camera off",
                             if (session.isCameraOff) Icons.Rounded.VideocamOff else Icons.Rounded.Videocam,
                             session.isCameraOff, hasLocalMedia || session.isDemo, onToggleCamera))
@@ -372,7 +422,15 @@ fun OngoingCallScreen(
                         onToggleAudioRoute(if (session.audioRoute == AudioRouteType.speaker) AudioRouteType.earpiece else AudioRouteType.speaker)
                     })
                 }
-                if (bundleId == com.example.chat.ui.calls.bundles.CallBundleId.GOOGLE_PHONE_LATEST) {
+                if (!session.isVideo && iosLayout) {
+                    IosSupportedAudioControls(session, hasLocalMedia || session.isDemo,
+                        onToggleMute, { onToggleAudioRoute(if (session.audioRoute == AudioRouteType.speaker) AudioRouteType.earpiece else AudioRouteType.speaker) },
+                        onRequestVideo, onCallTools, onEndCall)
+                } else if (!session.isVideo) {
+                    AudioFourControls(session, hasLocalMedia || session.isDemo,
+                        onToggleMute, { onToggleAudioRoute(if (session.audioRoute == AudioRouteType.speaker) AudioRouteType.earpiece else AudioRouteType.speaker) },
+                        onRequestVideo, videoUpgradeStatus, onEndCall, bundleId)
+                } else if (bundleId == com.example.chat.ui.calls.bundles.CallBundleId.GOOGLE_PHONE_LATEST) {
                     GoogleLatestProductionControls(
                         actions = actions, availableWidthDp = maxWidth.value.toInt(),
                         accent = callAccent, surface = controlBackground,
@@ -410,9 +468,14 @@ fun OngoingCallScreen(
                         }
                     }
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(54.dp)
-                        .clip(RoundedCornerShape(10.dp)).background(endCallColor)
-                        .semantics { contentDescription = "End call" }.clickable { onEndCall() }) {
-                        Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                        .clip(CircleShape).background(endCallColor)
+                        .semantics {
+                            contentDescription = "End call"
+                            role = Role.Button
+                            onClick(label = "End call") { onEndCall(); true }
+                        }) {
+                        Box(Modifier.matchParentSize().clip(CircleShape).clickable { onEndCall() })
+                        Icon(Icons.Rounded.CallEnd, null, tint = com.example.chat.ui.theme.LocalAppColors.current.onError, modifier = Modifier.size(28.dp))
                     }
                 }
                 if (compact) Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
@@ -456,19 +519,19 @@ private fun CallControlButton(
     activeColor: Color,
     enabled: Boolean,
     onClick: () -> Unit,
-    inactiveBackground: Color = Color(0xB32C3038),
+    inactiveBackground: Color = callSurface(),
     icon: @Composable (tint: Color) -> Unit,
 ) {
-    val tint = if (active) activeColor else Color.White
+    val tint = if (active) com.example.chat.ui.theme.LocalAppColors.current.onAccent else callForeground()
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(54.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(CircleShape)
             .semantics { contentDescription = label }
             .background(
                 if (active) activeColor.copy(alpha = 0.28f) else inactiveBackground,
-                RoundedCornerShape(10.dp),
+                CircleShape,
             )
             .clickable(enabled = enabled) { onClick() },
     ) {
@@ -485,7 +548,7 @@ private fun RemoteVideoSurface(
     if (videoSurfaces == null || !videoSurfaces.hasRemoteVideo) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize().background(Color(0xFF07090D)),
+            modifier = Modifier.fillMaxSize().background(callBackdrop()),
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CallAvatar(
@@ -498,14 +561,14 @@ private fun RemoteVideoSurface(
                 Spacer(Modifier.height(18.dp))
                 Text(
                     statusLabel(session, callDurationSeconds),
-                    color = Color(0xB3FFFFFF),
+                    color = callSecondary(),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.height(16.dp))
                 CircularProgressIndicator(
                     strokeWidth = 2.2.dp,
-                    color = Color(0xB3FFFFFF),
+                    color = callSecondary(),
                     modifier = Modifier.size(24.dp),
                 )
             }
@@ -569,8 +632,13 @@ private fun VoiceCallBackdrop(
                 session.remoteDisplayName,
                 color = bundleTokens?.primaryText ?: Color(theme.primaryTextColor),
                 fontSize = identity.nameSp.sp,
+                // Large font scales wrap the name to two lines; default metrics let the
+                // lines collide at fontScale 1.5 (run 41870523872 pixel). 1.25em keeps
+                // the gap proportional at any scale.
+                lineHeight = (identity.nameSp * 1.25f).sp,
                 fontWeight = if (identity.lightName) FontWeight.Light else FontWeight.Bold,
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             Spacer(Modifier.height(4.dp))
             Text(
@@ -585,15 +653,16 @@ private fun VoiceCallBackdrop(
 
 // ── Template decorations (Dart _topPanelDecoration/_bottomPanelDecoration) ──
 
+@Composable
 private fun topPanelDecoration(template: CallScreenTemplate): Modifier =
     when (template) {
         CallScreenTemplate.card -> Modifier
             .padding(start = 16.dp, top = 8.dp, end = 16.dp)
-            .background(Color(0x8C000000), RoundedCornerShape(20.dp))
+            .background(callSurface(), RoundedCornerShape(20.dp))
         CallScreenTemplate.edge -> Modifier
         else -> Modifier.background(
             androidx.compose.ui.graphics.Brush.verticalGradient(
-                listOf(Color(0xC2000000), Color.Transparent),
+                listOf(callSurface(), Color.Transparent),
             ),
         )
     }
@@ -605,19 +674,20 @@ private fun topPanelPadding(template: CallScreenTemplate): Modifier =
         Modifier.padding(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 12.dp)
     }
 
+@Composable
 private fun bottomPanelDecoration(template: CallScreenTemplate): Modifier =
     when (template) {
         CallScreenTemplate.sheet -> Modifier.background(
-            Color(0xF2141414),
+            callSurface(),
             RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
         )
         CallScreenTemplate.card -> Modifier
             .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
-            .background(Color(0x99000000), RoundedCornerShape(10.dp))
+            .background(callSurface(), RoundedCornerShape(10.dp))
         CallScreenTemplate.edge -> Modifier
         CallScreenTemplate.chatyClassic -> Modifier.background(
             androidx.compose.ui.graphics.Brush.verticalGradient(
-                listOf(Color.Transparent, Color(0xD6000000)),
+                listOf(Color.Transparent, callSurface()),
             ),
         )
     }
@@ -661,7 +731,7 @@ private fun GoogleLatestProductionControls(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        val tint = if (action.active) Color.White else Color.White.copy(alpha = if (action.enabled) 1f else 0.4f)
+                        val tint = if (action.active) com.example.chat.ui.theme.LocalAppColors.current.onAccent else callForeground().copy(alpha = if (action.enabled) 1f else 0.4f)
                         Icon(action.icon, null, tint = tint, modifier = Modifier.size(24.dp))
                         Spacer(Modifier.height(4.dp))
                         Text(action.label, color = tint, fontSize = 12.sp, maxLines = 2,
@@ -673,10 +743,16 @@ private fun GoogleLatestProductionControls(
         }
         Box(
             Modifier.width(availableWidthDp.coerceAtMost(144).coerceAtLeast(1).dp).height(64.dp).clip(RoundedCornerShape(32.dp))
-                .background(endColor).semantics { contentDescription = "End call" }
-                .clickable(onClick = onEndCall), contentAlignment = Alignment.Center,
+                .background(endColor)
+                .semantics {
+                    contentDescription = "End call"
+                    role = Role.Button
+                    onClick(label = "End call") { onEndCall(); true }
+                },
+            contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(32.dp))
+            Box(Modifier.matchParentSize().clip(RoundedCornerShape(32.dp)).clickable(onClick = onEndCall))
+            Icon(Icons.Rounded.CallEnd, null, tint = com.example.chat.ui.theme.LocalAppColors.current.onError, modifier = Modifier.size(32.dp))
         }
     }
 }
@@ -708,17 +784,17 @@ private fun BundleProductionControls(
                         val buttonShape = if (layout.circle) CircleShape else RoundedCornerShape(layout.controlRadiusDp.dp)
                         val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
                         val fill by androidx.compose.animation.animateColorAsState(
-                            targetValue = if (action.active) accent else if (layout.panel) Color.White.copy(alpha = 0.08f) else surface,
+                            targetValue = if (action.active) accent else if (layout.panel) callForeground().copy(alpha = 0.08f) else surface,
                             animationSpec = androidx.compose.animation.core.tween(if (reduceMotion) 0 else 140), label = "call-control-state")
                         Box(Modifier.size(52.dp).clip(buttonShape)
                             .background(fill),
                             contentAlignment = Alignment.Center) {
                             Icon(action.icon, null,
-                                tint = Color.White.copy(alpha = if (action.enabled) 1f else 0.4f),
+                                tint = callForeground().copy(alpha = if (action.enabled) 1f else 0.4f),
                                 modifier = Modifier.size(24.dp))
                         }
                         Spacer(Modifier.height(6.dp))
-                        Text(action.label, color = Color.White.copy(alpha = if (action.enabled) 1f else 0.4f),
+                        Text(action.label, color = callForeground().copy(alpha = if (action.enabled) 1f else 0.4f),
                             fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
@@ -733,11 +809,137 @@ private fun BundleProductionControls(
 private fun BundleEndAction(color: Color, onEnd: () -> Unit, wide: Boolean, availableWidthDp: Int) {
     Box(Modifier.width((if (wide) availableWidthDp.coerceAtMost(280) else 64).coerceAtMost(availableWidthDp).coerceAtLeast(1).dp)
         .height(64.dp).clip(RoundedCornerShape(32.dp)).background(color)
-        .semantics { contentDescription = "End call" }.clickable(onClick = onEnd),
+        .semantics {
+            contentDescription = "End call"
+            role = Role.Button
+            // One node carries label + role + action; the child layer is pointer-only.
+            onClick(label = "End call") { onEnd(); true }
+        },
         contentAlignment = Alignment.Center) {
+        Box(Modifier.matchParentSize().clip(RoundedCornerShape(32.dp)).clickable(onClick = onEnd))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.CallEnd, null, tint = Color.White, modifier = Modifier.size(28.dp))
-            if (wide) { Spacer(Modifier.width(8.dp)); Text("End call", color = Color.White, maxLines = 1) }
+            Icon(Icons.Rounded.CallEnd, null, tint = com.example.chat.ui.theme.LocalAppColors.current.onError, modifier = Modifier.size(28.dp))
+            if (wide) { Spacer(Modifier.width(8.dp)); Text("End call", color = com.example.chat.ui.theme.LocalAppColors.current.onError, maxLines = 1) }
         }
+    }
+}
+
+/** iOS composition with real actions only. Empty cells preserve reference alignment,
+ * not fake controls. Video appears only when the host provides a working upgrade. */
+@Composable
+private fun IosSupportedAudioControls(session: ChatyCallSession, ready: Boolean,
+    mute: () -> Unit, speaker: () -> Unit, video: (() -> Unit)?,
+    more: (() -> Unit)?, end: () -> Unit) {
+    val colors = com.example.chat.ui.theme.LocalAppColors.current
+    val entries = listOf(
+        CallControlAction("Speaker", Icons.Rounded.VolumeUp, session.audioRoute == AudioRouteType.speaker, ready, speaker),
+        video?.let { CallControlAction("Video", Icons.Rounded.Videocam, false, true, it) },
+        CallControlAction("Mute", if (session.isMuted) Icons.Rounded.MicOff else Icons.Rounded.Mic, session.isMuted, ready, mute),
+        more?.let { CallControlAction("More", Icons.Rounded.MoreHoriz, false, true, it) },
+        CallControlAction("End", Icons.Rounded.CallEnd, false, true, end),
+        null,
+    )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val columns = if (maxWidth < 160.dp) 1 else if (maxWidth < 260.dp || LocalConfiguration.current.fontScale > 1.5f) 2 else 3
+        val rows = if (columns == 3) entries.chunked(3) else entries.filterNotNull().chunked(columns)
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            rows.forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { action ->
+                        if (action == null) Spacer(Modifier.weight(1f)) else {
+                            Column(Modifier.weight(1f).semantics {
+                                contentDescription = action.label
+                                role = Role.Button
+                                stateDescription = if (action.label == "Mute") {
+                                    if (session.isMuted) "Muted" else "Microphone on"
+                                } else if (action.label == "Speaker") {
+                                    if (session.audioRoute == AudioRouteType.speaker) "Speaker on" else "Speaker off"
+                                } else ""
+                                // Emulator hierarchy (run 41851643303) showed this labelled
+                                // summary node split from the IconButton click node, so no
+                                // node carried label + click together and the control was not
+                                // actionable by its label. Carry the action on the labelled
+                                // node itself; IconButton keeps pointer visuals.
+                                if (action.enabled) {
+                                    onClick(label = action.label) { action.onClick(); true }
+                                } else disabled()
+                            }, horizontalAlignment = Alignment.CenterHorizontally) {
+                                val isEnd = action.label == "End"
+                                IconButton(onClick = action.onClick, enabled = action.enabled,
+                                    modifier = Modifier.size(60.dp).clip(CircleShape).background(
+                                        if (isEnd) colors.error else if (action.active) colors.accent else colors.foreground.copy(alpha = 0.10f))) {
+                                    Icon(action.icon, null, tint = if (isEnd) colors.onError else if (action.active) colors.onAccent else
+                                        colors.foreground.copy(alpha = if (action.enabled) 1f else 0.4f), modifier = Modifier.size(26.dp))
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Text(action.label, color = colors.foreground, fontSize = 12.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            }
+                        }
+                    }
+                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
+
+/** Exactly four primary audio controls. Wrapping protects labels at narrow/large text. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun AudioFourControls(session: ChatyCallSession, mediaReady: Boolean, mute: () -> Unit, speaker: () -> Unit,
+    video: (() -> Unit)?, videoStatus: String, end: () -> Unit,
+    bundle: com.example.chat.ui.calls.bundles.CallBundleId? = null) {
+    val c = com.example.chat.ui.theme.LocalAppColors.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val profile = callBundleVisualProfile(bundle)
+    val panelShape = RoundedCornerShape(profile.panelRadiusDp.dp)
+    val panelModifier = if (profile.panel) Modifier.background(c.surfaceSecondary, panelShape).padding(12.dp) else Modifier
+    val entries = listOf(
+        CallControlAction("Mute", if (session.isMuted) Icons.Rounded.MicOff else Icons.Rounded.Mic, session.isMuted, mediaReady, mute),
+        CallControlAction("Speaker", Icons.Rounded.VolumeUp, session.audioRoute == AudioRouteType.speaker, mediaReady, speaker),
+        CallControlAction("Video", Icons.Rounded.Videocam, false, true) {
+            if (video != null) video() else android.widget.Toast.makeText(context, videoStatus, android.widget.Toast.LENGTH_LONG).show()
+        },
+        CallControlAction("Hang up", Icons.Rounded.CallEnd, false, true, end),
+    )
+    BoxWithConstraints(Modifier.fillMaxWidth().then(panelModifier)) {
+      val columns = responsiveAudioControlColumns(maxWidth.value.toInt(), profile.columns)
+      val cellWidth = maxWidth / columns
+      val diameter = minOf(profile.controlDiameterDp.dp, (cellWidth - 8.dp).coerceAtLeast(48.dp))
+      androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalArrangement = Arrangement.spacedBy(minOf(profile.spacingDp, 12).dp), maxItemsInEachRow = columns) {
+        entries.forEach { a ->
+            Box(Modifier.width(cellWidth).semantics {
+                    contentDescription = if (a.label == "Video" && video == null) "Video - $videoStatus" else a.label
+                    role = Role.Button
+                    stateDescription = when (a.label) {
+                        "Mute" -> if (session.isMuted) "Muted" else "Microphone on"
+                        "Speaker" -> if (session.audioRoute == AudioRouteType.speaker) "Speaker on" else "Speaker off"
+                        else -> ""
+                    }
+                    // One a11y node carries label + role + action (sibling Modifier.clickable
+                    // splits the node - runs 41851643303/41861366491). Pointer input is a
+                    // full-cell child layer: run 41870523872 showed an icon-only target lets
+                    // a center-tap of this node fall into dead space at narrow/large text.
+                    if (a.enabled) {
+                        onClick(label = a.label) { a.onClick(); true }
+                    } else disabled()
+                }) {
+                Box(Modifier.matchParentSize().clickable(enabled = a.enabled, onClick = a.onClick))
+                Column(Modifier.align(Alignment.TopCenter).padding(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    val fill = if (a.label == "Hang up") c.error else if (a.active) c.accent else c.surface
+                    val outline = if (profile.outlined && a.label != "Hang up") Modifier.border(2.dp, if (a.active) c.accent else c.border, CircleShape) else Modifier
+                    Box(Modifier.size(diameter).clip(CircleShape).background(fill).then(outline), contentAlignment = Alignment.Center) {
+                        Icon(a.icon, null, tint = if (a.label == "Hang up") c.onError else if (a.active) c.onAccent else if (a.enabled) c.foreground else c.foregroundSecondary, modifier = Modifier.size(24.dp))
+                    }
+                    Text(a.label, color = c.foreground, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    if (a.label == "Video" && video == null) Text("Not ready", color = c.foregroundSecondary, fontSize = 10.sp)
+                }
+            }
+        }
+    }
     }
 }

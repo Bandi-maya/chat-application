@@ -1,6 +1,12 @@
 package com.example.chat.ui.kit
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.role
+
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.onClick
 
 import androidx.compose.foundation.selection.toggleable
 
@@ -212,17 +218,37 @@ fun ChatyColorPickerModal(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ColorPickerLogic.presetSwatches.forEach { c ->
                     val sel = c == color
+                    // 48dp touch target around the 40dp swatch. clearAndSetSemantics puts the
+                    // label, selection and the single click action on ONE node with no
+                    // cross-node merging. Role is Tab because Compose exposes
+                    // SemanticsProperties.Selected as AccessibilityNodeInfo.isSelected only
+                    // for Role.Tab; Role.Button/RadioButton map it to isChecked instead
+                    // (AndroidComposeViewAccessibilityDelegateCompat), and this repo's camera
+                    // mode tabs prove the Tab + selected mapping end to end.
+                    val pick: () -> Unit = { color = c; hex = ColorPickerLogic.toHex(c) }
                     Box(
-                        Modifier.size(40.dp).background(Color(c), CircleShape)
-                            .border(if (sel) 3.dp else 1.5.dp, if (sel) colors.primary else colors.border, CircleShape)
+                        Modifier.size(48.dp)
                             .clip(CircleShape)
-                            .clickable { color = c; hex = ColorPickerLogic.toHex(c) },
+                            .clearAndSetSemantics {
+                                contentDescription = "Preset color ${ColorPickerLogic.toHex(c)}"
+                                selected = sel
+                                role = Role.Tab
+                                onClick(null) { pick(); true }
+                            }
+                            .clickable { pick() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (sel) Icon(
-                            Icons.Rounded.Check, null, modifier = Modifier.size(20.dp),
-                            tint = if (ColorPickerLogic.luminance(c) > 0.5) Color.Black else Color.White,
-                        )
+                        Box(
+                            Modifier.size(40.dp).background(Color(c), CircleShape)
+                                .border(if (sel) 3.dp else 1.5.dp, if (sel) colors.primary else colors.border, CircleShape)
+                                .clip(CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (sel) Icon(
+                                Icons.Rounded.Check, null, modifier = Modifier.size(20.dp),
+                                tint = if (ColorPickerLogic.luminance(c) > 0.5) Color.Black else Color.White,
+                            )
+                        }
                     }
                 }
             }

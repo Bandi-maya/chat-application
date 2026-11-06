@@ -34,13 +34,19 @@ object ContactInfoLogic {
         }
     }
 
+    /** An index must not bypass deletion, view-once or no-copy rules in the message surface. */
+    fun indexable(message: ChatMessage): Boolean = !message.isDeletedForEveryone && !message.isDeletedForMe &&
+        !message.isRevokedBySender && !com.example.chat.data.local.AttachmentCachePolicy.viewOnceRestricted(message.metadata) &&
+        message.metadata["no_save"] != true && message.metadata["protected"] != true &&
+        message.metadata["restricted"] != true
+
     /** _media getter: attachment type image or video. */
     fun sharedMedia(messages: List<ChatMessage>): List<ChatMessage> =
-        messages.filter { it.attachment?.type == "image" || it.attachment?.type == "video" }
+        messages.filter { indexable(it) && (it.attachment?.type == "image" || it.attachment?.type == "video") }
 
     /** _documents getter: attachment type document. */
     fun sharedDocuments(messages: List<ChatMessage>): List<ChatMessage> =
-        messages.filter { it.attachment?.type == "document" }
+        messages.filter { indexable(it) && it.attachment?.type == "document" }
 
     private val LINK_REGEX = Regex("https?://\\S+", RegexOption.IGNORE_CASE)
 
@@ -48,7 +54,7 @@ object ContactInfoLogic {
      *  Dart LinkedHashSet (insertion-order) semantics. */
     fun extractLinks(messages: List<ChatMessage>): List<String> {
         val links = LinkedHashSet<String>()
-        for (message in messages) {
+        for (message in messages.filter(::indexable)) {
             for (match in LINK_REGEX.findAll(message.text)) {
                 if (match.value.isNotEmpty()) links.add(match.value)
             }

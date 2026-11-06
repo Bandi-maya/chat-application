@@ -92,6 +92,9 @@ fun RegisterOrganizationScreen(
     var hasManuallyEditedSlug by remember { mutableStateOf(false) }
     var allowUserRegistration by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    // Play UGC policy (P-06): account creation is gated on explicit acceptance.
+    var acceptedTerms by remember { mutableStateOf(false) }
+    var legalDialogAsset by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     var orgNameError by remember { mutableStateOf<String?>(null) }
     var tenantIdError by remember { mutableStateOf<String?>(null) }
@@ -135,6 +138,11 @@ fun RegisterOrganizationScreen(
         if (listOf(orgNameError, tenantIdError, fullNameError, usernameError, emailError, passwordError)
                 .any { it != null } || isLoading
         ) return
+
+        if (com.example.chat.ReleaseFeatures.LEGAL_ACCEPTANCE_GATE && !acceptedTerms) {
+            errorMessage = "Please accept the Terms of Use and Privacy Policy to create your organization."
+            return
+        }
 
         isLoading = true
         errorMessage = null
@@ -308,12 +316,27 @@ fun RegisterOrganizationScreen(
                     }
                 }
 
+                if (com.example.chat.ReleaseFeatures.LEGAL_ACCEPTANCE_GATE) {
+                    TermsAcceptanceRow(
+                        theme = theme,
+                        checked = acceptedTerms,
+                        onCheckedChange = { acceptedTerms = it; if (it) errorMessage = null },
+                        onOpenTerms = { legalDialogAsset = "Terms of Use" to "legal/terms_of_use.md" },
+                        onOpenPrivacy = { legalDialogAsset = "Privacy Policy" to "legal/privacy_policy.md" },
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                }
+
                 AuthPrimaryButton(
                     text = "Create Organization",
                     theme = theme,
                     onClick = { handleRegister() },
                     isLoading = isLoading,
                 )
+
+                legalDialogAsset?.let { (title, asset) ->
+                    LegalTextDialog(theme = theme, title = title, assetPath = asset, onDismiss = { legalDialogAsset = null })
+                }
                 Spacer(Modifier.height(20.dp))
 
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

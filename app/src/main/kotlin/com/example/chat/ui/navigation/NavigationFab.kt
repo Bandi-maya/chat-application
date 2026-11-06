@@ -40,14 +40,14 @@ import androidx.compose.material.icons.rounded.ReplyAll
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.ScheduleSend
 import androidx.compose.material.icons.rounded.Settings
+import com.example.chat.ui.kit.ChatyActionButton
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
-import androidx.compose.material3.Button
+import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -123,6 +123,8 @@ fun ContextualNavigationFab(
     var quickActionsOpen by remember { mutableStateOf(false) }
     var directNumberOpen by remember { mutableStateOf(false) }
 
+    val referenceShape = LocalReferenceDefaultPresentation.current && activeDestinationId in setOf(ChatyNavigationDestinationIds.chats, ChatyNavigationDestinationIds.groups)
+    val mainFabShape: androidx.compose.ui.graphics.Shape = if (referenceShape) RoundedCornerShape(16.dp) else CircleShape
     val accent = colors.primary
     val effectiveFabColor = prefs.fabNormalColor?.let(::Color) ?: accent
     val effectiveIconColor = prefs.fabIconsColor?.let(::Color) ?: colors.onPrimary
@@ -193,8 +195,8 @@ fun ContextualNavigationFab(
         Box(
             contentAlignment = Alignment.Center,
             modifier = modifier
-                .shadow(4.5.dp, CircleShape)
-                .clip(CircleShape)
+                .shadow(4.5.dp, mainFabShape)
+                .clip(mainFabShape)
                 .background(effectiveFabColor)
                 .clickable(onClick = onClick)
                 .padding(16.dp),
@@ -245,6 +247,7 @@ fun ContextualNavigationFab(
                 surfaceColor = colors.surfaceElevated,
                 textColor = colors.foreground,
                 showMetaAiIcon = prefs.showMetaAiIcon,
+                mainFabShape = mainFabShape,
                 modifier = modifier,
             )
         }
@@ -256,7 +259,7 @@ fun ContextualNavigationFab(
             title = { Text("Restart Chaty?") },
             text = { Text("Chaty will close and reopen. Make sure any unsent text is saved first.") },
             confirmButton = {
-                Button(onClick = {
+                ChatyActionButton(onClick = {
                     restartConfirm = false
                     scope.launch {
                         try {
@@ -267,7 +270,7 @@ fun ContextualNavigationFab(
                     }
                 }) { Text("Restart") }
             },
-            dismissButton = { TextButton(onClick = { restartConfirm = false }) { Text("Cancel") } },
+            dismissButton = { ChatyTextButton(onClick = { restartConfirm = false }, label = "Cancel") },
         )
     }
 
@@ -300,6 +303,7 @@ fun ContextualNavigationFab(
  *  above the main FAB, close icon swap. */
 @Composable
 private fun HomeSpeedDialFab(
+    mainFabShape: androidx.compose.ui.graphics.Shape = CircleShape,
     actions: List<DialActionLike>,
     normalColor: Color,
     iconColor: Color,
@@ -345,8 +349,8 @@ private fun HomeSpeedDialFab(
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .shadow(4.5.dp, CircleShape)
-                .clip(CircleShape)
+                .shadow(4.5.dp, mainFabShape)
+                .clip(mainFabShape)
                 .background(normalColor)
                 .clickable { expanded = !expanded }
                 .padding(16.dp),
@@ -487,10 +491,10 @@ private fun DirectNumberDialog(
             }
         },
         confirmButton = {
-            Button(
+            ChatyActionButton(
                 onClick = {
                     val trimmed = input.trim()
-                    if (trimmed.isEmpty()) return@Button
+                    if (trimmed.isEmpty()) return@ChatyActionButton
                     onDismiss()
                     scope.launch {
                         try {
@@ -503,6 +507,6 @@ private fun DirectNumberDialog(
                 },
             ) { Text("Chat") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { ChatyTextButton(onClick = onDismiss, label = "Cancel") },
     )
 }

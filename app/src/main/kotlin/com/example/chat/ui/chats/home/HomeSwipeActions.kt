@@ -111,7 +111,11 @@ fun HomeSwipeActions(
         Box(Modifier.fillMaxWidth().draggable(
             state = dragState,
             orientation = Orientation.Horizontal,
-            enabled = enabled,
+            // Keep standard horizontal touch-slop consumption even when reveal
+            // is disabled for selection. Otherwise a sideways drag can reach
+            // the child clickable as a tap. Delta/settle guards below still keep
+            // the row closed; vertical scrolling and ordinary taps are untouched.
+            enabled = true,
             onDragStarted = { animation.value?.cancel(); offset.floatValue = current },
             onDragStopped = { velocity ->
                 if (enabled) settle(homeSwipeSettleTarget(

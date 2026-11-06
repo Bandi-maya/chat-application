@@ -60,9 +60,9 @@ fun InAppCallPip(
     onEndCall: () -> Unit,
     bundleId: com.example.chat.ui.calls.bundles.CallBundleId? = null,
 ) {
-    val bundleTokens = bundleId?.let { com.example.chat.ui.calls.bundles.CallBundleRegistry.getTokens(it) }
-    val compactBackground = bundleTokens?.cardBackground ?: Color(0xFF141416)
-    val compactAccent = bundleTokens?.primaryAccent ?: Color(0xFF22C55E)
+    val bundleTokens = bundleId?.let { themedCallBundle(it) }
+    val compactBackground = bundleTokens?.cardBackground ?: callSurface()
+    val compactAccent = bundleTokens?.primaryAccent ?: callAccent()
     val compactCorner = bundleTokens?.cardCornerRadiusDp ?: 20
     BoxWithConstraints(Modifier.fillMaxSize()) {
     // Parent owns cutout/status safety. Measure its available bounds, not the
@@ -125,7 +125,7 @@ fun InAppCallPip(
         } else {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize().background(bundleTokens?.surfaceBackground ?: Color(0xFF1E1E24)),
+                modifier = Modifier.fillMaxSize().background(bundleTokens?.surfaceBackground ?: callBackdrop()),
             ) {
                 CallAvatar(
                     initials = session.remoteAvatarInitials
@@ -146,14 +146,14 @@ fun InAppCallPip(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(8.dp)
-                .background(Color(0xA6000000), RoundedCornerShape(10.dp))
+                .background(callSurface(), RoundedCornerShape(10.dp))
                 .padding(horizontal = 6.dp, vertical = 3.dp),
         ) {
             Box(Modifier.size(6.dp).background(compactAccent, CircleShape))
             Spacer4()
             Text(
                 compactCallStatus(session.state, durationSeconds),
-                color = Color.White,
+                color = callForeground(),
                 fontSize = 10.5.sp,
                 fontWeight = FontWeight.Bold,
             )
@@ -162,7 +162,7 @@ fun InAppCallPip(
         if (showControls) {
             Box(
                 contentAlignment = Alignment.BottomCenter,
-                modifier = Modifier.fillMaxSize().background(Color(0x8C000000)),
+                modifier = Modifier.fillMaxSize().background(callSurface().copy(alpha = 0.9f)),
             ) {
                 // Three 48dp action targets cannot fit a 120dp-wide row.
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -170,7 +170,7 @@ fun InAppCallPip(
                         Icon(
                             Icons.Rounded.Fullscreen,
                             contentDescription = "Expand call",
-                            tint = Color.White,
+                            tint = callForeground(),
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -178,7 +178,7 @@ fun InAppCallPip(
                         Icon(
                             Icons.Rounded.Minimize,
                             contentDescription = "Minimize to Island",
-                            tint = Color(0xB3FFFFFF),
+                            tint = callSecondary(),
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -186,7 +186,7 @@ fun InAppCallPip(
                         Icon(
                             Icons.Rounded.CallEnd,
                             contentDescription = "End call",
-                            tint = bundleTokens?.declineColor ?: Color(0xFFEF4444),
+                            tint = bundleTokens?.declineColor ?: com.example.chat.ui.theme.LocalAppColors.current.error,
                             modifier = Modifier.size(22.dp),
                         )
                     }

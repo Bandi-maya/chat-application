@@ -40,7 +40,14 @@ class RadialPlacementProofTest {
             assertFalse("Trigger must not overlap banner", Rect.intersects(menu, banner))
             assertFalse("Trigger must not overlap identity", Rect.intersects(menu, identity))
             assertTrue("Page below reserved navigation strip", banner.top >= menu.bottom)
-            assertTrue("Trigger remains 56dp", menu.width() >= 55 * density)
+            // Preserve failure evidence before any size assertion. The description
+            // selector must identify the clickable target, not its decorative glyph.
+            screenshot("radial-placement-before-size-check")
+            val diagnosticsDir = File(inst.targetContext.getExternalFilesDir(null), "screenshots")
+            device.dumpWindowHierarchy(File(diagnosticsDir, "radial-placement-hierarchy.xml"))
+            val diagnostics = "menu=$menu banner=$banner identity=$identity density=$density display=${device.displayWidth}x${device.displayHeight}"
+            File(diagnosticsDir, "radial-placement-bounds.txt").writeText(diagnostics)
+            assertTrue("Trigger remains 56dp: $diagnostics", menu.width() >= 55 * density)
             scenario.onActivity { activity ->
                 val insets = androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)
                     ?: throw AssertionError("No root insets")
@@ -67,6 +74,14 @@ class RadialPlacementProofTest {
             device.pressBack()
             assertEquals(menu, bounds("Open navigation menu"))
             device.findObject(By.desc("Open navigation menu")).click()
+            // Opening changes Compose state asynchronously. The first open above
+            // synchronizes through bounds(); the second open needs the same gate.
+            val tasksReady = device.wait(Until.hasObject(By.desc("Tasks")), 5000)
+            if (!tasksReady) {
+                screenshot("radial-placement-reopen-missing-tasks")
+                device.dumpWindowHierarchy(File(diagnosticsDir, "radial-placement-reopen-hierarchy.xml"))
+            }
+            assertTrue("Tasks must reappear within 5 seconds after reopening", tasksReady)
             device.findObject(By.desc("Tasks")).click()
             assertTrue("Selection retained", device.wait(Until.hasObject(By.text("Selected: tasks")), 5000))
             assertEquals(menu, bounds("Open navigation menu"))

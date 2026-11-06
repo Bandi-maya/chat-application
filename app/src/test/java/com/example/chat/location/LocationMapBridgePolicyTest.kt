@@ -32,4 +32,19 @@ class LocationMapBridgePolicyTest {
         val a = LocationMapBridgePolicy().session; val b = LocationMapBridgePolicy().session
         assertTrue(a.matches(Regex("[a-f0-9]{32}"))); assertNotEquals(a, b)
     }
+    @Test fun styleEventsAreExactAndAllowlisted() {
+        val fields = mapOf("version" to 1, "type" to "styleChanged", "session" to policy.session, "style" to "fiord")
+        assertEquals(LocationMapEvent.StyleChanged("fiord"), policy.validate(LocationMapBridgePolicy.LOCAL_ORIGIN, true, 150, fields))
+        assertNull(policy.validate(LocationMapBridgePolicy.LOCAL_ORIGIN, true, 150, fields + ("style" to "https://outside.invalid")))
+        assertNull(policy.validate(LocationMapBridgePolicy.LOCAL_ORIGIN, true, 150, fields + ("extra" to true)))
+        assertNull(policy.validate("https://outside.invalid", true, 150, fields))
+        assertNull(policy.validate(LocationMapBridgePolicy.LOCAL_ORIGIN, false, 150, fields))
+    }
+    @Test fun viewEventRequiresExactBooleanShape() {
+        val fields = mapOf("version" to 1, "type" to "viewChanged", "session" to session, "buildings" to true)
+        assertEquals(LocationMapEvent.ViewChanged(true), policy.validate(LocationMapBridgePolicy.LOCAL_ORIGIN, true, 150, fields))
+        assertNull(policy.validate(LocationMapBridgePolicy.LOCAL_ORIGIN, true, 150, fields + ("buildings" to "true")))
+        assertNull(policy.validate(LocationMapBridgePolicy.LOCAL_ORIGIN, true, 150, fields + ("url" to "outside")))
+        assertNull(policy.validate(LocationMapBridgePolicy.LOCAL_ORIGIN, false, 150, fields))
+    }
 }

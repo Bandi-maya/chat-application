@@ -26,6 +26,11 @@ data class StatusRecord(
     val isDeleted: Boolean get() = deletedAt != null
 }
 
+/** Thrown by every StatusService write while the status identity is unbound (fail closed). */
+class StatusIdentityUnboundException : IllegalStateException(
+    "Status isn't available for this account connection yet. Nothing was sent.",
+)
+
 data class StatusViewer(
     val userId: String,
     val displayName: String,
@@ -68,7 +73,21 @@ class StatusService(
     private val gbAudioStatusEnabled: () -> Boolean = { false },
     /** gbDouble('abo_saleh_audio_limit_check' | 'Up_size_limit', fallback). */
     private val gbSizeLimitMb: (key: String, fallback: Double) -> Double = { _, fb -> fb },
+    /**
+     * True only when the signed-in app account is proven to own the Supabase session this service
+     * writes through. No source contract links the custom-backend account (ApiAccountScope) to the
+     * GoTrue session, so the default is false: every write below fails closed with zero network
+     * calls. Do not pass a constant true; wire a real, verified binding when one exists.
+     */
+    private val identityBound: () -> Boolean = { false },
 ) {
+    /** True only when status reads and writes may run. UI uses it for preflight and for the unavailable state. */
+    fun isAvailable(): Boolean = identityBound()
+
+    private fun requireBound() {
+        if (!identityBound()) throw StatusIdentityUnboundException()
+    }
+
     /**
      * Dart watchActiveStatuses (status_updates stream, newest first, unexpired,
      * deleted rows kept only when anti-delete is on). The Supabase realtime
@@ -88,7 +107,7 @@ class StatusService(
             val refresh = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
             val subscribed = java.util.concurrent.atomic.AtomicBoolean(false)
             val userId = currentUserId()
-            val channel = if (userId == null) null else try {
+            val channel = if (userId == null || !identityBound()) null else try {
                 factory(
                     "chaty-status-$userId",
                     listOf(com.example.chat.data.remote.PostgresChangeSubscription(table = "status_updates")),
@@ -109,6 +128,7 @@ class StatusService(
     }
 
     private suspend fun queryActive(keepDeleted: () -> Boolean): List<StatusRecord> {
+        if (!identityBound()) { lastActive = emptyList(); return emptyList() }
         if (currentUserId() == null) return emptyList()
         val result: List<StatusRecord> = try {
             val rows = queryClient.from("status_updates")
@@ -141,6 +161,9 @@ class StatusService(
 
     /** Exact port of publishText. */
     suspend fun publishText(text: String): StatusRecord {
+        // Offline demo: status posts need the server; refuse.
+        if (com.example.chat.data.demo.DemoMode.active) throw IllegalStateException(com.example.chat.data.demo.DemoMode.UNAVAILABLE_MESSAGE)
+        requireBound()
         val value = text.trim()
         if (value.isEmpty()) throw IllegalStateException("Enter status text before publishing.")
         return insert(text = value, mediaType = "text")
@@ -159,7 +182,10 @@ class StatusService(
         mimeType: String? = null,
         durationSeconds: Long = 0,
     ): StatusRecord {
+        requireBound()
         if (mediaType == "audio" && !gbAudioStatusEnabled()) {
+        // Offline demo: status posts need the server; refuse.
+        if (com.example.chat.data.demo.DemoMode.active) throw IllegalStateException(com.example.chat.data.demo.DemoMode.UNAVAILABLE_MESSAGE)
             throw IllegalStateException("Enable Audio Status in Advanced Features first.")
         }
         val size = bytes.size.toLong()
@@ -202,13 +228,16 @@ class StatusService(
     }
 
     /** Exact port of createSignedUrl (default 900s). */
-    suspend fun createSignedUrl(path: String, expiresInSeconds: Int = 900): String =
-        storage.createSignedUrl(BUCKET, path, expiresInSeconds)
+    suspend fun createSignedUrl(path: String, expiresInSeconds: Int = 900): String {
+        requireBound()
+        return storage.createSignedUrl(BUCKET, path, expiresInSeconds)
+    }
 
     /** Exact port of markViewed: gated on preferences readiness, the
      *  publication policy, and the gb hide-view flag; silently no-ops when
      *  publication is suppressed. */
     suspend fun markViewed(status: StatusRecord): Boolean {
+        requireBound()
         if (!preferencesReady()) return false
         val mayPublish = publicationPolicy.allows(
             PrivacyPublication.statusView, privacy(),
@@ -223,6 +252,7 @@ class StatusService(
 
     /** Exact port of viewersFor (embedded profiles join; errors -> empty). */
     suspend fun viewersFor(statusId: String): List<StatusViewer> {
+        requireBound()
         return try {
             val rows = queryClient.from("status_view_events")
                 .select(
@@ -254,6 +284,7 @@ class StatusService(
 
     /** Exact port of deleteStatus (own-status guard + RPC). */
     suspend fun deleteStatus(status: StatusRecord) {
+        requireBound()
         val userId = currentUserId()
         if (userId == null || userId != status.userId) {
             throw IllegalStateException("You can only delete your own status.")
@@ -296,6 +327,13 @@ class StatusService(
         const val BUCKET = "status-media"
         const val STORAGE_LIMIT_MB = 50
 
+        /** Dart num.round(): half away from zero (Math.round is half toward +infinity).
+         *  Finite values only; Dart throws on NaN/Infinity, which is not ported. */
+        fun dartRound(n: Number): Long {
+            val d = n.toDouble()
+            return if (d < 0) -Math.round(-d) else Math.round(d)
+        }
+
         /** Exact port of _fromRow. */
         fun fromRow(row: Map<String, Any?>): StatusRecord = StatusRecord(
             id = row["id"]?.toString() ?: "",
@@ -304,9 +342,9 @@ class StatusService(
             mediaType = row["media_type"]?.toString() ?: "text",
             mediaPath = row["media_path"]?.toString(),
             mediaName = row["media_name"]?.toString(),
-            mediaSize = (row["media_size"] as? Number)?.toLong()
+            mediaSize = (row["media_size"] as? Number)?.let { dartRound(it) }
                 ?: row["media_size"]?.toString()?.toLongOrNull() ?: 0,
-            durationSeconds = (row["duration_seconds"] as? Number)?.toLong() ?: 0,
+            durationSeconds = (row["duration_seconds"] as? Number)?.let { dartRound(it) } ?: 0,
             createdAt = com.example.chat.core.util.parseIsoToInstant(
                 row["created_at"]?.toString(),
             ) ?: Instant.now(),

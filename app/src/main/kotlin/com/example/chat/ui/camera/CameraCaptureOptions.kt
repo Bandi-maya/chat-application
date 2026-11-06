@@ -12,4 +12,5 @@ data class CameraCaptureOptions(
     val stabilization: Boolean = false,
     val watermark: Boolean = false,
     val clarity: Boolean = false,
+    val night: Boolean = false,
 )

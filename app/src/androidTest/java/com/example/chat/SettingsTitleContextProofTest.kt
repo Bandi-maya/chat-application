@@ -1,6 +1,8 @@
 package com.example.chat
 
 import androidx.activity.compose.setContent
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -57,17 +59,27 @@ class SettingsTitleContextProofTest {
         val user = UserProfile("synthetic", "Synthetic Person", "fixture", "SP", "0xFF6366F1", "", lastSeenAt = Instant.now())
         try {
             ActivityScenario.launch(ChatFixtureActivity::class.java).use { scenario ->
+                var generation = 0
                 for ((context, back, visible) in listOf(Triple("settings", false, false), Triple(null, false, true), Triple("settings", true, true))) {
+                    val phase = ++generation
                     scenario.onActivity { activity -> activity.setContent {
                         CompositionLocalProvider(LocalDestinationTitlePresentation provides context) {
                             ChatyTheme(ThemePresets.getSystemDefaultTheme(true)) {
-                                SettingsRootScreen(prefs, theme, user, back, {}, {}, {}, {}, {})
+                                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.semantics { contentDescription = "Title context generation $phase" }) {
+                                    SettingsRootScreen(prefs, theme, user, back, {}, {}, {}, {}, {})
+                                }
                             }
                         }
                     } }
+                    assertTrue("Current title fixture committed", device.wait(Until.hasObject(By.desc("Title context generation $phase")), 10000))
                     assertTrue(device.wait(Until.hasObject(By.desc("Edit profile")), 10000))
                     device.waitForIdle()
-                    assertEquals("Only duplicate label is hidden", visible, device.findObject(By.text("Settings")) != null)
+                    if (visible != (device.findObject(By.text("Settings")) != null)) {
+                        val dir = java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
+                        device.takeScreenshot(java.io.File(dir, "settings-title-failure-$phase.png"))
+                        device.dumpWindowHierarchy(java.io.File(dir, "settings-title-failure-$phase.xml"))
+                    }
+                    assertEquals("Only duplicate label is hidden (phase=$phase context=$context back=$back)", visible, device.findObject(By.text("Settings")) != null)
                     for (label in listOf("Edit profile", "Search settings", "QR code")) {
                         assertTrue("Action retained: $label", device.findObject(By.desc(label)) != null)
                     }

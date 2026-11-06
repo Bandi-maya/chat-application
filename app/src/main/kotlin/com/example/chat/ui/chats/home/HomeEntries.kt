@@ -66,8 +66,8 @@ data class HomeStyleSpec(
 
 /** Filter chip sets (build(): forcedType == null ? full : reduced). */
 fun homeFilters(forcedType: ConversationType?): List<String> =
-    if (forcedType == null) listOf("All", "Unread", "Groups", "Direct", "Vault")
-    else listOf("All", "Unread", "Vault")
+    if (forcedType == null) listOf("All", "Unread", "Groups", "Direct")
+    else listOf("All", "Unread")
 
 /** The where() chain from build(): tasks excluded, forcedType enforced,
  *  hidden locked chats excluded, search query matches title or last message,
@@ -163,8 +163,26 @@ fun displayConversationTitle(
     return if (isKnownContact) conversation.title else "Unknown contact"
 }
 
+/** The name the Home bar shows for the user, shared by the real bar and the Header settings preview so both apply
+ *  the same rules: with "set my name" on, a non-placeholder override, else a non-placeholder display name, else the
+ *  username; with it off (or nothing usable) the app name "Chaty". Never a hard-coded brand such as "WhatsApp". */
+fun homeIdentityName(setMyName: Boolean, myNameOverride: String, userDisplayName: String, userUsername: String): String {
+    val override = myNameOverride.trim()
+    val effectiveOverride =
+        if (override.isNotEmpty() && override != "Alex Rivera" && override != "Bandi Maya") override else ""
+    val rawName = userDisplayName.trim()
+    val effectiveDisplayName =
+        if (rawName.isNotEmpty() && rawName != "Chaty User" && rawName != "Bandi Maya") rawName
+        else (if (userUsername.trim().isNotEmpty()) userUsername.trim() else "Chaty")
+    return if (setMyName) {
+        if (effectiveOverride.isNotEmpty()) effectiveOverride else effectiveDisplayName
+    } else {
+        "Chaty"
+    }
+}
+
 /** _compactBarTitle: the iOS-style compact-bar identity, including the
- *  placeholder-name exclusions and the Classic 'WhatsApp' special case. */
+ *  placeholder-name exclusions (Classic no longer special-cased). */
 fun compactBarTitle(
     homeStyle: String,
     headerStyle: HomeHeaderStyle,
@@ -175,21 +193,7 @@ fun compactBarTitle(
     userUsername: String,
     largeTitleShown: Boolean,
 ): String {
-    val override = myNameOverride.trim()
-    val effectiveOverride =
-        if (override.isNotEmpty() && override != "Alex Rivera" && override != "Bandi Maya") override else ""
-    val rawName = userDisplayName.trim()
-    val effectiveDisplayName =
-        if (rawName.isNotEmpty() && rawName != "Chaty User" && rawName != "Bandi Maya") rawName
-        else (if (userUsername.trim().isNotEmpty()) userUsername.trim() else "Chaty")
-    val identity = if (setMyName) {
-        if (effectiveOverride.isNotEmpty()) effectiveOverride else effectiveDisplayName
-    } else {
-        "Chaty"
-    }
-    val fallback = identity
-
-    if (homeStyle == "Classic" && pageTitle == null) return "WhatsApp"
+    val fallback = homeIdentityName(setMyName, myNameOverride, userDisplayName, userUsername)
 
     return when (headerStyle) {
         HomeHeaderStyle.prominentIdentity -> fallback

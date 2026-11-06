@@ -130,6 +130,9 @@ class P2pFileTransferService(
         val manifest: NativeP2pTransferProtocol.Manifest,
         val secret: ByteArray,
         val direction: TransferDirection,
+        val directOriginal: Boolean = false,
+        var outgoingControlSequence: Long = 0,
+        var incomingControlSequence: Long = 0,
         var sourceChannel: FileChannel? = null,
         var sourceOwner: java.io.Closeable? = null,
         var sourceUri: String? = null,
@@ -258,9 +261,15 @@ class P2pFileTransferService(
         sourceOwner: java.io.Closeable? = null,
         linkExpirySeconds: Long = 7L * 24L * 60L * 60L,
         sourceUri: String? = null,
+        directOriginal: Boolean = false,
     ): String = withContext(Dispatchers.IO) {
         val localUserId = currentUserId() ?: throw SecurityException("Sign in before sending a file.")
         require(targetUserId.isNotBlank() && targetUserId != localUserId) { "Choose a valid recipient" }
+        if (directOriginal) {
+            require(mimeType.startsWith("image/") || mimeType.startsWith("video/")) { "Chaty Direct supports original images/videos only" }
+            require(!sourceUri.isNullOrBlank()) { "Saved original access is required for durable resume" }
+        }
+
         val invite = NativeP2pTransferProtocol.createInvite()
         val manifest = NativeP2pTransferProtocol.createManifest(
             invite, source, displayName, sizeBytes, mimeType,
@@ -272,7 +281,7 @@ class P2pFileTransferService(
             manifest.chunkBytes, manifest.sha256Hex, manifest.noncePrefix, manifest.expiresAtEpochSeconds)
         val session = Session(
             invite.transferId, targetUserId, localUserId, null, manifest, invite.secret.copyOf(),
-            TransferDirection.upload, sourceChannel = source, sourceOwner = sourceOwner, sourceUri = sourceUri,
+            TransferDirection.upload, directOriginal = directOriginal, sourceChannel = source, sourceOwner = sourceOwner, sourceUri = sourceUri,
         )
         try {
             persistSenderResume(session)
@@ -291,9 +300,13 @@ class P2pFileTransferService(
         }
         session.monitorId = transferMonitor.begin(TransferDirection.upload, kind, manifest.sizeBytes, manifest.displayName)
         publish(session, "Waiting for recipient")
+        if (directOriginal) {
+            // Ticket first, negotiation later. Existing restart events recover offline peers.
+            return@withContext invite.toUri().also { invite.secret.fill(0) }
+        }
         try {
             val peer = createPeer(session)
-            val channel = peer.createDataChannel("chaty-file-v1", DataChannel.Init().apply { ordered = true })
+            val channel = peer.createDataChannel(if (session.directOriginal) ChatyDirectProtocol.CHANNEL else "chaty-file-v1", DataChannel.Init().apply { ordered = true })
                 ?: throw IllegalStateException("Could not create transfer channel")
             session.channel = channel
             observeChannel(session, channel, isSender = true)
@@ -351,6 +364,7 @@ class P2pFileTransferService(
                         manifest.sizeBytes != currentManifest.sizeBytes ||
                         manifest.chunkBytes != currentManifest.chunkBytes ||
                         manifest.sha256Hex != currentManifest.sha256Hex ||
+                        (activeReceiver.directOriginal && manifest.expiresAtEpochSeconds != currentManifest.expiresAtEpochSeconds) ||
                         !manifest.noncePrefix.contentEquals(currentManifest.noncePrefix)
                     ) return
                     val authentication = signal["manifest_auth"]?.toString()?.takeIf { it.length <= 128 }
@@ -360,7 +374,7 @@ class P2pFileTransferService(
                     )
                     activeReceiver.remoteDescriptionSet = false
                     activeReceiver.signalingReady = false
-                    setRemoteDescription(peer, SessionDescription.Type.OFFER, signal["sdp"]?.toString() ?: return)
+                    setRemoteDescription(peer, SessionDescription.Type.OFFER, remoteSdp(activeReceiver, signal["sdp"]?.toString() ?: return))
                     activeReceiver.remoteDescriptionSet = true
                     flushCandidates(activeReceiver)
                     val answer = createDescription(peer, offer = false)
@@ -380,7 +394,7 @@ class P2pFileTransferService(
                 val sdp = signal["sdp"]?.toString().orEmpty()
                 if (sdp.length !in 1..256_000) return
                 if (sdp.isNotBlank()) {
-                    setRemoteDescription(session.peer ?: return, SessionDescription.Type.ANSWER, sdp)
+                    setRemoteDescription(session.peer ?: return, SessionDescription.Type.ANSWER, remoteSdp(session, sdp))
                     session.remoteDescriptionSet = true
                 }
                 flushCandidates(session)
@@ -405,7 +419,7 @@ class P2pFileTransferService(
                         }
                     }
                 } else if (!session.remoteDescriptionSet) session.queuedCandidates.add(ice)
-                else session.peer?.addIceCandidate(ice)
+                else if (!session.directOriginal || !ChatyDirectProtocol.isRelayCandidate(ice.sdp)) session.peer?.addIceCandidate(ice)
             }
             "file_transfer_restart_request" -> {
                 val active = sessions[id]?.takeIf { it.peerUserId == sender && it.direction == TransferDirection.upload }
@@ -437,7 +451,7 @@ class P2pFileTransferService(
     }
 
     /** User taps Receive on the in-chat transfer card and selects a private destination. */
-    suspend fun acceptInvite(link: String, destination: File, senderUserId: String? = null): Boolean {
+    suspend fun acceptInvite(link: String, destination: File, senderUserId: String? = null, directOriginal: Boolean = false): Boolean {
         val invite = NativeP2pTransferProtocol.parseInvite(link)
         var pending = incoming[invite.transferId]
         if (pending == null && !senderUserId.isNullOrBlank() && currentUserId() != null) {
@@ -587,6 +601,7 @@ class P2pFileTransferService(
             manifest,
             invite.secret.copyOf(),
             TransferDirection.download,
+            directOriginal = directOriginal,
             destination = partFile,
             finalDestination = safeDestination,
         ).apply {
@@ -601,10 +616,18 @@ class P2pFileTransferService(
             }
             matchingCandidates.forEach { (_, candidate) -> session.queuedCandidates.add(candidate) }
         }
+        if (directOriginal) {
+            val record = JSONObject().put("local_user_id", localUserId).put("peer_user_id", offer.senderId)
+                .put("part", partFile.absolutePath).put("ledger", ledgerFile.absolutePath)
+            if (!resumePrefs.edit().putString("receiver_" + session.id, record.toString()).commit()) {
+                session.secret.fill(0)
+                throw IllegalStateException("Could not save Direct receive recovery state")
+            }
+        }
         sessions[invite.transferId] = session
         return try {
             val peer = createPeer(session)
-            setRemoteDescription(peer, SessionDescription.Type.OFFER, signal["sdp"]?.toString() ?: throw SecurityException("Offer missing"))
+            setRemoteDescription(peer, SessionDescription.Type.OFFER, remoteSdp(session, signal["sdp"]?.toString() ?: throw SecurityException("Offer missing")))
             session.remoteDescriptionSet = true
             flushCandidates(session)
             val answer = createDescription(peer, offer = false)
@@ -659,7 +682,23 @@ class P2pFileTransferService(
     fun cancel(transferId: String) {
         val session = sessions[transferId]
         if (session == null) {
+            val senderRecord = runCatching { loadSenderResumeRecord(transferId) }.getOrNull()
             clearSenderResume(transferId)
+            if (senderRecord != null && senderRecord.optString("local_user_id") == currentUserId()) {
+                sendSignal(senderRecord.optString("peer_user_id"), mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
+                _transfers.value = _transfers.value.map { if (it.transferId == transferId) it.copy(status = "Cancelled", error = null) else it }
+            }
+            val receipt = runCatching { resumePrefs.getString("receiver_" + transferId, null)?.let(::JSONObject) }.getOrNull()
+            if (receipt != null && receipt.optString("local_user_id") == currentUserId()) {
+                val root = appContext.filesDir.canonicalFile
+                val part = File(receipt.optString("part")).canonicalFile
+                val ledger = File(receipt.optString("ledger")).canonicalFile
+                if (part.parentFile == File(root, "p2p-received").canonicalFile && part.name.startsWith("." + transferId + "-")) part.delete()
+                if (ledger.parentFile == File(root, "p2p-ledger").canonicalFile && ledger.name.startsWith(transferId + "-")) ledger.delete()
+                resumePrefs.edit().remove("receiver_" + transferId).commit()
+                sendSignal(receipt.optString("peer_user_id"), mapOf("signal_type" to "file_transfer_cancel", "call_id" to transferId, "transfer_id" to transferId))
+                _transfers.value = _transfers.value.map { if (it.transferId == transferId) it.copy(status = "Cancelled", error = null) else it }
+            }
             incoming.remove(transferId)
             incomingCandidates.remove(transferId)
             refreshPending()
@@ -679,10 +718,18 @@ class P2pFileTransferService(
         if (session.direction != TransferDirection.download) return
         session.destination?.let { runCatching { it.delete() } }
         session.ledger?.let { runCatching { it.clear() } }
+        if (session.directOriginal) resumePrefs.edit().remove("receiver_" + session.id).commit()
     }
 
+    private fun remoteSdp(session: Session, sdp: String): String =
+        if (session.directOriginal) ChatyDirectProtocol.directSdp(sdp) else sdp
+
     private suspend fun createPeer(session: Session): PeerConnection {
-        val config = PeerConnection.RTCConfiguration(iceServers().ifEmpty { defaultIceServers() }).apply {
+        val servers = iceServers().ifEmpty { defaultIceServers() }
+        val safeServers = if (session.directOriginal) servers.flatMap { server ->
+            server.urls.filter(ChatyDirectProtocol::allowedIceUrl).map { PeerConnection.IceServer.builder(it).createIceServer() }
+        } else servers
+        val config = PeerConnection.RTCConfiguration(safeServers).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             iceTransportsType = PeerConnection.IceTransportsType.ALL
             bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
@@ -690,13 +737,18 @@ class P2pFileTransferService(
         }
         val peer = factory.createPeerConnection(config, object : PeerConnection.Observer {
             override fun onIceCandidate(candidate: IceCandidate?) {
-                if (candidate != null) {
+                if (candidate != null && (!session.directOriginal || !ChatyDirectProtocol.isRelayCandidate(candidate.sdp))) {
                     if (session.signalingReady) sendCandidate(session, candidate)
                     else if (session.pendingLocalCandidates.size < 256) session.pendingLocalCandidates.add(candidate)
                 }
             }
             override fun onDataChannel(channel: DataChannel?) {
                 if (channel != null && session.direction == TransferDirection.download) {
+                    if (session.directOriginal && channel.label() != ChatyDirectProtocol.CHANNEL) {
+                        channel.close()
+                        fail(session, "Update both phones: incompatible Chaty Direct version")
+                        return
+                    }
                     session.channel = channel
                     observeChannel(session, channel, isSender = false)
                 }
@@ -732,11 +784,34 @@ class P2pFileTransferService(
             override fun onAddTrack(receiver: org.webrtc.RtpReceiver?, streams: Array<out org.webrtc.MediaStream>?) {}
             override fun onRenegotiationNeeded() {}
         }) ?: throw IllegalStateException("Could not create WebRTC peer connection")
+        session.outgoingControlSequence = 0
+        session.incomingControlSequence = 0
         session.peer = peer
+        if (session.directOriginal) scope.launch {
+            kotlinx.coroutines.delay(30_000)
+            if (sessions[session.id] === session && session.peer === peer && session.channel?.state() != DataChannel.State.OPEN) {
+                fail(session, "Direct unavailable: keep both phones open and retry. No upload or relay was used.")
+            }
+        }
         return peer
     }
 
+    private fun sendControl(session: Session, message: JSONObject): Boolean = synchronized(session) {
+        val channel = session.channel ?: return@synchronized false
+        val body = message.toString()
+        val wire = if (session.directOriginal) {
+            val sequence = ++session.outgoingControlSequence
+            JSONObject().put("version", 2).put("sequence", sequence).put("body", body)
+                .put("mac", b64(ChatyDirectProtocol.controlMac(session.secret, session.id, session.localUserId, sequence, body))).toString()
+        } else body
+        channel.send(DataChannel.Buffer(ByteBuffer.wrap(wire.toByteArray(Charsets.UTF_8)), false))
+    }
+
     private fun observeChannel(session: Session, channel: DataChannel, isSender: Boolean) {
+        if (session.directOriginal && channel.label() != ChatyDirectProtocol.CHANNEL) {
+            fail(session, "Update both phones: incompatible Chaty Direct version")
+            return
+        }
         channel.registerObserver(object : DataChannel.Observer {
             override fun onBufferedAmountChange(previousAmount: Long) {}
             override fun onStateChange() {
@@ -749,7 +824,8 @@ class P2pFileTransferService(
             override fun onMessage(buffer: DataChannel.Buffer) {
                 if (buffer.binary) {
                     val size = buffer.data.remaining()
-                    if (size < 8 + 12 + 16 || size > session.manifest.chunkBytes + 8 + 12 + 16) {
+                    val overhead = if (session.directOriginal) ChatyDirectProtocol.OVERHEAD else 8 + 12 + 16
+                    if (size <= overhead || size > session.manifest.chunkBytes + overhead) {
                         scope.launch { fail(session, "Invalid transfer chunk frame") }
                         return
                     }
@@ -770,9 +846,29 @@ class P2pFileTransferService(
                 } finally {
                     controlBytes.fill(0)
                 }
-                val message = runCatching { JSONObject(text) }.getOrNull() ?: return
+                val message = try {
+                    val envelope = JSONObject(text)
+                    if (session.directOriginal) {
+                        val sequence = envelope.getLong("sequence")
+                        val body = envelope.getString("body")
+                        val expected = ChatyDirectProtocol.controlMac(session.secret, session.id, session.peerUserId, sequence, body)
+                        val supplied = unb64(envelope.getString("mac"))
+                        val valid = envelope.optInt("version") == 2 && sequence > session.incomingControlSequence &&
+                            java.security.MessageDigest.isEqual(expected, supplied)
+                        expected.fill(0)
+                        if (!valid) throw SecurityException("Direct peer control authentication failed")
+                        session.incomingControlSequence = sequence
+                        JSONObject(body)
+                    } else envelope
+                } catch (error: Throwable) {
+                    if (session.directOriginal) fail(session, "Update both phones or retry: Direct authentication failed")
+                    return
+                }
                 when (message.optString("kind")) {
-                    "request" -> if (isSender) scope.launch { sendRequested(session, message.optJSONArray("indices")) }
+                    "request" -> if (isSender) scope.launch {
+                        runCatching { sendRequested(session, message.optJSONArray("indices")) }
+                            .onFailure { fail(session, it.message ?: "Original source could not be sent") }
+                    }
                     "complete" -> if (isSender) completeSender(session)
                     "pause" -> publish(session, "Peer paused")
                 }
@@ -788,7 +884,7 @@ class P2pFileTransferService(
             val indices = ledger.missingIndices(maxRequestChunks())
             if (indices.isEmpty()) break
             val json = JSONObject().put("kind", "request").put("indices", JSONArray().apply { indices.forEach { put(it) } })
-            if (!channel.send(DataChannel.Buffer(ByteBuffer.wrap(json.toString().toByteArray()), false))) {
+            if (!sendControl(session, json)) {
                 kotlinx.coroutines.delay(150)
                 continue
             }
@@ -805,7 +901,8 @@ class P2pFileTransferService(
                 kotlinx.coroutines.delay(1_000)
             }
         }
-        if (ledger.isComplete()) finalizeReceiver(session)
+        if (ledger.isComplete()) runCatching { finalizeReceiver(session) }
+            .onFailure { fail(session, it.message ?: "Final verification failed") }
     }
 
     private suspend fun sendRequested(session: Session, array: JSONArray?) {
@@ -830,6 +927,13 @@ class P2pFileTransferService(
             }
             val index = array?.optLong(i, -1L) ?: -1L
             if (index !in 0 until session.manifest.chunkCount) continue
+            val packet = if (session.directOriginal) {
+                val bytes = withContext(Dispatchers.IO) {
+                    if (file != null) java.io.RandomAccessFile(file, "r").use { ChatyDirectProtocol.encryptChunk(it.channel, session.manifest, session.secret, index) }
+                    else ChatyDirectProtocol.encryptChunk(sourceChannel!!, session.manifest, session.secret, index)
+                }
+                ByteBuffer.wrap(bytes)
+            } else {
             val encrypted = withContext(Dispatchers.IO) {
                 if (file != null) NativeP2pTransferProtocol.encryptChunk(file, session.manifest, session.secret, index)
                 else NativeP2pTransferProtocol.encryptChunk(sourceChannel!!, session.manifest, session.secret, index)
@@ -839,6 +943,8 @@ class P2pFileTransferService(
             packet.put(encrypted.nonce)
             packet.put(encrypted.ciphertextAndTag)
             packet.flip()
+                packet
+            }
             if (!channel.send(DataChannel.Buffer(packet, true))) {
                 publish(session, "Network backpressure — waiting")
                 break
@@ -858,13 +964,22 @@ class P2pFileTransferService(
     private suspend fun receiveChunk(session: Session, bytes: ByteArray) = session.receiveMutex.withLock {
         if (bytes.size < 8 + 12 + 16) return@withLock
         try {
+            val count = if (session.directOriginal) withContext(Dispatchers.IO) {
+                val ledger = session.ledger ?: throw IllegalStateException("Resume ledger missing")
+                val part = session.destination ?: throw IllegalStateException("Destination missing")
+                val index = ChatyDirectProtocol.writeChunk(part, session.manifest, session.secret, bytes)
+                NativeP2pTransferProtocol.syncFile(part)
+                ledger.markReceived(index)
+                ledger.flush()
+                ledger.receivedCount()
+            } else {
             val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
             val index = buffer.long
             if (index !in 0 until session.manifest.chunkCount) throw SecurityException("Invalid chunk index")
             val nonce = ByteArray(12).also(buffer::get)
             val encrypted = ByteArray(buffer.remaining()).also(buffer::get)
             val ledger = session.ledger ?: throw IllegalStateException("Resume ledger missing")
-            val count = withContext(Dispatchers.IO) {
+            val legacyCount = withContext(Dispatchers.IO) {
                 if (!ledger.hasReceived(index)) {
                     val part = session.destination ?: throw IllegalStateException("Destination missing")
                     NativeP2pTransferProtocol.writeChunk(
@@ -880,6 +995,8 @@ class P2pFileTransferService(
                     ledger.markReceived(index)
                 }
                 ledger.receivedCount()
+            }
+                legacyCount
             }
             session.receivedBytes = count * session.manifest.chunkBytes
             session.receivedBytes = minOf(session.receivedBytes, session.manifest.sizeBytes)
@@ -898,13 +1015,23 @@ class P2pFileTransferService(
         if (!withContext(Dispatchers.IO) { NativeP2pTransferProtocol.verifyCompletedFile(part, session.manifest) }) {
             fail(session, "File integrity check failed; received file was discarded")
             part.delete()
+            session.ledger?.clear()
             return
         }
         if (target.exists()) throw IllegalStateException("A file with this name already exists")
         target.parentFile?.mkdirs()
         if (!part.renameTo(target)) throw IllegalStateException("Cannot finalize received file")
         session.ledger?.flush()
-        session.channel?.send(DataChannel.Buffer(ByteBuffer.wrap(JSONObject().put("kind", "complete").toString().toByteArray()), false))
+        if (session.directOriginal) {
+            val verified = JSONObject().put("local_user_id", session.localUserId).put("peer_user_id", session.peerUserId)
+                .put("path", target.absolutePath).put("size", session.manifest.sizeBytes).put("sha256", session.manifest.sha256Hex)
+            if (!resumePrefs.edit().putString("received_" + session.id, verified.toString()).commit()) {
+                target.renameTo(part)
+                throw IllegalStateException("Could not save verified file receipt; retry this transfer")
+            }
+        }
+        sendControl(session, JSONObject().put("kind", "complete"))
+        if (session.directOriginal) resumePrefs.edit().remove("receiver_" + session.id).commit()
         session.monitorId?.let { transferMonitor.finish(it) }
         publish(session, "Received and verified", target.absolutePath)
         session.secret.fill(0)
@@ -922,6 +1049,40 @@ class P2pFileTransferService(
         runCatching { (session.sourceOwner ?: session.sourceChannel)?.close() }
         session.secret.fill(0)
         sessions.remove(session.id)
+    }
+
+    /** Local encrypted ticket cache avoids replaying an already-consumed MLS application message. */
+    fun savedDirectTicket(transferId: String, peerUserId: String): String? {
+        val raw = resumePrefs.getString("ticket_" + transferId, null) ?: return null
+        val record = runCatching { JSONObject(raw) }.getOrNull() ?: return null
+        if (record.optString("local_user_id") != currentUserId() || record.optString("peer_user_id") != peerUserId) return null
+        return record.optString("link").takeIf { it.isNotBlank() }
+    }
+    fun saveDirectTicket(link: String, peerUserId: String) {
+        val invite = NativeP2pTransferProtocol.parseInvite(link)
+        try {
+            val localId = currentUserId() ?: throw SecurityException("Sign in to save the Direct ticket")
+            val record = JSONObject().put("local_user_id", localId).put("peer_user_id", peerUserId).put("link", link)
+            check(resumePrefs.edit().putString("ticket_" + invite.transferId, record.toString()).commit()) { "Could not save Direct receive ticket" }
+        } finally { invite.secret.fill(0) }
+    }
+
+    suspend fun verifiedOriginalFile(transferId: String, peerUserId: String): File? = withContext(Dispatchers.IO) {
+        val raw = resumePrefs.getString("received_" + transferId, null) ?: return@withContext null
+        val record = runCatching { JSONObject(raw) }.getOrNull() ?: return@withContext null
+        if (record.optString("local_user_id") != currentUserId() || record.optString("peer_user_id") != peerUserId) return@withContext null
+        val file = File(record.optString("path"))
+        val directory = File(appContext.filesDir, "p2p-received").canonicalFile
+        val safe = file.canonicalFile
+        if (directory.parentFile != appContext.filesDir.canonicalFile || directory.name != "p2p-received" ||
+            safe.parentFile != directory || safe != file.absoluteFile || !safe.isFile || safe.length() != record.optLong("size")) return@withContext null
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        safe.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) { val n = input.read(buffer); if (n < 0) break; if (n > 0) digest.update(buffer, 0, n) }
+        }
+        val hash = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+        if (hash != record.optString("sha256")) null else safe
     }
 
     fun disposeAll() {
@@ -1030,7 +1191,8 @@ class P2pFileTransferService(
 
     private fun flushCandidates(session: Session) {
         val peer = session.peer ?: return
-        session.queuedCandidates.toList().forEach(peer::addIceCandidate)
+        session.queuedCandidates.toList().filter { !session.directOriginal || !ChatyDirectProtocol.isRelayCandidate(it.sdp) }
+            .forEach(peer::addIceCandidate)
         session.queuedCandidates.clear()
     }
 
@@ -1087,7 +1249,7 @@ class P2pFileTransferService(
 
     private fun fail(session: Session, reason: String) {
         session.monitorId?.let { transferMonitor.finish(it, TransferStatus.failed) }
-        publish(session, "Failed", error = reason)
+        publish(session, if (reason == "Cancelled") "Cancelled" else "Failed", error = reason)
         session.channel?.close()
         session.peer?.close()
         runCatching { (session.sourceOwner ?: session.sourceChannel)?.close() }
@@ -1116,6 +1278,7 @@ class P2pFileTransferService(
             .put("local_user_id", session.localUserId)
             .put("peer_user_id", session.peerUserId)
             .put("source_uri", sourceUri)
+            .put("direct_original_v2", session.directOriginal)
             .put("display_name", manifest.displayName)
             .put("mime_type", manifest.mimeType)
             .put("size_bytes", manifest.sizeBytes)
@@ -1238,7 +1401,7 @@ class P2pFileTransferService(
                 }
                 val session = Session(
                     transferId, peerId, localId, null, manifest, secret.copyOf(),
-                    TransferDirection.upload, sourceChannel = channel, sourceOwner = owner, sourceUri = sourceUriText,
+                    TransferDirection.upload, directOriginal = record.optBoolean("direct_original_v2", false), sourceChannel = channel, sourceOwner = owner, sourceUri = sourceUriText,
                 )
                 val previous = sessions.putIfAbsent(transferId, session)
                 if (previous != null) {
@@ -1303,7 +1466,7 @@ class P2pFileTransferService(
 
     private suspend fun startRestoredSenderOffer(session: Session) {
         val peer = createPeer(session)
-        val channel = peer.createDataChannel("chaty-file-v1", DataChannel.Init().apply { ordered = true })
+        val channel = peer.createDataChannel(if (session.directOriginal) ChatyDirectProtocol.CHANNEL else "chaty-file-v1", DataChannel.Init().apply { ordered = true })
             ?: throw IllegalStateException("Could not recreate transfer channel")
         session.channel = channel
         observeChannel(session, channel, isSender = true)

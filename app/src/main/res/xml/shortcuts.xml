@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static launcher shortcuts. API 25+ feature; the meta-data reference is ignored
+     harmlessly on API 24 (minSdk), so no version guard is needed in the manifest. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_chat"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new_chat"
+        android:shortcutShortLabel="@string/shortcut_new_chat_short"
+        android:shortcutLongLabel="@string/shortcut_new_chat_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.logybyte.chaty"
+            android:targetClass="com.example.chat.MainActivity">
+            <extra
+                android:name="com.example.chat.extra.SHORTCUT_ACTION"
+                android:value="new_chat" />
+        </intent>
+    </shortcut>
+</shortcuts>

@@ -110,6 +110,8 @@ fun ContactInfoScreen(
     onDeletedPopToRoot: () -> Unit,
     onBack: () -> Unit,
 ) {
+    var showAllMedia by remember(conversation.id, contact.id) { mutableStateOf(false) }
+    if (showAllMedia) ConversationMediaDialog(messages.map(hydrateMessage), onOpenMedia, onClose = { showAllMedia = false })
     val colors = LocalAppColors.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -127,7 +129,12 @@ fun ContactInfoScreen(
     // this toolbar and SafeArea separately from its ListView body.
     Column(Modifier.fillMaxSize().background(colors.background)
         .windowInsetsPadding(WindowInsets.safeDrawing)) {
-        com.example.chat.ui.kit.ChatyAppBar(title = "Contact Info", onBack = onBack)
+        // GB contact-info top bar: back chevron only, no title (user reference 2026-11-03).
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.IconButton(onClick = onBack) {
+                Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
+            }
+        }
         Scaffold(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             containerColor = colors.background,
@@ -244,6 +251,19 @@ fun ContactInfoScreen(
             }
             Spacer(Modifier.height(20.dp))
 
+            // GB row order: per-contact privacy sits right under the identity card (GB "Custom Privacy" row).
+            Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
+                InfoTile(
+                    icon = { Icon(Icons.Rounded.Tune, contentDescription = null, tint = colors.primary) },
+                    title = "Individual Privacy Controls",
+                    titleColor = colors.foreground,
+                    subtitle = "Read receipts, typing indicator, recording & online presence",
+                    trailing = { Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary) },
+                    onClick = onOpenPrivacy,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+
             // Connection & Calls.
             SectionTitle("Connection & Calls", colors)
             Box(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
@@ -303,64 +323,18 @@ fun ContactInfoScreen(
             }
             Spacer(Modifier.height(12.dp))
 
-            // Privacy & Safety.
-            SectionTitle("Privacy & Safety", colors)
-            Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
-                InfoTile(
-                    icon = { Icon(Icons.Rounded.Tune, contentDescription = null, tint = colors.primary) },
-                    title = "Individual Privacy Controls",
-                    titleColor = colors.foreground,
-                    subtitle = "Read receipts, typing indicator, recording & online presence",
-                    trailing = { Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary) },
-                    onClick = onOpenPrivacy,
-                )
-                InfoTile(
-                    icon = {
-                        Icon(
-                            if (blocked) Icons.Rounded.LockOpen else Icons.Rounded.Block,
-                            contentDescription = null,
-                            tint = colors.error,
-                        )
-                    },
-                    title = if (blocked) "Unblock ${contact.displayName}" else "Block ${contact.displayName}",
-                    titleColor = colors.error,
-                    subtitle = if (blocked) "Allow messages from this contact again." else "Stop receiving messages from this contact.",
-                    onClick = {
-                        // Dart _toggleBlock: the confirm dialog only gates
-                        // blocking; unblocking applies directly.
-                        if (busy) return@InfoTile
-                        if (blocked) {
-                            scope.launch {
-                                try {
-                                    onSetBlocked(false)
-                                } catch (error: Exception) {
-                                    snackbar.showSnackbar("$error")
-                                }
-                            }
-                        } else {
-                            confirmAction = "block"
-                        }
-                    },
-                )
-                InfoTile(
-                    icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = colors.error) },
-                    title = "Delete Conversation",
-                    titleColor = colors.error,
-                    subtitle = "Remove this chat and all message history.",
-                    onClick = { if (!busy) confirmAction = "deleteConversation" },
-                )
-                InfoTile(
-                    icon = { Icon(Icons.Rounded.PersonRemove, contentDescription = null, tint = colors.error) },
-                    title = "Delete Contact & Chat",
-                    titleColor = colors.error,
-                    subtitle = "Remove ${contact.displayName} and all conversations.",
-                    onClick = { if (!busy) confirmAction = "deleteUser" },
-                )
+            // GB "Media, links, and docs" row: label left, total count + chevron right.
+            Row(
+                Modifier.fillMaxWidth().clickable { showAllMedia = true }.padding(horizontal = 4.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Media, links, and docs", color = colors.foregroundSecondary, fontSize = 13.sp)
+                Spacer(Modifier.weight(1f))
+                Text("${media.size + documents.size + links.size}", color = colors.foregroundSecondary, fontSize = 13.sp)
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary, modifier = Modifier.size(18.dp))
             }
-            Spacer(Modifier.height(12.dp))
-
-            // Shared Media & Files.
-            SectionTitle("Shared Media & Files", colors)
+            Spacer(Modifier.height(6.dp))
             Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
                 if (media.isEmpty() && links.isEmpty() && documents.isEmpty()) {
                     Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
@@ -447,6 +421,53 @@ fun ContactInfoScreen(
                         }
                     }
                 }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // Destructive actions stay flat at the bottom like the GB reference (no section header).
+            Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
+                InfoTile(
+                    icon = {
+                        Icon(
+                            if (blocked) Icons.Rounded.LockOpen else Icons.Rounded.Block,
+                            contentDescription = null,
+                            tint = colors.error,
+                        )
+                    },
+                    title = if (blocked) "Unblock ${contact.displayName}" else "Block ${contact.displayName}",
+                    titleColor = colors.error,
+                    subtitle = if (blocked) "Allow messages from this contact again." else "Stop receiving messages from this contact.",
+                    onClick = {
+                        // Dart _toggleBlock: the confirm dialog only gates
+                        // blocking; unblocking applies directly.
+                        if (busy) return@InfoTile
+                        if (blocked) {
+                            scope.launch {
+                                try {
+                                    onSetBlocked(false)
+                                } catch (error: Exception) {
+                                    snackbar.showSnackbar("$error")
+                                }
+                            }
+                        } else {
+                            confirmAction = "block"
+                        }
+                    },
+                )
+                InfoTile(
+                    icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = colors.error) },
+                    title = "Delete Conversation",
+                    titleColor = colors.error,
+                    subtitle = "Remove this chat and all message history.",
+                    onClick = { if (!busy) confirmAction = "deleteConversation" },
+                )
+                InfoTile(
+                    icon = { Icon(Icons.Rounded.PersonRemove, contentDescription = null, tint = colors.error) },
+                    title = "Delete Contact & Chat",
+                    titleColor = colors.error,
+                    subtitle = "Remove ${contact.displayName} and all conversations.",
+                    onClick = { if (!busy) confirmAction = "deleteUser" },
+                )
             }
             Spacer(Modifier.height(12.dp))
 

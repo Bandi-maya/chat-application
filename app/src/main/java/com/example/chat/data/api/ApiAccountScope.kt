@@ -28,3 +28,12 @@ class ApiAccountScopeOwner(private val lock: Any, private val auth: () -> ApiAut
         else { block(); snapshot() === expected }
     }
 }
+
+/** The operation's account scope changed (switch, logout, same-uid re-login, tenant/route change) while it ran. */
+class ApiScopeChangedException : java.io.IOException("Account changed; operation cancelled.")
+
+/** Carries the scope an upload flow started under through suspend calls that have no scope parameter
+ *  (e.g. ChatMediaService.apiUpload), so the wire call uses that exact immutable scope, never a re-read. */
+class ApiScopeElement(val scope: ApiAccountScope) : kotlin.coroutines.AbstractCoroutineContextElement(Key) {
+    companion object Key : kotlin.coroutines.CoroutineContext.Key<ApiScopeElement>
+}

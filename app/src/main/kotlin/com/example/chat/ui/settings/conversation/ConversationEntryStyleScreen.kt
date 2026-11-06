@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -72,6 +73,7 @@ import kotlinx.coroutines.launch
 
 private val entryStyles = listOf(
     "Stock",
+    "Reference 2",
     "YOWA Style",
     "WAMOD",
     "Hangouts",
@@ -94,13 +96,6 @@ private val entryStyles = listOf(
     "iOS 14",
     "FB Messenger",
     "RC Mess",
-    "Telegram Modern",
-    "iOS Clean Rounded",
-    "Hangouts Minimal",
-    "Simple Pill",
-    "RC-Flat Floating",
-    "WhatsApp Classic 3D",
-    "Signal Compact Bubble"
 )
 
 private fun normalizeStyle(raw: String): String {
@@ -161,7 +156,16 @@ fun ConversationEntryStyleScreen(preferences: ChatyPreferencesController, onBack
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 12.dp)) {
                 GbLivePreviewCard(padding = PaddingValues(horizontal = 8.dp, vertical = 16.dp)) {
                     Box(Modifier.fillMaxWidth().background(uiEntryBg, RoundedCornerShape(24.dp)).padding(horizontal = 10.dp, vertical = 8.dp)) {
-                        EntryStylePreview(normalizeStyle(p.entryStyle), pc)
+                        var previewText by remember { mutableStateOf("") }
+                        com.example.chat.ui.chats.detail.ChatEntryBar(
+                            entryStyle = normalizeStyle(p.entryStyle),
+                            colors = com.example.chat.ui.chats.detail.ComposerColors.resolve(config,
+                                p.uiButtonsColor, p.emojiButtonColor, p.sendButtonColor, p.micSendBgCircleColor,
+                                p.textEntryBackgroundColor, p.textEntryColor),
+                            template = com.example.chat.core.templates.ComposerTemplate(com.example.chat.core.templates.ComposerActionPlacement.integrated),
+                            theme = config, text = previewText, onTextChange = { previewText = it },
+                            onCamera = {}, onSend = { previewText = "" },
+                        )
                     }
                 }
                 Spacer(Modifier.height(14.dp))

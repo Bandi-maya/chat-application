@@ -55,4 +55,15 @@ class LocationDraftTest {
     @Test fun approximateGrantIsAccepted() = assertEquals(LocateAction.useApproximateFix, nextLocateAction(access(coarse = true)))
     @Test fun preciseGrantIsAccepted() = assertEquals(LocateAction.usePreciseFix, nextLocateAction(access(fine = true, coarse = true)))
     @Test fun disabledServicesOfferSettingsWithoutDiscardingGrant() = assertEquals(LocateAction.offerLocationSettings, nextLocateAction(access(coarse = true, enabled = false)))
+    @Test fun allPermissionAndServiceCombinationsRespectForegroundBoundary() {
+        for (fine in listOf(false, true)) for (coarse in listOf(false, true))
+        for (asked in listOf(false, true)) for (rationale in listOf(false, true))
+        for (services in listOf(false, true)) {
+            val action = nextLocateAction(access(fine, coarse, asked, rationale, services))
+            if (!fine && !coarse) assertFalse(action in setOf(LocateAction.usePreciseFix, LocateAction.useApproximateFix))
+            if ((fine || coarse) && !services) assertEquals(LocateAction.offerLocationSettings, action)
+            if (coarse && !fine && services) assertEquals(LocateAction.useApproximateFix, action)
+            if (fine && services) assertEquals(LocateAction.usePreciseFix, action)
+        }
+    }
 }

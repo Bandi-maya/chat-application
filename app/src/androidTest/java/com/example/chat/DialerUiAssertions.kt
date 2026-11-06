@@ -127,14 +127,8 @@ internal object DialerUiAssertions {
         assertTrue("Delete supports semantic long click", deleteNode.isLongClickable)
         assertTrue("Semantic delete dispatched", deleteNode.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
         assertTrue("Semantic click deletes exactly one digit", device.wait(Until.hasObject(By.text("7")), 5000))
-        // The one-tap clear (X) control was removed per the requested dialer
-        // redesign. The meaningful behavior - the entered number is fully
-        // clearable - stays covered here through the delete key.
-        var clearGuard = 0
-        while (device.hasObject(By.text("7")) && clearGuard++ < 10) {
-            deleteNode.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
-        }
-        assertTrue("Delete key clears the entered number", device.wait(Until.gone(By.text("7")), 5000))
+        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.
+        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))
         reach("Hide dialpad").click()
         assertTrue("Hide collapses keypad", device.wait(Until.gone(By.desc("Dial 2")), 5000))
         device.findObject(By.desc("Show dialpad")).click()

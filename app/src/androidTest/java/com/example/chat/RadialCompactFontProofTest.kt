@@ -56,12 +56,34 @@ class RadialCompactFontProofTest {
                 }
             } }
             assertTrue(device.wait(Until.hasObject(By.desc("Close navigation menu")), 10000))
+            val diagnosticsDir = File(inst.targetContext.getExternalFilesDir(null), "screenshots")
+            diagnosticsDir.mkdirs()
+            fun captureState(stage: String) {
+                val bitmap = inst.uiAutomation.takeScreenshot() ?: throw AssertionError("No $stage pixels")
+                FileOutputStream(File(diagnosticsDir, "radial-compact-$stage.png")).use {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+                bitmap.recycle()
+                device.dumpWindowHierarchy(File(diagnosticsDir, "radial-compact-$stage.xml"))
+            }
+            captureState("before-scroll")
             val scroll = device.findObject(By.scrollable(true)) ?: throw AssertionError("Missing compact scroll")
+            // UiObject2 defaults start at the scroll bounds edge. Use an interior
+            // gesture so the parent clip/boundary cannot reject its first event.
+            val margin = (16f * inst.targetContext.resources.displayMetrics.density).toInt()
+            scroll.setGestureMargins(margin, margin, margin, margin)
             var settings = device.findObject(By.text("Settings"))
             repeat(12) {
                 if (settings == null) { scroll.scroll(Direction.DOWN, 0.7f); settings = device.findObject(By.text("Settings")) }
             }
-            val target = settings ?: throw AssertionError("Last item unreachable")
+            if (settings == null) captureState("last-item-unreachable")
+            val target = settings ?: throw AssertionError("Last item unreachable after 12 interior gestures")
+            // This fixture's short English label must remain a whole single line,
+            // not merely exist inside bounds as "Setting" + orphan "s".
+            val singleLine = device.findObject(By.text("Selected index: 0"))
+                ?: throw AssertionError("Need single-line same-font reference for readability")
+            assertTrue("Settings must stay single-line, not orphan the last letter",
+                target.visibleBounds.height() <= singleLine.visibleBounds.height() * 1.25f)
             val image = inst.uiAutomation.takeScreenshot() ?: throw AssertionError("No screenshot")
             val file = File(inst.targetContext.getExternalFilesDir(null), "screenshots/radial-compact-large-font.png")
             file.parentFile?.mkdirs()

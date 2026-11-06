@@ -16,8 +16,18 @@ class CallBundlePresentationPolicyTest {
     }
     @Test fun unknownOrMissingBundleFallsBackWithoutLegacyTemplateInput() {
         for (raw in listOf(null, "", "corrupt", "sheet")) {
-            assertEquals(CallBundleId.CHATY_DEFAULT, resolveCallBundlePresentation(raw, CallSessionState.connecting).bundleId)
+            assertEquals(CallBundleId.APPLE_IOS, resolveCallBundlePresentation(raw, CallSessionState.connecting).bundleId)
         }
+    }
+    @Test fun renamedOptionsPreserveStableIdsAndDistinctPresentation() {
+        val old = resolveCallBundlePresentation("chaty_default", CallSessionState.incoming)
+        val fresh = resolveCallBundlePresentation("apple_ios", CallSessionState.incoming)
+        assertEquals(CallBundleId.CHATY_DEFAULT, old.bundleId)
+        assertEquals(CallBundleId.APPLE_IOS, fresh.bundleId)
+        assertNotEquals(old.template, fresh.template)
+        assertEquals("Apple iOS Call Experience", old.bundleId.displayName)
+        assertEquals("Chaty Default", fresh.bundleId.displayName)
+        assertEquals("Default", fresh.bundleId.badge)
     }
     @Test fun outgoingStatesNeverOfferAnswerOrPrematureTimer() {
         for (state in listOf(CallSessionState.initiating, CallSessionState.ringing, CallSessionState.connecting, CallSessionState.reconnecting)) {

@@ -51,12 +51,13 @@ fun Modifier.chatyBackdropBlur(sigma: Dp): Modifier {
     val blurLayer = rememberGraphicsLayer()
     var origin by remember { mutableStateOf(Offset.Zero) }
     val sigmaPx = with(density) { sigma.toPx() }
+    val blurEffect = remember(sigmaPx) { BlurEffect(sigmaPx, sigmaPx, TileMode.Clamp) }
     return this
         .onGloballyPositioned { origin = it.positionInWindow() }
         .drawBehind {
             val margin = 3f * sigmaPx
             val rel = origin - backdrop.hostOrigin
-            blurLayer.renderEffect = BlurEffect(sigmaPx, sigmaPx, TileMode.Clamp)
+            blurLayer.renderEffect = blurEffect
             blurLayer.record(size = IntSize((size.width + 2 * margin).toInt(), (size.height + 2 * margin).toInt())) {
                 translate(margin - rel.x, margin - rel.y) { drawLayer(backdrop.layer) }
             }
@@ -76,13 +77,14 @@ fun Modifier.chatyBoxShadow(color: Color, blurRadius: Dp, offsetX: Dp, offsetY: 
     val density = LocalDensity.current
     val layer = rememberGraphicsLayer()
     val sigmaPx = with(density) { (blurRadius / 2).toPx() }
+    val blurEffect = remember(sigmaPx) { BlurEffect(sigmaPx, sigmaPx, TileMode.Decal) }
     val dx = with(density) { offsetX.toPx() }
     val dy = with(density) { offsetY.toPx() }
     val r = with(density) { cornerRadius.toPx() }
     return this.drawBehind {
         val margin = 3f * sigmaPx
         val outer = size
-        layer.renderEffect = BlurEffect(sigmaPx, sigmaPx, TileMode.Decal)
+        layer.renderEffect = blurEffect
         layer.record(size = IntSize((size.width + 2 * margin).toInt(), (size.height + 2 * margin).toInt())) {
             drawRoundRect(color, Offset(margin + dx, margin + dy), Size(outer.width, outer.height), CornerRadius(r))
         }

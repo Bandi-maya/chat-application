@@ -99,7 +99,7 @@ class MediaFollowOnProofTest {
             assertEquals(before, outputs())
         } finally { source.delete() }
     }
-    @Test fun cancelAfterFirstWrittenSampleDeletesPartialMuxerOutput() = runBlocking {
+    @Test fun cancelAfterFirstWrittenSampleDeletesPartialMuxerOutput(): Unit = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val source = File(context.cacheDir, "synthetic-midexport-cancel.m4a")
         createSilentAac(source)
@@ -119,6 +119,7 @@ class MediaFollowOnProofTest {
         assertEquals("No partial trim copy after cancelled write", before, outputs())
         assertArrayEquals(original, source.readBytes())
         source.delete()
+        Unit // JUnit4 test methods must return void, not File.delete()'s Boolean.
     }
 
     internal fun createAvcWithAudio(file: File, audio: File) {

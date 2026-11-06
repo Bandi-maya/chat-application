@@ -394,7 +394,7 @@ fun SettingsRootScreen(
             },
             confirmButton = {
                 Button(onClick = { dialog = "" }, colors = ButtonDefaults.buttonColors(containerColor = colors.accent)) {
-                    Text("I Understand", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("I Understand", color = com.example.chat.ui.kit.chatyReadableOn(colors.accent, colors.onAccent, colors.foreground), fontWeight = FontWeight.Bold)
                 }
             },
         )
@@ -424,7 +424,7 @@ fun SettingsRootScreen(
             },
             confirmButton = {
                 Button(onClick = { dialog = "" }, colors = ButtonDefaults.buttonColors(containerColor = colors.accent)) {
-                    Text("OK", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("OK", color = com.example.chat.ui.kit.chatyReadableOn(colors.accent, colors.onAccent, colors.foreground), fontWeight = FontWeight.Bold)
                 }
             },
         )

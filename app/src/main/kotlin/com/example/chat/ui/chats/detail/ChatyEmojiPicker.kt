@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.TagFaces
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -97,6 +98,8 @@ fun ChatyEmojiPickerSheet(
     headerColor: Color? = null,
     headerIconsColor: Color? = null,
     backgroundColor: Color? = null,
+    onStickerSend: ((com.example.chat.core.stickers.StickerAsset) -> Unit)? = null,
+    stickerSessionKey: Any? = null,
 ) {
     // Dart ChatyEmojiPicker: backgroundColor ?? surface, headerColor as the header
     // container color (null = none), headerIconsColor ?? onSurface for the header
@@ -117,6 +120,7 @@ fun ChatyEmojiPickerSheet(
             },
         )
     }
+    var stickerTab by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchOpen by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf(0) } // 0 = recents
@@ -216,6 +220,20 @@ fun ChatyEmojiPickerSheet(
             }
         }
 
+        if (composerMode && !reactionMode) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                TextButton(onClick = { stickerTab = false }) { Text(if (!stickerTab) "EMOJI •" else "EMOJI") }
+                TextButton(onClick = { stickerTab = true }) { Text(if (stickerTab) "STICKER •" else "STICKER") }
+            }
+        }
+        if (stickerTab && composerMode && !reactionMode) {
+            androidx.compose.runtime.key(stickerSessionKey) {
+            ClusteredStickerPicker(com.example.chat.core.stickers.BundledStickerPacks.packs, theme,
+                onConfirmSend = onStickerSend,
+                modifier = Modifier.weight(1f),
+                unavailableReason = if (onStickerSend == null) "Sticker sending is not connected yet. Preview only." else null)
+            }
+        } else {
         // Search field (Dart SearchViewConfig, hint 'Search emoji…')
         if (searchOpen) {
             Box(
@@ -376,6 +394,7 @@ fun ChatyEmojiPickerSheet(
             IconButton(onClick = { searchOpen = !searchOpen; if (!searchOpen) searchQuery = "" }) {
                 Icon(Icons.Rounded.Search, contentDescription = "Search emoji", tint = accent)
             }
+        }
         }
     }
 }

@@ -43,6 +43,9 @@ class FcmTokenRegistrar(
      *  which ApiDeviceTokenClient enforces through its null-token guard),
      *  then the Supabase registry; each failure is logged, never thrown. */
     fun registerWithBackends(token: String) {
+        // Offline demo: never dispatch registrations (api-hub or the
+        // optional Supabase registry seam) while a demo session is active.
+        if (com.example.chat.data.demo.DemoMode.active) return
         try {
             apiDevices.registerDeviceToken(token, deviceType = platform)
         } catch (e: Exception) {
@@ -87,6 +90,7 @@ class FcmTokenRegistrar(
 
     /** Dart unregisterOnLogout: api-hub DELETE for the remembered token. */
     fun unregisterOnLogout() {
+        if (com.example.chat.data.demo.DemoMode.active) return
         val token = fcmToken
         if (!token.isNullOrEmpty()) {
             try {

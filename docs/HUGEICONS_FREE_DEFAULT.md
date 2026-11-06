@@ -1,0 +1,9 @@
+# Hugeicons Free default icon pack
+
+Official license checked4November2026: https://hugeicons.com/docs/faqs/license-questions (effective14Sep2026) and https://github.com/hugeicons/hugeicons/ . Free Stroke Rounded icons are MIT, including core-free-icons. Personal/commercial use, modification and redistribution allowed, including Android bundling. Retain copyright and permission notice with redistributed assets/source. No paid seat,key or account needed. Pro terms do not apply to Free. No Pro assets added.
+
+Existing77semantic Hugeicons drawable mappings and packaged MIT notice are reused. Some existing glyphs are explicitly adapted (forward, fullscreen,filled-heart,status center-dot and scheduled-send composition); catalog/provenance retained, not passed off as untouched official glyphs. Exact existing notice remains app/src/main/assets/icon-packs/licenses/LICENSE-hugeicons.txt. No icon network dependency or paid service added.
+
+Only fresh/missing global icon preference and missing composition-local default change to Hugeicons Free; reset-to-default points there and default badge moves. Explicit stored Chaty Orbit/Sigil or any other pack and per-icon overrides are preserved. Invalid non-null IDs retain existing Sigil fallback rather than silently rewriting stored choices. Launcher icon,emoji,font,theme colors and behavior unchanged.
+
+Scope limit: default applies through existing ChatyIcon provider/mapped icon surfaces. Direct Material Icons in surfaces not yet migrated remain unchanged, so this is NOT proof every icon in every screen is Hugeicons. Actual pixel and resource/runtime coverage still required. Source archive omits no required new binary resources because it reuses existing77drawable assets; publisher must verify those assets and MIT notice remain in effective build.

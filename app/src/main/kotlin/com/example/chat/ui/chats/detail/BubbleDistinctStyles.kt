@@ -112,16 +112,26 @@ private fun doodle(size: Size): Path = Path().apply {
 internal fun distinctBubblePath(id: BubbleStyleId, size: Size, isMe: Boolean): Path? {
     val h = size.height
     return when (id) {
+        // These variants differ in the painted rim itself, not low-contrast accents.
+        // Keep content insets and stored ids unchanged.
+        BubbleStyleId.gabiOutline -> rr(size, 4f, 4f, 34f, 34f)
+        BubbleStyleId.bbm -> rr(size, 16f, 16f, 0f, 0f)
+        BubbleStyleId.inBubble -> rr(Size(size.width, size.height), 4f, 20f, 20f, 4f)
+        BubbleStyleId.textra -> rr(Size(size.width, (h - 6f).coerceAtLeast(1f)), 22f, 22f, 22f, 22f)
+        // The older Hangouts panel has a broad upper corner and an angular opposite corner.
+        BubbleStyleId.oldHangouts -> if (isMe) rr(size, 30f, 0f, 12f, 12f) else rr(size, 0f, 30f, 12f, 12f)
+        // Material panel has generous leading corners and a straighter trailing edge.
+        BubbleStyleId.materialized -> if (isMe) rr(size, 28f, 6f, 28f, 6f) else rr(size, 6f, 28f, 6f, 28f)
         // iMessage style curl tail
-        BubbleStyleId.ios -> withTail(tailRect(size, isMe, min(18f, h / 2), 0f), size, isMe, false, 5f, 14f, 6f, 12f)
+        BubbleStyleId.ios -> withTail(tailRect(size, isMe, min(18f, h / 2), 0f), size, isMe, false, 13f, 22f, 6f, 18f)
         // Small swept hook
-        BubbleStyleId.cvIos -> withTail(tailRect(size, isMe, min(18f, h / 2), 0f), size, isMe, false, 3f, 8f, 4f, 8f)
+        BubbleStyleId.cvIos -> withTail(chamfered(size, isMe, 22f, 12f, top = true), size, isMe, false, 8f, 28f, 4f, 20f)
         BubbleStyleId.gabiDot2 -> tailRect(size, isMe, 14f, 2f, top = true)
         BubbleStyleId.ilkhang -> tailRect(size, isMe, 10f, 2f)
         // Chamfered "boxy" frame
-        BubbleStyleId.aranbor -> chamfered(size, isMe, 6f, 4f, top = false).let { p ->
+        BubbleStyleId.aranbor -> chamfered(size, isMe, 16f, 4f, top = false).let { p ->
             // chamfer both bottom corners by drawing the opposite one too
-            Path().apply { op(p, chamfered(size, !isMe, 6f, 4f, top = false), PathOperation.Intersect) }
+            Path().apply { op(p, chamfered(size, !isMe, 16f, 4f, top = false), PathOperation.Intersect) }
         }
         // Thought-bubble pill, circles drawn as accent
         BubbleStyleId.gabyRon -> Path().apply {
@@ -139,18 +149,18 @@ internal fun distinctBubblePath(id: BubbleStyleId, size: Size, isMe: Boolean): P
             close()
         }
         // WhatsApp-like tail on the top outer corner
-        BubbleStyleId.whatsappLb -> withTail(tailRect(size, isMe, 12f, 0f, top = true), size, isMe, true, 6f, 10f, 4f, 8f)
+        BubbleStyleId.whatsappLb -> withTail(tailRect(size, isMe, 12f, 0f, top = true), size, isMe, true, 12f, 22f, 4f, 16f)
         // Telegram-like hook at the bottom corner
-        BubbleStyleId.telegram -> withTail(tailRect(size, isMe, 14f, 0f), size, isMe, false, 6f, 10f, 3f, 14f)
+        BubbleStyleId.telegram -> withTail(tailRect(size, isMe, 26f, 0f), size, isMe, false, 14f, 24f, 3f, 20f)
         // Samsung ChatOn: big triangular tail
         BubbleStyleId.waChatOn -> withTail(tailRect(size, isMe, 10f, 0f), size, isMe, false, 8f, 16f, 2f, 6f)
         // Twitter DM: one sharp corner
-        BubbleStyleId.twitter -> if (isMe) rr(size, 22f, 0f, 0f, 22f) else rr(size, 0f, 22f, 22f, 0f)
+        BubbleStyleId.twitter -> if (isMe) rr(size, 34f, 0f, 0f, 34f) else rr(size, 0f, 34f, 34f, 0f)
         BubbleStyleId.plusMessengerEd -> tailRect(size, isMe, 18f, 4f, top = true)
         BubbleStyleId.newHangouts4 -> if (isMe) rr(size, 16f, 0f, 16f, 16f) else rr(size, 0f, 16f, 16f, 16f)
         BubbleStyleId.doodleHang -> doodle(size)
         BubbleStyleId.samyadeepCrayonAlt -> if (isMe) rr(size, 12f, 12f, 12f, 0f) else rr(size, 12f, 12f, 0f, 12f)
-        BubbleStyleId.rounded -> tailRect(size, isMe, 22f, 8f)
+        BubbleStyleId.rounded -> rr(size, 22f, 22f, 10f, 10f)
         // Material card: generous top, tight bottom
         BubbleStyleId.md -> rr(size, 20f, 20f, 6f, 6f)
         // Fold: chamfer at the bottom outer corner. Fold v2: larger chamfer at the top.
@@ -158,15 +168,23 @@ internal fun distinctBubblePath(id: BubbleStyleId, size: Size, isMe: Boolean): P
         BubbleStyleId.foldV2 -> chamfered(size, isMe, 18f, 14f, top = true)
         // Leaf: diagonal corners round, the others tight
         BubbleStyleId.bryed -> rr(size, 14f, 4f, 4f, 14f)
-        BubbleStyleId.hike -> withTail(tailRect(size, isMe, 10f, 0f), size, isMe, false, 5f, 9f, 3f, 9f)
-        BubbleStyleId.win -> rr(size, 2f, 2f, 2f, 2f)
-        BubbleStyleId.samyadeepDual -> tailRect(size, isMe, 12f, 6f)
-        BubbleStyleId.popzup -> rr(size, h / 2, h / 2, h / 2, h / 2)
-        BubbleStyleId.line -> tailRect(size, isMe, 20f, 0f)
-        BubbleStyleId.mood -> if (isMe) rr(size, 22f, 12f, 4f, 22f) else rr(size, 12f, 22f, 22f, 4f)
+        BubbleStyleId.hike -> withTail(if (isMe) rr(size, 4f, 4f, 22f, 0f) else rr(size, 4f, 4f, 0f, 22f), size, isMe, false, 12f, 30f, 3f, 16f)
+        BubbleStyleId.win -> Path().apply {
+            // Angular messenger panel: parallel slanted ends, not a2dp roundrect.
+            val slant = 8f
+            moveTo(slant, 0f); lineTo(size.width, 0f)
+            lineTo(size.width - slant, h); lineTo(0f, h); close()
+        }
+        BubbleStyleId.samyadeepDual -> rr(size, 2f, 2f, 20f, 20f)
+        BubbleStyleId.popzup -> rr(size, 6f, 6f, h / 2, h / 2)
+        BubbleStyleId.line -> Path().apply {
+            moveTo(0f, 0f); lineTo(size.width - 10f, 0f)
+            lineTo(size.width, h); lineTo(10f, h); close()
+        }
+        BubbleStyleId.mood -> if (isMe) rr(size, 6f, 26f, 26f, 12f) else rr(size, 26f, 6f, 12f, 26f)
         // Swept tail on the top outer corner instead of the bottom
         BubbleStyleId.rcGoSms -> withTail(tailRect(size, isMe, min(16f, h / 2), 4f, top = true), size, isMe, true, 12f, 14f, 10f, 2f)
-        BubbleStyleId.rcImess -> dome(size, 26f, 10f, bevel = false)
+        BubbleStyleId.rcImess -> dome(size, 16f, 10f, bevel = false)
         BubbleStyleId.rcTranLine -> dome(size, 24f, 10f, bevel = true)
         else -> null
     }

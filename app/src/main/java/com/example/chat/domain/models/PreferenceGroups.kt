@@ -15,7 +15,9 @@ data class PrivacyPreferences(
     val hideLastSeenAudience: String = "My Contacts",
     /** 'Everyone', 'Same as Last Seen' */
     val hideOnlineAudience: String = "Everyone",
-    val antiViewOnce: Boolean = true,
+    // Bandi's decision (Nov 4, 2026): anti-view-once retention defaults OFF,
+    // deviating from the Dart port's default. Saved user choices unaffected.
+    val antiViewOnce: Boolean = false,
     val disableForwardedLabel: Boolean = false,
     val readReceipts: Boolean = true,
     val typingIndicators: Boolean = true,
@@ -80,7 +82,7 @@ data class PrivacyPreferences(
             frozenLastSeenTime = map["frozenLastSeenTime"] as String? ?: "",
             hideLastSeenAudience = map["hideLastSeenAudience"] as String? ?: "My Contacts",
             hideOnlineAudience = map["hideOnlineAudience"] as String? ?: "Everyone",
-            antiViewOnce = map["antiViewOnce"] as Boolean? ?: true,
+            antiViewOnce = map["antiViewOnce"] as Boolean? ?: false,
             disableForwardedLabel = map["disableForwardedLabel"] as Boolean? ?: false,
             readReceipts = map["readReceipts"] as Boolean? ?: true,
             typingIndicators = map["typingIndicators"] as Boolean? ?: true,
@@ -274,7 +276,7 @@ data class UniversalPreferences(
     val emojiVariant: String = "WhatsApp",
     val notificationIcon: String = "White",
     val fontStyle: String = "Default",
-    val iconTheme: String = "Chaty Orbit",
+    val iconTheme: String = "Hugeicons Free",
     /** Per-icon visual theme overrides keyed by stable ChatyIconId.name. */
     val iconVariants: Map<String, String> = emptyMap(),
     val emojiStyle: String = "Chaty Motion",
@@ -348,7 +350,7 @@ data class UniversalPreferences(
             emojiVariant = map["emojiVariant"] as String? ?: "WhatsApp",
             notificationIcon = map["notificationIcon"] as String? ?: "White",
             fontStyle = map["fontStyle"] as String? ?: "Default",
-            iconTheme = map["iconTheme"] as String? ?: "Chaty Orbit",
+            iconTheme = map["iconTheme"] as String? ?: "Hugeicons Free",
             iconVariants = (map["iconVariants"] as? Map<*, *>)
                 ?.mapNotNull { (key, value) ->
                     if (key != null && value != null) key.toString() to value.toString() else null

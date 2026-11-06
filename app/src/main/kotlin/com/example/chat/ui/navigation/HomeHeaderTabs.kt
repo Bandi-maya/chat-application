@@ -8,8 +8,14 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,18 +87,43 @@ class HomeHeaderTabsState {
 val LocalHomeHeaderTabs = compositionLocalOf<HomeHeaderTabsState?> { null }
 
 /** The WhatsApp OLD UI tab row. Styled like the Header settings live preview
- *  (GbLiveHeaderPreview OldUiHeader): surface background, selected = bold accent label + 2.5dp accent underline,
+ *  (GbLiveHeaderPreview OldUiHeader): surface background, selected = bold foreground label + 2dp foreground underline,
  *  others secondary 13sp. With room, tabs share the width equally (same as before). When labels need more room
  *  (narrow screens, large font) the row grows in height only as far as the text needs, tabs stop shrinking below
  *  their label, the row scrolls horizontally, and the selected tab is scrolled into view. Labels never wrap or
  *  overflow; each tab keeps a 48dp touch height and Tab/selected semantics. */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun HomeHeaderTabsBar(colors: ChatyColors, ids: List<String>, selectedIndex: Int, heightDp: Float, onSelect: (Int) -> Unit) {
-    val scroll = rememberScrollState()
-    val requesters = remember(ids) { ids.map { BringIntoViewRequester() } }
-    LaunchedEffect(selectedIndex, ids) { requesters.getOrNull(selectedIndex)?.bringIntoView() }
-    BoxWithConstraints(Modifier.fillMaxWidth().background(colors.surface)) {
+fun HomeHeaderTabsBar(
+    colors: ChatyColors, ids: List<String>, selectedIndex: Int, heightDp: Float, onSelect: (Int) -> Unit,
+    // Test seams, defaults keep behaviour: the strip state, and a callback with each computed scroll target.
+    scroll: androidx.compose.foundation.ScrollState = rememberScrollState(),
+    onScrollTarget: (target: Int, maxValue: Int) -> Unit = { _, _ -> },
+    onScrollLog: (String) -> Unit = {},
+) {
+    // Content-space left/right of each tab, filled by layout. Scrolling the selected tab in uses these numbers
+    // directly (no relocation request), so a selection change from outside the strip scrolls it too.
+    val tabSpan = remember(ids) { mutableStateMapOf<Int, IntRange>() }
+    BoxWithConstraints(Modifier.fillMaxWidth().background(colors.background)) {
+        val viewportPx by rememberUpdatedState(constraints.maxWidth)
+        // Diagnostics only (no-op with the default callback): every change of the strip position, so a later reset to 0
+        // after a completed animateScrollTo shows up with its max value.
+        LaunchedEffect(scroll) { snapshotFlow { scroll.value to scroll.maxValue }.collect { onScrollLog("v=${it.first}/${it.second}") } }
+        LaunchedEffect(selectedIndex, ids) {
+            // Let the new (bold) selection lay out first, then centre it in the viewport, clamped to the scroll range.
+            repeat(2) { withFrameNanos { } }
+            val span = snapshotFlow { tabSpan[selectedIndex] }.filterNotNull().first()
+            val target = (span.first - (viewportPx - (span.last - span.first)) / 2).coerceIn(0, scroll.maxValue)
+            onScrollTarget(target, scroll.maxValue)
+            onScrollLog("start target=$target max=${scroll.maxValue} from=${scroll.value}")
+            try {
+                scroll.animateScrollTo(target)
+                onScrollLog("done value=${scroll.value}")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                onScrollLog("cancelled at value=${scroll.value} inProgress=${scroll.isScrollInProgress}")
+                throw e
+            }
+        }
         val share = if (ids.isEmpty()) maxWidth else maxWidth / ids.size
         Row(
             modifier = Modifier
@@ -109,13 +140,13 @@ fun HomeHeaderTabsBar(colors: ChatyColors, ids: List<String>, selectedIndex: Int
                         .widthIn(min = share)
                         .fillMaxHeight()
                         .testTag("home-tab-$id")
-                        .bringIntoViewRequester(requesters[index])
+                        .onGloballyPositioned { c -> val x = c.positionInParent().x.toInt(); tabSpan[index] = x..(x + c.size.width) }
                         .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(index) }),
                 ) {
                     Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
                         Text(
-                            NavigationCatalog.labelFor(id).uppercase(),
-                            color = if (selected) colors.primary else colors.foregroundSecondary,
+                            NavigationCatalog.labelFor(id),
+                            color = if (selected) colors.foreground else colors.foregroundSecondary,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 13.sp,
                             maxLines = 1,
@@ -126,8 +157,8 @@ fun HomeHeaderTabsBar(colors: ChatyColors, ids: List<String>, selectedIndex: Int
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(2.5.dp)
-                            .background(if (selected) colors.primary else Color.Transparent),
+                            .height(2.dp)
+                            .background(if (selected) colors.foreground else Color.Transparent),
                     )
                 }
             }

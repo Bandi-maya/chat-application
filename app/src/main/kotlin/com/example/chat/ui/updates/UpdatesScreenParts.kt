@@ -36,8 +36,9 @@ import androidx.compose.material.icons.rounded.PlayCircleFilled
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RemoveRedEye
 import androidx.compose.material.icons.rounded.Send
+import com.example.chat.ui.kit.ChatyActionButton
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
-import androidx.compose.material3.Button
+import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,7 +47,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -97,11 +97,13 @@ internal fun UpdatesConfirmDialog(
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(confirmLabel, color = if (destructive) colors.error else colors.primary)
-            }
+            ChatyTextButton(
+                onClick = onConfirm,
+                label = confirmLabel,
+                color = if (destructive) colors.error else colors.primary,
+            )
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { ChatyTextButton(onClick = onDismiss, label = "Cancel") },
     )
 }
 
@@ -224,7 +226,7 @@ internal fun UpdatesComposerSheet(
                 }
             }
             Spacer(Modifier.height(20.dp))
-            Button(
+            ChatyActionButton(
                 onClick = { if (busyType == null) publishText() },
                 enabled = busyType == null,
                 modifier = Modifier.fillMaxWidth(),
@@ -482,11 +484,7 @@ internal fun StatusContent(
             fontSize = 15.sp,
         )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = { openUrl(signedUrl) }, modifier = Modifier.heightIn(min = 48.dp)) {
-            Icon(Icons.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Open Securely")
-        }
+        ChatyActionButton(onClick = { openUrl(signedUrl) }, icon = Icons.Rounded.OpenInNew, label = "Open Securely")
     }
 }
 
@@ -602,7 +600,7 @@ internal fun StatusViewersSheet(
                         fontSize = 12.5.sp,
                         textAlign = TextAlign.Center,
                     )
-                    TextButton(onClick = ::load) { Text("Retry") }
+                    ChatyTextButton(onClick = ::load, label = "Retry")
                 }
                 list == null -> Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(strokeWidth = 2.dp)
@@ -791,11 +789,7 @@ internal fun StatusAudioPlayer(url: String, name: String, colors: ChatyColors) {
                     color = colors.error,
                     fontSize = 12.sp,
                 )
-                TextButton(onClick = ::loadSource) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Retry")
-                }
+                ChatyTextButton(onClick = ::loadSource, icon = Icons.Rounded.Refresh, label = "Retry")
             } else {
                 Slider(
                     value = positionMs.toFloat().coerceIn(0f, (if (durationMs > 0) durationMs else 1).toFloat()),
@@ -813,7 +807,7 @@ internal fun StatusAudioPlayer(url: String, name: String, colors: ChatyColors) {
                     Text(timeLabel(durationMs), color = colors.foregroundSecondary, fontSize = 12.sp)
                 }
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = ::togglePlayback, enabled = !loading) {
+                ChatyActionButton(onClick = ::togglePlayback, enabled = !loading) {
                     if (loading) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     } else {

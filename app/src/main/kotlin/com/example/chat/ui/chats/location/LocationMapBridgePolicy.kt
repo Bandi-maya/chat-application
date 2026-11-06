@@ -17,6 +17,8 @@ class LocationMapBridgePolicy(val session: String = newSession()) {
         if (fields["session"] != session) return null
         return when (fields["type"]) {
             "ready" -> if (fields.keys == setOf("version", "type", "session")) LocationMapEvent.Ready else null
+            "viewChanged" -> if (fields.keys == setOf("version", "type", "session", "buildings") && fields["buildings"] is Boolean) LocationMapEvent.ViewChanged(fields["buildings"] as Boolean) else null
+            "styleChanged" -> if (fields.keys == setOf("version", "type", "session", "style") && fields["style"] in setOf("liberty", "positron", "dark", "bright", "fiord")) LocationMapEvent.StyleChanged(fields["style"] as String) else null
             "pinSelected" -> {
                 if (fields.keys != setOf("version", "type", "session", "latitude", "longitude")) return null
                 val lat = (fields["latitude"] as? Number)?.toDouble() ?: return null
@@ -38,5 +40,7 @@ class LocationMapBridgePolicy(val session: String = newSession()) {
 
 sealed class LocationMapEvent {
     data object Ready : LocationMapEvent()
+    data class ViewChanged(val buildings: Boolean) : LocationMapEvent()
+    data class StyleChanged(val style: String) : LocationMapEvent()
     data class PinSelected(val coordinate: LocationCoordinate) : LocationMapEvent()
 }

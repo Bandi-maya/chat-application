@@ -47,3 +47,8 @@ internal fun voiceBundleIdentity(bundle: com.example.chat.ui.calls.bundles.CallB
         com.example.chat.ui.calls.bundles.CallBundleId.NEXTCLOUD_TALK -> VoiceBundleIdentity(96, 22, false)
         else -> VoiceBundleIdentity(110, 24, false)
     }
+
+/** Width is measured after panel padding. Explicit cell widths stop text intrinsics pushing
+ * Hang up into an unexpected fourth row at 220dp / 2x font. No touch target under48dp. */
+internal fun responsiveAudioControlColumns(widthDp: Int, preferred: Int): Int =
+    minOf(preferred, (widthDp / 76).coerceAtLeast(1))

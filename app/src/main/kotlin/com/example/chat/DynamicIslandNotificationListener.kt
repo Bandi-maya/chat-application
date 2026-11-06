@@ -93,22 +93,6 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
 
     private fun isPrivateScreen(): Boolean = IslandOverlay.isScreenPrivate(this)
 
-    /**
-     * Notification contents are ingested only when Chaty is enabled, Android
-     * currently grants overlay permission, and the app has no private/locked
-     * surface. This is checked again at dispatch time to close settings and
-     * screen-lock races.
-     */
-    private fun canCaptureNotificationContent(): Boolean {
-        val overlayAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-            Settings.canDrawOverlays(this)
-        return DynamicIslandPrivacyPolicy.shouldCapture(
-            enabled = isEnabled(this),
-            overlayPermissionGranted = overlayAllowed,
-            privateScreen = isPrivateScreen(),
-        )
-    }
-
     private var mediaSessionManager: MediaSessionManager? = null
     private var activeMediaController: MediaController? = null
 
@@ -181,7 +165,8 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
     }
 
     private fun syncActiveMedia() {
-        if (!canCaptureNotificationContent()) {
+        if (!isEnabled(this)) return
+        if (isPrivateScreen()) {
             IslandOverlay.suppressForPrivacy()
             return
         }
@@ -226,16 +211,13 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        if (sbn == null) return
-        if (!canCaptureNotificationContent()) {
-            IslandOverlay.suppressForPrivacy()
-            return
-        }
+        if (sbn == null || !isEnabled(this)) return
         processStatusBarNotification(sbn, isInitialReconcile = false)
     }
 
     private fun processStatusBarNotification(sbn: StatusBarNotification, isInitialReconcile: Boolean) {
-        if (!canCaptureNotificationContent()) {
+        if (!isEnabled(this)) return
+        if (isPrivateScreen()) {
             IslandOverlay.suppressForPrivacy()
             return
         }
@@ -329,9 +311,9 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
 
         val notificationKey = sbn.key ?: "${sbn.packageName}:${sbn.id}"
         Handler(Looper.getMainLooper()).post {
-            // Recheck all permission and privacy gates after queueing: overlay
-            // access can be revoked or the screen can lock after ingestion.
-            if (!canCaptureNotificationContent()) {
+            if (!isEnabled(this)) return@post
+            // Recheck after queueing: the screen can lock after ingestion.
+            if (isPrivateScreen()) {
                 IslandOverlay.suppressForPrivacy()
                 return@post
             }
@@ -925,3 +907,4 @@ class WavyAudioScrubberView(context: Context) : View(context) {
         stopWaveAnimation()
     }
 }
+

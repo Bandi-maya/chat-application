@@ -18,6 +18,31 @@ interface ApiSessionStore {
     fun clear()
 }
 
+/** Allowlisted reason codes for a session-persist failure. The raw cause is
+ *  kept only in [ApiSessionStorageException.cause] for private diagnostics;
+ *  user-visible copy and exported error reports come exclusively from these
+ *  fixed strings, so a secret-bearing store exception can never leak through
+ *  the UI or the share sheet. */
+enum class ApiSessionStorageFailure(val userSafeReason: String) {
+    SECURE_STORAGE_UNAVAILABLE("this device could not open its secure storage (Android Keystore)"),
+    WRITE_REJECTED("the device confirmed your sign-in data was not saved"),
+    UNKNOWN("secure storage failed unexpectedly"),
+}
+
+/** Sign-in (or re-auth) could not persist the session to the device's secure
+ *  storage. Login must fail closed on this: no session is kept in memory and
+ *  no temporary session is created (Bandi 2026-11-04). The login UI shows
+ *  [message] (fixed, user-safe) plus the support action. Extends
+ *  IllegalStateException so existing fail-closed catch sites keep working. */
+class ApiSessionStorageException(
+    val failure: ApiSessionStorageFailure,
+    cause: Throwable? = null,
+) : IllegalStateException(
+    "Chaty could not save your sign-in securely on this device, so sign-in was " +
+        "stopped to protect your account. Reason: " + failure.userSafeReason + ".",
+    cause,
+)
+
 fun apiUserToJson(user: ApiUserProfile): String = JSONObject()
     .put("id", user.id)
     .put("username", user.username)
@@ -92,7 +117,23 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
     fun adopt(result: ApiAuthResult) = synchronized(scopeLock) {
         // Commit the complete token/user/refresh-token tuple before publishing
         // the new identity to listeners or request owners.
-        store.saveSession(result.token, apiUserToJson(result.user), result.refreshToken)
+        try {
+            store.saveSession(result.token, apiUserToJson(result.user), result.refreshToken)
+        } catch (e: Exception) {
+            // Fail closed with an allowlisted reason: the identity is never
+            // published, no in-memory fallback session is kept, and the raw
+            // store exception (which can carry paths or secrets) stays in the
+            // private cause chain only.
+            val failure = when {
+                e.message?.contains("Attempted read or write") == true ->
+                    ApiSessionStorageFailure.WRITE_REJECTED
+                e is java.security.GeneralSecurityException ||
+                    e.cause is java.security.GeneralSecurityException ->
+                    ApiSessionStorageFailure.SECURE_STORAGE_UNAVAILABLE
+                else -> ApiSessionStorageFailure.UNKNOWN
+            }
+            throw ApiSessionStorageException(failure, e)
+        }
         state = ApiAuthSnapshot(result.user, result.token, state.generation + 1)
         onTransition()
     }

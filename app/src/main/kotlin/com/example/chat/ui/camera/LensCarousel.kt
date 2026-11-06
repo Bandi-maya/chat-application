@@ -1,6 +1,11 @@
 package com.example.chat.ui.camera
 
+import android.util.Log
+
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import com.example.chat.ui.kit.ChatyHapticsPort
 import androidx.compose.foundation.Canvas
@@ -120,9 +125,11 @@ fun LensCarousel(
     suspend fun centerOn(index: Int) {
         val generation = ++centeringGeneration
         programmaticTarget = index
+        if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "centerOn start index=" + index + " gen=" + generation)
         try {
             listState.animateScrollToItem(index)
         } finally {
+            if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "centerOn end gen=" + generation + " current=" + centeringGeneration + " cleared=" + (centeringGeneration == generation) + " landed=" + listState.firstVisibleItemIndex + "+" + listState.firstVisibleItemScrollOffset)
             if (centeringGeneration == generation) programmaticTarget = null
         }
     }
@@ -140,6 +147,7 @@ fun LensCarousel(
     // through the guard so the offset watcher can never override it.
     LaunchedEffect(managerSelectedId) {
         val index = catalog.indexOfFirst { it.id == manager.selected.id }
+        if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "selectionEffect managerSelectedId=" + managerSelectedId + " manager.selected=" + manager.selected.id + " resolvedIndex=" + index + " catalog=" + catalog.map { it.id })
         if (index < 0) return@LaunchedEffect
         currentIndex = index
         centerOn(index)
@@ -155,6 +163,7 @@ fun LensCarousel(
             if (programmaticTarget != null) return@collectLatest
             val nearest = (offsetPx / slotPx).roundToInt().coerceIn(0, catalog.size - 1)
             if (nearest == currentIndex || catalog.isEmpty()) return@collectLatest
+            if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "watcher select nearest=" + nearest + " offsetPx=" + offsetPx + " prevIndex=" + currentIndex + " slotPx=" + slotPx + " firstVisible=" + listState.firstVisibleItemIndex + "+" + listState.firstVisibleItemScrollOffset)
             currentIndex = nearest
             val now = System.currentTimeMillis()
             if (now >= hapticRearmAtMs) {
@@ -180,11 +189,32 @@ fun LensCarousel(
         items(catalog.size) { index ->
             val lens = catalog[index]
             val selected = index == currentIndex
+            val onItemTap: () -> Unit = {
+                // Dart _centerOn: select, then animate into the center.
+                // Selection only here - the manager-listener effect centers
+                // through the programmatic guard, so a stale scroll animation
+                // can never override this fresh selection.
+                if (com.example.chat.BuildConfig.DEBUG) Log.i("LENS-DIAG", "onTap index=" + index + " id=" + (catalog.getOrNull(index)?.id) + " managerSelected=" + manager.selected.id)
+                if (index < catalog.size) {
+                    val l = catalog[index]
+                    if (manager.selected.id != l.id) {
+                        ChatyHapticsPort.selection(view)
+                    }
+                    manager.select(l.id)
+                    onSelectionChanged?.invoke(l)
+                }
+            }
             Box(
                 modifier = Modifier
                     .size(width = slotExtent, height = selectedDiameter + 26.dp)
                     .semantics {
                         this.selected = selected
+                        // TalkBack/keyboard actionable: the visual thumb uses
+                        // detectTapGestures (no implicit click semantics), so the
+                        // click action and role are published here. Gestures and
+                        // visuals are unchanged.
+                        this.role = Role.Button
+                        this.onClick(label = null) { onItemTap(); true }
                         // Unique vs the browse sheet ("<name> lens"): carousel items
                         // are thumbnails, so a test can address each surface separately.
                         contentDescription =
@@ -202,20 +232,7 @@ fun LensCarousel(
                     scrollOffsetPx = listState.firstVisibleItemIndex * slotPx +
                         listState.firstVisibleItemScrollOffset,
                     runtimeState = manager.runtimeState,
-                    onTap = {
-                        // Dart _centerOn: select, then animate into the center.
-                        // Selection only here - the manager-listener effect centers
-                        // through the programmatic guard, so a stale scroll animation
-                        // can never override this fresh selection.
-                        if (index < catalog.size) {
-                            val l = catalog[index]
-                            if (manager.selected.id != l.id) {
-                                ChatyHapticsPort.selection(view)
-                            }
-                            manager.select(l.id)
-                            onSelectionChanged?.invoke(l)
-                        }
-                    },
+                    onTap = onItemTap,
                 )
             }
         }

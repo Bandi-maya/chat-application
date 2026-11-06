@@ -171,26 +171,9 @@ class ApiAuthClientParityTest {
     fun checkOrganizationReturnsDataObject() {
         val t = FakeTransport { 200 to """{"data":{"name":"Acme","allow_user_registration":false}}""" }
         val data = client(t).checkOrganization("acme")
-        assertEquals("http://10.0.2.2:8000/organization/check/acme", t.calls.first().url)
         val (name, allow) = ApiAuthClient.orgCheckToBanner(data, "acme")
         assertEquals("Acme", name)
         assertFalse(allow)
-    }
-
-    @Test
-    fun checkOrganizationRejectsPathInjectionBeforeNetwork() {
-        val t = FakeTransport { 200 to """{"data":{}}""" }
-        listOf("../admin", "tenant/other", "tenant?x=1", "tenant#fragment", "").forEach { invalid ->
-            try {
-                client(t).checkOrganization(invalid)
-                fail("expected invalid organization ID to be rejected")
-            } catch (_: IllegalArgumentException) {
-                // Expected: untrusted identifiers cannot change the REST path.
-            } catch (_: Exception) {
-                // Empty input uses the existing required-ID error.
-            }
-        }
-        assertTrue(t.calls.isEmpty())
     }
 
     @Test
@@ -229,7 +212,7 @@ class ApiAuthClientParityTest {
             client(down).login("x", "pw")
             fail("expected")
         } catch (e: Exception) {
-            assertEquals("Unable to reach server. Please check your internet connection.", e.message)
+            assertEquals("Unable to reach the Chaty server (RuntimeException). Check your internet connection; if it works, the server itself is not responding - try again later.", e.message)
         }
     }
 

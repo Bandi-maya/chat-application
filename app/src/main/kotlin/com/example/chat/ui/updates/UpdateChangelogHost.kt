@@ -3,96 +3,94 @@ package com.example.chat.ui.updates
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
+import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
+import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.chat.BuildConfig
 
 private const val PREFS = "chaty_release_notes"
-private const val LAST_SEEN_VERSION = "last_seen_version"
+private const val LAST_SEEN_IDENTITY = "last_seen_release_identity_v2"
+private const val HISTORY = "release_history_v1"
+private const val QUARANTINE = "release_history_quarantine_v1"
 
-private data class ReleaseNote(val title: String, val detail: String)
-
-private val currentReleaseNotes = listOf(
-    ReleaseNote("Camera zoom controls", "Tap a zoom preset directly or expand the circular dial for finer control. Available zoom is limited by the active camera."),
-    ReleaseNote("Camera interaction polish", "Zoom controls expose clear selected states and accessible labels."),
-    ReleaseNote("Settings and color feedback", "Selected color swatches now show a clear selection marker, and modal dialogs no longer use the top accent strip or full outline border."),
-    ReleaseNote("Startup lock reliability", "Initial app-lock scheduling retries when restored authentication and saved lock preferences become available."),
-)
-
+/** Uses only this app's notes. No network requests, promotional links or copied reference data. */
 @Composable
-fun UpdateChangelogHost(onFinished: () -> Unit = {}) {
+fun UpdateChangelogHost(onFinished: () -> Unit = {}, forceShow: Boolean = false) {
     val context = LocalContext.current
+    val current = remember { ReleaseNotesPolicy.current(BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE.toLong()) }
     var show by remember { mutableStateOf(false) }
-    var resolved by remember { mutableStateOf(false) }
-    val versionName = BuildConfig.VERSION_NAME.ifBlank { "current build" }
-    val packageUpdatedAt = remember(context) {
-        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime }.getOrDefault(0L)
-    }
-    val installVersion = "$versionName (${BuildConfig.VERSION_CODE}) @$packageUpdatedAt"
+    var history by remember { mutableStateOf(emptyList<ReleaseHistoryEntry>()) }
+    var historyReadOnly by remember { mutableStateOf(false) }
 
-    LaunchedEffect(installVersion) {
+    LaunchedEffect(current.identity) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val previous = prefs.getString(LAST_SEEN_VERSION, null)
-        show = previous != installVersion
-        resolved = true
-        if (previous == installVersion) onFinished()
+        val rawHistory = prefs.getString(HISTORY, null)
+        val recovered = ReleaseHistoryCodec.recover(rawHistory, prefs.getString(QUARANTINE, null))
+        history = ReleaseNotesPolicy.history(current, recovered.entries)
+        historyReadOnly = !recovered.canWrite
+        if (recovered.canWrite) {
+            val edit = prefs.edit().putString(HISTORY, ReleaseHistoryCodec.write(history))
+            recovered.quarantine?.let { edit.putString(QUARANTINE, it) }
+            edit.apply()
+        }
+        // The old last_seen_version value includes installation time and cannot identify notes.
+        // Leave it intact; this release introduces the stable identity once, without fake backfill.
+        show = forceShow || ReleaseNotesPolicy.shouldShow(prefs.getString(LAST_SEEN_IDENTITY, null), current)
+        if (!show) onFinished()
     }
 
-    if (!resolved || !show) return
-
+    if (!show) return
+    fun close() {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(LAST_SEEN_IDENTITY, current.identity).apply()
+        show = false
+        onFinished()
+    }
     AlertDialog(
-        onDismissRequest = { markSeen(context, installVersion); show = false; onFinished() },
-        title = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("What’s new in Chaty")
-                Text("Version $versionName", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            }
-        },
+        shape = com.example.chat.ui.kit.ChatyModalShape,
+        onDismissRequest = { close() },
+        title = { Text("Chaty changelog") },
         text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth()) {
-                items(currentReleaseNotes) { note ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                        Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(note.title, style = MaterialTheme.typography.titleSmall)
-                            Text(note.detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                if (historyReadOnly) item {
+                    Text("Stored update history could not be read. Existing records have been kept, but this update cannot be saved to history yet.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                items(history, key = { it.identity }) { entry ->
+                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text("Version ${entry.versionName} (${entry.versionCode})", style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary)
+                        Text(if (entry.identity == current.identity) "Latest changes" else "Earlier update", style = MaterialTheme.typography.labelMedium)
+                        entry.changes.forEach { change ->
+                            Text("\u2022 $change", style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
-                item { Spacer(Modifier.height(2.dp)) }
+                item {
+                    Text("Earlier versions appear here as they are recorded on this device. App data removal also removes this local history.",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         },
-        confirmButton = {
-            TextButton(onClick = { markSeen(context, installVersion); show = false; onFinished() }) { Text("Continue") }
-        },
+        confirmButton = { ChatyTextButton(onClick = { close() }, label = "Close") },
     )
 }
 
-private fun markSeen(context: Context, versionName: String) {
-    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        .edit()
-        .putString(LAST_SEEN_VERSION, versionName)
-        .apply()
-}

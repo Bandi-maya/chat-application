@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.BrokenImage
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.OpenInNew
@@ -71,6 +72,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -82,6 +85,7 @@ import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.ui.theme.ChatyAsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Port of lib/features/messages/media_viewer_screen.dart: signed-url
  *  resolution via ChatMediaService.createSignedUrl (3600s expiry), image
@@ -119,8 +123,15 @@ fun MediaViewerScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val opening = remember(storagePath) { Animatable(0f) }
-    LaunchedEffect(storagePath) { opening.animateTo(1f, tween(280)) }
+    val reduceMotion = !android.animation.ValueAnimator.areAnimatorsEnabled()
+    val opening = remember(storagePath) { Animatable(if (reduceMotion) 1f else 0f) }
+    var targetBounds by remember { mutableStateOf<Rect?>(null) }
+    var imageReady by remember(storagePath) { mutableStateOf(false) }
+    val openingReady = type != "image" || imageReady
+    LaunchedEffect(storagePath, reduceMotion, targetBounds != null, openingReady) {
+        if (reduceMotion || sourceBounds == null) opening.snapTo(1f)
+        else if (targetBounds != null && openingReady) opening.animateTo(1f, tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+    }
     var trimming by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var editedCopy by remember(storagePath) { mutableStateOf<java.io.File?>(null) }
@@ -201,7 +212,7 @@ fun MediaViewerScreen(
 
     // Dart _openExternally (url_launcher externalApplication).
     fun openExternally() {
-        if (restrictedViewOnce) return
+        if (restrictedViewOnce || error != null) return
         if (ownedActions) { onOwnedOpen?.invoke(); return }
         val url = signedUrl ?: return
         try {
@@ -224,7 +235,7 @@ fun MediaViewerScreen(
 
     // Dart _share (share_plus text + subject).
     fun share() {
-        if (restrictedViewOnce) return
+        if (restrictedViewOnce || error != null) return
         if (ownedActions) { onOwnedShare?.invoke(); return }
         val local = editedCopy
         if (local != null) {
@@ -250,6 +261,21 @@ fun MediaViewerScreen(
     }
 
     // Dart _toggleVideo.
+    // GB media-preview option: save the viewed image/video to the device gallery.
+    fun saveToGallery() {
+        val source = editedCopy?.absolutePath
+            ?: (providedModel as? java.io.File)?.absolutePath
+            ?: signedUrl
+            ?: return
+        scope.launch {
+            val message = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { saveMediaToGallery(context, source, title, type == "video") }
+                    .getOrElse { "Save failed: ${it.message ?: it}" }
+            }
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
     fun toggleVideo() {
         val vv = videoView ?: return
         if (!videoReady || !mediaLifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) return
@@ -266,6 +292,16 @@ fun MediaViewerScreen(
         isPlaying = vv.isPlaying
     }
 
+    var closing by remember { mutableStateOf(false) }
+    fun closeViewer() {
+        if (closing) return
+        closing = true
+        scope.launch {
+            if (!reduceMotion && sourceBounds != null && openingReady) opening.animateTo(0f, tween(220))
+            onBack()
+        }
+    }
+    androidx.activity.compose.BackHandler { closeViewer() }
     val elevated = Color(theme.cardColor)
     val foreground = Color(theme.primaryTextColor)
     val foregroundSecondary = Color(theme.secondaryTextColor)
@@ -287,7 +323,7 @@ fun MediaViewerScreen(
         return
     }
     Scaffold(
-        modifier = modifier.graphicsLayer { alpha = opening.value },
+        modifier = modifier,
         containerColor = elevated,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -299,7 +335,7 @@ fun MediaViewerScreen(
                     .background(elevated.copy(alpha = 0.85f))
                     .padding(start = 4.dp, end = 4.dp),
             ) {
-                IconButton(onClick = onBack) {
+                IconButton(onClick = ::closeViewer) {
                     Icon(
                         Icons.Rounded.ChevronLeft,
                         contentDescription = "Back",
@@ -321,18 +357,25 @@ fun MediaViewerScreen(
                         fontSize = 11.5.sp,
                     )
                 }
-                if (type in setOf("video", "audio") && !restrictedViewOnce) TextButton(onClick = { if (ownedActions) onOwnedEdit?.invoke() else trimming = true }, enabled = signedUrl != null || providedModel != null) { Text("Trim") }
-                if (type == "image" && !title.endsWith(".gif", ignoreCase = true) && !restrictedViewOnce) IconButton(onClick = { if (ownedActions) onOwnedEdit?.invoke() else editing = true }, enabled = signedUrl != null || providedModel != null) {
+                if (type in setOf("video", "audio") && !restrictedViewOnce && error == null) TextButton(onClick = { if (ownedActions) onOwnedEdit?.invoke() else trimming = true }, enabled = signedUrl != null || providedModel != null) { Text("Trim") }
+                if (type == "image" && !title.endsWith(".gif", ignoreCase = true) && !restrictedViewOnce && error == null) IconButton(onClick = { if (ownedActions) onOwnedEdit?.invoke() else editing = true }, enabled = signedUrl != null || providedModel != null) {
                     Icon(Icons.Rounded.Edit, "Edit a copy", tint = foreground)
                 }
-                if (!restrictedViewOnce) IconButton(onClick = ::openExternally, enabled = signedUrl != null || providedModel != null) {
+                if (!restrictedViewOnce && error == null) IconButton(onClick = ::openExternally, enabled = signedUrl != null || providedModel != null) {
                     Icon(
                         Icons.Rounded.OpenInNew,
                         contentDescription = "Open with app",
                         tint = foreground,
                     )
                 }
-                if (!restrictedViewOnce) IconButton(onClick = ::share, enabled = signedUrl != null || providedModel != null) {
+                if (type in setOf("image", "video") && !restrictedViewOnce && error == null) IconButton(onClick = ::saveToGallery, enabled = signedUrl != null || providedModel != null) {
+                    Icon(
+                        Icons.Rounded.Download,
+                        contentDescription = "Save to gallery",
+                        tint = foreground,
+                    )
+                }
+                if (!restrictedViewOnce && error == null) IconButton(onClick = ::share, enabled = signedUrl != null || providedModel != null) {
                     Icon(
                         Icons.Rounded.Share,
                         contentDescription = "Share file link",
@@ -347,16 +390,19 @@ fun MediaViewerScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .graphicsLayer {
-                    val progress = opening.value
+                .onGloballyPositioned { targetBounds = it.boundsInWindow() },
+            contentAlignment = Alignment.Center,
+        ) {
+        Box(Modifier.fillMaxSize().graphicsLayer {
                     val source = sourceBounds
-                    val initial = if (source != null && this.size.width > 0f) (source.width / this.size.width).coerceIn(0.1f, 1f) else 0.92f
-                    scaleX = initial + (1f - initial) * progress
-                    scaleY = scaleX
-                    if (source != null) {
-                        translationX = (source.center.x - this.size.width / 2f) * (1f - progress)
-                        translationY = (source.center.y - this.size.height / 2f) * (1f - progress)
-                    }
+                    val target = targetBounds
+                    val transform = if (source != null && target != null && openingReady) mediaOpeningTransform(
+                        source.width, source.center.x, source.center.y, target.width,
+                        target.center.x, target.center.y, opening.value) else MediaOpeningTransform(1f, 0f, 0f)
+                    scaleX = transform.scale
+                    scaleY = transform.scale
+                    translationX = transform.x
+                    translationY = transform.y
                 },
             contentAlignment = Alignment.Center,
         ) {
@@ -382,6 +428,7 @@ fun MediaViewerScreen(
                     primary = primary,
                     foregroundSecondary = foregroundSecondary,
                     theme = theme,
+                    onReady = { imageReady = true },
                 )
 
                 type == "video" -> {
@@ -440,7 +487,7 @@ fun MediaViewerScreen(
                                         text = "Unable to initialize this video.",
                                         foregroundSecondary = foregroundSecondary,
                                         theme = theme,
-                                        actionLabel = "Open Securely",
+                                        actionLabel = if (restrictedViewOnce || error != null) null else "Open Securely",
                                         onAction = ::openExternally,
                                     )
                                 } else if (!videoReady) {
@@ -457,8 +504,8 @@ fun MediaViewerScreen(
                                     Column(modifier = Modifier.align(Alignment.Center)) {
                                         AnimatedVisibility(
                                             visible = !isPlaying,
-                                            enter = fadeIn(tween(160)),
-                                            exit = fadeOut(tween(160)),
+                                            enter = fadeIn(tween(if (reduceMotion) 0 else 160)),
+                                            exit = fadeOut(tween(if (reduceMotion) 0 else 160)),
                                         ) {
                                             Box(
                                                 Modifier
@@ -494,7 +541,8 @@ fun MediaViewerScreen(
                                         tint = foreground,
                                     )
                                 }
-                                Spacer(Modifier.width(8.dp)) // ChatySpacing.sm
+                                Text(formatPlaybackTime(positionMs), color = foregroundSecondary, fontSize = 12.sp)
+                                Spacer(Modifier.width(8.dp))
                                 VideoProgressBar(
                                     position = if (durationMs > 0) {
                                         positionMs.toFloat() / durationMs.toFloat()
@@ -513,6 +561,8 @@ fun MediaViewerScreen(
                                     },
                                     modifier = Modifier.weight(1f),
                                 )
+                                Spacer(Modifier.width(8.dp))
+                                Text(formatPlaybackTime(durationMs), color = foregroundSecondary, fontSize = 12.sp)
                             }
                         }
                     }
@@ -527,14 +577,15 @@ fun MediaViewerScreen(
                     }
                     MediaViewerFallbackCard(
                         icon = icon,
-                        text = "This private $type is ready to open securely.",
+                        text = if (restrictedViewOnce) "This restricted attachment cannot be opened in another app." else "This private $type is ready to open securely.",
                         foregroundSecondary = foregroundSecondary,
                         theme = theme,
-                        actionLabel = "Open Securely",
+                        actionLabel = if (restrictedViewOnce || error != null) null else "Open Securely",
                         onAction = ::openExternally,
                     )
                 }
             }
+        }
         }
     }
 }
@@ -569,6 +620,7 @@ private fun ImageViewerContent(
     primary: Color,
     foregroundSecondary: Color,
     theme: ThemeConfig,
+    onReady: () -> Unit = {},
 ) {
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -617,6 +669,7 @@ private fun ImageViewerContent(
             model = coil.request.ImageRequest.Builder(LocalContext.current).data(model)
                 .memoryCachePolicy(coil.request.CachePolicy.DISABLED).diskCachePolicy(coil.request.CachePolicy.DISABLED).build(),
             contentDescription = title,
+            onSuccess = { onReady() },
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxSize()
@@ -734,4 +787,60 @@ private fun MediaViewerFallbackCard(
             }
         }
     }
+}
+
+private fun formatPlaybackTime(milliseconds: Int): String {
+    val seconds = milliseconds.coerceAtLeast(0) / 1000
+    return "%d:%02d".format(seconds / 60, seconds % 60)
+}
+
+/** Writes [source] (http(s) URL, content:// URI, or absolute file path) into the
+ *  device gallery via MediaStore and returns the user-facing result text
+ *  (GB copy: "Photo saved to gallery" / "Video saved to gallery"). */
+private fun saveMediaToGallery(context: android.content.Context, source: String, displayName: String, isVideo: Boolean): String {
+    if (android.os.Build.VERSION.SDK_INT < 29) {
+        return "Saving to gallery needs Android 10 or newer."
+    }
+    val extension = displayName.substringAfterLast('.', "").lowercase(java.util.Locale.ROOT)
+    val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
+        ?: if (isVideo) "video/mp4" else "image/jpeg"
+    val collection = if (isVideo) {
+        android.provider.MediaStore.Video.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
+    } else {
+        android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
+    }
+    val values = android.content.ContentValues().apply {
+        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mime)
+        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, (if (isVideo) "Movies" else "Pictures") + "/Chaty")
+        put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
+    }
+    val resolver = context.contentResolver
+    val uri = resolver.insert(collection, values) ?: return "Save failed: the gallery refused the new item."
+    try {
+        resolver.openOutputStream(uri)?.use { out ->
+            openMediaSource(context, source).use { input -> input.copyTo(out) }
+        } ?: error("could not open the gallery item for writing")
+        values.clear()
+        values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+        resolver.update(uri, values, null, null)
+    } catch (error: Exception) {
+        resolver.delete(uri, null, null)
+        return "Save failed: ${error.message ?: error}"
+    }
+    return if (isVideo) "Video saved to gallery" else "Photo saved to gallery"
+}
+
+private fun openMediaSource(context: android.content.Context, source: String): java.io.InputStream = when {
+    source.startsWith("http://") || source.startsWith("https://") -> {
+        val connection = java.net.URL(source).openConnection() as java.net.HttpURLConnection
+        connection.connectTimeout = 15000
+        connection.readTimeout = 30000
+        connection.connect()
+        if (connection.responseCode !in 200..299) error("download failed (HTTP ${connection.responseCode})")
+        connection.inputStream
+    }
+    source.startsWith("content://") ->
+        context.contentResolver.openInputStream(Uri.parse(source)) ?: error("could not open the source")
+    else -> java.io.File(source).inputStream()
 }

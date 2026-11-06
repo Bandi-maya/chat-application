@@ -13,14 +13,14 @@ enum class CallBundleId(
 ) {
     CHATY_DEFAULT(
         id = "chaty_default",
-        displayName = "Chaty Default",
+        displayName = "Apple iOS Call Experience",
         subtitle = "Speaker-focused video, participant grid, invitation screen & compact call cards",
-        badge = "Default",
     ),
     APPLE_IOS(
         id = "apple_ios",
-        displayName = "Apple iOS Call Experience",
+        displayName = "Chaty Default",
         subtitle = "Lock-screen slider, incoming/outgoing screens, active call controls & iOS layout",
+        badge = "Default",
     ),
     SAMSUNG_ONE_UI(
         id = "samsung_one_ui",
@@ -59,10 +59,10 @@ enum class CallBundleId(
     );
 
     companion object {
-        val all: List<CallBundleId> = entries
+        val all: List<CallBundleId> = listOf(APPLE_IOS) + entries.filter { it != APPLE_IOS }
 
         fun fromId(rawId: String?): CallBundleId =
-            entries.firstOrNull { it.id == rawId } ?: CHATY_DEFAULT
+            entries.firstOrNull { it.id == rawId } ?: APPLE_IOS
     }
 }
 
