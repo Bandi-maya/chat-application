@@ -62,6 +62,8 @@ import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.ViewInAr
 import androidx.compose.material.icons.rounded.ViewQuilt
 import androidx.compose.material.icons.rounded.ViewSidebar
@@ -250,6 +252,24 @@ fun HeaderSettingsScreen(
                     iconContent = rowIcon(Icons.Rounded.ViewInAr), title = "Header tab style",
                     subtitle = "${if (home.tabBubbleStyle.isNotEmpty()) home.tabBubbleStyle else "Capsule Pill"} \u00b7 ${if (home.pagerTransition3d.isNotEmpty()) home.pagerTransition3d else "Default"}",
                     showChevron = true, onTap = { showTabStyleSheet = true },
+                )
+                divider()
+                HeaderReferenceSettingRow(
+                    iconContent = rowIcon(Icons.Rounded.TaskAlt), title = "Hide Tasks tab",
+                    subtitle = "Remove Tasks from the bottom navigation",
+                    switchValue = preferences.gbBool("nav_hide_tasks"),
+                    onSwitchChanged = {
+                        preferences.updateGbFeatures(mapOf("nav_hide_tasks" to it), logTitle = "Hide Tasks tab")
+                    },
+                )
+                divider()
+                HeaderReferenceSettingRow(
+                    iconContent = rowIcon(Icons.Rounded.Update), title = "Hide Updates tab",
+                    subtitle = "Remove Updates from the bottom navigation",
+                    switchValue = preferences.gbBool("nav_hide_updates"),
+                    onSwitchChanged = {
+                        preferences.updateGbFeatures(mapOf("nav_hide_updates" to it), logTitle = "Hide Updates tab")
+                    },
                 )
                 divider()
                 HeaderReferenceSettingRow(
