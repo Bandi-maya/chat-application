@@ -42,8 +42,11 @@ jobs:
               (out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
               adb('shell','uiautomator','dump','/sdcard/window.xml')
               raw=adb('shell','cat','/sdcard/window.xml'); (out/(name+'.xml')).write_bytes(raw)
-              try:return E.fromstring(raw)
-              except:return None
+              try: root=E.fromstring(raw)
+              except: return None
+              if name.startswith('0') and any("isn't responding" in n.get('text','') for n in root.iter('node')):
+                  raise RuntimeError('BLOCKED: system or app ANR during exploration, not dismissed')
+              return root
           def tap(root,labels):
               if root is None:return False
               for n in root.iter('node'):
@@ -52,6 +55,26 @@ jobs:
                       if len(b)==4:
                           events.append({'tap':n.attrib}); adb('shell','input','tap',str((b[0]+b[2])//2),str((b[1]+b[3])//2));return True
               return False
+          # Bounded launcher-only recovery. Any app ANR stays visible and blocks coverage.
+          adb('shell','uiautomator','dump','/sdcard/preflight.xml')
+          raw=adb('shell','cat','/sdcard/preflight.xml')
+          (out/'preflight.xml').write_bytes(raw)
+          (out/'preflight.png').write_bytes(adb('exec-out','screencap','-p'))
+          try: pre=E.fromstring(raw)
+          except: raise RuntimeError('BLOCKED: preflight UI hierarchy unavailable')
+          labels=[n.get('text','') for n in pre.iter('node')]
+          if "Pixel Launcher isn't responding" in labels:
+              close=next((n for n in pre.iter('node') if n.get('text')=='Close app' and n.get('package')=='android'),None)
+              if close is None: raise RuntimeError('BLOCKED: launcher dialog close action unavailable')
+              b=list(map(int,re.findall(r'\d+',close.get('bounds',''))))
+              if len(b)!=4: raise RuntimeError('BLOCKED: launcher dialog bounds invalid')
+              adb('shell','input','tap',str((b[0]+b[2])//2),str((b[1]+b[3])//2))
+              (out/'launcher-recovery.txt').write_text('Dismissed diagnosed Pixel Launcher ANR once; no app ANR dismissed.')
+          for sample in range(2):
+              check=cap('preflight-stable-'+str(sample))
+              if check is None: raise RuntimeError('BLOCKED: readiness hierarchy unavailable')
+              if any("isn't responding" in n.get('text','') for n in check.iter('node')):
+                  raise RuntimeError('BLOCKED: ANR remains after bounded launcher recovery')
           adb('logcat','-c')
           (out/'launch.txt').write_bytes(adb('shell','monkey','-p',pkg,'-c','android.intent.category.LAUNCHER','1'))
           time.sleep(8); r=cap('01-launch')
