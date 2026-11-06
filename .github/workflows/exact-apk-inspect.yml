@@ -83,9 +83,15 @@ jobs:
               if tap(r,['Close','Skip','Next','Get Started','Continue','Allow notifications','Not now']):r=cap('02-onboarding-'+str(i))
               else:break
           # Bounded entrypoint inspection, no credentials or account creation.
-          for i,label in enumerate(['Settings','Log in','Login','Sign in','Sign up','Create account','Forgot password?']):
+          for i,label in enumerate(['Log In','Register']):
               if tap(r,[label]):
-                  cap('03-entry-'+str(i));adb('shell','input','keyevent','4');r=cap('04-back-'+str(i))
+                  entry=cap('03-entry-'+str(i))
+                  fields=[] if entry is None else [n for n in entry.iter('node') if n.get('class')=='android.widget.EditText']
+                  if fields:
+                      b=list(map(int,re.findall(r'\d+',fields[0].get('bounds',''))))
+                      if len(b)==4:
+                          adb('shell','input','tap',str((b[0]+b[2])//2),str((b[1]+b[3])//2));cap('03-keyboard-'+str(i));adb('shell','input','keyevent','4')
+                  adb('shell','input','keyevent','4');r=cap('04-back-'+str(i))
           adb('shell','settings','put','system','accelerometer_rotation','0')
           adb('shell','settings','put','system','user_rotation','1');cap('05-landscape')
           adb('shell','settings','put','system','user_rotation','0');r=cap('06-portrait')
