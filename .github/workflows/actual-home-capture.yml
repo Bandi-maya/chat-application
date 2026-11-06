@@ -40,8 +40,14 @@ jobs:
            if r.returncode:raise RuntimeError('Device command failed; arguments withheld')
            return r.stdout
           def nodes():
-           adb('shell','uiautomator','dump','/sdcard/view.xml')
-           return list(ET.fromstring(adb('shell','cat','/sdcard/view.xml')).iter('node'))
+           for attempt in range(3):
+            try:
+             adb('shell','rm','-f','/sdcard/view.xml')
+             adb('shell','uiautomator','dump','/sdcard/view.xml')
+             return list(ET.fromstring(adb('shell','cat','/sdcard/view.xml')).iter('node'))
+            except (RuntimeError,ET.ParseError):
+             if attempt==2:raise
+             time.sleep(2)
           def tap(n):
            b=list(map(int,re.findall(r'\d+',n.get('bounds',''))));adb('shell','input','tap',str((b[0]+b[2])//2),str((b[1]+b[3])//2))
           def match(text):
@@ -69,8 +75,9 @@ jobs:
           time.sleep(3);capture('00-blank-entry')
           try:wait('Register',60)
           except RuntimeError:
-           (out/'00-blank-entry.xml').write_bytes(adb('shell','cat','/sdcard/view.xml'))
            capture('00-blank-entry-failed')
+           try:(out/'00-blank-entry.xml').write_bytes(adb('shell','cat','/sdcard/view.xml'))
+           except RuntimeError:pass
            raise
           click('Register');wait('Email',30);time.sleep(1)
           capture('00-blank-register')
@@ -89,7 +96,8 @@ jobs:
           ns=nodes();cb=next((n for n in ns if n.get('checkable')=='true' and n.get('class')!='android.widget.EditText'),None)
           if cb is not None and cb.get('checked')!='true':tap(cb)
           # No second registration attempt. Password and UI hierarchy remain private in runner memory.
-          click('Register');time.sleep(20)
+          (out/'registration-submit-status.txt').write_text('Register control tapped once. Backend outcome must be verified; no second submit.')
+          click('Register');time.sleep(30)
           # Capture only after password fields are absent; error captures must never reveal inputs.
           ns=nodes()
           if any(n.get('class')=='android.widget.EditText' and n.get('password')=='true' for n in ns):
