@@ -89,8 +89,8 @@ jobs:
               shutil.copy2(source, target)
               print(f"Applied {target}")
               applied += 1
-          if applied != 136:
-              raise SystemExit(f"Expected 136 override files, applied {applied}")
+          if applied != 137:
+              raise SystemExit(f"Expected 137 override files, applied {applied}")
           PYOVERRIDES
 
       - name: Patch debug-only proof fixtures to current Kotlin ports
