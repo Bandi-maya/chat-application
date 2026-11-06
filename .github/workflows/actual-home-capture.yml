@@ -82,6 +82,9 @@ jobs:
           click('Log In');wait('Email or username',30);time.sleep(1)
           capture('00-blank-login')
           click('Try the demo');time.sleep(15)
+          capture('00-first-run-prompts')
+          for control in ['Not now','Close','Not Now']:
+           if match(control) is not None:click(control);time.sleep(2)
           ns=nodes()
           if any(n.get('class')=='android.widget.EditText' and n.get('password')=='true' for n in ns):
            capture('01-demo-entry-result')
@@ -100,6 +103,8 @@ jobs:
            raise RuntimeError('Home not established')
           capture('01-actual-home-fullscreen')
           adb('shell','am','force-stop',os.environ['TEST_PACKAGE']);adb('shell','monkey','-p',os.environ['TEST_PACKAGE'],'-c','android.intent.category.LAUNCHER','1');time.sleep(12)
+          for control in ['Not now','Close','Not Now']:
+           if match(control) is not None:click(control);time.sleep(2)
           capture('02-actual-home-reopened')
           (out/'status.txt').write_text('Exact82d14 production APK, built-in Try the demo selected by user. Offline sample data, not a real account. Full demo Home captured and reopened.')
           adb('shell','rm','-f','/sdcard/view.xml')
