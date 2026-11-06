@@ -1,0 +1,117 @@
+name: Exact APK real-account Home capture
+on:
+  push:
+    branches: [testref/actual-home-nov6]
+    paths: [.github/workflows/actual-home-capture.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: chaty-app-debug-apk
+          path: apk
+          run-id: 42213727153
+          repository: Bandi-maya/chat-application
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Record exact artifact
+        run: |
+          mkdir -p evidence
+          sha256sum apk/app-debug.apk > evidence/apk-sha256.txt
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Prepare bounded capture script
+        run: |
+          cat > /tmp/capture.py <<'PY'
+          import os,pathlib,subprocess,time,re,xml.etree.ElementTree as ET
+          out=pathlib.Path('evidence');out.mkdir(exist_ok=True)
+          def adb(*args):
+           r=subprocess.run(['adb',*args],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=45)
+           if r.returncode:raise RuntimeError('Device command failed; arguments withheld')
+           return r.stdout
+          def nodes():
+           adb('shell','uiautomator','dump','/sdcard/view.xml')
+           return list(ET.fromstring(adb('shell','cat','/sdcard/view.xml')).iter('node'))
+          def tap(n):
+           b=list(map(int,re.findall(r'\d+',n.get('bounds',''))));adb('shell','input','tap',str((b[0]+b[2])//2),str((b[1]+b[3])//2))
+          def match(text):
+           for n in nodes():
+            if n.get('text')==text or n.get('content-desc')==text:return n
+           return None
+          def click(text):
+           n=match(text)
+           if n is None:raise RuntimeError('Expected control missing: '+text)
+           tap(n)
+          def wait(text,secs=30):
+           for _ in range(secs//2):
+            if match(text) is not None:return
+            time.sleep(2)
+           raise RuntimeError('Expected screen missing: '+text)
+          def capture(name):
+           (out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
+          def scroll():adb('shell','input','swipe','540','1700','540','650','500')
+          adb('shell','monkey','-p','com.example.chat','-c','android.intent.category.LAUNCHER','1')
+          time.sleep(8);click('Register');time.sleep(3)
+          # Match fields by native editable node/accessibility label, never record filled hierarchy.
+          fields=[('Email',os.environ['TEST_EMAIL']),('Username',os.environ['TEST_USERNAME']),('Password',os.environ['TEST_PASSWORD'])]
+          for label,value in fields:
+           ns=nodes();n=next((n for n in ns if n.get('class')=='android.widget.EditText' and label.lower() in (n.get('content-desc','')+' '+n.get('text','')).lower()),None)
+           if n is None:raise RuntimeError('Native editable field missing: '+label)
+           tap(n);adb('shell','input','text',value)
+           adb('shell','input','keyevent','4')
+          for _ in range(5):
+           ns=nodes();cb=next((n for n in ns if n.get('checkable')=='true' and n.get('class')!='android.widget.EditText'),None)
+           if cb is not None:
+            if cb.get('checked')!='true':tap(cb)
+            break
+           scroll();time.sleep(1)
+          else:raise RuntimeError('Explicit legal acceptance checkbox missing; no submission')
+          # No second registration attempt. Password and UI hierarchy remain private in runner memory.
+          click('Register');time.sleep(20)
+          # Capture only after password fields are absent; error captures must never reveal inputs.
+          ns=nodes()
+          if any(n.get('class')=='android.widget.EditText' and n.get('password')=='true' for n in ns):
+           # Do not dump errors that could echo request bodies. Report generic blocked state only.
+           (out/'status.txt').write_text('Registration did not reach Home. No second submit. No auth screenshots or hierarchy uploaded. Verification or error needs private review.')
+           raise RuntimeError('Registration did not reach Home')
+          labels=[n.get('text','') for n in ns]
+          if 'Find people' not in labels and 'No conversations yet' not in labels:
+           (out/'status.txt').write_text('Post-registration screen not recognized as Chats Home; capture withheld to avoid unexpected account state.')
+           raise RuntimeError('Home not established')
+          capture('01-actual-home-fullscreen')
+          adb('shell','am','force-stop','com.example.chat');adb('shell','monkey','-p','com.example.chat','-c','android.intent.category.LAUNCHER','1');time.sleep(12)
+          capture('02-actual-home-reopened')
+          (out/'status.txt').write_text('Exact82d14 production APK, real Normal account created through Register, full Home captured. No fake session, fixture screen, messages, calls or contacts granted.')
+          adb('shell','rm','-f','/sdcard/view.xml')
+          PY
+      - name: Create approved throwaway Normal account through app and capture
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          TEST_EMAIL: cmopavan@mail.instinct.com
+          TEST_USERNAME: chaty_screen_test_1106
+          TEST_PASSWORD: ${{ secrets.CHATY_EMULATOR_TEST_PASSWORD }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: |
+            test -n "$TEST_PASSWORD"
+            adb install apk/app-debug.apk > /tmp/install.txt 2>&1
+            python3 /tmp/capture.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: actual-home-fullscreen-evidence
+          path: evidence/
+          retention-days: 1
+          if-no-files-found: error
