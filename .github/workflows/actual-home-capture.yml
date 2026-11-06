@@ -62,7 +62,7 @@ jobs:
            launcher_closed=False
            for _ in range(secs//2):
             if not launcher_closed and match("Pixel Launcher isn't responding") is not None:
-             click('Close app');launcher_closed=True;time.sleep(2)
+             click('Wait');launcher_closed=True;time.sleep(2)
             if match(text) is not None:return
             time.sleep(2)
            raise RuntimeError('Expected screen missing: '+text)
@@ -79,25 +79,27 @@ jobs:
            try:(out/'00-blank-entry.xml').write_bytes(adb('shell','cat','/sdcard/view.xml'))
            except RuntimeError:pass
            raise
-          click('Register');wait('Email',30);time.sleep(1)
-          capture('00-blank-register')
-          (out/'00-blank-register.xml').write_bytes(adb('shell','cat','/sdcard/view.xml'))
-          # Match fields by native editable node/accessibility label, never record filled hierarchy.
-          fields=[('Email',os.environ['TEST_EMAIL']),('Username',os.environ['TEST_USERNAME']),('Password',os.environ['TEST_PASSWORD'])]
+          click('Log In');wait('Email or username',30);time.sleep(1)
+          capture('00-blank-login')
+          fields=[('Email or username',os.environ['TEST_EMAIL']),('Password',os.environ['TEST_PASSWORD'])]
           for label,value in fields:
            ns=nodes();n=None
            for edit in ns:
             if edit.get('class')=='android.widget.EditText' and any(label.lower()==(c.get('content-desc','') or c.get('text','')).lower() for c in edit.iter('node')):
              n=edit;break
            if n is None:raise RuntimeError('Native editable field missing: '+label)
-           tap(n);adb('shell','input','text',value)
-           adb('shell','input','keyevent','4')
-          # Exact82d14 ReleaseFeatures.LEGAL_ACCEPTANCE_GATE=false; do not invent a gate.
-          ns=nodes();cb=next((n for n in ns if n.get('checkable')=='true' and n.get('class')!='android.widget.EditText'),None)
-          if cb is not None and cb.get('checked')!='true':tap(cb)
-          # No second registration attempt. Password and UI hierarchy remain private in runner memory.
-          (out/'registration-submit-status.txt').write_text('Register control tapped once. Backend outcome must be verified; no second submit.')
-          click('Register');time.sleep(30)
+           tap(n);adb('shell','input','text',value);adb('shell','input','keyevent','4')
+          (out/'login-submit-status.txt').write_text('Login tapped once for prior registration identity; no registration attempted in this run.')
+          click('Log In');time.sleep(30)
+          ns=nodes()
+          # Preserve the real form error only when the secret is absent from visible labels.
+          visible=[(n.get('text','')+' '+n.get('content-desc','')) for n in ns if n.get('password')!='true']
+          if any(os.environ['TEST_PASSWORD'] in v for v in visible):
+           raise RuntimeError('Unexpected credential echo; screenshot withheld')
+          if any(n.get('class')=='android.widget.EditText' and n.get('password')=='true' for n in ns):
+           capture('01-actual-login-result-password-masked')
+           (out/'status.txt').write_text('Login remains on auth form. Real masked-password form captured. Account existence unresolved; no registration attempted.')
+           raise RuntimeError('Login did not reach Home; inspect real result')
           # Capture only after password fields are absent; error captures must never reveal inputs.
           ns=nodes()
           if any(n.get('class')=='android.widget.EditText' and n.get('password')=='true' for n in ns):
@@ -111,7 +113,7 @@ jobs:
           capture('01-actual-home-fullscreen')
           adb('shell','am','force-stop',os.environ['TEST_PACKAGE']);adb('shell','monkey','-p',os.environ['TEST_PACKAGE'],'-c','android.intent.category.LAUNCHER','1');time.sleep(12)
           capture('02-actual-home-reopened')
-          (out/'status.txt').write_text('Exact82d14 production APK, real Normal account created through Register, full Home captured. No fake session, fixture screen, messages, calls or contacts granted.')
+          (out/'status.txt').write_text('Exact82d14 production APK, real Normal account authenticated through Login, full Home captured. No fake session, fixture screen, messages, calls or contacts granted.')
           adb('shell','rm','-f','/sdcard/view.xml')
           PY
       - name: Create approved throwaway Normal account through app and capture
