@@ -61,7 +61,7 @@ jobs:
           def wait(text,secs=30):
            launcher_closed=False
            for _ in range(secs//2):
-            if not launcher_closed and match("Pixel Launcher isn't responding") is not None:
+            if match("Pixel Launcher isn't responding") is not None:
              click('Wait');launcher_closed=True;time.sleep(2)
             if match(text) is not None:return
             time.sleep(2)
@@ -79,7 +79,7 @@ jobs:
            try:(out/'00-blank-entry.xml').write_bytes(adb('shell','cat','/sdcard/view.xml'))
            except RuntimeError:pass
            raise
-          click('Log In');wait('Email or username',30);time.sleep(1)
+          wait('Log In',60);click('Log In');wait('Email or username',30);time.sleep(1)
           capture('00-blank-login')
           click('Try the demo');time.sleep(15)
           capture('00-first-run-prompts')
