@@ -22,6 +22,9 @@ jobs:
         run: |
           mkdir -p evidence
           sha256sum apk/app-debug.apk > evidence/apk-sha256.txt
+          AAPT=$(ls "$ANDROID_HOME/build-tools/"*/aapt | sort -V | tail -1)
+          "$AAPT" dump badging apk/app-debug.apk > /tmp/apk-badging.txt
+          awk -F"'" '/^package: name=/ {print "TEST_PACKAGE=" $2}' /tmp/apk-badging.txt >> "$GITHUB_ENV"
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -57,7 +60,7 @@ jobs:
           def capture(name):
            (out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
           def scroll():adb('shell','input','swipe','540','1700','540','650','500')
-          adb('shell','monkey','-p','com.example.chat','-c','android.intent.category.LAUNCHER','1')
+          adb('shell','monkey','-p',os.environ['TEST_PACKAGE'],'-c','android.intent.category.LAUNCHER','1')
           time.sleep(8);click('Register');time.sleep(3)
           # Match fields by native editable node/accessibility label, never record filled hierarchy.
           fields=[('Email',os.environ['TEST_EMAIL']),('Username',os.environ['TEST_USERNAME']),('Password',os.environ['TEST_PASSWORD'])]
@@ -86,7 +89,7 @@ jobs:
            (out/'status.txt').write_text('Post-registration screen not recognized as Chats Home; capture withheld to avoid unexpected account state.')
            raise RuntimeError('Home not established')
           capture('01-actual-home-fullscreen')
-          adb('shell','am','force-stop','com.example.chat');adb('shell','monkey','-p','com.example.chat','-c','android.intent.category.LAUNCHER','1');time.sleep(12)
+          adb('shell','am','force-stop',os.environ['TEST_PACKAGE']);adb('shell','monkey','-p',os.environ['TEST_PACKAGE'],'-c','android.intent.category.LAUNCHER','1');time.sleep(12)
           capture('02-actual-home-reopened')
           (out/'status.txt').write_text('Exact82d14 production APK, real Normal account created through Register, full Home captured. No fake session, fixture screen, messages, calls or contacts granted.')
           adb('shell','rm','-f','/sdcard/view.xml')
