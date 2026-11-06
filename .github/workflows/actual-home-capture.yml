@@ -112,17 +112,20 @@ jobs:
            nodes()
            (out/(name+'.xml')).write_bytes(adb('shell','cat','/sdcard/view.xml'))
           try:
-           click('Aisha (sample), See you tomorrow!, 1 unread message');time.sleep(4);snap('03-actual-conversation')
-           click('Chat options');time.sleep(2);snap('04-actual-chat-options')
+           click('More options');time.sleep(2);snap('06-actual-home-options')
            adb('shell','input','keyevent','4');time.sleep(1)
-           opened=False
-           for label in ['Attach','Attachment','Attachments','Add attachment']:
-            if match(label) is not None:click(label);opened=True;break
-           if not opened:
-            snap('05-attachment-control-not-found')
-           else:
-            time.sleep(3);snap('05-actual-attachment-sheet')
-           (out/'status.txt').write_text('Current kotlin APK; built-in offline demo. Opened chat and options, attempted attachment sheet. No messages, calls or shares sent. No app code/build.')
+           click('Aisha (sample), See you tomorrow!, 1 unread message');time.sleep(4);snap('03-actual-conversation')
+           n=match('Hi! This is a sample chat.')
+           if n is None:raise RuntimeError('Sample bubble missing')
+           tap(n);time.sleep(2);snap('04-actual-bubble-single-tap')
+           adb('shell','input','keyevent','4');time.sleep(1)
+           if match('Hi! This is a sample chat.') is None:
+            click('Aisha (sample), See you tomorrow!, 1 unread message');time.sleep(2)
+           n=match('Hi! This is a sample chat.')
+           if n is None:raise RuntimeError('Sample bubble missing before long press')
+           b=list(map(int,re.findall(r'\d+',n.get('bounds',''))));x=str((b[0]+b[2])//2);y=str((b[1]+b[3])//2)
+           adb('shell','input','swipe',x,y,x,y,'900');time.sleep(2);snap('05-actual-bubble-long-press')
+           (out/'status.txt').write_text('Single tap and long press on existing incoming demo bubble only. No menu action selected, messages sent, calls or shares.')
           except Exception as e:
            snap('09-navigation-blocked');(out/'status.txt').write_text('Read-only demo navigation blocked: '+str(e))
            raise
