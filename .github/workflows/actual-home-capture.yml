@@ -106,6 +106,13 @@ jobs:
           for control in ['Not now','Close','Not Now']:
            if match(control) is not None:click(control);time.sleep(2)
           capture('02-actual-home-reopened')
+          for idx,label in [(3,'Calls'),(4,'Tasks'),(5,'Settings')]:
+           click(label);time.sleep(4)
+           for control in ['Not now','Close','Not Now']:
+            if match(control) is not None:click(control);time.sleep(2)
+           capture(str(idx).zfill(2)+'-actual-'+label.lower())
+           (out/(str(idx).zfill(2)+'-'+label.lower()+'.xml')).write_bytes(adb('shell','cat','/sdcard/view.xml'))
+          
           (out/'status.txt').write_text('Exact82d14 production APK, built-in Try the demo selected by user. Offline sample data, not a real account. Full demo Home captured and reopened.')
           adb('shell','rm','-f','/sdcard/view.xml')
           PY
