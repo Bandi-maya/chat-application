@@ -30,6 +30,55 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Prepare unchanged exploration script
+        run: |
+          cat > /tmp/chaty-inspect.py <<'PY'
+          import subprocess as S, pathlib as P, time, re, json, xml.etree.ElementTree as E
+          out=P.Path('evidence'); pkg='com.logybyte.chaty'; events=[]
+          def adb(*a):
+              p=S.run(['adb',*a],stdout=S.PIPE,stderr=S.PIPE,timeout=45); return p.stdout
+          def cap(name):
+              time.sleep(2)
+              (out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
+              adb('shell','uiautomator','dump','/sdcard/window.xml')
+              raw=adb('shell','cat','/sdcard/window.xml'); (out/(name+'.xml')).write_bytes(raw)
+              try:return E.fromstring(raw)
+              except:return None
+          def tap(root,labels):
+              if root is None:return False
+              for n in root.iter('node'):
+                  if (n.get('text') in labels or n.get('content-desc') in labels) and n.get('enabled')=='true':
+                      b=list(map(int,re.findall(r'\d+',n.get('bounds',''))))
+                      if len(b)==4:
+                          events.append({'tap':n.attrib}); adb('shell','input','tap',str((b[0]+b[2])//2),str((b[1]+b[3])//2));return True
+              return False
+          adb('logcat','-c')
+          (out/'launch.txt').write_bytes(adb('shell','monkey','-p',pkg,'-c','android.intent.category.LAUNCHER','1'))
+          time.sleep(8); r=cap('01-launch')
+          # Dismiss only local changelog/onboarding. Never submit account forms.
+          for i in range(4):
+              if tap(r,['Close','Skip','Next','Get Started','Continue','Allow notifications','Not now']):r=cap('02-onboarding-'+str(i))
+              else:break
+          # Bounded entrypoint inspection, no credentials or account creation.
+          for i,label in enumerate(['Settings','Log in','Login','Sign in','Sign up','Create account','Forgot password?']):
+              if tap(r,[label]):
+                  cap('03-entry-'+str(i));adb('shell','input','keyevent','4');r=cap('04-back-'+str(i))
+          adb('shell','settings','put','system','accelerometer_rotation','0')
+          adb('shell','settings','put','system','user_rotation','1');cap('05-landscape')
+          adb('shell','settings','put','system','user_rotation','0');r=cap('06-portrait')
+          # Keyboard resize without typing identifiers or sending forms.
+          if r is not None:
+              fields=[n for n in r.iter('node') if n.get('class')=='android.widget.EditText']
+              if fields:
+                  b=list(map(int,re.findall(r'\d+',fields[0].get('bounds',''))))
+                  if len(b)==4:adb('shell','input','tap',str((b[0]+b[2])//2),str((b[1]+b[3])//2));cap('07-keyboard');adb('shell','input','keyevent','4')
+          adb('shell','am','force-stop',pkg)
+          adb('shell','monkey','-p',pkg,'-c','android.intent.category.LAUNCHER','1');time.sleep(5);cap('08-reopen')
+          (out/'logcat.txt').write_bytes(adb('logcat','-d','-v','threadtime'))
+          (out/'activity.txt').write_bytes(adb('shell','dumpsys','activity','activities'))
+          (out/'exploration.json').write_text(json.dumps(events,indent=2))
+          (out/'coverage.txt').write_text('Fresh install entrypoints, visible onboarding, landscape/portrait, keyboard if available, force-stop/reopen. No authenticated Settings claim. No login submitted. Screenshots require human inspection; no automatic bug verdict.')
+          PY
       - name: Fresh-install screen exploration
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -41,53 +90,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           script: |
             adb install apk/app-debug.apk > evidence/install.txt 2>&1
-            python3 - <<'PY'
-            import subprocess as S, pathlib as P, time, re, json, xml.etree.ElementTree as E
-            out=P.Path('evidence'); pkg='com.logybyte.chaty'; events=[]
-            def adb(*a):
-                p=S.run(['adb',*a],stdout=S.PIPE,stderr=S.PIPE,timeout=45); return p.stdout
-            def cap(name):
-                time.sleep(2)
-                (out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
-                adb('shell','uiautomator','dump','/sdcard/window.xml')
-                raw=adb('shell','cat','/sdcard/window.xml'); (out/(name+'.xml')).write_bytes(raw)
-                try:return E.fromstring(raw)
-                except:return None
-            def tap(root,labels):
-                if root is None:return False
-                for n in root.iter('node'):
-                    if (n.get('text') in labels or n.get('content-desc') in labels) and n.get('enabled')=='true':
-                        b=list(map(int,re.findall(r'\d+',n.get('bounds',''))))
-                        if len(b)==4:
-                            events.append({'tap':n.attrib}); adb('shell','input','tap',str((b[0]+b[2])//2),str((b[1]+b[3])//2));return True
-                return False
-            adb('logcat','-c')
-            (out/'launch.txt').write_bytes(adb('shell','monkey','-p',pkg,'-c','android.intent.category.LAUNCHER','1'))
-            time.sleep(8); r=cap('01-launch')
-            # Dismiss only local changelog/onboarding. Never submit account forms.
-            for i in range(4):
-                if tap(r,['Close','Skip','Next','Get Started','Continue','Allow notifications','Not now']):r=cap('02-onboarding-'+str(i))
-                else:break
-            # Bounded entrypoint inspection, no credentials or account creation.
-            for i,label in enumerate(['Settings','Log in','Login','Sign in','Sign up','Create account','Forgot password?']):
-                if tap(r,[label]):
-                    cap('03-entry-'+str(i));adb('shell','input','keyevent','4');r=cap('04-back-'+str(i))
-            adb('shell','settings','put','system','accelerometer_rotation','0')
-            adb('shell','settings','put','system','user_rotation','1');cap('05-landscape')
-            adb('shell','settings','put','system','user_rotation','0');r=cap('06-portrait')
-            # Keyboard resize without typing identifiers or sending forms.
-            if r is not None:
-                fields=[n for n in r.iter('node') if n.get('class')=='android.widget.EditText']
-                if fields:
-                    b=list(map(int,re.findall(r'\d+',fields[0].get('bounds',''))))
-                    if len(b)==4:adb('shell','input','tap',str((b[0]+b[2])//2),str((b[1]+b[3])//2));cap('07-keyboard');adb('shell','input','keyevent','4')
-            adb('shell','am','force-stop',pkg)
-            adb('shell','monkey','-p',pkg,'-c','android.intent.category.LAUNCHER','1');time.sleep(5);cap('08-reopen')
-            (out/'logcat.txt').write_bytes(adb('logcat','-d','-v','threadtime'))
-            (out/'activity.txt').write_bytes(adb('shell','dumpsys','activity','activities'))
-            (out/'exploration.json').write_text(json.dumps(events,indent=2))
-            (out/'coverage.txt').write_text('Fresh install entrypoints, visible onboarding, landscape/portrait, keyboard if available, force-stop/reopen. No authenticated Settings claim. No login submitted. Screenshots require human inspection; no automatic bug verdict.')
-            PY
+            python3 /tmp/chaty-inspect.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
