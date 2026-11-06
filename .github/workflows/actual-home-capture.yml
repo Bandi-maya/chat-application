@@ -85,13 +85,9 @@ jobs:
            if n is None:raise RuntimeError('Native editable field missing: '+label)
            tap(n);adb('shell','input','text',value)
            adb('shell','input','keyevent','4')
-          for _ in range(5):
-           ns=nodes();cb=next((n for n in ns if n.get('checkable')=='true' and n.get('class')!='android.widget.EditText'),None)
-           if cb is not None:
-            if cb.get('checked')!='true':tap(cb)
-            break
-           scroll();time.sleep(1)
-          else:raise RuntimeError('Explicit legal acceptance checkbox missing; no submission')
+          # Exact82d14 ReleaseFeatures.LEGAL_ACCEPTANCE_GATE=false; do not invent a gate.
+          ns=nodes();cb=next((n for n in ns if n.get('checkable')=='true' and n.get('class')!='android.widget.EditText'),None)
+          if cb is not None and cb.get('checked')!='true':tap(cb)
           # No second registration attempt. Password and UI hierarchy remain private in runner memory.
           click('Register');time.sleep(20)
           # Capture only after password fields are absent; error captures must never reveal inputs.
