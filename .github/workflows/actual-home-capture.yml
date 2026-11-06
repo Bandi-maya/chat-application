@@ -53,14 +53,19 @@ jobs:
            if n is None:raise RuntimeError('Expected control missing: '+text)
            tap(n)
           def wait(text,secs=30):
+           launcher_closed=False
            for _ in range(secs//2):
+            if not launcher_closed and match("Pixel Launcher isn't responding") is not None:
+             click('Close app');launcher_closed=True;time.sleep(2)
             if match(text) is not None:return
             time.sleep(2)
            raise RuntimeError('Expected screen missing: '+text)
           def capture(name):
            (out/(name+'.png')).write_bytes(adb('exec-out','screencap','-p'))
           def scroll():adb('shell','input','swipe','540','1700','540','650','500')
-          adb('shell','monkey','-p',os.environ['TEST_PACKAGE'],'-c','android.intent.category.LAUNCHER','1')
+          activity=adb('shell','cmd','package','resolve-activity','--brief',os.environ['TEST_PACKAGE']).decode().strip().splitlines()[-1]
+          if '/' not in activity:raise RuntimeError('Launcher activity not resolved')
+          adb('shell','am','start','-n',activity)
           time.sleep(3);capture('00-blank-entry')
           try:wait('Register',60)
           except RuntimeError:
