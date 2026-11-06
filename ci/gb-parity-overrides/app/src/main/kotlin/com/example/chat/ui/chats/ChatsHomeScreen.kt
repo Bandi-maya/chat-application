@@ -38,7 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -51,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -397,17 +398,22 @@ fun ChatsHomeScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val number = messageNumberText.trim()
-                    showMessageNumber = false
-                    messageNumberText = ""
-                    if (number.isNotEmpty()) nav.onMessageNumber(number)
-                }) { Text("Chat", fontWeight = FontWeight.W700) }
+                ChatyTextButton(
+                    onClick = {
+                        val number = messageNumberText.trim()
+                        showMessageNumber = false
+                        messageNumberText = ""
+                        if (number.isNotEmpty()) nav.onMessageNumber(number)
+                    },
+                    label = "Chat",
+                    fontWeight = FontWeight.W700,
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showMessageNumber = false; messageNumberText = "" }) {
-                    Text("Cancel")
-                }
+                ChatyTextButton(
+                    onClick = { showMessageNumber = false; messageNumberText = "" },
+                    label = "Cancel",
+                )
             },
         )
     }
@@ -544,7 +550,7 @@ fun ChatsHomeScreen(
                 rawHomeUiStyle !in setOf("ios style", "whatsapp old ui")) {
                 Box(
                     modifier = Modifier
-                        .height(((1 - effectiveTitleCollapse) * 44).dp)
+                        .height(with(LocalDensity.current) { (44f * theme.fontScale.toFloat()).sp.toDp() } * (1 - effectiveTitleCollapse))
                         .alpha(1 - effectiveTitleCollapse),
                 ) {
                     Text(
