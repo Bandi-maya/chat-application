@@ -112,7 +112,7 @@ jobs:
            nodes()
            (out/(name+'.xml')).write_bytes(adb('shell','cat','/sdcard/view.xml'))
           try:
-           click('Aisha (sample)');time.sleep(4);snap('03-actual-conversation')
+           click('Aisha (sample), See you tomorrow!, 1 unread message');time.sleep(4);snap('03-actual-conversation')
            click('Chat options');time.sleep(2);snap('04-actual-chat-options')
            adb('shell','input','keyevent','4');time.sleep(1)
            opened=False
