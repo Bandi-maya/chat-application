@@ -106,15 +106,28 @@ jobs:
           for control in ['Not now','Close','Not Now']:
            if match(control) is not None:click(control);time.sleep(2)
           capture('02-actual-home-reopened')
-          for idx,label in [(3,'Calls'),(4,'Tasks'),(5,'Settings')]:
-           click(label);time.sleep(4)
-           for control in ['Not now','Close','Not Now']:
-            if match(control) is not None:click(control);time.sleep(2)
-           capture(str(idx).zfill(2)+'-actual-'+label.lower())
-           (out/(str(idx).zfill(2)+'-'+label.lower()+'.xml')).write_bytes(adb('shell','cat','/sdcard/view.xml'))
-          
-          (out/'status.txt').write_text('Exact82d14 production APK, built-in Try the demo selected by user. Offline sample data, not a real account. Full demo Home captured and reopened.')
-          adb('shell','rm','-f','/sdcard/view.xml')
+          # Open sample chat and inspect only. Never send, call, share or modify settings.
+          def snap(name):
+           capture(name)
+           nodes()
+           (out/(name+'.xml')).write_bytes(adb('shell','cat','/sdcard/view.xml'))
+          try:
+           click('Aisha (sample)');time.sleep(4);snap('03-actual-conversation')
+           click('Chat options');time.sleep(2);snap('04-actual-chat-options')
+           adb('shell','input','keyevent','4');time.sleep(1)
+           opened=False
+           for label in ['Attach','Attachment','Attachments','Add attachment']:
+            if match(label) is not None:click(label);opened=True;break
+           if not opened:
+            snap('05-attachment-control-not-found')
+           else:
+            time.sleep(3);snap('05-actual-attachment-sheet')
+           (out/'status.txt').write_text('Current kotlin APK; built-in offline demo. Opened chat and options, attempted attachment sheet. No messages, calls or shares sent. No app code/build.')
+          except Exception as e:
+           snap('09-navigation-blocked');(out/'status.txt').write_text('Read-only demo navigation blocked: '+str(e))
+           raise
+          finally:
+           adb('shell','rm','-f','/sdcard/view.xml')
           PY
       - name: Capture user-selected built-in demo Home
         uses: reactivecircus/android-emulator-runner@v2
