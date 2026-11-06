@@ -49,6 +49,7 @@ fun HomeUiPreview(style: String, theme: ThemeConfig, current: AppNavigationMode,
                 navigationStyleName = ServiceLocator.appearanceVariantController.navigationStyle),
             screenContent = {
                 ChatsHomeScreen(
+                    templates = com.example.chat.ui.chats.home.resolveHomeTemplates(ServiceLocator.templateController.config, com.example.chat.core.preferences.HomePresentationPolicy.isDefault(style), ServiceLocator.templateController.chatList),
                     conversations = api.conversations.filterNot { prefs.isConversationLocked(it.id) || prefs.isConversationHidden(it.id) },
                     requiresSubscription = false, subscriptionMessage = null, onOpenConversation = {},
                     currentUserId = me?.id.orEmpty(), homePreferences = home, securityPreferences = prefs.security,

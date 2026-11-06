@@ -15,11 +15,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
 import kotlin.math.atan2
 import kotlin.math.abs
 
@@ -27,24 +38,32 @@ import kotlin.math.abs
 fun CameraOptionsPanel(
     options: CameraCaptureOptions,
     stabilizationSupported: Boolean,
+    nightSupported: Boolean,
     onChange: (CameraCaptureOptions) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.background(Color(0xEE101010), RoundedCornerShape(10.dp))
-        .heightIn(max = 350.dp).verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Camera options   Close", color = Color.White, modifier = Modifier.align(Alignment.End).clickable(onClick = onClose).padding(8.dp))
+        .heightIn(max = 350.dp).verticalScroll(rememberScrollState())
+        .semantics { contentDescription="Camera options panel" }.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            Text("Camera options",color=Color.White,modifier=Modifier.weight(1f))
+            androidx.compose.material3.TextButton(shape = com.example.chat.ui.kit.ChatyActionShape, onClick=onClose){Text("Close",color=Color.White)}
+        }
+        Text("Ratio",color=Color.LightGray)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             CaptureAspect.entries.forEach { aspect ->
                 OptionChip(aspect.label, options.aspect == aspect, { onChange(options.copy(aspect = aspect)) }, Modifier.weight(1f))
             }
         }
+        Text("Timer",color=Color.LightGray)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(0, 3, 5, 10).forEach { seconds ->
                 OptionChip(if (seconds == 0) "Off" else "${seconds}s", options.timerSeconds == seconds,
                     { onChange(options.copy(timerSeconds = seconds)) }, Modifier.weight(1f))
             }
         }
+        Text("Capture",color=Color.LightGray)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OptionChip("Grid lines", options.grid, { onChange(options.copy(grid = !options.grid)) }, Modifier.weight(1f))
             OptionChip("Level", options.level, { onChange(options.copy(level = !options.level)) }, Modifier.weight(1f))
@@ -55,15 +74,24 @@ fun CameraOptionsPanel(
             OptionChip("Watermark", options.watermark, { onChange(options.copy(watermark = !options.watermark)) }, Modifier.weight(1f))
             OptionChip("Clarity", options.clarity, { onChange(options.copy(clarity = !options.clarity)) }, Modifier.weight(1f))
         }
+        OptionChip(if (nightSupported) "Night mode · hold still" else "Night mode unavailable on this camera",
+            options.night && nightSupported, { if (nightSupported) onChange(options.copy(night = !options.night)) }, Modifier.fillMaxWidth(), nightSupported)
+        Text("Night uses the phone maker's supported multi-frame mode. It cannot see in total darkness. Timer, grid and level still work. Face lenses and preview stabilization are off during Night.",color=Color.LightGray)
         Text("Clarity adjusts photo contrast only. Stabilization affects preview where supported; it does not restore blurred detail. Document scanning has its own crop review.", color = Color.LightGray)
     }
 }
 
 @Composable
 private fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier, enabled: Boolean = true) {
-    Box(modifier.background(if (selected) Color(0xFFFFD747) else Color(0xFF292929), RoundedCornerShape(10.dp))
-        .clickable(enabled = enabled, onClick = onClick).padding(10.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = if (selected) Color.Black else if (enabled) Color.White else Color.Gray)
+    Box(modifier.heightIn(min=48.dp).clip(com.example.chat.ui.kit.ChatyActionShape).background(if (selected) androidx.compose.material3.MaterialTheme.colorScheme.primary else Color(0xFF292929), com.example.chat.ui.kit.ChatyActionShape)
+        .clearAndSetSemantics {
+            this.text = AnnotatedString(text)
+            this.selected = selected
+            role = Role.Button
+            if(!enabled) disabled() else onClick { onClick(); true }
+        }
+        .clickable(enabled = enabled, onClick = onClick).padding(horizontal=10.dp,vertical=12.dp), contentAlignment = Alignment.Center) {
+        Text(text, color = if (selected) androidx.compose.material3.MaterialTheme.colorScheme.onPrimary else if (enabled) Color.White else Color.Gray)
     }
 }
 

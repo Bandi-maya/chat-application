@@ -318,7 +318,7 @@ object ServiceLocator {
             store = AndroidPreferencesBlobStore(preferencesStorage),
             remote = SupabaseRemoteSettingsStore(queryClient),
             lockStore = localLockService,
-            auth = SessionAuthSource(sessionManager),
+            auth = SessionAndApiAuthSource(GoTrueAuthPlane(sessionManager), ApiBackendAuthPlane(apiBackend)),
             scope = appScope,
         )
     }

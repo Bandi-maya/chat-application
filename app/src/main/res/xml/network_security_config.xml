@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Cleartext traffic is disabled by default. All API/backend calls must use TLS. -->
+    <!-- Cleartext traffic is denied for every domain (targetSdk 36 also defaults
+         to denied; stated explicitly so no future domain-config can widen it).
+         All API/backend calls must use TLS (api.hub.logybyte.in over https/wss,
+         map tiles over https). -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">secure.chaty.app</domain>
-        <domain includeSubdomains="true">api.chaty.app</domain>
+        <domain includeSubdomains="true">hub.logybyte.in</domain>
+        <domain includeSubdomains="true">openfreemap.org</domain>
     </domain-config>
 </network-security-config>

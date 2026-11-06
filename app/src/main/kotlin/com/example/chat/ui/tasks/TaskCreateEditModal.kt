@@ -197,19 +197,18 @@ fun TaskCreateEditModal(
     // issuetracker.google.com/issues/292204649; fixed upstream by recreating the window on
     // configuration change, androidx commit ca9123c5). Apply the same repair at the call site:
     // key the sheet on the configuration so rotation rebuilds the dialog window. The SheetState
-    // is recreated WITH the window (fresh SheetState below); the hoisted per-account draft
+    // is recreated WITH the window (see the fresh-state note below); the hoisted per-account draft
     // reseeds every field, so no user input is lost across the rebuild.
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     androidx.compose.runtime.key(configuration) {
-    // Fresh SheetState per recreated window: the rebuilt dialog's first anchor pass measures
-    // sheetSize=0 (Expanded anchor absent) and AnchoredDraggableState.updateAnchors retargets by
-    // closestAnchor(offset) WITHOUT confirmValueChange, so a SURVIVED state (offset=0 at the top)
-    // snapped to Hidden and the sheet vanished (capture 40751995833). A fresh state starts
-    // offset=NaN and the retarget keeps targetValue. Start AT Expanded so the sheet never rests
-    // at the Partial anchor during the open pass: an early upward gesture on a half-settled
-    // sheet expands it instead of scrolling the form, leaving the end controls unreachable
-    // (capture 40772281420). Drag-down to half after open still works; scrim-tap, back, cancel
-    // and save dismissal are untouched (onDismissRequest only via user paths; draft hoisted).
+    // fresh SheetState per recreated window. The rebuilt dialog's first anchor pass
+    // measures sheetSize=0 (Expanded anchor absent) and AnchoredDraggableState.updateAnchors
+    // retargets by closestAnchor(offset) WITHOUT confirmValueChange, so a SURVIVED state
+    // (offset=0 at the top) snapped to Hidden and the sheet vanished (capture 40751995833).
+    // A fresh state starts offset=NaN; the retarget then keeps targetValue and the sheet's own
+    // LaunchedEffect show() lands on Expanded - the recovery the recreate() path already proves
+    // (AccountDraftIsolationProofTest recreate + font2 legs). Scrim-tap, back, cancel and save
+    // dismissal are untouched (onDismissRequest only via user paths; the draft stays hoisted).
     val sheetDensity = androidx.compose.ui.platform.LocalDensity.current
     val sheetState = androidx.compose.runtime.remember {
         androidx.compose.material3.SheetState(

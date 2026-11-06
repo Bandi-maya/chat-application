@@ -32,7 +32,7 @@ fun main() {
     check(ChatyIconThemeId.fromString("Chaty Orbit") == ChatyIconThemeId.chatySigil)
     check(ChatyIconThemeId.fromString("prism-edge") == ChatyIconThemeId.origamiGeometry)
     check(ChatyIconThemeId.fromString("Technical Blueprint") == ChatyIconThemeId.technicalBlueprint)
-    check(ChatyIconThemeId.fromString(null) == ChatyIconThemeId.chatySigil)
+    check(ChatyIconThemeId.fromString(null) == ChatyIconThemeId.hugeiconsFree)
     check(ChatyIconThemeId.fromString("zzz") == ChatyIconThemeId.chatySigil)
     // arcToPoint: half circle from (0,0) to (2,0) radius 1 clockwise ends at (2,0) and bulges upward (y<0)
     val p = Path(); p.moveTo(0, 0); p.arcToPoint(Offset(2, 0), radius = Radius.circular(1), clockwise = true)

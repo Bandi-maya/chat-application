@@ -261,12 +261,27 @@ object ChatyNotifications {
             .setAutoCancel(false)
             .setTimeoutAfter(45_000)
             .setContentIntent(fullScreen)
-            .setFullScreenIntent(fullScreen, true)
+            .apply {
+                // Android 14+ lets the user revoke USE_FULL_SCREEN_INTENT
+                // (Settings > Apps > Special access). When denied, posting a
+                // full-screen intent is ignored and the incoming call would
+                // degrade to a silent shade entry; the fallback keeps the call
+                // arriving as a ringing high-priority heads-up notification
+                // (Play audit P-08).
+                if (canUseFullScreenIntent(context)) setFullScreenIntent(fullScreen, true)
+            }
             .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
             .build()
         notification.flags = notification.flags or Notification.FLAG_INSISTENT // keep ringing
         try { NotificationManagerCompat.from(context).notify(CALL_NOTIFICATION_ID, notification) } catch (_: SecurityException) {}
     }
+
+    /** Below API 34 full-screen intent needs no runtime grant; on 34+ the user
+     *  can revoke it, so check the live state on every incoming call. */
+    private fun canUseFullScreenIntent(context: Context): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE ||
+            (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .canUseFullScreenIntent()
 
     /** Stops the ringing notification (answered, declined, cancelled). */
     fun cancelIncomingCall(context: Context, callId: String? = null) {

@@ -206,6 +206,37 @@ fun AppRoot() {
             // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
             ServiceLocator.messageAutomation
         }
+        // Launcher shortcut tap (static res/xml/shortcuts.xml via MainActivity). Consumed
+        // only once the authenticated shell is visible and the app lock is satisfied; the
+        // session/TTL/lock matrix lives in LauncherShortcutPolicy (JVM-tested).
+        val pendingShortcut by com.example.chat.LauncherShortcutRouter.pending.collectAsState()
+        androidx.compose.runtime.LaunchedEffect(pendingShortcut, ServiceLocator.apiBackend.isAuthenticated, lockRequired, route) {
+            val p = pendingShortcut ?: return@LaunchedEffect
+            val api = ServiceLocator.apiBackend
+            val scope = api.authSnapshot()
+            val shellVisible = api.isAuthenticated && when (route) {
+                AuthRoute.Home, AuthRoute.ChatDetail, AuthRoute.NewChat,
+                AuthRoute.GlobalSearch, AuthRoute.Notifications, AuthRoute.Security,
+                AuthRoute.LockedChats, AuthRoute.HiddenVault, AuthRoute.MessageManagement,
+                AuthRoute.LinkedDevices, AuthRoute.Starred -> true
+                else -> false
+            }
+            when (com.example.chat.LauncherShortcutPolicy.decide(
+                pendingAction = p.action,
+                fresh = com.example.chat.LauncherShortcutRouter.isFresh(),
+                scopeAllowed = com.example.chat.LauncherShortcutRouter.scopeAllows(scope.userId, scope.generation),
+                authenticatedShellVisible = shellVisible,
+                lockRequired = lockRequired,
+            )) {
+                com.example.chat.LauncherShortcutPolicy.Decision.OpenNewChat -> {
+                    com.example.chat.LauncherShortcutRouter.consume()
+                    route = AuthRoute.NewChat
+                }
+                com.example.chat.LauncherShortcutPolicy.Decision.Drop ->
+                    com.example.chat.LauncherShortcutRouter.consume()
+                com.example.chat.LauncherShortcutPolicy.Decision.Wait -> Unit
+            }
+        }
         var previousLockRequired by remember { mutableStateOf(lockRequired) }
         androidx.compose.runtime.LaunchedEffect(lockRequired) {
             // local_auth stopAuthentication(): a pending prompt never resumes once the lock requirement drops (unlocked
@@ -918,6 +949,7 @@ fun AppRoot() {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.chats -> {
                 com.example.chat.ui.ChatsHomeHost(
                     forcedType = null, pageTitle = null, gate = gate,
+                    onNewCall = { showCallPicker = true },
                     onOpenDestination = { id ->
                         when (id) {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> pushedTasks = true
@@ -953,6 +985,7 @@ fun AppRoot() {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.groups ->
                                 com.example.chat.ui.ChatsHomeHost(
                                     forcedType = com.example.chat.domain.models.ConversationType.group,
+                                    onNewCall = { showCallPicker = true },
                                     pageTitle = "Groups", gate = gate,
                                     onOpenConversation = { conversation ->
                                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)

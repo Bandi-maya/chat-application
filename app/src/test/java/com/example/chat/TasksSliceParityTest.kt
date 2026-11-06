@@ -254,6 +254,42 @@ class TasksControllerParityTest {
         assertEquals(listOf("Todo → In Process • 25/10 18:30"), c.historyFor("t1"))
     }
 
+    @Test fun moveTaskServerFailureKeepsPersistedStatus() = runBlocking {
+        val transport = FakeTransport(body = "{\"data\":[{\"uid\":\"t1\",\"status\":\"todo\",\"title\":\"T\"}]}")
+        val c = controller(transport)
+        c.loadTasks()
+        val task = c.tasks.single()
+        // Server rejects the status PUT (500): the board must stay on the persisted status, no fake move.
+        transport.status = 500
+        transport.body = "{}"
+        c.moveTask(task, TaskStatus.inProgress)
+        assertEquals(TaskStatus.inbox, c.tasks.single().status)
+        val put = transport.calls.last()
+        assertEquals("PUT", put.method)
+        assertTrue(put.url.endsWith("/tasks/t1"))
+        assertEquals("{\"status\":\"in_progress\"}", put.body)
+        // NOTE (parity, not asserted): api's updateTaskStatus also ignores non-200, so moveTask still returns Moved
+        // and records history; the user sees no error. Decide separately whether to deviate from api.
+    }
+
+    @Test fun moveTaskTransportExceptionKeepsPersistedStatus() = runBlocking {
+        val throwing = object : ApiHttpTransport {
+            var fail = false
+            override fun execute(method: String, url: String, headers: Map<String, String>, body: String?): Pair<Int, String> {
+                if (fail) throw java.io.IOException("offline")
+                return 200 to "{\"data\":[{\"uid\":\"t1\",\"status\":\"todo\",\"title\":\"T\"}]}"
+            }
+        }
+        val client = ApiTasksClient(
+            baseUrl = { "http://10.0.2.2:8000/" }, tenantId = { "chat-application" }, token = { "tok" }, transport = throwing,
+        )
+        val c = TasksController(client, InMemoryHistoryStore(), now = { fixedNow })
+        c.loadTasks()
+        throwing.fail = true
+        c.moveTask(c.tasks.single(), TaskStatus.inProgress)
+        assertEquals(TaskStatus.inbox, c.tasks.single().status)
+    }
+
     @Test fun historyCodecRoundTripAndCap() = runBlocking {
         val transport = FakeTransport(body = "{\"data\":[{\"uid\":\"t1\",\"status\":\"todo\",\"title\":\"T\"}]}")
         val store = InMemoryHistoryStore()

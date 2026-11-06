@@ -171,13 +171,26 @@ internal fun FloatingIslandRailShell(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(if (isSel) colors.primary else Color.Transparent)
                                 .clickable { onSelect(i) }
-                                .padding(10.dp),
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
                         ) {
-                            NavDestinationIcon(
-                                id,
-                                size = 20,
-                                tint = if (isSel) colors.onPrimary else colors.foregroundSecondary,
-                            )
+                            // Labeled options (2026-11-03 21:35 batch): every rail destination
+                            // shows its name under the icon, selected state in onPrimary.
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                NavDestinationIcon(
+                                    id,
+                                    size = 20,
+                                    tint = if (isSel) colors.onPrimary else colors.foregroundSecondary,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    NavigationCatalog.labelFor(id),
+                                    color = if (isSel) colors.onPrimary else colors.foregroundSecondary,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }

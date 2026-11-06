@@ -50,10 +50,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,6 +66,7 @@ import com.example.chat.domain.models.UserProfile
 import com.example.chat.ui.theme.ChatyAsyncImage
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 
 /**
  * Port of lib/features/profile/profile_edit_screen.dart (api @ 3bee780d):
@@ -93,6 +96,10 @@ fun ProfileEditScreen(
     /** Throws with a user-readable message on failure. */
     onSave: suspend (displayName: String, username: String, about: String, avatarUrl: String?, bannerUrl: String?) -> Unit,
     checkUsernameAvailable: (suspend (String) -> Boolean)? = null,
+    /** Local-only preview. Never passed as avatarUrl to onSave. Host owns draft and cleanup. */
+    avatarDraftPath: String? = null,
+    avatarDraft: ProfileAvatarDraft? = null,
+    isCurrentPreview: () -> Boolean = { true },
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
@@ -112,36 +119,42 @@ fun ProfileEditScreen(
     val isDirty = displayName.trim() != user.displayName ||
         username.trim() != user.username ||
         about.trim() != user.about ||
+        avatarDraftPath != null ||
         newAvatarUrl != null ||
         newBannerUrl != null
 
     fun attemptBack() {
+        // Saving owns the draft reader and scoped upload. Do not offer Discard until it settles.
+        if (isSaving) return
         if (!isDirty && !isSaving) onBack() else showDiscardDialog = true
     }
     BackHandler { attemptBack() }
 
-    val activeAvatarUrl = newAvatarUrl ?: user.avatarUrl
+    val activeAvatarUrl = avatarDraftPath ?: newAvatarUrl ?: user.avatarUrl
     val activeBannerUrl = newBannerUrl ?: user.bannerUrl
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val bannerHeight = (screenWidth - 32) * 9 / 16
 
     fun pick(source: ProfileMediaSource) {
+        if (isSaving) return
         val target = sourceSheetFor ?: return
         sourceSheetFor = null
         val picker = if (target == "avatar") onPickAvatar else onPickBanner
         if (picker == null) return
+        isSaving = true
         scope.launch {
-            isSaving = true
             try {
                 val url = picker(source)
                 if (url != null) {
                     if (target == "avatar") newAvatarUrl = url else newBannerUrl = url
                 }
-            } catch (error: Throwable) {
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                 if (error.message?.contains("cancelled") != true) {
                     snackbar.showSnackbar(
-                        if (target == "avatar") "Could not upload profile photo: ${error.message}"
-                        else "Could not upload banner photo: ${error.message}",
+                        if (target == "avatar") "Could not prepare profile photo: ${error.message}"
+                        else "Could not prepare banner photo: ${error.message}",
                     )
                 }
             } finally {
@@ -172,8 +185,8 @@ fun ProfileEditScreen(
             scope.launch { snackbar.showSnackbar("Please select an available username before saving.") }
             return
         }
+        isSaving = true
         scope.launch {
-            isSaving = true
             try {
                 // Live availability re-check at save time when a checker is
                 // wired (mirrors the Dart save-time re-check).
@@ -188,7 +201,9 @@ fun ProfileEditScreen(
                 isSaving = false
                 snackbar.showSnackbar("Profile updated successfully.")
                 onBack()
-            } catch (error: Throwable) {
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                 isSaving = false
                 snackbar.showSnackbar("Could not save profile: ${error.message}")
             }
@@ -269,7 +284,8 @@ fun ProfileEditScreen(
                     )
                     if (onPickBanner != null) {
                         IconButton(
-                            onClick = { sourceSheetFor = "banner" },
+                            onClick = { if (!isSaving) sourceSheetFor = "banner" },
+                            enabled = !isSaving,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(10.dp)
@@ -293,7 +309,6 @@ fun ProfileEditScreen(
                     Box(
                         Modifier
                             .size(96.dp)
-                            .shadow(12.dp, CircleShape)
                             .border(3.5.dp, Color(theme.surfaceColor), CircleShape)
                             .clip(CircleShape)
                             .background(Color(theme.accentColor).copy(alpha = 0.2f)),
@@ -307,25 +322,35 @@ fun ProfileEditScreen(
                                 fontWeight = FontWeight.Bold,
                             )
                         }
-                        ChatyAsyncImage(
-                            url = activeAvatarUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            placeholder = avatarFallback,
-                            error = avatarFallback,
-                        )
+                        if (avatarDraft != null) {
+                            // Local drafts are owned by the scoped host, not a remote image request.
+                            // The keyed child is replaced immediately on draft/account replacement.
+                            androidx.compose.runtime.key(avatarDraft) {
+                                LocalAvatarDraftPreview(avatarDraft, isCurrentPreview)
+                            }
+                        } else {
+                            ChatyAsyncImage(
+                                url = activeAvatarUrl,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                placeholder = avatarFallback,
+                                error = avatarFallback,
+                            )
+                        }
                     }
                     IconButton(
-                        onClick = { sourceSheetFor = "avatar" },
+                        onClick = { if (!isSaving) sourceSheetFor = "avatar" },
+                        enabled = !isSaving,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
+                            .semantics { contentDescription = "Change avatar" }
                             .size(34.dp)
                             .border(2.5.dp, Color(theme.surfaceColor), CircleShape)
                             .background(Color(theme.accentColor), CircleShape),
                     ) {
                         Icon(
                             Icons.Rounded.PhotoCamera,
-                            contentDescription = "Change avatar",
+                            contentDescription = null,
                             tint = Color(theme.onAccentColor),
                             modifier = Modifier.size(17.dp),
                         )
@@ -442,5 +467,44 @@ fun ProfileEditScreen(
                 TextButton(onClick = { showDiscardDialog = false }) { Text("Keep Editing") }
             },
         )
+    }
+}
+
+
+/** Bounded local-only preview. Bitmap is left to GC after disposal rather than recycled
+ * while Compose's renderer might still hold it. No private path/URI is logged or displayed. */
+@Composable
+private fun LocalAvatarDraftPreview(draft: ProfileAvatarDraft, isCurrent: () -> Boolean) {
+    data class Preview(val bitmap: android.graphics.Bitmap? = null, val failed: Boolean = false)
+    val currentCheck = androidx.compose.runtime.rememberUpdatedState(isCurrent)
+    val state = androidx.compose.runtime.produceState(Preview(), draft) {
+        try {
+            val bitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                check(currentCheck.value()) { "Account changed." }
+                val bytes = draft.readBytes() // serialized with owner close/delete
+                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                check(bounds.outWidth > 0 && bounds.outHeight > 0) { "Invalid local photo." }
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 512) sample *= 2
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size,
+                    android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+                    ?: error("Could not decode local photo.")
+            }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            if (currentCheck.value()) value = Preview(bitmap = bitmap)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { if (currentCheck.value()) value = Preview(failed = true) }
+    }.value
+    when {
+        state.bitmap != null -> androidx.compose.foundation.Image(
+            bitmap = state.bitmap.asImageBitmap(),
+            contentDescription = "Local profile photo preview",
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        state.failed -> Text("Photo preview unavailable", fontSize = 10.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        else -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
     }
 }

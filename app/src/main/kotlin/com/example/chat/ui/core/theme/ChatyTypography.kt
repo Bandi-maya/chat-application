@@ -122,6 +122,15 @@ object ChatyTypography {
  */
 @Composable
 fun ChatyTextScaleProvider(appearanceTextScale: Double, content: @Composable () -> Unit) {
+    if (appearanceTextScale == 1.0) {
+        // No appearance override: keep the platform density untouched so the OS font scale,
+        // including Android 14 non-linear scaling, applies exactly as the user set it.
+        content()
+        return
+    }
+    // An explicit appearance preset is active: apply it as a linear scale on top of the OS
+    // scale (Flutter TextScaler.linear parity). resolveTextScale never shrinks an explicitly
+    // enlarged OS scale.
     val d = LocalDensity.current
     val effective = AppearanceVariantController.resolveTextScale(d.fontScale.toDouble(), appearanceTextScale)
     CompositionLocalProvider(LocalDensity provides Density(d.density, effective.toFloat())) { content() }

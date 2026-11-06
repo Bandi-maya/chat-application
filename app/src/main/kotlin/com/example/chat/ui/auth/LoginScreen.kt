@@ -38,17 +38,25 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.auth.friendlyLoginError
+import com.example.chat.data.api.ApiSessionStorageException
 import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.core.validators.ChatyValidators
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.launch
+
+/** Label for the secure-storage-failure support action. A share chooser is
+ *  not customer care, so this is "Share error report" until a verified support
+ *  address exists (publisher review 2026-11-04; Bandi asked, pending) - then
+ *  flip this single constant to "Contact customer care". */
+private const val STORAGE_FAILURE_ACTION_LABEL = "Share error report"
 
 /** Port of lib/features/auth/login_screen.dart. The login call is injected so
  *  the screen never touches the service locator directly (testable seam);
@@ -79,6 +87,10 @@ fun LoginScreen(
     var identifierError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
     var workspaceError by remember { mutableStateOf<String?>(null) }
+    // Non-null only when sign-in was stopped by a secure-storage failure
+    // (fail-closed); drives the Contact-customer-care action (Bandi 2026-11-04).
+    var storageFailure by remember { mutableStateOf<ApiSessionStorageException?>(null) }
+    val context = LocalContext.current
 
 
     // Dart _validateIdentifier
@@ -106,6 +118,7 @@ fun LoginScreen(
 
         isLoading = true
         errorMessage = null
+        storageFailure = null
         scope.launch {
             try {
                 val userId = login(
@@ -116,6 +129,7 @@ fun LoginScreen(
                 )
                 onLoggedIn(userId)
             } catch (e: Exception) {
+                storageFailure = e as? ApiSessionStorageException
                 errorMessage = friendlyLoginError(e)
                 isLoading = false
             }
@@ -251,6 +265,43 @@ fun LoginScreen(
                     }
                 }
 
+                storageFailure?.let { failure ->
+                    // A share chooser is not "customer care": this stays
+                    // STORAGE_FAILURE_ACTION_LABEL ("Share error report") until
+                    // a verified support address exists (asked Bandi, pending),
+                    // then the single constant flips to "Contact customer care"
+                    // and the intent becomes a direct mailto. The exported
+                    // report contains only the allowlisted failure copy - never
+                    // the raw store exception, identifier, password, or tokens.
+                    TextButton(
+                        onClick = {
+                            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Chaty sign-in problem: secure storage failure")
+                                putExtra(
+                                    android.content.Intent.EXTRA_TEXT,
+                                    "Customer care,\n\nChaty could not sign me in because the app could not save the session securely on this device.\n\nDetails shown by the app:\n" +
+                                        (failure.message ?: "unknown reason") +
+                                        "\n\nPlease advise how to fix this.",
+                                )
+                            }
+                            runCatching {
+                                context.startActivity(
+                                    android.content.Intent.createChooser(send, "Contact customer care"),
+                                )
+                            }
+                        },
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    ) {
+                        Text(
+                            STORAGE_FAILURE_ACTION_LABEL,
+                            color = Color(theme.linkColor),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+
                 AuthPrimaryButton(text = "Log In", theme = theme, onClick = { handleLogin() }, isLoading = isLoading)
                 Spacer(Modifier.height(14.dp))
 
@@ -289,6 +340,7 @@ fun LoginScreen(
                 if (demoLogin != null) {
                     DemoLoginCard(theme = theme, enabled = !isLoading, onClick = {
                         errorMessage = null
+                        storageFailure = null
                         isLoading = true
                         scope.launch {
                             try {

@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -33,6 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.BubbleChart
@@ -80,8 +83,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
@@ -92,7 +97,6 @@ import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.core.theme.AppNavigationMode
 import com.example.chat.domain.models.HomePreferences
 import com.example.chat.ui.kit.ChatyBackButton
-import com.example.chat.ui.kit.GbSettingRow
 import com.example.chat.ui.kit.rememberGbPickers
 import com.example.chat.ui.theme.LocalAppColors
 import com.example.chat.ui.theme.LocalThemeConfig
@@ -158,15 +162,10 @@ fun HeaderSettingsScreen(
 
     fun updateHome(p: HomePreferences, logTitle: String? = null) = preferences.updateHome(p, logTitle = logTitle)
 
-    val override = home.myNameOverride.trim()
-    val effectiveOverride = if (override.isNotEmpty() && override != "Alex Rivera" && override != "Bandi Maya") override else ""
-    val rawName = currentUserDisplayName?.trim() ?: ""
-    val displayName = when {
-        effectiveOverride.isNotEmpty() -> effectiveOverride
-        rawName.isNotEmpty() && rawName != "Bandi Maya" && rawName != "Chaty User" -> rawName
-        !currentUserUsername.isNullOrEmpty() -> currentUserUsername
-        else -> "User"
-    }
+    // Same identity rules as the real Home bar (setMyName is applied by the preview itself).
+    val displayName = com.example.chat.ui.chats.home.homeIdentityName(
+        true, home.myNameOverride, currentUserDisplayName ?: "", currentUserUsername ?: "",
+    )
     val statusText = if (!currentUserAbout.isNullOrEmpty()) currentUserAbout else "Available"
     val effectiveSearchPlacement =
         if (home.disableSearchBar && home.searchPlacement.trim().lowercase() == "header action") "Below header" else home.searchPlacement
@@ -178,7 +177,7 @@ fun HeaderSettingsScreen(
 
     @Composable
     fun divider() = HorizontalDivider(
-        Modifier.padding(start = 68.dp, end = 16.dp), thickness = 0.8.dp, color = Color(config.cardColor),
+        Modifier.fillMaxWidth(), thickness = 0.5.dp, color = colors.borderSubtle.copy(alpha = 0.55f),
     )
 
     Column(Modifier.fillMaxSize().background(colors.background)) {
@@ -190,43 +189,82 @@ fun HeaderSettingsScreen(
             Box(Modifier.padding(8.dp)) { ChatyBackButton(onPressed = onBack) }
             Text("Header", color = colors.foreground, fontSize = 19.sp, fontWeight = FontWeight.W700, letterSpacing = (-0.2).sp)
         }
-        headerPreview(
-            HeaderPreviewArgs(
-                displayName, statusText, home.setMyName, home.disableStatusUnderName, home.disableSearchBar,
-                home.showSearchBar, home.showCameraIcon, home.showDesktopIcon, home.showIconAddAccount,
-                effectiveSearchPlacement, home.separateChatsAndGroups, selectedStyle,
-                home.tabBubbleStyle, home.pagerTransition3d,
-            ) { showOverflowMenu(onBack) },
-        )
-        Spacer(Modifier.height(8.dp))
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(14.dp, 4.dp, 14.dp, 24.dp)) {
+        // The settings panel is the live layout's content, not a second full Home screenshot.
+        // MainNavigationShell owns bottom system insets and reserves its dock footprint.
+        com.example.chat.ui.navigation.MainNavigationShell(
+            modifier = Modifier.weight(1f), colors = com.example.chat.ui.core.theme.ChatyColors(config), navigationMode = navigationMode,
+            template = com.example.chat.ServiceLocator.templateController.navigation,
+            previewOnly = true,
+            prefs = com.example.chat.ui.navigation.NavigationShellPrefs(
+                homeStyle = home.homeStyle, separateChatsAndGroups = home.separateChatsAndGroups,
+                pagerTransition3d = home.pagerTransition3d, animationsDisabled = true,
+                hasCustomNavigationDestinations = com.example.chat.ServiceLocator.templateController.hasCustomNavigationDestinations,
+                hideTasks = preferences.gbBool("nav_hide_tasks"),
+                hideUpdates = preferences.gbBool("nav_hide_updates") || !com.example.chat.ReleaseFeatures.STATUS_UPDATES,
+                bottomBarStyle = com.example.chat.ServiceLocator.appearanceVariantController.bottomBarStyle,
+                oneUiRaisedCenterDock = com.example.chat.ui.navigation.HomePresetNormalizer.oneUiRaisedCenterDockEnabled(home.homeStyle),
+                navigationStyleName = com.example.chat.ServiceLocator.appearanceVariantController.navigationStyle,
+            ),
+            screenContent = {
+            Column(Modifier.fillMaxSize()) {
+                val listStyle = com.example.chat.core.preferences.HomePresentationPolicy.listStyle(home.homeStyle)
+                val headerStyle = com.example.chat.ui.chats.home.effectiveHomeHeaderStyle(
+                    home.homeStyle.trim().lowercase(), listStyle,
+                    com.example.chat.ui.chats.home.defaultHomeTemplates.headerStyle,
+                )
+                com.example.chat.ui.chats.home.StandardHomeAppBar(
+                    theme = config, homePrefs = home, headerStyle = headerStyle, homeStyle = listStyle,
+                    title = com.example.chat.ui.chats.home.compactBarTitle(
+                        listStyle, headerStyle, null, home.setMyName, home.myNameOverride,
+                        currentUserDisplayName.orEmpty(), currentUserUsername.orEmpty(), true,
+                    ),
+                    identity = com.example.chat.ui.chats.home.HomeIdentity(
+                        displayName = currentUserDisplayName.orEmpty(), username = currentUserUsername.orEmpty(),
+                        about = currentUserAbout.orEmpty(),
+                    ),
+                    isSearchOpen = false, forcedTypeIsSet = false,
+                    nav = com.example.chat.ui.chats.home.ChatsHomeNav(),
+                    onToggleSearch = {}, onToggleGhost = {}, onIdentityTap = {}, onIdentityLongPress = {},
+                    onOpenOverflowMenu = { showOverflowMenu(onBack) }, onSnack = {},
+                )
+                // Use the shell's published tab data, as the real Home content does.
+                com.example.chat.ui.navigation.LocalHomeHeaderTabs.current?.let { tabs ->
+                    if (tabs.active) com.example.chat.ui.navigation.HomeHeaderTabsBar(
+                        com.example.chat.ui.core.theme.ChatyColors(config), tabs.ids,
+                        tabs.selectedIndex, tabs.heightDp, onSelect = {},
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp, 4.dp, 16.dp, 12.dp)) {
             Column(
-                Modifier.fillMaxWidth().background(colors.surface).border(1.1.dp, colors.borderSubtle),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
+                    .background(colors.surface).border(0.5.dp, colors.borderSubtle, RoundedCornerShape(22.dp))
+                    .padding(16.dp),
             ) {
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Outlined.Layers), title = "Home UI Style", subtitle = selectedStyle,
                     showChevron = true, onTap = { showStyleSheet = true },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Rounded.ViewInAr), title = "Header tab style",
-                    subtitle = "${if (home.tabBubbleStyle.isNotEmpty()) home.tabBubbleStyle else "Capsule Pill"} \u00b7 ${if (home.pagerTransition3d.isNotEmpty()) home.pagerTransition3d else "Cube 3D"}",
+                    subtitle = "${if (home.tabBubbleStyle.isNotEmpty()) home.tabBubbleStyle else "Capsule Pill"} \u00b7 ${if (home.pagerTransition3d.isNotEmpty()) home.pagerTransition3d else "Default"}",
                     showChevron = true, onTap = { showTabStyleSheet = true },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Rounded.DonutLarge), title = "Enable Instagram-like Stories",
                     switchValue = home.enableStoriesStrip,
                     onSwitchChanged = { updateHome(home.copy(enableStoriesStrip = it), "Stories Strip") },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Outlined.BubbleChart), title = "Carousel View",
                     subtitle = "Enable Instagram-like Stories", switchValue = home.carouselView,
                     onSwitchChanged = { updateHome(home.copy(carouselView = it), "Carousel View") },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Rounded.BubbleChart), title = "Stories Style",
                     subtitle = if (home.storiesStyle.isNotEmpty()) home.storiesStyle else "Instagram",
                     showChevron = true,
@@ -238,31 +276,31 @@ fun HeaderSettingsScreen(
                     },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Rounded.AltRoute), title = "Separate Chats/Groups",
                     subtitle = SEPARATE_SUBTITLE, switchValue = home.separateChatsAndGroups,
                     onSwitchChanged = { updateHome(home.copy(separateChatsAndGroups = it), "Separate Chats/Groups") },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Outlined.Badge), title = "Set My Name",
                     subtitle = "Set your name instead of Chaty in Home Screen", switchValue = home.setMyName,
                     onSwitchChanged = { updateHome(home.copy(setMyName = it), "Set My Name") },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Outlined.EventBusy), title = "Disable Status under my name",
                     subtitle = "Removes your status line under your name in Main Screen", switchValue = home.disableStatusUnderName,
                     onSwitchChanged = { updateHome(home.copy(disableStatusUnderName = it), "Disable Status") },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Outlined.Inbox), title = "Hide chat sort list",
                     subtitle = "Hide the chat sort list from the main screen.", switchValue = home.hideChatSortList,
                     onSwitchChanged = { updateHome(home.copy(hideChatSortList = it), "Hide Sort List") },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Rounded.ManageSearch), title = "Search placement",
                     subtitle = effectiveSearchPlacement, showChevron = true,
                     onTap = {
@@ -279,7 +317,7 @@ fun HeaderSettingsScreen(
                 )
                 divider()
                 val airplane = home.airplaneModeSimulator || preferences.gbBool("yo_want_airplanemode")
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Rounded.AirplanemodeActive, if (home.airplaneModeSimulator) colors.primary else colors.foregroundSecondary),
                     title = "Airplane mode",
                     subtitle = if (airplane) "Enabled \u2014 Chaty presence is offline until you turn it off"
@@ -291,7 +329,7 @@ fun HeaderSettingsScreen(
                     },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Rounded.MoveDown), title = "Move search out of header",
                     subtitle = if (home.searchPlacement == "Above chat filters") "Search appears above the chat filter tags."
                     else if (home.disableSearchBar) "Search appears below the header."
@@ -306,7 +344,7 @@ fun HeaderSettingsScreen(
                     },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Rounded.SearchOff), title = "Hide search everywhere",
                     subtitle = "Temporarily hides search from the header, below-header area, and chat filters.",
                     switchValue = !home.showSearchBar,
@@ -315,31 +353,34 @@ fun HeaderSettingsScreen(
                     },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Outlined.Lock), title = "Tap name to open Locked Chats",
                     subtitle = "Off by default. When on, tapping your name in the Home header opens Locked Chats.",
                     switchValue = home.nameTapOpensLocked,
                     onSwitchChanged = { on -> updateHome(home.copy(nameTapOpensLocked = on), if (on) "Name Tap Opens Locked Chats" else "Name Tap Does Nothing") },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Outlined.Palette), title = "Themes", switchValue = home.themesEnabled,
                     onSwitchChanged = { updateHome(home.copy(themesEnabled = it), "Themes Enabled") },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Outlined.VisibilityOff), title = "Ghost mode",
                     subtitle = "Show the ghost mode pill in the header.", switchValue = home.showGhostPill,
                     onSwitchChanged = { updateHome(home.copy(showGhostPill = it), if (it) "Show Ghost Pill" else "Hide Ghost Pill") },
                 )
                 divider()
-                GbSettingRow(
+                HeaderReferenceSettingRow(
                     iconContent = rowIcon(Icons.Outlined.PersonAddAlt1), title = "Show icon Add Account",
                     switchValue = home.showIconAddAccount,
                     onSwitchChanged = { updateHome(home.copy(showIconAddAccount = it), "Show Add Account") },
                 )
             }
         }
+            }
+            },
+        )
     }
 
     if (showStyleSheet) {
@@ -356,7 +397,7 @@ fun HeaderSettingsScreen(
     if (showTabStyleSheet) {
         HeaderTabStyleSheet(
             tabStyle = if (home.tabBubbleStyle.isNotEmpty()) home.tabBubbleStyle else "Capsule Pill",
-            pagerStyle = if (home.pagerTransition3d.isNotEmpty()) home.pagerTransition3d else "Cube 3D",
+            pagerStyle = if (home.pagerTransition3d.isNotEmpty()) home.pagerTransition3d else "Default",
             onDismiss = { showTabStyleSheet = false },
             onApply = { tab, pager ->
                 showTabStyleSheet = false
@@ -378,11 +419,81 @@ private fun HomeUiStyleSheet(
     onApply: (String) -> Unit,
 ) {
     val config = LocalThemeConfig.current
-    com.example.chat.ui.kit.ChatySingleChoiceModal(
-        title = "Select Home UI style", value = selected, options = HomeUiStyles.homeUiStyles,
-        labelBuilder = { it }, descriptionBuilder = { HomeUiStyles.description(it) },
-        onDismiss = onDismiss, onApply = onApply,
-        description = "Select a layout to preview it, then apply it.",
-        previewBuilder = { draft -> HomeUiPreview(draft, config, navigationMode, large = false) },
-    )
+    var draft by remember(selected) { mutableStateOf(selected) }
+    com.example.chat.ui.kit.ChatySelectionModal(
+        title = "Select Home UI style", onDismiss = onDismiss,
+        onApply = { onApply(draft) }, applyEnabled = draft != selected,
+    ) {
+        LazyColumn(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            item { Text("Select a layout to preview it, then apply it.", color = LocalAppColors.current.foregroundSecondary) }
+            item { HomeUiPreview(draft, config, navigationMode, large = false) }
+            itemsIndexed(HomeUiStyles.homeUiStyles) { _, option ->
+                com.example.chat.ui.kit.ChatyPreviewRadioRow(
+                    label = option, selected = option == draft, onSelect = { draft = option },
+                    description = HomeUiStyles.description(option),
+                )
+            }
+        }
+    }
+}
+
+
+/** APK reference metrics, rebuilt with Chaty's own controls and callbacks. Header scope only. */
+@Composable
+private fun HeaderReferenceSettingRow(
+    title: String,
+    iconContent: @Composable () -> Unit,
+    subtitle: String? = null,
+    switchValue: Boolean? = null,
+    onSwitchChanged: ((Boolean) -> Unit)? = null,
+    showChevron: Boolean = false,
+    onTap: (() -> Unit)? = null,
+) {
+    val colors = LocalAppColors.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val isSwitch = switchValue != null && onSwitchChanged != null
+    val action = if (isSwitch) Modifier.toggleable(
+        value = switchValue == true, role = androidx.compose.ui.semantics.Role.Switch,
+        onValueChange = { value ->
+            com.example.chat.ui.kit.ChatyHapticsPort.selection(view)
+            onSwitchChanged?.invoke(value)
+        },
+    ) else Modifier.clickable {
+        com.example.chat.ui.kit.ChatyHapticsPort.selection(view)
+        onTap?.invoke()
+    }
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 60.dp).then(action)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.padding(horizontal = 8.dp).size(40.dp)
+            .background(colors.primary.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { iconContent() }
+        Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+            Text(title, color = colors.foreground, fontSize = 16.sp,
+                fontWeight = FontWeight.Normal)
+            if (!subtitle.isNullOrEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(subtitle, color = colors.foregroundSecondary,
+                    fontSize = 12.sp, lineHeight = 15.sp)
+            }
+        }
+        if (isSwitch) {
+            Box(Modifier.padding(horizontal = 8.dp)
+                .then(Modifier.clearAndSetSemantics { })) {
+                com.example.chat.ui.kit.GbCustomSwitch(
+                    switchValue == true, { value -> onSwitchChanged?.invoke(value) },
+                    interactive = false,
+                )
+            }
+        } else if (showChevron) {
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null,
+                tint = colors.primary, modifier = Modifier.padding(horizontal = 8.dp).size(20.dp))
+        }
+    }
 }

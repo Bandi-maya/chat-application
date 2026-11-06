@@ -61,12 +61,13 @@ import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
+import com.example.chat.ui.kit.ChatyTextButton
+import com.example.chat.ui.theme.LocalAppColors
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -78,6 +79,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
@@ -118,6 +120,7 @@ data class ChatsHomeNav(
     val onOpenQr: () -> Unit = {},
     val onOpenLinkedDevices: () -> Unit = {},
     val onOpenNewChat: (groupMode: Boolean, broadcastMode: Boolean) -> Unit = { _, _ -> },
+    val onNewCall: () -> Unit = {},
     val onOpenStarredMessages: () -> Unit = {},
     val onOpenMessageManagement: () -> Unit = {},
     val onOpenLockedVault: () -> Unit = {},
@@ -226,7 +229,9 @@ fun StandardHomeAppBar(
     Column(Modifier.fillMaxWidth()) {
     if (largeDefault) {
         Row(Modifier.fillMaxWidth()
-            .height((com.example.chat.ui.navigation.ReferenceLayoutMetrics.expandedIdentityHeightDp * (1f - headerCollapse)).dp)
+            // Collapse drives height to exactly 0; the expanded height scales with
+            // font scale (sp->dp) so large text is not cut by clipToBounds.
+            .height(with(LocalDensity.current) { (com.example.chat.ui.navigation.ReferenceLayoutMetrics.expandedIdentityHeightDp.toFloat() * theme.fontScale.toFloat()).sp.toDp() } * (1f - headerCollapse))
             .padding(top = (com.example.chat.ui.navigation.ReferenceLayoutMetrics.actionBarHeightDp * (1f - headerCollapse)).dp)
             .clipToBounds().alpha(1f - headerCollapse)
             .padding(horizontal = 24.dp)
@@ -372,6 +377,7 @@ fun HomeOverflowMenu(
     nav: ChatsHomeNav,
     onMarkAllAsRead: () -> Unit,
     onMessageANumber: () -> Unit,
+    onOpenArchived: () -> Unit = {},
 ) {
     // Linked Devices / Scheduler / Auto Reply are deferred to the next release (ReleaseFeatures).
     val items: List<Triple<ImageVector, String, () -> Unit>> = listOfNotNull(
@@ -381,10 +387,13 @@ fun HomeOverflowMenu(
         Triple(Icons.Outlined.Dialpad, "Message a Number") { onMessageANumber() },
         Triple(Icons.Outlined.Campaign, "Mass Message") { nav.onOpenNewChat(false, true) },
         Triple(Icons.Outlined.GroupAdd, "New Group") { nav.onOpenNewChat(true, false) },
+        Triple(Icons.Outlined.ChatBubbleOutline, "New Chat") { nav.onOpenNewChat(false, false) },
+        Triple(Icons.Outlined.Call, "New Call") { nav.onNewCall() },
         if (nav.showUpdatesEntry) Triple(Icons.Outlined.Update, "Updates") { nav.onOpenUpdates() } else null,
         if (nav.showTasksEntry) Triple(Icons.Outlined.TaskAlt, "Tasks") { nav.onOpenTasks() } else null,
         if (ReleaseFeatures.LINKED_DEVICES) Triple(Icons.Outlined.Devices, "Linked Devices") { nav.onOpenLinkedDevices() } else null,
         Triple(Icons.Outlined.Star, "Starred Messages") { nav.onOpenStarredMessages() },
+        Triple(Icons.Outlined.Archive, "Archived Chats") { onOpenArchived() },
         Triple(Icons.Outlined.DoneAll, "Mark All as Read") { onMarkAllAsRead() },
         Triple(Icons.Outlined.Call, "Who can call me?") { nav.onWhoCanCallMe() },
         Triple(Icons.Outlined.Share, "Share Chaty") { nav.onShareApp() },
@@ -693,15 +702,18 @@ fun HomeConfirmDialog(
         title = { Text(title, fontWeight = FontWeight.W700) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = {
-                onConfirm()
-                onDismiss()
-            }) {
-                Text(confirmLabel, color = Color(0xFFE11D48), fontWeight = FontWeight.W700)
-            }
+            ChatyTextButton(
+                onClick = {
+                    onConfirm()
+                    onDismiss()
+                },
+                label = confirmLabel,
+                color = LocalAppColors.current.error,
+                fontWeight = FontWeight.W700,
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            ChatyTextButton(onClick = onDismiss, label = "Cancel")
         },
     )
 }
@@ -823,13 +835,17 @@ fun LockedChatsSetupDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                onClose()
-                onConfigureSecurity()
-            }) { Text("Configure Security", fontWeight = FontWeight.W700) }
+            ChatyTextButton(
+                onClick = {
+                    onClose()
+                    onConfigureSecurity()
+                },
+                label = "Configure Security",
+                fontWeight = FontWeight.W700,
+            )
         },
         dismissButton = {
-            TextButton(onClick = onClose) { Text("Close") }
+            ChatyTextButton(onClick = onClose, label = "Close")
         },
     )
 }

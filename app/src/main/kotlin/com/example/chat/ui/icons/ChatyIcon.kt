@@ -39,7 +39,7 @@ import androidx.compose.ui.graphics.StrokeCap as CxCap
 import androidx.compose.ui.graphics.StrokeJoin as CxJoin
 
 /** Active icon theme (Dart: prefs.universal.iconTheme resolved via ChatyIconThemeId.fromString). */
-val LocalChatyIconTheme = compositionLocalOf { ChatyIconThemeId.chatySigil }
+val LocalChatyIconTheme = compositionLocalOf { ChatyIconThemeId.hugeiconsFree }
 val LocalChatyIconVariants = compositionLocalOf<Map<String, String>> { emptyMap() }
 
 /** Observes global and per-icon preferences and provides them to every ChatyIcon descendant. */
@@ -123,6 +123,7 @@ fun ChatyIcon(
     color: CxColor? = null,
     themeOverride: ChatyIconThemeId? = null,
     semanticLabel: String? = null,
+    selected: Boolean = false,
 ) {
     val theme = themeOverride
         ?: LocalChatyIconVariants.current[icon.name]?.let(ChatyIconThemeId::fromString)
@@ -130,6 +131,21 @@ fun ChatyIcon(
     val resolved = color ?: LocalContentColor.current
     val px = with(LocalDensity.current) { size.toPx() }.toDouble()
     val sem = if (!semanticLabel.isNullOrEmpty()) Modifier.semantics { contentDescription = semanticLabel } else Modifier
+    if (ChatyIconPackCatalog.isAssetPack(theme)) {
+        val drawable = ChatyAssetIcons.drawable(theme, icon, selected)
+        if (drawable != null) {
+            androidx.compose.material3.Icon(
+                painter = androidx.compose.ui.res.painterResource(drawable),
+                contentDescription = semanticLabel, tint = resolved,
+                modifier = modifier.size(size),
+            )
+        } else {
+            androidx.compose.foundation.layout.Spacer(modifier.size(size).semantics {
+                contentDescription = "${theme.title}: ${icon.name} unavailable"
+            })
+        }
+        return
+    }
     Canvas(modifier.size(size).then(sem)) {
         drawIntoCanvas { canvas ->
             ChatyIconPainter.paint(
@@ -152,9 +168,10 @@ fun ChatyAnimatedIcon(
     tooltip: String? = null,
 ) {
     var pressed by remember { mutableStateOf(false) }
+    val reducedMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val s by animateFloatAsState(
         targetValue = if (pressed) 0.93f else 1f,
-        animationSpec = tween(160, easing = CubicBezierEasing(0.23f, 1.0f, 0.32f, 1.0f)),
+        animationSpec = tween(if (reducedMotion) 0 else 160, easing = CubicBezierEasing(0.23f, 1.0f, 0.32f, 1.0f)),
         label = "chatyIconScale",
     )
     val gesture = if (onTap != null) Modifier.pointerInput(onTap) {

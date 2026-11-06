@@ -61,6 +61,9 @@ class SupabaseRealtimeChannel(
     private val onChange: (PostgresChange) -> Unit,
     private val onStatus: (RealtimeSubscribeStatus) -> Unit,
     private val client: OkHttpClient = OkHttpClient(),
+    /** Socket seam (Dart tests the channel the same way): defaults to the
+     *  shared OkHttpClient, injectable so tests can prove zero dispatch. */
+    private val socketFactory: WebSocket.Factory = client,
 ) : RealtimeChannel {
 
     private val lock = Any()
@@ -98,6 +101,9 @@ class SupabaseRealtimeChannel(
     private fun nextRef(): String = refCounter.incrementAndGet().toString()
 
     private fun connect() {
+        // Offline demo: the demo session is fully local; the realtime socket
+        // (and its reconnect loop) must never dispatch, whatever the caller.
+        if (com.example.chat.data.demo.DemoMode.active) return
         val wsUrl = supabaseUrl
             .replaceFirst("https://", "wss://")
             .replaceFirst("http://", "ws://")
@@ -127,7 +133,7 @@ class SupabaseRealtimeChannel(
         }
         synchronized(lock) {
             if (closedIntentionally) return
-            socket = client.newWebSocket(request, listener)
+            socket = socketFactory.newWebSocket(request, listener)
         }
     }
 

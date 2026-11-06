@@ -98,6 +98,9 @@ fun RegisterScreen(
     var usernameError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
     var workspaceError by remember { mutableStateOf<String?>(null) }
+    // Play UGC policy (P-06): account creation is gated on explicit acceptance.
+    var acceptedTerms by remember { mutableStateOf(false) }
+    var legalDialogAsset by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     var orgCheckJob by remember { mutableStateOf<Job?>(null) }
     var isCheckingOrg by remember { mutableStateOf(false) }
@@ -159,6 +162,11 @@ fun RegisterScreen(
         workspaceError =
             if (useOrganization && workspace.trim().isEmpty()) "Please enter your Workspace ID" else null
         if (emailError != null || usernameError != null || passwordError != null || workspaceError != null) return
+
+        if (com.example.chat.ReleaseFeatures.LEGAL_ACCEPTANCE_GATE && !acceptedTerms) {
+            errorMessage = "Please accept the Terms of Use and Privacy Policy to create your account."
+            return
+        }
 
         if (useOrganization) {
             if (isCheckingOrg) {
@@ -336,6 +344,17 @@ fun RegisterScreen(
                         }
                     }
 
+                    if (com.example.chat.ReleaseFeatures.LEGAL_ACCEPTANCE_GATE) {
+                        TermsAcceptanceRow(
+                            theme = theme,
+                            checked = acceptedTerms,
+                            onCheckedChange = { acceptedTerms = it; if (it) errorMessage = null },
+                            onOpenTerms = { legalDialogAsset = "Terms of Use" to "legal/terms_of_use.md" },
+                            onOpenPrivacy = { legalDialogAsset = "Privacy Policy" to "legal/privacy_policy.md" },
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        )
+                    }
+
                     val registrationBlocked = useOrganization && !allowUserRegistration
                     AuthPrimaryButton(
                         text = if (registrationBlocked) "Registration Disabled" else "Register",
@@ -348,6 +367,10 @@ fun RegisterScreen(
                     RegisterOrgCard(theme = theme, onClick = onRegisterOrganization)
 
                     Spacer(Modifier.height(20.dp))
+
+                    legalDialogAsset?.let { (title, asset) ->
+                        LegalTextDialog(theme = theme, title = title, assetPath = asset, onDismiss = { legalDialogAsset = null })
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,

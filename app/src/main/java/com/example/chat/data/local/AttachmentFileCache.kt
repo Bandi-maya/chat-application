@@ -132,6 +132,7 @@ class AttachmentFileCache(
             synchronized(lock) {
                 if (!valid(ep) || !file.exists()) throw IOException("revoked")
                 marker.delete()
+                inFlight.remove(key)   // The finished entry counts toward the cap; finally removal is idempotent.
                 evict(dir)
             }
             return StorePut.Stored

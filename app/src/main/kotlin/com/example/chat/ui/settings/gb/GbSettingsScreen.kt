@@ -359,27 +359,8 @@ fun GbSettingsScreen(
 
     // ---- dialogs ----
     when (dialog) {
-        GbDialog.Updates -> AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
-            onDismissRequest = { dialog = null }, containerColor = Color(theme.surfaceColor),
-            title = { Text("Chaty Updates") },
-            text = {
-                Column {
-                    Text("Installed version: 1.0.0+1", fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(10.dp))
-                    Text("\u2022 Global templates and component-specific appearance")
-                    Text("\u2022 Settings backup and restore for visual preferences")
-                    Text("\u2022 Runtime fixes and compatibility improvements")
-                    Spacer(Modifier.height(8.dp))
-                    Text("Check the project release page for published release notes and newer builds.")
-                }
-            },
-            dismissButton = { TextButton(onClick = { dialog = null }) { Text("Close") } },
-            confirmButton = {
-                Button(colors = ButtonDefaults.buttonColors(containerColor = accent), onClick = {
-                    dialog = null
-                    if (!launchUrl("https://github.com/Bandi-maya/chat-application/releases")) toast("Could not open Chaty release notes.")
-                }) { Text("View Release Notes") }
-            },
+        GbDialog.Updates -> com.example.chat.ui.updates.UpdateChangelogHost(
+            onFinished = { dialog = null }, forceShow = true,
         )
         GbDialog.About -> AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { dialog = null }, containerColor = Color(theme.surfaceColor),

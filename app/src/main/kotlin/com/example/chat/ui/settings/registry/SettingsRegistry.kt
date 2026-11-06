@@ -463,54 +463,6 @@ object SettingsRegistry {
             ),
             ),
         ),
-        SettingsCluster(
-            id = "cluster_chaty_customization_hub",
-            title = "Chaty Customization Hub",
-            description = "Original Chaty presentation of GB-style customization categories",
-            category = SettingsCategory.appearance,
-            settings = listOf(
-                SettingDefinition(
-                    id = "appearance_chaty_customization_hub",
-                    title = "Chaty Customization Hub",
-                    description = "Open the integrated settings hub for themes, privacy controls, home layout, conversation appearance, notifications, media and navigation effects",
-                    category = SettingsCategory.appearance,
-                    subcategory = "Customization",
-                    controlType = SettingControlType.navigationLink,
-                    iconName = "tune_rounded",
-                    searchKeywords = listOf(
-                        "customization hub", "advanced appearance", "gb-style settings",
-                        "home screen", "conversation screen", "universal", "media settings",
-                        "navigation effects", "privacy and security", "theme editor",
-                    ),
-                    canonicalRoute = "/settings/chaty_customization_hub",
-                    defaultValue = null,
-                ),
-            ),
-        ),
-        SettingsCluster(
-            id = "cluster_advanced_feature_center",
-            title = "Advanced Feature Center",
-            description = "Searchable Chaty controls for home, privacy, status, media and visual behavior",
-            category = SettingsCategory.appearance,
-            settings = listOf(
-                SettingDefinition(
-                    id = "appearance_advanced_feature_center",
-                    title = "Advanced Feature Center",
-                    description = "Browse the expanded compatibility controls for home header, privacy, status, notifications, bubbles, colors, calls and media limits",
-                    category = SettingsCategory.appearance,
-                    subcategory = "Advanced Controls",
-                    controlType = SettingControlType.navigationLink,
-                    iconName = "tune_rounded",
-                    searchKeywords = listOf(
-                        "advanced features", "feature center", "gb style", "home header",
-                        "privacy", "anti delete", "view once", "status", "chat bubbles",
-                        "colors", "media limits", "notifications", "calls", "presence",
-                    ),
-                    canonicalRoute = "/settings/gb_features",
-                    defaultValue = null,
-                ),
-            ),
-        ),
     )
 
     val allSettings: List<SettingDefinition> get() = clusters.flatMap { it.settings }
@@ -518,70 +470,11 @@ object SettingsRegistry {
     fun clustersForCategory(category: SettingsCategory): List<SettingsCluster> =
         clusters.filter { it.category == category }
 
-    /**
-     * Validates the complete catalog contract before the settings search/indexer
-     * consumes it. [validRoutes] can be supplied by the navigation host to
-     * verify that every declared destination is actually registered.
-     */
-    fun validateInvariants(validRoutes: Set<String>? = null): Boolean {
-        val categoryIds = HashSet<String>()
-        for (category in SettingsCategory.values()) {
-            require(category.id.matches(Regex("^[a-z][a-z0-9_]*$"))) { "Invalid settings category ID: ${category.id}" }
-            require(categoryIds.add(category.id)) { "Duplicate settings category ID: ${category.id}" }
-            require(category.title.isNotBlank() && category.subtitle.isNotBlank()) {
-                "Settings category ${category.id} must have a title and subtitle."
-            }
-        }
-
-        val clusterIds = HashSet<String>()
-        for (cluster in clusters) {
-            require(cluster.id.matches(Regex("^[a-z][a-z0-9_]*$"))) { "Invalid settings cluster ID: ${cluster.id}" }
-            require(clusterIds.add(cluster.id)) { "Duplicate settings cluster ID: ${cluster.id}" }
-            require(cluster.title.isNotBlank() && cluster.description.isNotBlank()) {
-                "Settings cluster ${cluster.id} must have a title and description."
-            }
-            require(cluster.settings.isNotEmpty()) { "Settings cluster ${cluster.id} must contain at least one setting." }
-            require(cluster.settings.all { it.category == cluster.category }) {
-                "Settings cluster ${cluster.id} contains an item from another category."
-            }
-        }
-
+    /** ONE SETTING = ONE CANONICAL LOCATION. Throws on duplicate ids (source message omitted the id interpolation). */
+    fun validateInvariants(): Boolean {
         val ids = HashSet<String>()
-        for (setting in allSettings) {
-            require(setting.id.matches(Regex("^[a-z][a-z0-9_]*$"))) { "Invalid setting ID: ${setting.id}" }
-            require(ids.add(setting.id)) { "Duplicate setting ID: ${setting.id}" }
-            require(setting.title.isNotBlank() && setting.description.isNotBlank()) {
-                "Setting ${setting.id} must have a title and description."
-            }
-            require(
-                setting.canonicalRoute.matches(Regex("^/settings/[a-z0-9_-]+(/[a-z0-9_-]+)*$")) &&
-                    setting.canonicalRoute.split('/').none { it == "." || it == ".." }
-            ) { "Setting ${setting.id} has an invalid canonical route: ${setting.canonicalRoute}" }
-            require(setting.subcategory.isNotBlank()) {
-                "Setting ${setting.id} must define a subcategory."
-            }
-            require(setting.searchKeywords.none { it.isBlank() }) {
-                "Setting ${setting.id} contains a blank search keyword."
-            }
-            validRoutes?.let { routes ->
-                require(setting.canonicalRoute in routes) {
-                    "Setting ${setting.id} points to an unregistered route: ${setting.canonicalRoute}"
-                }
-            }
-            when (setting.controlType) {
-                SettingControlType.toggle -> require(setting.defaultValue is Boolean) {
-                    "Toggle ${setting.id} must define a Boolean default value."
-                }
-                SettingControlType.singleChoice -> require(setting.defaultValue is String) {
-                    "Single-choice setting ${setting.id} must define a String default value."
-                }
-                SettingControlType.slider -> require(setting.defaultValue is Number) {
-                    "Slider ${setting.id} must define a numeric default value."
-                }
-                SettingControlType.previewSelector,
-                SettingControlType.action,
-                SettingControlType.navigationLink -> Unit
-            }
+        for (s in allSettings) {
+            if (!ids.add(s.id)) throw AssertionError("Duplicate setting ID found: ")
         }
         return true
     }

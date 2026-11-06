@@ -31,6 +31,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.OutlinedTextField
+import com.example.chat.core.groups.GroupMemberPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -55,10 +60,19 @@ fun GroupInfoScreen(
     currentUserId: String,
     onLeave: () -> Unit,
     onBack: () -> Unit,
+    messages: List<com.example.chat.domain.models.ChatMessage> = emptyList(),
+    onOpenMedia: (com.example.chat.domain.models.ChatMessage) -> Unit = {},
+    onSearch: () -> Unit = {},
 ) {
+    var showAllMedia by remember(conversation.id, currentUserId) { mutableStateOf(false) }
+    if (showAllMedia) com.example.chat.ui.chats.contact_info.ConversationMediaDialog(messages, onOpenMedia, onClose = { showAllMedia = false })
     val colors = LocalAppColors.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    var memberQuery by remember(conversation.id, currentUserId) { mutableStateOf("") }
+    val memberCount = GroupMemberPolicy.knownCount(conversation.participantIds)
+    val loadedMembers = GroupMemberPolicy.members(conversation.participantIds, participants, conversation.adminIds, currentUserId, "")
+    val visibleMembers = GroupMemberPolicy.members(conversation.participantIds, participants, conversation.adminIds, currentUserId, memberQuery)
 
     Scaffold(
         containerColor = colors.background,
@@ -122,13 +136,15 @@ fun GroupInfoScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "${conversation.participantIds.size} known members",
+                    "$memberCount known members",
                     color = colors.foregroundSecondary,
                     fontSize = 12.sp,
                 )
             }
             Spacer(Modifier.height(16.dp))
 
+            androidx.compose.material3.TextButton(onClick = onSearch) { Text("Search conversation") }
+            androidx.compose.material3.TextButton(onClick = { showAllMedia = true }) { Text("All media, documents and links") }
             com.example.chat.ui.chats.contact_info.SectionTitle("Group Security & Settings", colors)
             Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
                 com.example.chat.ui.chats.contact_info.InfoTile(
@@ -137,7 +153,7 @@ fun GroupInfoScreen(
                     titleColor = colors.foreground,
                     subtitle = "Settings unavailable in this build",
                     trailing = { Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary) },
-                    onClick = {},
+                    onClick = { scope.launch { snackbar.showSnackbar("Disappearing message settings are not available. No setting was changed.") } },
                 )
                 com.example.chat.ui.chats.contact_info.InfoTile(
                     icon = { Icon(Icons.Outlined.VerifiedUser, contentDescription = null, tint = colors.success) },
@@ -145,12 +161,12 @@ fun GroupInfoScreen(
                     titleColor = colors.foreground,
                     subtitle = "Encryption has not been verified",
                     trailing = { Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary) },
-                    onClick = {},
+                    onClick = { scope.launch { snackbar.showSnackbar("No verified device-to-device safety number is available for this group.") } },
                 )
             }
             Spacer(Modifier.height(12.dp))
 
-            com.example.chat.ui.chats.contact_info.SectionTitle("${participants.size} Members", colors)
+            com.example.chat.ui.chats.contact_info.SectionTitle("Members (${loadedMembers.size} loaded / $memberCount known)", colors)
             Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
                 com.example.chat.ui.chats.contact_info.InfoTile(
                     icon = {
@@ -167,7 +183,14 @@ fun GroupInfoScreen(
                         scope.launch { snackbar.showSnackbar("No invite was created. Group invites are not available in this build.") }
                     },
                 )
-                participants.forEach { p ->
+                OutlinedTextField(value = memberQuery, onValueChange = { memberQuery = it.take(200) },
+                    label = { Text("Search members") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(12.dp))
+                if (loadedMembers.size < memberCount) Text("Some member profiles are not loaded. Search covers loaded profiles only.",
+                    color = colors.foregroundSecondary, modifier = Modifier.padding(12.dp))
+                if (visibleMembers.isEmpty()) Text(if (memberQuery.isBlank()) "No member profiles available" else "No matching loaded members",
+                    color = colors.foregroundSecondary, modifier = Modifier.padding(12.dp))
+                visibleMembers.forEach { p ->
                     val isAdmin = conversation.adminIds.contains(p.id)
                     val isMe = p.id == currentUserId
                     Row(
@@ -189,13 +212,15 @@ fun GroupInfoScreen(
                             )
                         }
                         Spacer(Modifier.width(12.dp))
-                        Column {
+                        Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     if (isMe) "${p.displayName} (You)" else p.displayName,
                                     color = colors.foreground,
                                     fontSize = 14.5.sp,
                                     fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 2,
                                 )
                                 if (isAdmin) {
                                     Spacer(Modifier.width(4.dp))
@@ -208,7 +233,7 @@ fun GroupInfoScreen(
                                     }
                                 }
                             }
-                            Text("@${p.username}", color = colors.foregroundSecondary, fontSize = 12.sp)
+                            if (p.username.isNotBlank()) Text("@${p.username}", color = colors.foregroundSecondary, fontSize = 12.sp)
                         }
                     }
                 }

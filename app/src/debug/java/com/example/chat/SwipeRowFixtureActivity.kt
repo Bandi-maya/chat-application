@@ -1,6 +1,11 @@
 package com.example.chat
 
+import android.graphics.Rect
 import android.os.Bundle
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -25,6 +30,12 @@ import com.example.chat.ui.chats.home.HomeSwipeActions
 
 /** Synthetic callbacks only. No account, network, service locator, or live chat action. */
 class SwipeRowFixtureActivity : ComponentActivity() {
+    // Physical layout probe, independent of accessibility occlusion/caching.
+    @Volatile var measuredRows: Map<Int, Rect> = emptyMap()
+        private set
+    @Volatile var eventSnapshot: String = "not composed"
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -36,6 +47,8 @@ class SwipeRowFixtureActivity : ComponentActivity() {
             var count by remember { mutableIntStateOf(0) }
             var rowTaps by remember { mutableIntStateOf(0) }
             var swipeEnabled by remember { mutableStateOf(true) }
+            SideEffect { eventSnapshot = "Events: $events/$count; row: $rowTaps; enabled: $swipeEnabled" }
+            CompositionLocalProvider(LocalLayoutDirection provides if (intent.getBooleanExtra("rtl", false)) LayoutDirection.Rtl else LayoutDirection.Ltr) {
             Column(Modifier.fillMaxSize().background(bg).safeDrawingPadding()) {
                 Text("Events: $events/$count; row: $rowTaps", color = fg)
                 Button(onClick = { swipeEnabled = !swipeEnabled }) {
@@ -55,7 +68,15 @@ class SwipeRowFixtureActivity : ComponentActivity() {
                                 ) { events = name; count++ }
                             },
                         ) {
-                            Row(Modifier.fillMaxWidth().height(if (index == 0) 86.dp else 112.dp)
+                            Row(Modifier.onGloballyPositioned { coordinates ->
+                                val b = coordinates.boundsInWindow()
+                                val origin = IntArray(2)
+                                window.decorView.getLocationOnScreen(origin)
+                                measuredRows = measuredRows + (index to Rect(
+                                    b.left.toInt() + origin[0], b.top.toInt() + origin[1],
+                                    b.right.toInt() + origin[0], b.bottom.toInt() + origin[1],
+                                ))
+                            }.fillMaxWidth().height(if (index == 0) 86.dp else 112.dp)
                                 .semantics { contentDescription = "Synthetic row $index" }
                                 .clickable { rowTaps++ }.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
@@ -70,6 +91,7 @@ class SwipeRowFixtureActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
             }
         }
     }

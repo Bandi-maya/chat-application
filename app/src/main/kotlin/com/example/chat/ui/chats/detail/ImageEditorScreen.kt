@@ -1,5 +1,6 @@
 package com.example.chat.ui.chats.detail
 
+import com.example.chat.core.media.ImageTextOverlayPolicy
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.ColorMatrix as AndroidColorMatrix
@@ -8,6 +9,7 @@ import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -22,6 +24,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -53,6 +56,11 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
     var saving by remember { mutableStateOf(false) }
     var brightness by remember { mutableFloatStateOf(0f) }
     var contrast by remember { mutableFloatStateOf(1f) }
+    var textOverlay by remember { mutableStateOf("") }
+    var textMode by remember { mutableStateOf(false) }
+    var textX by remember { mutableFloatStateOf(0.1f) }
+    var textY by remember { mutableFloatStateOf(0.3f) }
+    var textScale by remember { mutableFloatStateOf(0.07f) }
     var draw by remember { mutableStateOf(false) }
     var ink by remember { mutableStateOf(Color.Red) }
     var strokes by remember { mutableStateOf<List<EditorStroke>>(emptyList()) }
@@ -80,14 +88,14 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
                 val original = bitmap ?: return@TextButton
                 saving = true
                 saveJob = scope.launch {
-                    val file = outputFile ?: File(context.cacheDir, "chaty_edited-${java.util.UUID.randomUUID()}.jpg")
+                    val file = outputFile ?: File(context.cacheDir, "chaty-outgoing-edited-${java.util.UUID.randomUUID()}.jpg")
                     var handedOff = false
                     val sourceUri = android.net.Uri.parse(source)
                     val aliasesOriginal = sourceUri.scheme == "file" && file.canonicalPath == File(sourceUri.path.orEmpty()).canonicalPath
                     try {
                         require(!aliasesOriginal) { "Output cannot overwrite the source." }
                         withContext(Dispatchers.IO) {
-                            val edited = renderEditedImage(original, brightness, contrast, strokes)
+                            val edited = renderEditedImage(original, brightness, contrast, strokes, textOverlay, textX, textY, textScale, ink.toArgb())
                             try {
                                 file.outputStream().use { check(edited.compress(Bitmap.CompressFormat.JPEG, 92, it)) }
                                 coroutineContext.ensureActive()
@@ -127,13 +135,22 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
                             val color = Color(stroke.color.toInt())
                             stroke.points.zipWithNext().forEach { (a, b) -> drawLine(color, Offset(a.x * size.width, a.y * size.height), Offset(b.x * size.width, b.y * size.height), size.width * 0.008f, StrokeCap.Round) }
                         }
+                        if (textOverlay.isNotBlank()) drawContext.canvas.nativeCanvas.apply {
+                            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = ink.toArgb(); textSize = size.width * textScale
+                                setShadowLayer(size.width * 0.004f, 0f, 0f, android.graphics.Color.BLACK)
+                            }
+                            paint.textSize = ImageTextOverlayPolicy.fittedTextSize(size.width, textX, paint.textSize, paint.measureText(textOverlay))
+                            drawText(textOverlay, size.width * textX, size.height * textY, paint)
+                        }
                     }
                 }
             }
         }
         error?.let { Text(it, color = Color(0xFFFFB4AB), modifier = Modifier.padding(8.dp)) }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly) {
-            TextButton({ draw = !draw }, enabled = !saving) { Text(if (draw) "Drawing on" else "Draw") }
+            TextButton({ textMode = !textMode; draw = false }, enabled = !saving) { Text(if (textMode) "Text on" else "Text") }
+            TextButton({ draw = !draw; textMode = false }, enabled = !saving) { Text(if (draw) "Drawing on" else "Draw") }
             TextButton({ strokes = strokes.dropLast(1) }, enabled = strokes.isNotEmpty() && !saving) { Text("Undo") }
             TextButton({
                 bitmap?.let { image ->
@@ -142,7 +159,7 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
                     strokes = strokes.map { s -> s.copy(points = s.points.map { Offset(1f - it.y, it.x) }) }
                 }
             }, enabled = bitmap != null && !saving) { Text("Rotate") }
-            TextButton({ brightness = 0f; contrast = 1f; strokes = emptyList(); bitmap = originalBitmap }, enabled = !saving) { Text("Reset") }
+            TextButton({ brightness = 0f; contrast = 1f; strokes = emptyList(); textOverlay = ""; textX = 0.1f; textY = 0.3f; textScale = 0.07f; bitmap = originalBitmap }, enabled = !saving) { Text("Reset") }
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly) {
             Text("Crop", color = Color.White, modifier = Modifier.padding(12.dp))
@@ -159,7 +176,18 @@ fun ImageEditorScreen(source: String, onCancel: () -> Unit, onApply: (File) -> U
                 }, enabled = bitmap != null && !saving) { Text(label) }
             }
         }
-        if (draw) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly) {
+        if (textMode) Column(Modifier.fillMaxWidth().heightIn(max = 170.dp).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp)) {
+            OutlinedTextField(textOverlay, { textOverlay = ImageTextOverlayPolicy.text(it) }, singleLine = true,
+                label = { Text("Text on image") }, enabled = !saving, modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White))
+            Text("Horizontal position", color = Color.White)
+            Slider(textX, { textX = it }, valueRange = 0f..0.9f, enabled = !saving)
+            Text("Vertical position", color = Color.White)
+            Slider(textY, { textY = it }, valueRange = 0.1f..0.95f, enabled = !saving)
+            Text("Text size", color = Color.White)
+            Slider(textScale, { textScale = it }, valueRange = 0.03f..0.15f, enabled = !saving)
+        }
+        if (draw || textMode) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.SpaceEvenly) {
             listOf(Color.Red, Color.Yellow, Color.White, Color.Black, Color.Cyan).forEach { color ->
                 TextButton({ ink = color }) { Text(if (ink == color) "●" else "○", color = color) }
             }
@@ -178,7 +206,9 @@ internal fun editorColorValues(brightness: Float, contrast: Float): FloatArray {
     val shift = brightness * 255f + 128f * (1f - contrast)
     return floatArrayOf(contrast,0f,0f,0f,shift, 0f,contrast,0f,0f,shift, 0f,0f,contrast,0f,shift, 0f,0f,0f,1f,0f)
 }
-internal fun renderEditedImage(original: Bitmap, brightness: Float, contrast: Float, strokes: List<EditorStroke>): Bitmap {
+internal fun renderEditedImage(original: Bitmap, brightness: Float, contrast: Float, strokes: List<EditorStroke>,
+    text: String = "", textX: Float = 0.1f, textY: Float = 0.3f, textScale: Float = 0.07f,
+    textColor: Int = android.graphics.Color.WHITE): Bitmap {
     val output = Bitmap.createBitmap(original.width, original.height, Bitmap.Config.ARGB_8888)
     val canvas = AndroidCanvas(output)
     canvas.drawBitmap(original, 0f, 0f, Paint(Paint.ANTI_ALIAS_FLAG).apply { colorFilter = ColorMatrixColorFilter(AndroidColorMatrix(editorColorValues(brightness, contrast))) })
@@ -187,6 +217,12 @@ internal fun renderEditedImage(original: Bitmap, brightness: Float, contrast: Fl
         paint.color = stroke.color.toInt()
         stroke.points.zipWithNext().forEach { (a, b) -> canvas.drawLine(a.x * original.width, a.y * original.height, b.x * original.width, b.y * original.height, paint) }
     }
+    if (text.isNotBlank()) canvas.drawText(ImageTextOverlayPolicy.text(text), original.width * ImageTextOverlayPolicy.x(textX),
+        original.height * ImageTextOverlayPolicy.y(textY), Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = textColor; textSize = original.width * ImageTextOverlayPolicy.scale(textScale)
+            textSize = ImageTextOverlayPolicy.fittedTextSize(original.width.toFloat(), textX, textSize, measureText(ImageTextOverlayPolicy.text(text)))
+            setShadowLayer(original.width * 0.004f, 0f, 0f, android.graphics.Color.BLACK)
+        })
     return output
 }
 

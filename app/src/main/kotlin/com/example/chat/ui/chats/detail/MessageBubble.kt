@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ImageNotSupported
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.rounded.Check
@@ -77,7 +78,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -87,6 +92,9 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.data.transfer.P2pFileTransferService
+import com.example.chat.core.links.MessageLinkPolicy
+import com.example.chat.data.links.LinkPreviewService
+import com.example.chat.data.links.sharedLinkPreviewService
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.TaskPriority
@@ -156,6 +164,8 @@ fun ChatMessageBubble(
     modifier: Modifier = Modifier,
     senderName: String? = null,
     showGroupAvatar: Boolean = true,
+    // Chaty #29: group sender avatar quick view; null keeps the avatar inert.
+    onAvatarTap: (() -> Unit)? = null,
     senderCluster: SenderClusterPosition = SenderClusterPosition.SINGLE,
     isSenderAdmin: Boolean = false,
     makeTextSelectable: Boolean = true,
@@ -172,6 +182,7 @@ fun ChatMessageBubble(
     showEditedLabel: Boolean = true,
     viewOnceOpened: Boolean = false,
     retainViewOnce: Boolean = false,
+    viewOncePlaybackCompleted: Boolean = false,
     colorOverrides: BubbleColorOverrides? = null,
     remoteImage: RemoteImageSlot? = chatyRemoteImage,
     onLongPress: () -> Unit = {},
@@ -184,12 +195,15 @@ fun ChatMessageBubble(
     onReactionTap: ((String) -> Unit)? = null,
     onReactionBadgeTap: ((MessageReaction) -> Unit)? = null,
     mediaContent: (@Composable () -> Unit)? = null,
+    // Chaty #34: in-bubble link previews for text messages (client-side OpenGraph).
+    linkPreviewService: LinkPreviewService = sharedLinkPreviewService,
     onMediaTap: (() -> Unit)? = null,
     onMediaTapWithBounds: ((Rect) -> Unit)? = null,
     attachmentBinding: AttachmentConsumerBinding? = null,
     p2pTransferState: P2pFileTransferService.TransferState? = null,
     onVoicePlay: ((MessageAttachment) -> Unit)? = null,
     onViewOnceOpen: (() -> Unit)? = null,
+    onViewOncePlaybackCompleted: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
     task: ChatTask? = null,
     onTaskTap: (() -> Unit)? = null,
@@ -219,6 +233,14 @@ fun ChatMessageBubble(
     }
     val rawTextSize = colorOverrides?.messageTextSize ?: 15.0
     val messageTextSize = rawTextSize.coerceIn(10.0, 30.0)
+    // Chaty #36: per-participant group label color, theme-derived; an explicit
+    // groupParticipantNameColor override still wins.
+    val participantNameColor = colorOverrides?.groupParticipantNameColor
+        ?: if (!isMe && senderName != null) {
+            ParticipantColorPolicy.colorFor(message.senderId, theme.accentColor, theme.surfaceColor)
+        } else {
+            theme.accentColor
+        }
 
     // --- System message pill ---
     if (message.type == MessageType.system) {
@@ -364,7 +386,19 @@ fun ChatMessageBubble(
                     Modifier
                         .padding(end = 8.dp, bottom = 2.dp)
                         .size(28.dp)
-                        .background(Color(theme.accentColor), CircleShape),
+                        .clip(CircleShape)
+                        .background(Color(theme.accentColor), CircleShape)
+                        .then(
+                            if (onAvatarTap != null) {
+                                Modifier.clickable(
+                                    role = androidx.compose.ui.semantics.Role.Button,
+                                    onClickLabel = "View $senderName",
+                                    onClick = onAvatarTap,
+                                )
+                            } else {
+                                Modifier
+                            },
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -458,7 +492,7 @@ fun ChatMessageBubble(
                             Text(
                                 senderName,
                                 color = Color(
-                                    colorOverrides?.groupParticipantNameColor ?: theme.accentColor,
+                                    participantNameColor,
                                 ),
                                 fontSize = (11.5 * theme.fontScale).sp,
                                 fontWeight = FontWeight.W700,
@@ -477,7 +511,7 @@ fun ChatMessageBubble(
                                     contentDescription = null,
                                     modifier = Modifier.size(13.dp),
                                     tint = Color(
-                                        colorOverrides?.groupParticipantNameColor ?: theme.accentColor,
+                                        participantNameColor,
                                     ),
                                 )
                             }
@@ -578,18 +612,74 @@ fun ChatMessageBubble(
                             )
                         }
                     }
+                    // GB/stock parity: view-once covers photo, video AND voice notes.
+                    // Voice expires after the first completed playback; image/video
+                    // expire after the viewer closes. Enforcement is local to this
+                    // device: consumption is persisted per account
+                    // (ViewOnceConsumedStore), there is no server-side consume or
+                    // revocation, and the pre-existing host retainViewOnce flag
+                    // (anti-view-once preference, on by default) keeps an opened
+                    // in-session image/video view visible. Rules live in
+                    // ViewOnceStatePolicy (JVM-tested).
+                    val isViewOnceVoice = message.metadata["view_once"] == true &&
+                        (message.attachment?.type == "audio" || message.type == MessageType.audio)
                     val isViewOnceMedia = message.metadata["view_once"] == true &&
                         (message.attachment?.type == "image" || message.attachment?.type == "video")
-                    if (isViewOnceMedia && !isMe && !viewOnceOpened) {
+                    val viewOnceSurface = when {
+                        isViewOnceMedia -> com.example.chat.core.messages.ViewOnceStatePolicy.surface(
+                            com.example.chat.core.messages.ViewOnceStatePolicy.Kind.MEDIA,
+                            opened = viewOnceOpened,
+                            retainOpenedMedia = retainViewOnce,
+                            playbackCompleted = false,
+                        )
+                        isViewOnceVoice -> com.example.chat.core.messages.ViewOnceStatePolicy.surface(
+                            com.example.chat.core.messages.ViewOnceStatePolicy.Kind.VOICE,
+                            opened = viewOnceOpened,
+                            retainOpenedMedia = retainViewOnce,
+                            playbackCompleted = viewOncePlaybackCompleted,
+                        )
+                        else -> null
+                    }
+                    if (viewOnceSurface != null && !isMe &&
+                        viewOnceSurface == com.example.chat.core.messages.ViewOnceStatePolicy.Surface.LOCKED
+                    ) {
                         ViewOnceLockedCard(
                             isVideo = message.attachment?.type == "video",
+                            isVoice = isViewOnceVoice,
                             textColor = Color(textColor),
                             accentColor = Color(theme.accentColor),
                             surfaceColor = Color(theme.surfaceColor),
                             onTap = onViewOnceOpen,
+                            retainAfterOpen = retainViewOnce,
                         )
-                    } else if (isViewOnceMedia && !isMe && viewOnceOpened && !retainViewOnce) {
-                        ViewOnceExpiredCard(textColor = Color(textColor))
+                    } else if (viewOnceSurface != null && !isMe &&
+                        viewOnceSurface == com.example.chat.core.messages.ViewOnceStatePolicy.Surface.EXPIRED
+                    ) {
+                        var expiredDialogOpen by remember(message.id) { mutableStateOf(false) }
+                        ViewOnceExpiredCard(
+                            textColor = Color(textColor),
+                            onTap = { expiredDialogOpen = true },
+                        )
+                        if (expiredDialogOpen) {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { expiredDialogOpen = false },
+                                confirmButton = {
+                                    androidx.compose.material3.TextButton(onClick = { expiredDialogOpen = false }) {
+                                        Text("OK")
+                                    }
+                                },
+                                title = {
+                                    Text(
+                                        when {
+                                            isViewOnceVoice -> "Voice message expired"
+                                            message.attachment?.type == "video" -> "Video expired"
+                                            else -> "Photo expired"
+                                        },
+                                    )
+                                },
+                                text = { Text("This view-once message has expired. Ask the sender to send it again.") },
+                            )
+                        }
                     } else {
                         when (message.attachment?.type) {
                             "image" -> if (mediaContent != null) Box(Modifier.testTag("message_bubble_media")) { mediaContent() } else {
@@ -627,6 +717,7 @@ fun ChatMessageBubble(
                                 urlResolver = voiceUrlResolver,
                                 message = message, binding = attachmentBinding,
                                 onPlay = onVoicePlay,
+                                onPlaybackCompleted = if (isViewOnceVoice) onViewOncePlaybackCompleted else null,
                             )
                             "document" -> {
                                 val attachment = message.attachment!!
@@ -684,15 +775,51 @@ fun ChatMessageBubble(
                                         emojiStyle = emojiStyle,
                                     )
                                 } else {
-                                    BasicText(
-                                        text = message.text,
-                                        style = TextStyle(
-                                            color = Color(textColor),
-                                            fontSize = (messageTextSize * theme.fontScale).sp,
-                                            lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
-                                        ),
-                                        modifier = mod,
+                                    // Chaty #34: in-text links render underlined in the theme
+                                    // accent and open on tap (Compose LinkAnnotation); long-press
+                                    // text selection still works. Plain text keeps the original
+                                    // render; the animated-emoji path is unchanged.
+                                    val linkSpans = remember(message.text) {
+                                        MessageLinkPolicy.linkSpans(message.text)
+                                    }
+                                    val bodyStyle = TextStyle(
+                                        color = Color(textColor),
+                                        fontSize = (messageTextSize * theme.fontScale).sp,
+                                        lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
                                     )
+                                    if (linkSpans.isEmpty()) {
+                                        BasicText(
+                                            text = message.text,
+                                            style = bodyStyle,
+                                            modifier = mod,
+                                        )
+                                    } else {
+                                        val linkedText = remember(message.text, theme.accentColor) {
+                                            buildAnnotatedString {
+                                                append(message.text)
+                                                linkSpans.forEach { span ->
+                                                    addLink(
+                                                        LinkAnnotation.Url(
+                                                            url = span.url,
+                                                            styles = TextLinkStyles(
+                                                                style = SpanStyle(
+                                                                    color = Color(theme.accentColor),
+                                                                    textDecoration = TextDecoration.Underline,
+                                                                ),
+                                                            ),
+                                                        ),
+                                                        span.start,
+                                                        span.end,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        BasicText(
+                                            text = linkedText,
+                                            style = bodyStyle,
+                                            modifier = mod,
+                                        )
+                                    }
                                 }
                             }
                             if (makeTextSelectable) {
@@ -702,6 +829,16 @@ fun ChatMessageBubble(
                             } else {
                                 bodyText(Modifier)
                             }
+                        }
+                    }
+                    if (!isVisualMedia && message.attachment == null && message.type == MessageType.text) {
+                        MessageLinkPolicy.extractUrls(message.text).forEach { link ->
+                            LinkPreviewCard(
+                                url = link,
+                                theme = theme,
+                                textColor = Color(textColor),
+                                service = linkPreviewService,
+                            )
                         }
                     }
                     Row(
@@ -1068,6 +1205,7 @@ private fun VoiceNoteCard(
     onPlay: ((MessageAttachment) -> Unit)?,
     message: ChatMessage,
     binding: AttachmentConsumerBinding?,
+    onPlaybackCompleted: (() -> Unit)? = null,
 ) {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val audioContext = androidx.compose.ui.platform.LocalContext.current
@@ -1167,6 +1305,7 @@ private fun VoiceNoteCard(
                         playing = false; completed = false; positionMs = totalMs ?: 0
                         runCatching { player.reset() }; prepared = false
                         releasePlaybackLeaseAfterReader()
+                        onPlaybackCompleted?.invoke()
                     }
                 }
                 if (completed) { player.seekTo(0); completed = false; positionMs = 0 }
@@ -1432,8 +1571,8 @@ private fun P2pFileInviteCard(
     transferState: P2pFileTransferService.TransferState? = null,
 ) {
     val transferLabel = when (transferState?.status) {
-        "Sending" -> "Sending · ${(transferState.progress * 100).toInt()}%"
-        "Receiving" -> "Receiving · ${(transferState.progress * 100).toInt()}%"
+        "Sending" -> "Sending · ${(transferState.progress * 100).toInt().coerceAtMost(99)}%"
+        "Receiving" -> "Receiving · ${(transferState.progress * 100).toInt().coerceAtMost(99)}%"
         "Waiting for recipient" -> "Waiting for recipient"
         "Secure channel connected", "Secure channel ready" -> "Secure connection · ready"
         "Connecting", "Waiting for secure data channel" -> "Connecting securely"
@@ -1443,10 +1582,12 @@ private fun P2pFileInviteCard(
         "Peer paused" -> "Recipient paused"
         "Connection could not recover" -> "Connection lost · retry available"
         "Received and verified" -> "Received · ready to play"
-        "Sent" -> "Sent securely"
-        "Failed" -> "Transfer failed · see connection details"
+        "Sent" -> "Sent securely · verified"
+        "Channel closed" -> "Direct connection closed · tap to retry"
+        "Waiting for recipient — resuming", "Paused — source ready to resume" -> "Waiting · tap to resume"
+        "Failed" -> "Transfer failed · tap to retry/cancel"
         "Cancelled" -> "Transfer cancelled"
-        else -> if (isMe) "Waiting for recipient" else "Tap to receive video"
+        else -> if (isMe) "Waiting for recipient" else "Tap to receive original"
     }
     if (attachment.type == "video") {
         // Keep the invitation looking like a native video message, not a pasted URL.
@@ -1544,6 +1685,8 @@ private fun ViewOnceLockedCard(
     accentColor: Color,
     surfaceColor: Color,
     onTap: (() -> Unit)?,
+    isVoice: Boolean = false,
+    retainAfterOpen: Boolean = false,
 ) {
     Column(
         Modifier
@@ -1552,26 +1695,33 @@ private fun ViewOnceLockedCard(
             .clip(RoundedCornerShape(14.dp))
             .background(surfaceColor.copy(alpha = 0.55f))
             .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-            .pointerInput("viewOnce") { detectTapGestures(onTap = { onTap?.invoke() }) },
+            .clickable(
+                role = androidx.compose.ui.semantics.Role.Button,
+                onClickLabel = if (isVoice) "Play view-once voice message" else "Open view-once message",
+            ) { onTap?.invoke() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            if (isVideo) Icons.Rounded.VideocamOff else Icons.Outlined.ImageNotSupported,
+            if (isVoice) Icons.Rounded.MicOff else if (isVideo) Icons.Rounded.VideocamOff else Icons.Outlined.ImageNotSupported,
             contentDescription = null,
             tint = accentColor,
             modifier = Modifier.size(30.dp),
         )
         Box(Modifier.height(8.dp))
         Text(
-            "View once",
+            if (isVoice) "View once voice message" else "View once",
             color = textColor.copy(alpha = 0.85f),
             fontSize = 12.sp,
             fontWeight = FontWeight.W700,
         )
         Box(Modifier.height(2.dp))
         Text(
-            "Tap to open • opens only once",
+            // Voice still plays once while retention is on; only image/video
+            // stay visible after opening (ViewOnceStatePolicy).
+            if (isVoice) "Tap to listen • plays only once"
+            else if (retainAfterOpen) "Tap to open"
+            else "Tap to open • opens only once",
             color = textColor.copy(alpha = 0.5f),
             fontSize = 9.5.sp,
         )
@@ -1579,12 +1729,16 @@ private fun ViewOnceLockedCard(
 }
 
 @Composable
-private fun ViewOnceExpiredCard(textColor: Color) {
+private fun ViewOnceExpiredCard(textColor: Color, onTap: (() -> Unit)? = null) {
     Row(
         Modifier
             .width(210.dp)
             .height(64.dp)
-            .background(textColor.copy(alpha = 0.06f), RoundedCornerShape(14.dp)),
+            .background(textColor.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
+            .clickable(
+                role = androidx.compose.ui.semantics.Role.Button,
+                onClickLabel = "View-once message expired. Details",
+            ) { onTap?.invoke() },
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {

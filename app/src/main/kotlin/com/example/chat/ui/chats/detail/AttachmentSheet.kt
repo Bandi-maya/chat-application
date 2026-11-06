@@ -65,7 +65,7 @@ private val gradientTask = listOf(Color(0xFF00BFA5), Color(0xFF00897B))
 private val gradientLargeFile = listOf(Color(0xFF2563EB), Color(0xFF1D4ED8))
 
 enum class AttachmentAction { image, video, document, audio, location, contact, poll, task,
-    largeFile, demoDocument, demoAudio, demoCall, demoTask, demoLocation }
+    chatyDirect, largeFile, demoDocument, demoAudio, demoCall, demoTask, demoLocation }
 
 private data class AttachmentItem(
     val icon: ImageVector,

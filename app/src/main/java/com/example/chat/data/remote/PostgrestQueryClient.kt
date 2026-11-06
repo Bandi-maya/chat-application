@@ -131,6 +131,7 @@ class PostgrestQueryClient(
             }
             .delete()
             .build()
+        com.example.chat.data.demo.DemoMode.requireRealBackend()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("Delete $table failed with HTTP ${response.code}")
@@ -164,6 +165,7 @@ class PostgrestQueryClient(
             }
             .post(body.toString().toRequestBody(JSON))
             .build()
+        com.example.chat.data.demo.DemoMode.requireRealBackend()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw IOException("Upsert into $table failed with HTTP ${response.code}")
@@ -197,6 +199,7 @@ class PostgrestQueryClient(
             }
             .post(body.toString().toRequestBody(JSON))
             .build()
+        com.example.chat.data.demo.DemoMode.requireRealBackend()
         client.newCall(request).execute().use { response ->
             val text = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
@@ -234,6 +237,7 @@ class PostgrestQueryClient(
             }
             .patch(body.toString().toRequestBody(JSON))
             .build()
+        com.example.chat.data.demo.DemoMode.requireRealBackend()
         client.newCall(request).execute().use { response ->
             val text = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
@@ -269,6 +273,7 @@ class PostgrestQueryClient(
             }
             .get()
             .build()
+        com.example.chat.data.demo.DemoMode.requireRealBackend()
         client.newCall(request).execute().use { response ->
             val text = response.body?.string().orEmpty()
             if (!response.isSuccessful) {

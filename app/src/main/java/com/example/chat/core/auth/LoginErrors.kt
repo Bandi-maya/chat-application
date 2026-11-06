@@ -2,6 +2,12 @@ package com.example.chat.core.auth
 
 /** Exact port of _LoginScreenState._friendlyError. */
 fun friendlyLoginError(error: Throwable): String {
+    // Secure-storage failures are fail-closed and already carry a user-safe
+    // reason; surface it verbatim so the user can tell customer care exactly
+    // why sign-in was stopped (Bandi 2026-11-04: show why it failed).
+    if (error is com.example.chat.data.api.ApiSessionStorageException) {
+        return error.message ?: "Chaty could not save your sign-in securely on this device. Sign-in was stopped to protect your account."
+    }
     val value = (error.message ?: error.toString()).replaceFirst("Exception: ", "")
     val lower = value.lowercase()
     if (lower.contains("connection refused") ||
@@ -28,6 +34,9 @@ fun friendlyLoginError(error: Throwable): String {
 
 /** Exact port of _RegisterScreenState._friendlyError. */
 fun friendlyRegisterError(error: Throwable): String {
+    if (error is com.example.chat.data.api.ApiSessionStorageException) {
+        return error.message ?: "Chaty could not save your sign-in securely on this device. Registration was stopped to protect your account."
+    }
     val value = (error.message ?: error.toString()).replaceFirst("Exception: ", "")
     val lower = value.lowercase()
     if (lower.contains("connection refused") ||
@@ -63,6 +72,9 @@ fun friendlyRegisterError(error: Throwable): String {
 
 /** Exact port of _RegisterOrganizationScreenState._friendlyError. */
 fun friendlyOrgRegisterError(error: Throwable): String {
+    if (error is com.example.chat.data.api.ApiSessionStorageException) {
+        return error.message ?: "Chaty could not save your sign-in securely on this device. Registration was stopped to protect your account."
+    }
     val value = (error.message ?: error.toString()).replaceFirst("Exception: ", "")
     val lower = value.lowercase()
     if (lower.contains("connection refused") ||

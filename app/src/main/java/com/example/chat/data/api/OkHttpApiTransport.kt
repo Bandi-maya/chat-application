@@ -1,5 +1,7 @@
 package com.example.chat.data.api
 
+import com.example.chat.data.demo.DemoMode
+import com.example.chat.data.demo.DemoModeOfflineException
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -19,6 +21,10 @@ class OkHttpApiTransport : ApiHttpTransport {
         headers: Map<String, String>,
         body: String?,
     ): Pair<Int, String> {
+        // Offline demo: while a demo session is active, or a request carries the
+        // synthetic demo token, nothing leaves the device; fail closed before
+        // any socket is opened (covers unsigned requests too).
+        if (DemoMode.active || headers["Authorization"] == "Bearer ${DemoMode.TOKEN}") throw DemoModeOfflineException()
         val builder = Request.Builder().url(url)
         for ((k, v) in headers) builder.addHeader(k, v)
         when (method) {
@@ -49,6 +55,8 @@ class OkHttpApiBinaryTransport : ApiBinaryTransport {
         .build()
 
     override fun execute(method: String, url: String, headers: Map<String, String>, body: ByteArray): Pair<Int, String> {
+        // Offline demo: same fail-closed guard for binary (profile photo) uploads.
+        if (DemoMode.active || headers["Authorization"] == "Bearer ${DemoMode.TOKEN}") throw DemoModeOfflineException()
         val builder = Request.Builder().url(url)
         var contentType: String? = null
         for ((k, v) in headers) {

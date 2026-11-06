@@ -160,6 +160,7 @@ class WebRtcCallMediaController(
             override fun onAddStream(stream: MediaStream?) {
                 if (stream != null) {
                     remoteStream = stream
+                    stream.audioTracks.forEach { it.setEnabled(remoteAudioEnabled) }
                     hasRemoteMedia = true
                     onRemoteStream?.invoke()
                 }
@@ -169,6 +170,7 @@ class WebRtcCallMediaController(
                 val stream = streams?.firstOrNull()
                 if (stream != null && remoteStream == null) {
                     remoteStream = stream
+                    stream.audioTracks.forEach { it.setEnabled(remoteAudioEnabled) }
                     hasRemoteMedia = true
                     onRemoteStream?.invoke()
                 }
@@ -416,6 +418,14 @@ class WebRtcCallMediaController(
         peerConnection?.addIceCandidate(IceCandidate(sdpMid, sdpMLineIndex ?: 0, candidate))
     }
 
+    private var remoteAudioEnabled = true
+    override val supportsLocalHold: Boolean get() = true
+    override fun setRemoteAudioEnabled(enabled: Boolean): Boolean {
+        remoteAudioEnabled = enabled
+        remoteStream?.audioTracks?.forEach { it.setEnabled(enabled) }
+        return true
+    }
+
     override fun setAudioEnabled(enabled: Boolean): Boolean {
         val track = localAudioTrack ?: return false
         track.setEnabled(enabled)
@@ -426,6 +436,69 @@ class WebRtcCallMediaController(
         val track = localVideoTrack ?: return false
         track.setEnabled(enabled)
         return true
+    }
+
+    // This sender owns its track separately from localStream; ordinary audio is untouched.
+    private var upgradeSender: org.webrtc.RtpSender? = null
+    private var upgradePrepared = false
+    private var upgradeCommitted = false
+    // Kept disabled until rollback/camera/ICE behavior passes the two-endpoint gate.
+    override val supportsVideoUpgrade: Boolean get() = false
+
+    override suspend fun prepareVideoUpgrade() {
+        check(localVideoTrack == null && !upgradePrepared) { "Video already allocated" }
+        CallPermissionGate.ensure(appContext, true)
+        val peer = peerConnection ?: error("No peer connection")
+        val factory = peerConnectionFactory ?: error("No media factory")
+        try {
+            val capturer = createCameraCapturer() ?: error("No usable camera")
+            videoCapturer = capturer
+            val helper = SurfaceTextureHelper.create("chaty_upgrade_capture", eglContext)
+            surfaceTextureHelper = helper
+            val source = factory.createVideoSource(false)
+            localVideoSource = source
+            capturer.initialize(helper, appContext, source.capturerObserver)
+            val track = factory.createVideoTrack("chaty_upgrade_video", source)
+            track.setEnabled(false)
+            localVideoTrack = track
+            // No capture before matching remote answer+commit. Disabled track cannot send frames.
+            upgradeSender = peer.addTrack(track, listOf("chaty_upgrade")) ?: error("No video sender")
+            upgradePrepared = true
+        } catch (error: Exception) { releaseUpgradeVideo(); throw error }
+    }
+
+    override suspend fun commitVideoUpgrade() {
+        check(upgradePrepared) { "No pending video" }
+        val capturer = videoCapturer ?: error("No camera")
+        check(!upgradeCommitted) { "Video already committed" }
+        capturer.startCapture(640, 360, 24)
+        check(localVideoTrack?.setEnabled(true) == true) { "Video enable failed" }
+        upgradeCommitted = true
+    }
+
+    override suspend fun abortVideoUpgrade() {
+        if (!upgradePrepared && upgradeSender == null) return
+        val peer = peerConnection
+        // Cancel an in-progress offer without destroying the established audio transport.
+        if (peer != null && (peer.signalingState() == PeerConnection.SignalingState.HAVE_LOCAL_OFFER ||
+            peer.signalingState() == PeerConnection.SignalingState.HAVE_REMOTE_OFFER)) {
+            runCatching { setLocalDescription(peer, SessionDescription(SessionDescription.Type.ROLLBACK, "")) }
+        }
+        releaseUpgradeVideo()
+    }
+
+    private fun releaseUpgradeVideo() {
+        if (upgradeSender == null && !upgradePrepared && localStream?.videoTracks?.isNotEmpty() == true) return
+        localVideoTrack?.setEnabled(false)
+        upgradeSender?.let { sender -> runCatching { sender.setTrack(null, false) }; runCatching { peerConnection?.removeTrack(sender) } }
+        upgradeSender = null
+        runCatching { videoCapturer?.stopCapture() }
+        runCatching { videoCapturer?.dispose() }; videoCapturer = null
+        runCatching { localVideoTrack?.dispose() }; localVideoTrack = null
+        runCatching { localVideoSource?.dispose() }; localVideoSource = null
+        runCatching { surfaceTextureHelper?.dispose() }; surfaceTextureHelper = null
+        upgradePrepared = false
+        upgradeCommitted = false
     }
 
     override suspend fun switchCamera(): Boolean {
@@ -574,10 +647,12 @@ class WebRtcCallMediaController(
 
     @Synchronized
     private fun disposeInternal() {
+        if (upgradePrepared || upgradeSender != null) releaseUpgradeVideo()
         stopTrafficStats()
         trafficSessionPrepared = false
         hasLocalMedia = false
         hasRemoteMedia = false
+        remoteAudioEnabled = true
         val screen = screenCapturer
         screenCapturer = null
         try {

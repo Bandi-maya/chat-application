@@ -21,13 +21,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.ListAlt
 import androidx.compose.material.icons.rounded.MoreVert
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material.icons.rounded.ViewKanban
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyTextButton
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -126,7 +128,7 @@ fun TasksScreen(
     }
 
     Scaffold(
-        containerColor = colors.background,
+        containerColor = com.example.chat.ui.navigation.LocalReferenceContentSurface.current ?: colors.background,
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
@@ -135,7 +137,9 @@ fun TasksScreen(
                 modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
+                if (com.example.chat.ui.navigation.LocalDestinationTitlePresentation.current == "tasks") {
+                    Spacer(Modifier.weight(1f))
+                } else Text(
                     "Action Items",
                     color = colors.foreground,
                     fontSize = 22.sp,
@@ -145,7 +149,7 @@ fun TasksScreen(
                 IconButton(
                     onClick = onCreateTask,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(CircleShape)
                         .background(colors.surfaceSecondary),
                 ) {
                     Icon(Icons.Rounded.Add, contentDescription = "Create task", tint = colors.primary)
@@ -388,7 +392,7 @@ private fun TaskListCard(
                 DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Edit Task") },
-                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        leadingIcon = { Icon(Icons.Rounded.Update, contentDescription = null, modifier = Modifier.size(18.dp)) },
                         onClick = { menuOpen = false; onEditTask() },
                     )
                     DropdownMenuItem(
@@ -397,8 +401,8 @@ private fun TaskListCard(
                         onClick = { menuOpen = false; onOpenDetail() },
                     )
                     DropdownMenuItem(
-                        text = { Text("Delete Task", color = Color(0xFFF44336)) },
-                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = Color(0xFFF44336), modifier = Modifier.size(18.dp)) },
+                        text = { Text("Delete Task", color = colors.error) },
+                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = colors.error, modifier = Modifier.size(18.dp)) },
                         onClick = { menuOpen = false; onDeleteTask() },
                     )
                 }
@@ -674,7 +678,7 @@ private fun KanbanCardBody(
             Spacer(Modifier.weight(1f))
             if (showActions) {
                 IconButton(onClick = onEditTask, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Rounded.Edit, contentDescription = "Edit task", tint = colors.primary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Rounded.Update, contentDescription = "Edit task", tint = colors.primary, modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onShowHistory, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Rounded.History, contentDescription = "History", tint = colors.primary, modifier = Modifier.size(18.dp))
@@ -736,7 +740,7 @@ private fun TaskHistoryDialog(
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onClose) { Text("Close") }
+            ChatyTextButton(onClick = onClose, label = "Close")
         },
         containerColor = colors.surface,
     )

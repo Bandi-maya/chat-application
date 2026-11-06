@@ -27,6 +27,8 @@ class PresenceService(
 
     /** Exact port of setPresence's non-demo path. */
     suspend fun setPresence(presence: PresenceState) {
+        // Offline demo: presence is never published from a demo session.
+        if (com.example.chat.data.demo.DemoMode.active) return
         val userId = currentUserId() ?: return
         val snap = privacy()
         val update = mutableMapOf<String, Any?>(

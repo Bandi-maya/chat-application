@@ -219,6 +219,11 @@ class AuthSessionManager(
         }
     }
 
+    /** Offline demo entry (NOT in Flutter): true when any GoTrue identity is
+     *  live or persisted. Demo activation must refuse in that case; the real
+     *  local session is never cleared or modified as demo prep. */
+    suspend fun hasAnySession(): Boolean = currentSession != null || storage.load() != null
+
     /** Idempotent: nested refresh/restore failure paths both funnel here;
      *  signedOut fires once, when a session was actually dropped. */
     private suspend fun clearLocalSession() {

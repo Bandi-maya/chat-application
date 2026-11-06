@@ -56,7 +56,9 @@ data class CallPresentationPreferences(
     /** Persisted CallScreenTemplate name for the ongoing call screen. */
     val ongoingCallTemplate: String = "chatyClassic",
     /** Persisted Call Experience Bundle identifier (atomic complete bundle). */
-    val callExperienceBundleId: String = "chaty_default",
+    val callExperienceBundleId: String = "apple_ios",
+    /** Empty means preserve existing message design until explicitly selected. */
+    val messageExperienceBundleId: String = "",
 )
 
 /** Persistence seam so the store stays JVM-testable; the Android adapter
@@ -86,6 +88,7 @@ class CallPresentationPreferencesStore(
         const val LOW_DATA_USAGE_KEY = "chaty.calls.low_data_usage_enabled.v1"
         const val INCOMING_TEMPLATE_KEY = "chaty.calls.incoming_template.v1"
         const val ONGOING_TEMPLATE_KEY = "chaty.calls.ongoing_template.v1"
+        const val BUNDLE_SCOPES_KEY = "chaty.presentation.bundle_scopes.v1"
         const val CALL_EXPERIENCE_BUNDLE_KEY = "chaty.calls.experience_bundle.v1"
     }
 
@@ -113,13 +116,15 @@ class CallPresentationPreferencesStore(
         initializeStarted = true
         scope.launch {
             try {
+            val pair = storage.getString(BUNDLE_SCOPES_KEY)?.split('|')?.takeIf { it.size == 2 }
             value = CallPresentationPreferences(
                 dynamicIslandEnabled = storage.getBool(DYNAMIC_ISLAND_KEY) ?: true,
                 pictureInPictureEnabled = storage.getBool(PICTURE_IN_PICTURE_KEY) ?: true,
                 lowDataUsageEnabled = storage.getBool(LOW_DATA_USAGE_KEY) ?: false,
                 incomingCallTemplate = storage.getString(INCOMING_TEMPLATE_KEY) ?: "chatyClassic",
                 ongoingCallTemplate = storage.getString(ONGOING_TEMPLATE_KEY) ?: "chatyClassic",
-                callExperienceBundleId = storage.getString(CALL_EXPERIENCE_BUNDLE_KEY) ?: "chaty_default",
+                callExperienceBundleId = pair?.get(0) ?: storage.getString(CALL_EXPERIENCE_BUNDLE_KEY) ?: "apple_ios",
+                messageExperienceBundleId = pair?.get(1) ?: "",
             )
             isInitialized = true
             initializationComplete.complete(Unit)
@@ -167,13 +172,21 @@ class CallPresentationPreferencesStore(
         update = { it.copy(ongoingCallTemplate = template) },
     )
 
-    /** Atomically selects and persists the global Call Experience Bundle. */
-    fun setCallExperienceBundle(bundleId: String) = setString(
-        key = CALL_EXPERIENCE_BUNDLE_KEY,
-        template = bundleId,
-        read = { it.callExperienceBundleId },
-        update = { it.copy(callExperienceBundleId = bundleId) },
-    )
+    /** Single storage commit and publication for Both. Cancellation writes nothing. */
+    suspend fun applyExperienceBundle(bundleId: String, target: BundleApplyTarget) {
+        require(bundleId in setOf("chaty_default", "apple_ios", "samsung_one_ui", "google_phone_latest", "google_phone_classic", "vivo_iqoo", "azure_ring_vertical", "mono_chevron_dark", "nextcloud_talk"))
+        initialize(); initializationComplete.await()
+        writeMutex.withLock {
+            val next = value.copy(
+                callExperienceBundleId = if (target != BundleApplyTarget.MESSAGES) bundleId else value.callExperienceBundleId,
+                messageExperienceBundleId = if (target != BundleApplyTarget.CALLS) bundleId else value.messageExperienceBundleId,
+            )
+            if (!storage.putString(BUNDLE_SCOPES_KEY, next.callExperienceBundleId + "|" + next.messageExperienceBundleId))
+                throw IllegalStateException("Unable to save bundle selection. Nothing was applied.")
+            value = next; notifyListeners()
+        }
+    }
+    fun setCallExperienceBundle(bundleId: String) { scope.launch { applyExperienceBundle(bundleId, BundleApplyTarget.CALLS) } }
 
     private fun setString(
         key: String,
@@ -480,3 +493,5 @@ class CallPresentationController(
             private set
     }
 }
+
+enum class BundleApplyTarget { CALLS, MESSAGES, BOTH }

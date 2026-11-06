@@ -13,10 +13,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Flag
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
+import com.example.chat.ui.kit.ChatyTextButton
+import com.example.chat.ui.theme.LocalAppColors
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -109,10 +110,10 @@ fun DeleteTaskDialog(onCancel: () -> Unit, onDelete: () -> Unit) {
         title = { Text("Delete Task") },
         text = { Text("Are you sure you want to delete this task? This action cannot be undone.") },
         confirmButton = {
-            TextButton(onClick = onDelete) { Text("Delete", color = Color(0xFFF44336)) }
+            ChatyTextButton(onClick = onDelete, label = "Delete", color = LocalAppColors.current.error)
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text("Cancel") }
+            ChatyTextButton(onClick = onCancel, label = "Cancel")
         },
     )
 }

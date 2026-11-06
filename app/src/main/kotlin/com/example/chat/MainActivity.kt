@@ -7,7 +7,9 @@ import android.util.Log
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.example.chat.data.auth.SupabaseAuthClient
 import com.example.chat.ui.AppRoot
+
 
 private const val TAG = "ChatyMain"
 
@@ -64,6 +66,13 @@ class MainActivity : FragmentActivity() {
         val N = com.example.chat.notifications.ChatyNotifications
         when (intent?.action) {
             N.ACTION_OPEN_CHAT -> N.requestOpenRoom(intent.getStringExtra(N.EXTRA_ROOM_ID))
+            N.ACTION_SHOW_CALL -> {
+                // Ongoing-call notification tap: return to the full call UI. Only for a
+                // live session, so an ended call is never resurrected on screen.
+                if (ServiceLocator.callSignaling.hasActiveSession) {
+                    ServiceLocator.callPresentationController.showFullScreen()
+                }
+            }
             N.ACTION_INCOMING_CALL, N.ACTION_ANSWER_CALL -> {
                 showOverLockScreen()
                 val callId = intent.getStringExtra(N.EXTRA_CALL_ID).orEmpty()
@@ -79,6 +88,10 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private var lockScreenListener: (() -> Unit)? = null
+
+    /** Lets the incoming-call screen appear over the lock screen and wake the display. Undone as
+     *  soon as the call is over, so chats are never shown over the lock screen. */
     /**
      * Handles chaty:// deep links from email magic-link / password-reset callbacks.
      * The state nonce issued by SupabaseAuthClient.registerPendingState() must be present
@@ -90,20 +103,16 @@ class MainActivity : FragmentActivity() {
         when (val host = data.host?.lowercase()) {
             "login-callback", "reset-password" -> {
                 val state = data.getQueryParameter("state")
-                if (state.isNullOrEmpty() || !ServiceLocator.apiBackend.consumePendingState(state)) {
+                if (state.isNullOrEmpty() || !SupabaseAuthClient.consumePendingState(state)) {
                     Log.w(TAG, "Rejected $host deep link: missing or invalid state nonce")
                     return
                 }
-                ServiceLocator.apiBackend.pendingDeepLinkData = data
+                SupabaseAuthClient.pendingDeepLinkData = data
             }
             else -> Unit
         }
     }
 
-    private var lockScreenListener: (() -> Unit)? = null
-
-    /** Lets the incoming-call screen appear over the lock screen and wake the display. Undone as
-     *  soon as the call is over, so chats are never shown over the lock screen. */
     private fun showOverLockScreen() {
         if (lockScreenListener == null) {
             val calls = ServiceLocator.callSignaling
@@ -163,3 +172,4 @@ class MainActivity : FragmentActivity() {
         ServiceLocator.nativeCallPip.onPipModeChanged(isInPictureInPictureMode)
     }
 }
+

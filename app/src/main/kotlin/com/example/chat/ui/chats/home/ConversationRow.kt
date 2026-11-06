@@ -28,6 +28,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -53,6 +59,26 @@ data class HomePresence(
     val isRecording: Boolean = false,
     val lastSeenAt: java.time.Instant? = null,
 )
+
+internal fun conversationRowA11ySummary(
+    displayTitle: String,
+    subtitle: String,
+    unreadCount: Int,
+    isPinned: Boolean,
+    isMuted: Boolean,
+    locked: Boolean,
+    selected: Boolean,
+): String {
+    val parts = mutableListOf(displayTitle)
+    if (subtitle.isNotEmpty()) parts.add(subtitle)
+    if (unreadCount == 1) parts.add("1 unread message")
+    else if (unreadCount > 1) parts.add("$unreadCount unread messages")
+    if (isPinned) parts.add("pinned")
+    if (isMuted) parts.add("muted")
+    if (locked) parts.add("locked")
+    if (selected) parts.add("selected")
+    return parts.joinToString(", ")
+}
 
 /** Port of chats_home_screen.dart _conversationTile: density-scaled row with
  *  template/prefs-driven colors, presence + typing line, draft highlight,
@@ -145,11 +171,35 @@ fun ConversationRow(
     val avatarShape = if (homePrefs.avatarShape == "circle") chatList.avatarShape else homePrefs.avatarShape
     val subtitleActive = presence?.isTyping == true || presence?.isRecording == true
 
+    // A-03: one TalkBack node per row. The summary derives from the SAME subtitle
+    // the row displays (draft / typing / recording / presence / last message).
+    val rowSubtitle = when {
+        conversation.draftText.isNotEmpty() -> "Draft: ${conversation.draftText}"
+        subtitleActive -> presenceText
+        conversation.lastMessageText.isEmpty() -> presenceText
+        else -> conversation.lastMessageText
+    }
+    val rowDescription = conversationRowA11ySummary(
+        displayTitle = displayTitle,
+        subtitle = rowSubtitle,
+        unreadCount = conversation.unreadCount,
+        isPinned = conversation.isPinned,
+        isMuted = conversation.isMuted,
+        locked = locked,
+        selected = selected,
+    )
+
     Column(modifier) {
         Box(
             Modifier
                 .padding(horizontal = 4.dp, vertical = 2.dp)
                 .background(tileColor, RoundedCornerShape(tileRadius.dp))
+                .clearAndSetSemantics {
+                    contentDescription = rowDescription
+                    role = Role.Button
+                    onClick(label = "Open conversation") { onTap(); true }
+                    onLongClick(label = "Select conversation") { onLongPress(); true }
+                }
                 .combinedClickable(
                     onClick = onTap,
                     onLongClick = onLongPress,
@@ -289,13 +339,8 @@ fun ConversationRow(
                                 modifier = Modifier.weight(1f),
                             )
                         } else {
-                            val subtitle = when {
-                                subtitleActive -> presenceText
-                                conversation.lastMessageText.isEmpty() -> presenceText
-                                else -> conversation.lastMessageText
-                            }
                             Text(
-                                subtitle,
+                                rowSubtitle,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 color = when {

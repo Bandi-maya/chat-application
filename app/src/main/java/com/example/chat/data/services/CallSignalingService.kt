@@ -56,6 +56,8 @@ data class ChatyCallSession(
     val isFrontCamera: Boolean = true,
     val isSharingScreen: Boolean = false,
     val isDemo: Boolean = false,
+    val isLocallyHeld: Boolean = false,
+    val isRemotelyHeld: Boolean = false,
 ) {
     /** Whether the session is currently active or establishing media. */
     val isActive: Boolean
@@ -118,6 +120,16 @@ interface CallMediaController {
 
     /** Enables/disables local video tracks (Dart toggleCamera). */
     fun setVideoEnabled(enabled: Boolean): Boolean
+
+    /** Audio-to-video seam. Default false keeps older/fake providers honest. */
+    val supportsVideoUpgrade: Boolean get() = false
+    suspend fun prepareVideoUpgrade() { throw UnsupportedOperationException("Video upgrade unavailable") }
+    suspend fun commitVideoUpgrade() { throw UnsupportedOperationException("Video upgrade unavailable") }
+    suspend fun abortVideoUpgrade() { }
+
+    /** Local playout pause. False means the provider does not implement safe local hold. */
+    val supportsLocalHold: Boolean get() = false
+    fun setRemoteAudioEnabled(enabled: Boolean): Boolean = false
 
     /** Helper.switchCamera on the first local video track. */
     suspend fun switchCamera(): Boolean
@@ -192,6 +204,11 @@ class CallSignalingService(
     private val captureAccountScope: () -> Any? = { null },
     private val accountScopeValid: (Any?) -> Boolean = { true },
     private val accountScopeGuard: (Any?, () -> Unit) -> Boolean = { _, action -> action(); true },
+    /** Authenticated server + peer capability for THIS call. Default denied, not guessed. */
+    private val videoUpgradeCapability: (String, String) -> Boolean = { _, _ -> false },
+    /** Feature-specific authenticated relay AND peer support. Never inferred from ordinary calls. */
+    private val callExtrasCapability: (String, String, String) -> Boolean = { _, _, _ -> false },
+    private val monotonicMillis: () -> Long = { android.os.SystemClock.elapsedRealtime() },
 ) {
     var currentSession: ChatyCallSession? = null
         private set
@@ -227,6 +244,108 @@ class CallSignalingService(
     private var remoteDescriptionReady = false
     private var localDescriptionSignaled = false
     private val pendingLocalCandidates = linkedSetOf<QueuedCandidate>()
+
+    private var upgrade: CallVideoUpgradeCoordinator? = null
+    val videoUpgradePhase: VideoUpgradeState.Phase get() = upgrade?.state?.phase ?: VideoUpgradeState.Phase.AUDIO
+    val videoUpgradeNotice: String? get() = upgrade?.notice
+    val canRequestVideoUpgrade: Boolean get() {
+        val s = currentSession ?: return false
+        return s.state == CallSessionState.connected && !s.isVideo && !s.isDemo && media?.supportsVideoUpgrade == true && videoUpgradeCapability(s.callId, s.remoteUserId)
+    }
+    private fun upgradeForCurrentCall(): CallVideoUpgradeCoordinator? {
+        upgrade?.let { return it }
+        val s = currentSession ?: return null
+        val peer = media ?: return null
+        val me = currentUserId() ?: return null
+        val expected = callAccountScope
+        if (!peer.supportsVideoUpgrade || !videoUpgradeCapability(s.callId, s.remoteUserId)) return null
+        return CallVideoUpgradeCoordinator(me, s.remoteUserId, peer, scope,
+            valid = { runCatching { requireCallIdentity(expected, s.callId, peer) }.isSuccess },
+            send = { type, id, sdp -> guardCall(expected, s.callId, peer) {
+                signalSender.sendCallSignal(s.remoteUserId, buildMap {
+                    put("signal_type", type); put("call_id", s.callId); put("request_id", id); put("protocol_version", 1)
+                    if (sdp != null) put("sdp", sdp)
+                })
+            } }, changed = { guardCall(expected, s.callId, peer) { notifyChanged() }; Unit },
+            videoChanged = { video -> guardCall(expected, s.callId, peer) {
+                currentSession = currentSession?.copy(isVideo = video, isCameraOff = !video)
+                notifyChanged()
+            }; Unit },
+        ).also { upgrade = it }
+    }
+    fun requestVideoUpgrade(): Boolean = canRequestVideoUpgrade && upgradeForCurrentCall()?.request(UUID.randomUUID().toString(), true) == true
+    fun acceptVideoUpgrade(): Boolean = upgradeForCurrentCall()?.acceptIncoming() == true
+    fun declineVideoUpgrade() { upgrade?.cancel("Video request declined", decline = true) }
+    fun cancelVideoUpgrade() { upgrade?.cancel() }
+    fun returnToAudio() { upgrade?.returnToAudio() }
+    private fun closeVideoUpgrade() { upgrade?.close(); upgrade = null; clearCallExtras() }
+
+    var callReaction: CallReaction? = null; private set
+    private var reactionExpiry: Job? = null
+    private var lastLocalReactionMillis = Long.MIN_VALUE
+    private var lastPeerReactionMillis = Long.MIN_VALUE
+    private val seenPeerReactions = linkedSetOf<String>()
+    private var localHoldRevision = 0L
+    private var remoteHoldRevision = -1L
+    val canHoldLocally: Boolean get() = currentSession?.state == CallSessionState.connected && media?.supportsLocalHold == true
+    val canNotifyHold: Boolean get() = currentSession?.let { callExtrasCapability(it.callId, it.remoteUserId, "hold_v1") } == true
+    fun toggleLocalHold(): Boolean {
+        var applied = false
+        val expected = callAccountScope
+        val session = currentSession ?: return false
+        guardCall(expected, session.callId) {
+            val active = currentSession ?: return@guardCall
+            val peer = media ?: return@guardCall
+            if (active.state != CallSessionState.connected || !peer.supportsLocalHold) return@guardCall
+            val held = !active.isLocallyHeld
+            if (!peer.setRemoteAudioEnabled(!held)) return@guardCall
+            if (!peer.setAudioEnabled(!held && !active.isMuted)) {
+                peer.setRemoteAudioEnabled(!active.isLocallyHeld); return@guardCall
+            }
+            currentSession = active.copy(isLocallyHeld = held)
+            if (callExtrasCapability(active.callId, active.remoteUserId, "hold_v1")) {
+                localHoldRevision++
+                signalSender.sendCallSignal(active.remoteUserId, mapOf("signal_type" to "call_hold", "call_id" to active.callId,
+                    "protocol_version" to 1, "held" to held, "revision" to localHoldRevision))
+            }
+            applied = true; notifyChanged()
+        }
+        return applied
+    }
+    private fun showReaction(reaction: CallReaction, expected: Any?, callId: String) {
+        callReaction = reaction
+        reactionExpiry?.cancel()
+        reactionExpiry = scope.launch {
+            delay((reaction.expiresAtMillis - monotonicMillis()).coerceIn(1L, CallExtrasPolicy.reactionLifetimeMillis))
+            guardCall(expected, callId) { if (callReaction?.id == reaction.id) { callReaction = null; notifyChanged() } }
+        }
+        notifyChanged()
+    }
+    /** Returns false if unsupported emoji, ended call or rate limit. Local-only is explicitly exposed. */
+    fun sendLocalCallReaction(emoji: String): Boolean {
+        val session = currentSession ?: return false
+        var sent = false
+        val expected = callAccountScope
+        guardCall(expected, session.callId) {
+            val active = currentSession ?: return@guardCall
+            val tick = monotonicMillis()
+            if (active.state != CallSessionState.connected || !CallExtrasPolicy.permittedReaction(emoji) ||
+                (lastLocalReactionMillis != Long.MIN_VALUE && tick - lastLocalReactionMillis < CallExtrasPolicy.minimumReactionIntervalMillis)) return@guardCall
+            lastLocalReactionMillis = tick
+            val id = UUID.randomUUID().toString()
+            val delivered = callExtrasCapability(active.callId, active.remoteUserId, "reactions_v1")
+            if (delivered) signalSender.sendCallSignal(active.remoteUserId, mapOf("signal_type" to "call_reaction", "call_id" to active.callId,
+                "protocol_version" to 1, "reaction_id" to id, "emoji" to emoji, "ttl_ms" to CallExtrasPolicy.reactionLifetimeMillis))
+            showReaction(CallReaction(id, emoji, false, delivered, tick + CallExtrasPolicy.reactionLifetimeMillis), expected, active.callId)
+            sent = true
+        }
+        return sent
+    }
+    private fun clearCallExtras() {
+        reactionExpiry?.cancel(); reactionExpiry = null; callReaction = null
+        lastLocalReactionMillis = Long.MIN_VALUE; lastPeerReactionMillis = Long.MIN_VALUE; seenPeerReactions.clear()
+        localHoldRevision = 0; remoteHoldRevision = -1
+    }
 
     /** Run under the captured account/call/peer guard, after offer/answer enqueue. */
     private fun flushLocalCandidates(session: ChatyCallSession) {
@@ -290,6 +409,7 @@ class CallSignalingService(
      * detached peer and cannot touch a later account's media/session. */
     fun detachForAccountTransition(next: Any?): (suspend () -> Unit)? {
         if (callAccountScope === next) return null
+        closeVideoUpgrade()
         val old = media
         media = null; currentSession = null; callAccountScope = next
         acceptingCallId = null
@@ -354,6 +474,49 @@ class CallSignalingService(
                 else applied = guardCall(expectedAccount, callId, action = action)
             }
             applied
+        }
+        if (signalType == "call_hold" || signalType == "call_reaction") {
+            if (!receiveValid() || currentSession?.state != CallSessionState.connected ||
+                (signal["protocol_version"] != 1 && signal["protocol_version"] != 1L)) return
+            receiveGuard extras@{
+                val active = currentSession ?: return@extras
+                if (signalType == "call_hold") {
+                    if (!callExtrasCapability(callId, senderId, "hold_v1")) return@extras
+                    val revision = (signal["revision"] as? Number)?.toLong() ?: return@extras
+                    val held = signal["held"] as? Boolean ?: return@extras
+                    if (revision <= remoteHoldRevision || revision < 0) return@extras
+                    remoteHoldRevision = revision; currentSession = active.copy(isRemotelyHeld = held); notifyChanged()
+                } else {
+                    if (!callExtrasCapability(callId, senderId, "reactions_v1")) return@extras
+                    val id = signal["reaction_id"] as? String ?: return@extras
+                    val emoji = signal["emoji"] as? String ?: return@extras
+                    val ttl = (signal["ttl_ms"] as? Number)?.toLong() ?: return@extras
+                    val tick = monotonicMillis()
+                    if (id.isBlank() || id.length > 128 || id in seenPeerReactions || ttl !in 1..CallExtrasPolicy.reactionLifetimeMillis ||
+                        !CallExtrasPolicy.permittedReaction(emoji) || (lastPeerReactionMillis != Long.MIN_VALUE && tick-lastPeerReactionMillis < CallExtrasPolicy.minimumReactionIntervalMillis)) return@extras
+                    seenPeerReactions.add(id); if (seenPeerReactions.size > 64) seenPeerReactions.remove(seenPeerReactions.first())
+                    lastPeerReactionMillis = tick
+                    showReaction(CallReaction(id, emoji, true, true, tick + ttl), expectedAccount, callId)
+                }
+            }
+            return
+        }
+        if (signalType?.startsWith("video_") == true) {
+            if (!receiveValid() || currentSession?.state != CallSessionState.connected) return
+            if (signal["protocol_version"] != 1 && signal["protocol_version"] != 1L) return
+            val id = signal["request_id"] as? String ?: return
+            if (id.isBlank() || id.length > 128) return
+            val u = upgradeForCurrentCall() ?: return
+            when (signalType) {
+                "video_upgrade_request" -> u.incoming(id)
+                "video_upgrade_accept" -> u.accepted(id)
+                "video_upgrade_offer" -> u.offer(id, CallSignalCodec.sdp(signal["sdp"]))
+                "video_upgrade_answer" -> u.answer(id, CallSignalCodec.sdp(signal["sdp"]))
+                "video_upgrade_commit" -> u.commit(id)
+                "video_upgrade_decline", "video_upgrade_cancel" -> if (u.state.requestId == id) u.cancel(if (signalType == "video_upgrade_decline") "Video request declined" else "Video request cancelled", false)
+                "video_return_audio" -> if (u.state.requestId == id) u.returnToAudio(false)
+            }
+            return
         }
         when (signalType) {
             "offer" -> {
@@ -461,6 +624,7 @@ class CallSignalingService(
                         state = if (signalType == "busy") CallSessionState.busy else CallSessionState.declined,
                         endedAt = now(),
                     )
+                        closeVideoUpgrade()
                         oldPeer = media
                         media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
                         localDescriptionSignaled = false; pendingLocalCandidates.clear()
@@ -490,6 +654,7 @@ class CallSignalingService(
                         state = CallSessionState.ended,
                         endedAt = now(),
                     )
+                        closeVideoUpgrade()
                         oldPeer = media
                         media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
                         localDescriptionSignaled = false; pendingLocalCandidates.clear()
@@ -662,16 +827,18 @@ class CallSignalingService(
     }
 
     /** Dart declineCall. */
-    suspend fun declineCall() {
+    suspend fun declineCall(expectedCallId: String? = null) {
         val expected = callAccountScope
         var detached: CallMediaController? = null
         if (!accountScopeGuard(expected) {
             val session = currentSession
-            if (session != null && session.state == CallSessionState.incoming) {
+            if (session != null && session.state == CallSessionState.incoming &&
+                (expectedCallId == null || session.callId == expectedCallId)) {
                 ringTimeoutJob?.cancel(); connectionTimeoutJob?.cancel()
                 if (!session.isDemo) signalSender.sendCallSignal(session.remoteUserId, mapOf("signal_type" to "decline", "call_id" to session.callId))
                 logCallRecordOnce(session, CallDirection.missed, 0)
                 currentSession = session.copy(state = CallSessionState.declined, endedAt = now())
+                closeVideoUpgrade()
                 detached = media; media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
                         localDescriptionSignaled = false; pendingLocalCandidates.clear()
                 notifyChanged()
@@ -731,6 +898,7 @@ class CallSignalingService(
                 val direction = if (session.isOutgoing) CallDirection.outgoing else if (callDurationSeconds > 0) CallDirection.incoming else CallDirection.missed
                 logCallRecordOnce(session, direction, callDurationSeconds)
                 currentSession = session.copy(state = CallSessionState.ended, endedAt = now())
+                closeVideoUpgrade()
                 detached = media; media = null; remoteDescriptionReady = false; queuedRemoteCandidates.clear()
                         localDescriptionSignaled = false; pendingLocalCandidates.clear()
                 notifyChanged()
@@ -818,12 +986,8 @@ class CallSignalingService(
         notifyChanged()
     }
 
-    /** Dart sendCallReaction: production throws UnsupportedError. */
-    fun sendCallReaction(@Suppress("UNUSED_PARAMETER") emoji: String) {
-        throw UnsupportedOperationException(
-            "Call reactions are not available in production yet.",
-        )
-    }
+    /** Legacy entry point now routes the bounded real/local-only reaction workflow. */
+    fun sendCallReaction(emoji: String) { sendLocalCallReaction(emoji) }
 
     fun toggleMute() {
         accountScopeGuard(callAccountScope) control@{
@@ -836,7 +1000,7 @@ class CallSignalingService(
         }
         val stream = media ?: return@control
         if (!stream.hasLocalMedia) return@control
-        stream.setAudioEnabled(!nextMuted)
+        stream.setAudioEnabled(!nextMuted && !session.isLocallyHeld)
         currentSession = session.copy(isMuted = nextMuted)
         notifyChanged()
         }
@@ -1154,6 +1318,7 @@ class CallSignalingService(
 
     /** Called only while the caller owns the expected account guard. */
     private fun detachMediaTransport(): CallMediaController? {
+        closeVideoUpgrade()
         localDescriptionSignaled = false; pendingLocalCandidates.clear()
         remoteDescriptionReady = false
         queuedRemoteCandidates.clear()

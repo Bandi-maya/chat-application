@@ -79,9 +79,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -154,9 +156,11 @@ import com.example.chat.ui.theme.LocalThemeConfig
 import java.time.Duration
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Full port of lib/features/chats/chat_detail_screen.dart's conversation
  *  surface: header (normal + multi-select + in-chat search with match
@@ -250,6 +254,9 @@ fun ChatDetailScreen(
     onClearConversation: () -> Unit = {},
     onRetryMessage: (messageId: String) -> Unit = {},
     onOpenInfo: () -> Unit = {},
+    // Chaty #29: group sender avatar quick view actions; null lambdas hide their
+    // buttons. Host owns member navigation/call routing.
+    groupMemberActions: com.example.chat.ui.chats.detail.GroupMemberQuickActions? = null,
     externalSearchRequest: Int = 0,
     onCreateTaskFromMessage: (ChatMessage) -> Unit = {},
     // Dart dataStore.tasks slice + task callbacks (chat_detail_screen.dart:2966-3058);
@@ -310,7 +317,7 @@ fun ChatDetailScreen(
         com.example.chat.ui.chats.detail.LocalEmojiPack provides
             com.example.chat.ui.chats.detail.ChatyEmojiPack.normalize(universalEmojiStyle),
     ) {
-    val theme = LocalThemeConfig.current
+    val theme = com.example.chat.ui.chats.bundles.messageBundleTheme(LocalThemeConfig.current)
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -324,9 +331,18 @@ fun ChatDetailScreen(
     val contextMenuMessageState = remember { mutableStateOf<ChatMessage?>(null) }
     var contextMenuMessage by contextMenuMessageState
     var singleTapMessage by remember(conversation.id) { mutableStateOf<ChatMessage?>(null) }
+    var avatarQuickViewSenderId by remember(conversation.id) { mutableStateOf<String?>(null) }
     var infoMessage by remember(conversation.id) { mutableStateOf<ChatMessage?>(null) }
     var showStarredInChat by remember(conversation.id) { mutableStateOf(false) }
     val shareContext = androidx.compose.ui.platform.LocalContext.current
+    // Chaty #35 / GTranslate route: client-side online translation, no backend.
+    val translatorStore = remember(shareContext) {
+        com.example.chat.data.translate.TranslatorLanguageStore(shareContext)
+    }
+    val gTranslateClient = remember { com.example.chat.data.translate.GTranslateClient() }
+    var translateMessage by remember { mutableStateOf<ChatMessage?>(null) }
+    var choosingTranslatorLanguage by remember { mutableStateOf(false) }
+    var translatorTarget by remember { mutableStateOf(translatorStore.target()) }
     val localMessageStore = remember(localOverrideAccountKey, conversation.id) {
         com.example.chat.core.messages.LocalMessageOverrideStore(shareContext.applicationContext, localOverrideAccountKey, conversation.id)
     }
@@ -341,7 +357,102 @@ fun ChatDetailScreen(
     var contextMenuAnchor by remember { mutableStateOf<Rect?>(null) }
     var attachmentSheetOpen by remember { mutableStateOf(false) }
     var chatMenuOpen by remember { mutableStateOf(initialChatMenuOpen) }
-    var openedViewOnceIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    // View-once consumption persists per account (ViewOnceConsumedStore) so
+    // leaving and reopening the chat keeps expired items expired. The in-OK
+    // session sets start from the persisted ids; enforcement is local to this
+    // device and the pre-existing host retainViewOnce flag can still retain
+    // an opened in-session view.
+    val viewOnceConsumedStore = remember(shareContext, localOverrideAccountKey) {
+        com.example.chat.data.media.ViewOnceConsumedStore.android(shareContext, localOverrideAccountKey)
+    }
+    // Keyed by account + session identity: switching accounts or sessions
+    // reloads that account's persisted consumed ids and drops the previous
+    // in-memory view.
+    // Initial load is guarded: a read failure yields Failed (unknown), which
+    // must never be treated as an empty set. The sets start empty, the cards
+    // stay locked, and any open attempt surfaces the storage error via the
+    // controller's fail-closed isConsumed path below.
+    val viewOnceConsumedRead = remember(localOverrideAccountKey, messageSessionIdentity) {
+        viewOnceConsumedStore.readConsumed()
+    }
+    var openedViewOnceIds by remember(localOverrideAccountKey, messageSessionIdentity) {
+        mutableStateOf((viewOnceConsumedRead as? com.example.chat.data.media.ViewOnceConsumedStore.ReadResult.Ok)?.ids.orEmpty())
+    }
+    var completedViewOnceIds by remember(localOverrideAccountKey, messageSessionIdentity) {
+        mutableStateOf((viewOnceConsumedRead as? com.example.chat.data.media.ViewOnceConsumedStore.ReadResult.Ok)?.ids.orEmpty())
+    }
+    // GB/stock parity: the receiver sees the view-once explainer exactly once.
+    val viewOnceNuxStore = remember(shareContext) {
+        com.example.chat.data.media.ViewOnceNuxStore(shareContext)
+    }
+    // Keyed by account + session + conversation so a switch drops a pending
+    // explainer instead of acting on a stale message from the previous
+    // session. Each request carries a token; the confirm callback only acts
+    // while its token is still the current pending request.
+    var viewOnceNuxRequestCount by remember { mutableLongStateOf(0L) }
+    var viewOnceNuxPending by remember(localOverrideAccountKey, messageSessionIdentity, conversation.id) {
+        mutableStateOf<Pair<Long, ChatMessage>?>(null)
+    }
+    // One controller per account/session/conversation; the JVM-tested
+    // ordering lives in ViewOnceOpenController. The controller captures the
+    // identity tuple at creation and compares it against the CURRENT tuple
+    // (rememberUpdatedState) before and after the durable-write suspension:
+    // a controller surviving an account switch must not validate against
+    // the newly valid session, and this coroutine is not cancelled when the
+    // remember keys change.
+    val currentViewOnceSession by rememberUpdatedState(
+        Triple(localOverrideAccountKey, messageSessionIdentity, conversation.id)
+    )
+    val viewOnceOpenController = remember(localOverrideAccountKey, messageSessionIdentity, conversation.id) {
+        com.example.chat.core.messages.ViewOnceOpenController(
+            expectedSession = Triple(localOverrideAccountKey, messageSessionIdentity, conversation.id),
+            currentSession = { currentViewOnceSession },
+            // Captured at creation, NOT through rememberUpdatedState: the
+            // original session's own validity check (live auth revocation).
+            sessionStillValid = isMessageSessionCurrent,
+            isConsumed = { id ->
+                when (val read = viewOnceConsumedStore.readConsumed()) {
+                    is com.example.chat.data.media.ViewOnceConsumedStore.ReadResult.Ok -> read.ids.contains(id)
+                    // Unknown is not empty: throw so the controller turns it
+                    // into ConsumeFailed and the storage error shows.
+                    com.example.chat.data.media.ViewOnceConsumedStore.ReadResult.Failed ->
+                        throw IllegalStateException("view-once consumed store unreadable")
+                }
+            },
+            persistConsumed = { id ->
+                withContext(Dispatchers.IO) { viewOnceConsumedStore.markConsumed(id) }
+            },
+        )
+    }
+    var viewOnceOpenErrorId by remember(localOverrideAccountKey, messageSessionIdentity, conversation.id) {
+        mutableStateOf<String?>(null)
+    }
+    fun openViewOnceMessage(m: ChatMessage) {
+        val isVoice = m.attachment?.type == "audio" ||
+            m.type == com.example.chat.domain.models.MessageType.audio
+        scope.launch {
+            when (val result = viewOnceOpenController.open(m.id, isVoice)) {
+                is com.example.chat.core.messages.ViewOnceOpenController.Result.RevealVoice -> {
+                    openedViewOnceIds = openedViewOnceIds + m.id
+                    onViewOnceOpen(m)
+                }
+                is com.example.chat.core.messages.ViewOnceOpenController.Result.RevealMedia -> {
+                    openedViewOnceIds = openedViewOnceIds + m.id
+                    onViewOnceOpen(m)
+                }
+                is com.example.chat.core.messages.ViewOnceOpenController.Result.ConsumeFailed -> {
+                    // Fail-closed: nothing was revealed and the id stays out
+                    // of the session-opened set, so the card stays locked and
+                    // a later tap retries the durable write. Show a safe
+                    // error instead of the viewer.
+                    viewOnceOpenErrorId = result.id
+                }
+                is com.example.chat.core.messages.ViewOnceOpenController.Result.StaleSession,
+                is com.example.chat.core.messages.ViewOnceOpenController.Result.AlreadyConsumed,
+                is com.example.chat.core.messages.ViewOnceOpenController.Result.Busy -> Unit
+            }
+        }
+    }
     var pendingBelowCount by remember { mutableIntStateOf(0) }
     var localPinMenu by remember(conversation.id, messageSessionIdentity) { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
@@ -638,11 +749,9 @@ fun ChatDetailScreen(
             MessageActionType.deleteForMe -> onDeleteMessage(message.id, false)
             MessageActionType.deleteForEveryone -> onDeleteMessage(message.id, true)
             MessageActionType.translate -> {
-                // Dart _executeMessageAction translate: informational snackbar only.
-                scope.launch {
-                    snackbarHostState.showSnackbar(
-                        "Translation is not configured. Choose a supported translation provider in Settings.",
-                    )
+                if (com.example.chat.ui.chats.detail.SelectionAction.copy in
+                    com.example.chat.ui.chats.detail.SelectionActionPolicy.available(listOf(message))) {
+                    translateMessage = message
                 }
             }
             MessageActionType.report -> if (message.senderId != currentUserId) onReportMessage(message)
@@ -690,6 +799,9 @@ fun ChatDetailScreen(
         scope.launch {
             try {
                 onSend(text)
+                // Chaty #33: sending lands on the newest message even when the
+                // user was scrolled up reading history.
+                scrollToBottom()
             } catch (error: Exception) {
                 snackbarHostState.showSnackbar(
                     error.message?.removePrefix("Exception: ") ?: "Could not send message",
@@ -895,6 +1007,11 @@ fun ChatDetailScreen(
                                 null
                             },
                             showGroupAvatar = showGroupAvatar,
+                            onAvatarTap = if (conversation.isGroup && !isMine) {
+                                { avatarQuickViewSenderId = message.senderId }
+                            } else {
+                                null
+                            },
                             senderCluster = senderClusters[rowIndex],
                             isSenderAdmin = conversation.isGroup &&
                                 conversation.adminIds.contains(message.senderId),
@@ -918,6 +1035,7 @@ fun ChatDetailScreen(
                             showDeletedContent = showDeletedContent,
                             retainViewOnce = retainViewOnce,
                             viewOnceOpened = openedViewOnceIds.contains(message.id),
+                            viewOncePlaybackCompleted = completedViewOnceIds.contains(message.id),
                             colorOverrides = colorOverrides,
                             remoteImage = remoteImage,
                             onLongPress = { openMessageMenu(message, null) },
@@ -950,8 +1068,23 @@ fun ChatDetailScreen(
                             },
                             onVoicePlay = { attachment -> onVoicePlay(attachment) },
                             onViewOnceOpen = {
-                                openedViewOnceIds = openedViewOnceIds + message.id
-                                onViewOnceOpen(message)
+                                if (viewOnceNuxStore.needsReceiverNux()) {
+                                    viewOnceNuxPending = (++viewOnceNuxRequestCount) to message
+                                } else {
+                                    openViewOnceMessage(message)
+                                }
+                            },
+                            onViewOncePlaybackCompleted = {
+                                // Consumed in memory immediately (card expires
+                                // now). The durable append is best-effort:
+                                // playback already revealed the content, so
+                                // the write cannot be a precondition; if it
+                                // fails, expiry holds for this session but may
+                                // not survive process death.
+                                completedViewOnceIds = completedViewOnceIds + message.id
+                                scope.launch {
+                                    viewOnceOpenController.consumeAfterPlayback(message.id)
+                                }
                             },
                             onRetry = if (isMine && message.deliveryState == DeliveryState.failed) {
                                 { onRetryMessage(message.id) }
@@ -1213,8 +1346,8 @@ fun ChatDetailScreen(
                 },
                 com.example.chat.ui.chats.detail.MessageMoreOption("Copy", textAllowed) { runAction(tapped, MessageActionType.copy) },
                 com.example.chat.ui.chats.detail.MessageMoreOption("Copy Selection", textAllowed) { copySelectionMessage = tapped },
-                com.example.chat.ui.chats.detail.MessageMoreOption("Translate", false) {},
-                com.example.chat.ui.chats.detail.MessageMoreOption("Change Translator Language", false) {},
+                com.example.chat.ui.chats.detail.MessageMoreOption("Translate", textAllowed) { translateMessage = tapped },
+                com.example.chat.ui.chats.detail.MessageMoreOption("Change Translator Language", true) { choosingTranslatorLanguage = true },
                 com.example.chat.ui.chats.detail.MessageMoreOption("interaction", ReleaseFeatures.MESSAGE_REACTIONS && standard) { emojiReactionTarget = tapped },
                 com.example.chat.ui.chats.detail.MessageMoreOption("Double Tap Reaction", ReleaseFeatures.MESSAGE_REACTIONS && onDoubleTapReactionEmojiChanged != null) { choosingDoubleTapEmoji = true },
                 com.example.chat.ui.chats.detail.MessageMoreOption("Image quote", textAllowed) { quoteMessageId = tapped.id },
@@ -1234,6 +1367,76 @@ fun ChatDetailScreen(
                 com.example.chat.ui.chats.detail.MessageMoreOption("Message info", true) { infoMessage = tapped },
             ),
             onDismiss = { singleTapMessage = null },
+        )
+    }
+    avatarQuickViewSenderId?.let { senderId ->
+        com.example.chat.ui.chats.detail.GroupMemberQuickViewDialog(
+            senderId = senderId,
+            senderName = resolveSenderName(senderId),
+            actions = groupMemberActions ?: com.example.chat.ui.chats.detail.GroupMemberQuickActions(),
+            onDismiss = { avatarQuickViewSenderId = null },
+        )
+    }
+    viewOnceOpenErrorId?.let {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { viewOnceOpenErrorId = null },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { viewOnceOpenErrorId = null }) { Text("OK") }
+            },
+            title = { Text("Couldn't open view-once message") },
+            text = { Text("The message could not be saved as viewed on this device, so it was not opened and nothing was revealed. Try again.") },
+        )
+    }
+    viewOnceNuxPending?.let { (requestToken, pending) ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { viewOnceNuxPending = null },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    // Stale-callback guard: act only while this dialog is the
+                    // current pending request token (account, session or
+                    // conversation may have changed while it was visible).
+                    if (viewOnceNuxPending?.first == requestToken) {
+                        viewOnceNuxStore.markReceiverSeen()
+                        viewOnceNuxPending = null
+                        openViewOnceMessage(pending)
+                    }
+                }) { Text("Open") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { viewOnceNuxPending = null }) { Text("Not now") }
+            },
+            title = { Text("View once message") },
+            text = {
+                Text(
+                    // Honest while the pre-existing anti-view-once retention
+                    // flag is on (default): opened photos/videos stay visible.
+                    if (retainViewOnce) {
+                        "This photo, video or voice message is marked as view once. The view-once retention setting is on for this device, so opened photos and videos stay visible in this chat; voice messages still play only once."
+                    } else {
+                        "This photo, video or voice message disappears from the chat on this device after you have seen or played it once."
+                    },
+                )
+            },
+        )
+    }
+    translateMessage?.let { target ->
+        val language = com.example.chat.core.translate.ChatTranslationPolicy.languages
+            .first { it.code == translatorTarget }
+        com.example.chat.ui.chats.detail.MessageTranslateDialog(
+            sourceText = target.text,
+            targetLanguage = language,
+            client = gTranslateClient,
+            onDismiss = { translateMessage = null },
+        )
+    }
+    if (choosingTranslatorLanguage) {
+        com.example.chat.ui.chats.detail.TranslatorLanguageDialog(
+            current = translatorTarget,
+            onPick = { picked ->
+                translatorTarget = picked.code
+                translatorStore.setTarget(picked.code)
+            },
+            onDismiss = { choosingTranslatorLanguage = false },
         )
     }
     quoteMessageId?.let { id -> messages.firstOrNull { it.id == id } }
@@ -1355,32 +1558,33 @@ fun ChatDetailScreen(
                     },
                 )
             } else {
-                com.example.chat.ui.chats.detail.AttachmentGallerySheet(
-                    theme = theme,
-                    // User directive: the clip/attachment panel opens taller and expands
-                    // to full height when pulled up.
-                    heightFraction = if (attachmentSheetState.targetValue == androidx.compose.material3.SheetValue.Expanded) 1.0f else 0.72f,
-                    onAction = { action ->
-                        attachmentSheetOpen = false
-                        onAttachmentAction(action)
-                    },
-                    onCamera = {
-                        attachmentSheetOpen = false
-                        onCameraTap()
-                    },
-                    onReviewImages = attachmentReviewImages?.let { review ->
-                        { uris ->
+                com.example.chat.ui.chats.detail.AttachmentGalleryViewport(attachmentSheetState) {
+                    com.example.chat.ui.chats.detail.AttachmentGallerySheet(
+                        theme = theme,
+                        // The wrapper follows the actual visible viewport, not targetValue.
+                        heightFraction = 1.0f,
+                        onAction = { action ->
                             attachmentSheetOpen = false
-                            review(uris)
-                        }
-                    },
-                    onDirectSendImages = attachmentDirectSendImages?.let { send ->
-                        { uris ->
+                            onAttachmentAction(action)
+                        },
+                        onCamera = {
                             attachmentSheetOpen = false
-                            send(uris)
-                        }
-                    },
-                )
+                            onCameraTap()
+                        },
+                        onReviewImages = attachmentReviewImages?.let { review ->
+                            { uris ->
+                                attachmentSheetOpen = false
+                                review(uris)
+                            }
+                        },
+                        onDirectSendImages = attachmentDirectSendImages?.let { send ->
+                            { uris ->
+                                attachmentSheetOpen = false
+                                send(uris)
+                            }
+                        },
+                    )
+                }
             }
         }
     }

@@ -21,12 +21,14 @@ class ImageEditorPixelsTest {
         assertEquals(Color.rgb(60, 80, 100), original.getPixel(40, 40))
     }
     @Test fun drawingAndBrightnessAreInExportedPixelsNotJustPreview() {
-        val original = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.rgb(60, 80, 100)) }
+        val original = Bitmap.createBitmap(500, 500, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.rgb(60, 80, 100)) }
+        //4px brush at500px source gives a solid interior sample;100px made a
+        //0.8px antialiased line with no fully covered pixel at the asserted center.
         val stroke = EditorStroke(Color.RED.toLong(), listOf(Offset(0.1f, 0.5f), Offset(0.9f, 0.5f)))
         val edited = renderEditedImage(original, 0.1f, 1f, listOf(stroke))
-        assertTrue(Color.red(edited.getPixel(50, 50)) > 240)
-        assertTrue(Color.green(edited.getPixel(50, 50)) < 15)
-        assertTrue(Color.red(edited.getPixel(10, 10)) > Color.red(original.getPixel(10, 10)))
-        assertEquals(Color.rgb(60, 80, 100), original.getPixel(50, 50))
+        assertTrue(Color.red(edited.getPixel(250, 250)) > 240)
+        assertTrue(Color.green(edited.getPixel(250, 250)) < 15)
+        assertTrue(Color.red(edited.getPixel(50, 50)) > Color.red(original.getPixel(50, 50)))
+        assertEquals(Color.rgb(60, 80, 100), original.getPixel(250, 250))
     }
 }

@@ -26,7 +26,6 @@ val hostedSettingsDestinations: Set<SettingsDestination> = setOf(
     SettingsDestination.Conversation, SettingsDestination.HomeScreen, SettingsDestination.Calls,
     SettingsDestination.Permissions, SettingsDestination.StorageMedia,
     SettingsDestination.TemplateStudio, SettingsDestination.ThemeEngine,
-    SettingsDestination.AdvancedFeatures, SettingsDestination.ChatyCustomizationHub,
     SettingsDestination.HomeShortcuts, SettingsDestination.WasteCleaning,
 )
 
@@ -48,14 +47,9 @@ fun SettingsSubHost(
     val toast: (String) -> Unit = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     when (destination) {
         SettingsDestination.Privacy -> PrivacyCenterScreen(preferences = prefs, onBack = onBack)
-        SettingsDestination.AdvancedFeatures -> com.example.chat.ui.settings.gb.GbFeatureCenterScreen(
-            preferences = prefs,
-            onBack = onBack,
-        )
-        SettingsDestination.ChatyCustomizationHub -> GbSettingsHubHost(onBack = onBack, onSwitch = onSwitch)
         SettingsDestination.Effects -> NavigationEffectsScreen(preferences = prefs, onBack = onBack)
-        // Notification preferences use the native Dynamic Island bridge. The
-        // preview action below deliberately posts a real local test notification.
+        // Dart settings_root_screen '/settings/notifications' => NotificationSettingsPage (the toast-only screen is not
+        // instantiated anywhere in Dart). Dynamic Island native bridge has no Kotlin implementation: bridge = null.
         SettingsDestination.Notifications -> com.example.chat.ui.settings.notifications.NotificationSettingsPage(
             preferences = prefs, onBack = onBack,
             bridge = com.example.chat.ui.island.AndroidDynamicIslandBridge(androidx.compose.ui.platform.LocalContext.current),
@@ -174,6 +168,7 @@ fun SettingsSubHost(
             } else if (showBundles) {
                 com.example.chat.ui.calls.bundles.CallExperienceBundlePickerScreen(
                     currentBundleId = store.value.callExperienceBundleId,
+                    onApplyScopedBundle = { bundleId, target -> store.applyExperienceBundle(bundleId, target) },
                     onApplyBundle = { bundleId ->
                         scope.launch {
                             try {
@@ -227,7 +222,7 @@ fun SettingsSubHost(
             canUseBiometrics = { ServiceLocator.localLockService.canUseBiometrics() },
             authenticateBiometric = { reason -> ServiceLocator.localLockService.authenticateBiometric(reason) },
         )
-        // Storage quality controls are backed by the shared media-upload preferences; local cache actions stay account-scoped.
+        // Storage quality controls are backed by the shared media-upload preferences.
         SettingsDestination.StorageMedia -> {
             var cacheLimitMb by remember { mutableStateOf(com.example.chat.data.local.MediaCacheSettings.limitMb(context)) }
             StorageMediaScreen(

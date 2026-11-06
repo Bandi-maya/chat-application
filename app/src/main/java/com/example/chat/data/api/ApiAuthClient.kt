@@ -71,7 +71,36 @@ class ApiAuthClient(
         username: String? = null,
         avatarUrl: String? = null,
     ): Pair<Boolean, String> {
-        val authToken = token() ?: throw Exception("Not authenticated")
+        val tok = token() ?: throw Exception("Not authenticated")
+        return putProfile(baseUrl(), tenantId(), tok, displayName, about, username, avatarUrl) { }
+    }
+
+    /** Account-bound form: route, tenant and token come ONLY from [expected] (captured once, never re-read on the
+     *  404 retry). [isCurrent] (authSnapshot() === expected) is checked before each request and before the result is
+     *  released; a failed check throws [ApiScopeChangedException] and no retry is sent. HTTP runs outside any lock.
+     *  A blank token or blank userId is rejected before any request. The caller publishes to the local profile inside
+     *  a short withScope(expected) callback. */
+    fun updateProfile(
+        expected: ApiAccountScope,
+        isCurrent: () -> Boolean,
+        displayName: String? = null,
+        about: String? = null,
+        username: String? = null,
+        avatarUrl: String? = null,
+    ): Pair<Boolean, String> {
+        val tok = expected.token?.takeIf { it.isNotBlank() && !expected.userId.isNullOrBlank() }
+            ?: throw Exception("Not authenticated")
+        if (expected.baseUrl.isBlank()) throw Exception("Not authenticated")
+        return putProfile(expected.baseUrl, expected.tenantId, tok, displayName, about, username, avatarUrl) {
+            if (!isCurrent()) throw ApiScopeChangedException()
+        }
+    }
+
+    private fun putProfile(
+        base: String, tenant: String, authToken: String,
+        displayName: String?, about: String?, username: String?, avatarUrl: String?,
+        check: () -> Unit,
+    ): Pair<Boolean, String> {
         val payload = JSONObject()
         if (displayName != null) payload.put("full_name", displayName.trim())
         if (about != null) payload.put("about", about.trim())
@@ -84,20 +113,23 @@ class ApiAuthClient(
         val headers = mapOf(
             "Authorization" to "Bearer $authToken",
             "Content-Type" to "application/json",
-            "x-tenant-id" to tenantId(),
+            "x-tenant-id" to tenant,
         )
+        check()
         val response = try {
-            transport.execute("PUT", "${baseUrl()}/app-users/profile", headers, payload.toString())
+            transport.execute("PUT", "$base/app-users/profile", headers, payload.toString())
         } catch (e: Exception) {
             throw Exception("Unable to reach server to update profile: $e")
         }
+        check()   // switch while in flight: no retry under a stale account
         val finalResponse = if (response.first == 404) {
             try {
-                transport.execute("PUT", "${baseUrl()}/api/v1/app-users/profile", headers, payload.toString())
+                transport.execute("PUT", "$base/api/v1/app-users/profile", headers, payload.toString())
             } catch (e: Exception) {
                 throw Exception("Unable to reach server to update profile: $e")
             }
         } else response
+        check()   // never release a result into a replaced account
 
         if (finalResponse.first == 200) return true to ""
         var detail = "Failed to update profile (${finalResponse.first})"
@@ -235,15 +267,9 @@ class ApiAuthClient(
     fun checkOrganization(workspace: String): Map<String, Any?> {
         val clean = workspace.trim()
         if (clean.isEmpty()) throw Exception("Organization ID cannot be empty")
-        val safeWorkspace = clean.takeIf { value ->
-            value.length <= 64 && value != "." && value != ".." &&
-                value.first().isLetterOrDigit() &&
-                value.all { it.isLetterOrDigit() || it == '-' || it == '_' || it == '.' }
-        } ?: throw IllegalArgumentException("Organization ID contains invalid characters.")
-        val encodedWorkspace = java.net.URLEncoder.encode(safeWorkspace, "UTF-8")
 
-        val primary = "${baseUrl()}/organization/check/$encodedWorkspace"
-        val fallback = "${baseUrl()}/tenants/config?tenant_id=$encodedWorkspace"
+        val primary = "${baseUrl()}/organization/check/$clean"
+        val fallback = "${baseUrl()}/tenants/config?tenant_id=$clean"
         var response: Pair<Int, String>? = null
         try {
             response = transport.execute("GET", primary, emptyMap(), null)
@@ -294,6 +320,18 @@ class ApiAuthClient(
     }
 
 
+    /** Transport failure text: name the actual cause class so a server outage is not
+     *  misreported as the user's internet. The configured endpoint is not changed here. */
+    private fun serverUnreachable(e: Exception): Exception {
+        val cause = when (e) {
+            is java.net.SocketTimeoutException -> "server did not answer in time"
+            is java.net.ConnectException -> "connection refused by the server"
+            is java.net.UnknownHostException -> "server address not found"
+            else -> e.javaClass.simpleName
+        }
+        return Exception("Unable to reach the Chaty server ($cause). Check your internet connection; if it works, the server itself is not responding - try again later.")
+    }
+
     private fun postWithFallback(
         path: String,
         body: String,
@@ -303,13 +341,13 @@ class ApiAuthClient(
         val response = try {
             transport.execute("POST", "${baseUrl()}/$path", headers, body)
         } catch (e: Exception) {
-            throw Exception("Unable to reach server. Please check your internet connection.")
+            throw serverUnreachable(e)
         }
         if (response.first == 404) {
             return try {
                 transport.execute("POST", "${baseUrl()}/api/v1/$path", headers, body)
             } catch (e: Exception) {
-                throw Exception("Unable to reach server. Please check your internet connection.")
+                throw serverUnreachable(e)
             }
         }
         return response

@@ -128,7 +128,7 @@ fun StatusSettingsScreen(preferences: ChatyPreferencesController, onBack: () -> 
                                     Text("TN", fontWeight = FontWeight.Bold, color = Color(config.primaryTextColor))
                                 }
                                 Box(Modifier.align(Alignment.BottomEnd).background(accent, CircleShape).padding(2.dp)) {
-                                    Icon(Icons.Rounded.Add, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    Icon(Icons.Rounded.Add, null, tint = com.example.chat.ui.kit.chatyReadableOn(accent, Color.White, Color.Black), modifier = Modifier.size(14.dp))
                                 }
                             }
                             Spacer(Modifier.width(14.dp))

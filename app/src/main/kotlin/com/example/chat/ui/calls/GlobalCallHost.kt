@@ -73,6 +73,8 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
         onDispose { service.removeCallWaitingListener(waiting) }
     }
     @Suppress("UNUSED_EXPRESSION") revision
+    val notificationPreviewOwner = remember(service.currentSession?.callId) { IncomingPreviewOwner() }
+    DisposableEffect(notificationPreviewOwner) { onDispose { notificationPreviewOwner.close() } }
     // "Answer" tapped on the incoming-call notification: accept as soon as the offer is here
     // (when the app was closed it arrives a moment after the socket reconnects).
     val pendingCallAction by com.example.chat.notifications.ChatyNotifications.pendingCallAction
@@ -84,6 +86,7 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
         com.example.chat.notifications.ChatyNotifications.consumeCallAction()
         if (cs.state != CallSessionState.incoming) return@LaunchedEffect
         if (act.answer) {
+            notificationPreviewOwner.close()
             presentation.showFullScreen()
             callAction(cs.callId, "Unable to accept the call. Check microphone and camera permissions.") { service.acceptCall() }
         }
@@ -147,19 +150,22 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
             } finally { incomingGate.complete(); incomingActionPending = false }
         }
     }
+    val incomingPreviewOwner = notificationPreviewOwner
     if (bundlePresentation.incoming) {
         com.example.chat.ui.calls.bundles.BundleIncomingCallView(
             bundleId = activeBundle,
             session = session,
             actionPending = incomingActionPending,
             banner = incomingBanner,
+            localPreviewOwner = incomingPreviewOwner,
             onExpand = { incomingBanner = false },
-            onMinimize = { incomingBanner = true },
+            onMinimize = { incomingPreviewOwner.close(); incomingBanner = true },
             onAccept = { incomingAction {
+                incomingPreviewOwner.close()
                 presentation.showFullScreen()
                 service.acceptCall()
             } },
-            onDecline = { incomingAction { service.declineCall() } },
+            onDecline = { incomingPreviewOwner.close(); incomingAction { service.declineCall() } },
         )
         return
     }
@@ -168,6 +174,28 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
     if (!session.isActive && (!terminalNotice || dismissedNotice)) return
 
     val surfaces = service.activeMedia as? CallVideoSurfaceProvider
+    val upgradePhase = service.videoUpgradePhase
+    if (upgradePhase == com.example.chat.data.services.VideoUpgradeState.Phase.INCOMING) {
+        androidx.compose.material3.AlertDialog(onDismissRequest = { service.declineVideoUpgrade() },
+            title = { androidx.compose.material3.Text("Switch to video?") },
+            text = { androidx.compose.material3.Text("${session.remoteDisplayName} wants to use video. Your camera will stay off until both sides agree and setup finishes. Audio continues if you decline.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { service.acceptVideoUpgrade() }) { androidx.compose.material3.Text("Accept video") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { service.declineVideoUpgrade() }) { androidx.compose.material3.Text("Keep audio") } })
+    } else if (upgradePhase == com.example.chat.data.services.VideoUpgradeState.Phase.OUTGOING || upgradePhase == com.example.chat.data.services.VideoUpgradeState.Phase.NEGOTIATING) {
+        androidx.compose.material3.AlertDialog(onDismissRequest = { service.cancelVideoUpgrade() },
+            title = { androidx.compose.material3.Text(if (upgradePhase == com.example.chat.data.services.VideoUpgradeState.Phase.OUTGOING) "Waiting for video consent" else "Setting up video") },
+            text = { androidx.compose.material3.Text("Audio remains connected. Video starts only when both sides agree and setup succeeds.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { service.cancelVideoUpgrade() }) { androidx.compose.material3.Text("Cancel video") } })
+    }
+    var toolsOpen by remember(session.callId) { mutableStateOf(false) }
+    if (toolsOpen && !terminalNotice) {
+        CallToolsDialog(session.isLocallyHeld, service.canHoldLocally, service.canNotifyHold,
+            onHold = { service.toggleLocalHold() },
+            onReaction = { emoji ->
+                if (service.sendLocalCallReaction(emoji)) toolsOpen = false
+                else android.widget.Toast.makeText(hostContext, "Wait a moment before another reaction, or reconnect the call.", android.widget.Toast.LENGTH_SHORT).show()
+            }, onDismiss = { toolsOpen = false })
+    }
     if (presentation.isFullScreen || terminalNotice) {
         OngoingCallScreen(
             session = session,
@@ -183,6 +211,16 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
                 if (terminalNotice) dismissedNotice = true
                 else presentation.minimizeToPipOrIsland()
             },
+            onCallTools = if (session.state == CallSessionState.connected) ({ toolsOpen = true }) else null,
+            callToolsStatus = when {
+                session.isLocallyHeld -> if (service.canNotifyHold) "On hold" else "On hold locally - peer not notified"
+                session.isRemotelyHeld -> "Other person put the call on hold"
+                else -> null
+            },
+            reactionText = service.callReaction?.let { r -> "${r.emoji} " + if (r.fromPeer) "From ${session.remoteDisplayName}" else if (r.deliveredToPeer) "Sent" else "Only on this device" },
+            onRequestVideo = if (service.canRequestVideoUpgrade) ({ service.requestVideoUpgrade(); Unit }) else null,
+            videoUpgradeStatus = service.videoUpgradeNotice ?: "Video upgrade pending verified server and peer support",
+            onReturnToAudio = if (session.isVideo && service.videoUpgradePhase == com.example.chat.data.services.VideoUpgradeState.Phase.VIDEO) ({ service.returnToAudio() }) else null,
             onEndCall = { service.endCall() },
             onToggleMute = { service.toggleMute() },
             onToggleCamera = { service.toggleCamera() },

@@ -24,6 +24,7 @@ import androidx.compose.material.icons.rounded.Dialpad
 import androidx.compose.material.icons.rounded.PhoneCallback
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,7 +75,15 @@ fun CallsScreen(
         containerColor = com.example.chat.ui.navigation.LocalReferenceContentSurface.current ?: Color(theme.backgroundColor),
         floatingActionButton = {
             if (showCallActions) {
-                ExtendedFloatingActionButton(
+                if (com.example.chat.ui.navigation.LocalReferenceDefaultPresentation.current) {
+                    FloatingActionButton(
+                        modifier = Modifier.size(56.dp).semantics { contentDescription = "Add call" },
+                        onClick = onOpenAddCall,
+                        shape = RoundedCornerShape(16.dp),
+                        containerColor = Color(theme.accentColor),
+                        contentColor = Color(theme.onAccentColor),
+                    ) { Icon(Icons.Rounded.Dialpad, contentDescription = null) }
+                } else ExtendedFloatingActionButton(
                     modifier = Modifier.semantics { contentDescription = "Add call" },
                     onClick = onOpenAddCall,
                     containerColor = Color(theme.accentColor),

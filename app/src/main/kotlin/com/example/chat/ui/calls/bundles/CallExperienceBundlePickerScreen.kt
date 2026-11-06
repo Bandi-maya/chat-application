@@ -1,6 +1,6 @@
 package com.example.chat.ui.calls.bundles
 
-import android.widget.Toast
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,20 +34,50 @@ fun CallExperienceBundlePickerScreen(
     currentBundleId: String,
     onApplyBundle: (String) -> Unit,
     onBack: () -> Unit,
+    onApplyScopedBundle: (suspend (String, com.example.chat.ui.calls.BundleApplyTarget) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var selectedId by remember { mutableStateOf(currentBundleId) }
     var previewBundleId by remember { mutableStateOf<CallBundleId?>(null) }
+    var pendingBundle by remember { mutableStateOf<CallBundleId?>(null) }
+    var applying by remember { mutableStateOf(false) }
+    var applyError by remember { mutableStateOf<String?>(null) }
+    val applyScope = rememberCoroutineScope()
+    pendingBundle?.let { pending ->
+        AlertDialog(onDismissRequest = { if (!applying) pendingBundle = null },
+            title = { Text("Apply ${pending.displayName}") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Choose which layouts to change. Your other selection stays unchanged.")
+                com.example.chat.ui.calls.BundleApplyTarget.entries.forEach { target ->
+                    TextButton(enabled = !applying, modifier = Modifier.heightIn(min = 48.dp), onClick = {
+                        applying = true; applyError = null
+                        applyScope.launch {
+                            try {
+                                val scoped = onApplyScopedBundle
+                                if (scoped != null) scoped(pending.id, target)
+                                else if (target == com.example.chat.ui.calls.BundleApplyTarget.CALLS) onApplyBundle(pending.id)
+                                else error("Message bundle application is unavailable on this screen.")
+                                if (target != com.example.chat.ui.calls.BundleApplyTarget.MESSAGES) selectedId = pending.id
+                                pendingBundle = null; previewBundleId = null
+                            } catch (error: Exception) { applyError = error.message ?: "Unable to apply bundle" }
+                            finally { applying = false }
+                        }
+                    }) { Text(when (target) {
+                        com.example.chat.ui.calls.BundleApplyTarget.CALLS -> "Calls only"
+                        com.example.chat.ui.calls.BundleApplyTarget.MESSAGES -> "Messages only"
+                        com.example.chat.ui.calls.BundleApplyTarget.BOTH -> "Both"
+                    }) }
+                }
+                applyError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            } }, confirmButton = { TextButton(enabled = !applying, onClick = { pendingBundle = null }) { Text("Cancel") } })
+    }
 
     if (previewBundleId != null) {
         CallBundleLivePreviewScreen(
             bundleId = previewBundleId!!,
             onClose = { previewBundleId = null },
             onApply = {
-                selectedId = previewBundleId!!.id
-                onApplyBundle(previewBundleId!!.id)
-                Toast.makeText(context, "${previewBundleId!!.displayName} applied", Toast.LENGTH_SHORT).show()
-                previewBundleId = null
+                pendingBundle = previewBundleId
             },
         )
         return
@@ -92,7 +122,7 @@ fun CallExperienceBundlePickerScreen(
         ) {
             items(CallBundleId.all, key = { it.id }) { bundle ->
                 val isSelected = bundle.id == selectedId
-                val tokens = remember(bundle) { CallBundleRegistry.getTokens(bundle) }
+                val tokens = com.example.chat.ui.calls.themedCallBundle(bundle)
 
                 Surface(
                     shape = RoundedCornerShape(20.dp),
@@ -104,9 +134,7 @@ fun CallExperienceBundlePickerScreen(
                             else Modifier
                         )
                         .clickable {
-                            selectedId = bundle.id
-                            onApplyBundle(bundle.id)
-                            Toast.makeText(context, "${bundle.displayName} applied", Toast.LENGTH_SHORT).show()
+                            pendingBundle = bundle
                         },
                 ) {
                     Column(
@@ -178,9 +206,7 @@ fun CallExperienceBundlePickerScreen(
                             Spacer(Modifier.width(10.dp))
                             Button(
                                 onClick = {
-                                    selectedId = bundle.id
-                                    onApplyBundle(bundle.id)
-                                    Toast.makeText(context, "${bundle.displayName} applied", Toast.LENGTH_SHORT).show()
+                                    pendingBundle = bundle
                                 },
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(

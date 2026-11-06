@@ -104,7 +104,7 @@ class TemplateController(private val store: TemplateStateStore) {
     suspend fun resetNavigationDestinations(runtime: TemplateRuntime = TemplateRuntime()) =
         commit({ it.withoutNavigationDestinationOverride() }, runtime, applyNavigation = true)
 
-    suspend fun init(runtime: TemplateRuntime = TemplateRuntime()) {
+    suspend fun init(runtime: TemplateRuntime = TemplateRuntime(), restorePresentation: Boolean = true) {
         if (initialized) return
         initialized = true
         try {
@@ -113,7 +113,10 @@ class TemplateController(private val store: TemplateStateStore) {
         } catch (e: Exception) {
             // Dart: debugPrint, keep defaults.
         }
-        sync(runtime, applyTheme = true, applyNavigation = true, applyHome = true, applyConversation = true)
+        // A process restore must not re-apply a template over the user's saved layout choice.
+        // Explicit template Apply actions below still own their requested presentation changes.
+        sync(runtime, applyTheme = true, applyNavigation = restorePresentation,
+            applyHome = restorePresentation, applyConversation = true)
     }
 
     suspend fun synchronizeThemeAndNavigation(runtime: TemplateRuntime) =

@@ -73,8 +73,8 @@ enum class ProfileHeaderStyle { compactHeader, centeredIdentity, bannerWithAvata
 /**
  * Port of lib/features/profile/profile_screen.dart (api @ 3bee780d): the
  * root "Profile" destination with banner/avatar header, optional stats
- * grid, Account and App sections and the log-out entry with the shared
- * confirmChatyLogout dialog copy.
+ * grid, a flat GB-style row list with hairline dividers and the log-out
+ * entry with the shared confirmChatyLogout dialog copy.
  *
  * TemplateController/profile-template values (headerStyle, showStatsGrid,
  * avatarShape) arrive as parameters until the template slice lands; the
@@ -121,22 +121,6 @@ fun ProfileScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
-            // ChatySettingsPage title/subtitle.
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
-                Text(
-                    "Profile",
-                    color = Color(theme.primaryTextColor),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.4).sp,
-                )
-                Text(
-                    "Account, status and app entry points",
-                    color = Color(theme.secondaryTextColor),
-                    fontSize = 13.sp,
-                )
-            }
-
             ProfileHeader(
                 initials = user.avatarInitials,
                 colorHex = user.avatarColorHex,
@@ -154,58 +138,56 @@ fun ProfileScreen(
             if (showStatsGrid) {
                 Spacer(Modifier.height(8.dp))
                 ProfileStatsGrid(chats = chatsCount, groups = groupsCount, contacts = contactsCount)
-            }
-            Spacer(Modifier.height(8.dp))
-
-            SettingsSection(title = "Account") {
-                SettingsTile(
-                    icon = Icons.Outlined.AlternateEmail,
-                    title = "Username",
-                    subtitle = "@${user.username}",
-                )
-                if (user.about.isNotEmpty()) {
-                    SettingsTile(
-                        icon = Icons.Outlined.Info,
-                        title = "About",
-                        subtitle = user.about,
-                    )
-                }
+                Spacer(Modifier.height(12.dp))
             }
 
-            SettingsSection(title = "App") {
+            // GB profile rows: one flat list with hairline dividers, no
+            // section headers or cards. Only existing destinations.
+            SettingsTile(
+                icon = Icons.Outlined.AlternateEmail,
+                title = "Username",
+                subtitle = "@${user.username}",
+            )
+            if (user.about.isNotEmpty()) {
+                ProfileRowDivider()
                 SettingsTile(
-                    icon = Icons.Outlined.Settings,
-                    title = "Settings",
-                    subtitle = "Account, privacy, appearance and app behavior",
-                    showChevron = true,
-                    onClick = onOpenSettings,
-                )
-                SettingsTile(
-                    icon = Icons.Outlined.NotificationsNone,
-                    title = "Notifications",
-                    subtitle = "Toasts, alerts and previews",
-                    showChevron = true,
-                    onClick = onOpenNotifications,
-                )
-                SettingsTile(
-                    icon = Icons.Outlined.VisibilityOff,
-                    title = "Privacy Center",
-                    subtitle = "Presence, receipts and anti-delete options",
-                    showChevron = true,
-                    onClick = onOpenPrivacyCenter,
+                    icon = Icons.Outlined.Info,
+                    title = "About",
+                    subtitle = user.about,
                 )
             }
-            Spacer(Modifier.height(8.dp))
-
-            SettingsSection {
-                SettingsTile(
-                    icon = Icons.AutoMirrored.Rounded.Logout,
-                    iconTint = Color(theme.dangerColor),
-                    title = "Log out",
-                    subtitle = "Sign out of Chaty on this device",
-                    onClick = { showLogoutConfirm = true },
-                )
-            }
+            ProfileRowDivider()
+            SettingsTile(
+                icon = Icons.Outlined.Settings,
+                title = "Settings",
+                subtitle = "Account, privacy, appearance and app behavior",
+                showChevron = true,
+                onClick = onOpenSettings,
+            )
+            ProfileRowDivider()
+            SettingsTile(
+                icon = Icons.Outlined.NotificationsNone,
+                title = "Notifications",
+                subtitle = "Toasts, alerts and previews",
+                showChevron = true,
+                onClick = onOpenNotifications,
+            )
+            ProfileRowDivider()
+            SettingsTile(
+                icon = Icons.Outlined.VisibilityOff,
+                title = "Privacy Center",
+                subtitle = "Presence, receipts and anti-delete options",
+                showChevron = true,
+                onClick = onOpenPrivacyCenter,
+            )
+            ProfileRowDivider()
+            SettingsTile(
+                icon = Icons.AutoMirrored.Rounded.Logout,
+                iconTint = Color(theme.dangerColor),
+                title = "Log out",
+                subtitle = "Sign out of Chaty on this device",
+                onClick = { showLogoutConfirm = true },
+            )
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -712,6 +694,18 @@ internal fun SettingsSection(
     }
 }
 
+/** GB profile hairline divider, inset to align with the row title text. */
+@Composable
+private fun ProfileRowDivider() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 46.dp)
+            .height(0.5.dp)
+            .background(LocalAppColors.current.borderSubtle),
+    )
+}
+
 @Composable
 internal fun SettingsTile(
     icon: ImageVector,
@@ -732,12 +726,12 @@ internal fun SettingsTile(
         Icon(
             icon,
             contentDescription = null,
-            tint = iconTint ?: Color(theme.accentColor),
+            tint = iconTint ?: Color(theme.secondaryTextColor),
             modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color(theme.primaryTextColor), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(title, color = Color(theme.primaryTextColor), fontSize = 14.sp, fontWeight = FontWeight.Normal)
             Text(
                 subtitle,
                 color = Color(theme.secondaryTextColor),

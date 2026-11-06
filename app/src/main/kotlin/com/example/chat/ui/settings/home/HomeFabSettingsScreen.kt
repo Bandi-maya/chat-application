@@ -48,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -92,7 +93,15 @@ fun HomeFabSettingsScreen(preferences: ChatyPreferencesController, onBack: () ->
     val accent = Color(config.accentColor)
     val normalColor = colorOr(p.fabNormalColor, accent)
     val pressedColor = colorOr(p.fabPressedColor, accent.copy(alpha = 0.8f))
-    val iconColor = colorOr(p.fabIconsColor, Color.White)
+    // Only the DEFAULT adapts (white on the dark theme turquoise is 2.2:1); a user-picked icon colour is kept as is.
+    val iconColor = colorOr(p.fabIconsColor, com.example.chat.ui.kit.chatyReadableOn(normalColor, Color.White, Color.Black))
+    // Pressed dots sit on a translucent pressed colour over the preview backdrop: judge that composite, not the raw colour.
+    val pressedIconColor = colorOr(
+        p.fabIconsColor,
+        com.example.chat.ui.kit.chatyReadableOn(
+            pressedColor.compositeOver(Color(config.backgroundColor)), Color.White, Color.Black,
+        ),
+    )
     val fs = config.fontScale.toFloat()
     val redAccent = Color(0xFFFF5252)
     val colors = com.example.chat.ui.theme.LocalAppColors.current
@@ -132,9 +141,9 @@ fun HomeFabSettingsScreen(preferences: ChatyPreferencesController, onBack: () ->
                                 )
                                 if (!p.hideFab) {
                                     Column(Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 16.dp), horizontalAlignment = Alignment.End) {
-                                        if (!p.hideGbwaSettingsFab) FabDot(14, pressedColor, Icons.Filled.Settings, iconColor, 14, 6)
-                                        if (!p.hideCutEditFab) FabDot(14, pressedColor, Icons.Filled.ContentCut, iconColor, 14, 6)
-                                        if (!p.hideLastSeenFab) FabDot(14, pressedColor, Icons.Rounded.HistoryToggleOff, iconColor, 14, 6)
+                                        if (!p.hideGbwaSettingsFab) FabDot(14, pressedColor, Icons.Filled.Settings, pressedIconColor, 14, 6)
+                                        if (!p.hideCutEditFab) FabDot(14, pressedColor, Icons.Filled.ContentCut, pressedIconColor, 14, 6)
+                                        if (!p.hideLastSeenFab) FabDot(14, pressedColor, Icons.Rounded.HistoryToggleOff, pressedIconColor, 14, 6)
                                         FabDot(24, normalColor, if (p.showMetaAiIcon) Icons.Rounded.Psychology else Icons.Rounded.ChatBubbleOutline, iconColor, 24, 0)
                                     }
                                 }

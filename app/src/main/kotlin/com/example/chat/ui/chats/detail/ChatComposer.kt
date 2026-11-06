@@ -168,6 +168,9 @@ fun ChatEntryBar(
     onVideoHoldEnd: (Long) -> Unit = {},
     onVideoHoldCancel: (Long) -> Unit = {},
 ) {
+    val bundleTemplate = com.example.chat.ui.chats.bundles.messageBundleComposer(template)
+    val messageBundle = com.example.chat.ui.chats.bundles.rememberMessageBundleDesign()
+    val stockRadius = (messageBundle?.radius ?: 28.0).dp
     val hasText = text.trim().isNotEmpty()
 
     // --- Shared building blocks (Dart local widget closures) ----------------
@@ -189,9 +192,9 @@ fun ChatEntryBar(
         onTap = onAttach,
     )
 
-    // Dart: cameraBtn exists only when template.showCameraShortcut.
+    // Dart: cameraBtn exists only when bundleTemplate.showCameraShortcut.
     val cameraSlot: (@Composable () -> Unit)? =
-        if (template.showCameraShortcut && onCamera != null) {
+        if (bundleTemplate.showCameraShortcut && onCamera != null) {
             {
                 ComposerActionButton(
                     semanticsLabel = "Camera",
@@ -365,7 +368,7 @@ fun ChatEntryBar(
         when {
             style == STOCK_ENTRY_STYLE -> {
                 // Current Stock/default follows the user-supplied reference, not a new opt-in style.
-                field(radius = 28.dp, contentPadding = PaddingValues(4.dp),
+                field(radius = stockRadius, contentPadding = PaddingValues(4.dp),
                     prefix = {
                         if (!currentUserAvatarUrl.isNullOrBlank()) {
                             coil.compose.AsyncImage(currentUserAvatarUrl, "Your profile photo",
@@ -383,7 +386,7 @@ fun ChatEntryBar(
 
             style == SECOND_REFERENCE_ENTRY_STYLE -> Row(verticalAlignment = Alignment.Bottom) {
                 Box(Modifier.weight(1f)) {
-                    field(radius = 28.dp, contentPadding = PaddingValues(4.dp),
+                    field(radius = stockRadius, contentPadding = PaddingValues(4.dp),
                         prefix = { attachBtn() }, suffix = { emojiBtn() })
                 }
                 Spacer(Modifier.width(4.dp))
@@ -631,7 +634,7 @@ fun ChatEntryBar(
                 Row(verticalAlignment = Alignment.Bottom) {
                     Box(Modifier.weight(1f)) {
                         field(
-                            radius = template.cornerRadius.dp,
+                            radius = bundleTemplate.cornerRadius.dp,
                             prefix = { emojiBtn() },
                             suffix = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -736,6 +739,9 @@ private fun ComposerActionButton(
                     onDragStart = {
                         dragOffset = Offset.Zero
                         pressedState.value = true
+                        // Record-start haptic tick (WhatsApp-style hold-to-record
+                        // feedback); gesture-only, no visual change.
+                        if (onLongPressStart != null) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         onLongPressStart?.invoke()
                     },
                     onDrag = { change, delta ->

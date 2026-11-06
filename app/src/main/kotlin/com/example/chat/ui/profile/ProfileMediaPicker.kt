@@ -16,12 +16,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.mandatorySystemGestures
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -196,20 +201,29 @@ fun rememberProfileMediaPicker(
     onResult: (File?) -> Unit,
     onError: (String) -> Unit = {},
     square: Int = 512,
+    isCurrent: () -> Boolean = { true },
 ): ProfileMediaPickerState {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val latestCheck = androidx.compose.runtime.rememberUpdatedState(isCurrent)
+    val files = remember {
+        ProfileLocalOutputs.initialize(context)
+        ProfilePickFiles(ProfileLocalOutputs::record, ProfileLocalOutputs::delete)
+    }
+    fun active() = files.isActive() && latestCheck.value() && ProfileLocalOutputs.state() is ProfilePhotoFeatureState.Ready
+    androidx.compose.runtime.DisposableEffect(files) { onDispose { runCatching { files.close() }.onFailure { if (it is Exception) ProfileLocalOutputs.markBlocked(it) } } }
     var pendingCrop by remember { mutableStateOf<PendingCrop?>(null) }
-    var cameraFile by remember { mutableStateOf<File?>(null) }
     val state = remember { mutableStateOf<ProfileMediaPickerState?>(null) }
 
     fun ingest(uri: Uri?, tagIsAvatar: Boolean, tagTitle: String) {
+        if (!active()) return
         if (uri == null) {
             onResult(null)
             return
         }
         scope.launch {
-            val file = copyPickToCache(context, uri, state.value?.pendingSquare ?: square)
+            val file = copyPickToCache(context, uri, state.value?.pendingSquare ?: square, files)
+            if (!active()) { files.close(); return@launch }
             if (file == null) {
                 onError("The selected image is no longer accessible.")
             } else {
@@ -224,59 +238,48 @@ fun rememberProfileMediaPicker(
         val s = state.value ?: return@rememberLauncherForActivityResult
         ingest(uri, s.pendingIsAvatar, s.pendingTitle)
     }
-    val cameraLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicture(),
-    ) { success ->
-        val file = cameraFile
-        if (!success || file == null) {
-            onResult(null)
-        } else {
-            val s = state.value ?: return@rememberLauncherForActivityResult
-            // Dart image_picker bounds camera captures to the same max dimension and quality.
-            scope.launch {
-                val bounded = boundPickedFile(context, file, s.pendingSquare)
-                if (bounded == null) {
-                    onError("The captured image could not be read.")
-                } else {
-                    pendingCrop = PendingCrop(bounded, s.pendingIsAvatar, s.pendingTitle)
-                }
-            }
-        }
-    }
 
     if (state.value == null) {
         // One-time init; launchers are captured by reference and stable.
         state.value = ProfileMediaPickerState(
-            launchGallery = { galleryLauncher.launch("image/*") },
+            launchGallery = { check(active()); galleryLauncher.launch("image/*") },
             launchCamera = {
-                val file = File(
-                    context.cacheDir,
-                    "chaty_camera_" + System.currentTimeMillis() + ".jpg",
-                )
-                cameraFile = file
-                val uri = FileProvider.getUriForFile(
-                    context,
-                    context.packageName + ".fileprovider",
-                    file,
-                )
-                cameraLauncher.launch(uri)
+                check(active())
+                scope.launch {
+                    try {
+                        val captured = ProfileCameraResultBridge.pick()
+                        if (captured == null) { if (active()) onResult(null); return@launch }
+                        if (!active()) { captured.delete(); return@launch }
+                        // Terminal external callback has fired; local owner can now own/delete it.
+                        files.track(captured)
+                        val bounded = boundPickedFile(context, captured, state.value?.pendingSquare ?: square, files)
+                        if (!active()) { files.close(); return@launch }
+                        if (bounded == null) onError("The captured image could not be read.")
+                        else pendingCrop = PendingCrop(bounded, state.value?.pendingIsAvatar ?: true, state.value?.pendingTitle ?: "Crop Avatar Photo")
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (error: Exception) { if (active()) onError(error.message ?: "Could not capture profile photo.") }
+                }
+
             },
         )
     }
 
-    pendingCrop?.let { crop ->
-        ProfileImageCropperDialog(
+    pendingCrop?.takeIf { active() }?.let { crop ->
+        ProfileImageCropperOwnedDialog(
             sourceFile = crop.file,
             isAvatar = crop.isAvatar,
             title = crop.title,
+            files = files,
+            isCurrent = ::active,
             onDone = { result ->
                 pendingCrop = null
                 if (result == null) {
-                    crop.file.delete()
-                    onResult(null)
+                    files.remove(crop.file)
+                    if (active()) onResult(null)
                 } else {
-                    if (result.absolutePath != crop.file.absolutePath) crop.file.delete()
-                    onResult(result)
+                    if (result.absolutePath != crop.file.absolutePath) files.remove(crop.file)
+                    if (active() && files.transfer(result)) onResult(result)
+                    else files.close()
                 }
             },
             onError = onError,
@@ -290,24 +293,25 @@ fun rememberProfileMediaPicker(
  *  the decode to square*1.8 on the long side (Dart maxWidth/maxHeight) and
  *  re-encoding JPEG at quality 95 (Dart imageQuality). EXIF orientation is
  *  applied, matching what Image.file shows. */
-private suspend fun copyPickToCache(context: Context, uri: Uri, square: Int): File? =
+private suspend fun copyPickToCache(context: Context, uri: Uri, square: Int, files: ProfilePickFiles): File? =
     withContext(Dispatchers.IO) {
         val bytes = runCatching {
             context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
         }.getOrNull() ?: return@withContext null
-        boundImageBytesToCache(context, bytes, square)
+        boundImageBytesToCache(context, bytes, square, files)
     }
 
 /** Camera-capture variant (Dart image_picker bounds camera captures the same way). */
-private suspend fun boundPickedFile(context: Context, file: File, square: Int): File? =
+private suspend fun boundPickedFile(context: Context, file: File, square: Int, files: ProfilePickFiles): File? =
     withContext(Dispatchers.IO) {
-        val bytes = runCatching { file.readBytes() }.getOrNull() ?: return@withContext null
-        val out = boundImageBytesToCache(context, bytes, square)
-        runCatching { file.delete() }
-        out
+        if (!files.tryBegin(file)) return@withContext null
+        try {
+            val bytes = file.readBytes()
+            boundImageBytesToCache(context, bytes, square, files)
+        } finally { files.end(file); if (files.isActive()) files.remove(file) }
     }
 
-private fun boundImageBytesToCache(context: Context, bytes: ByteArray, square: Int): File? =
+private fun boundImageBytesToCache(context: Context, bytes: ByteArray, square: Int, files: ProfilePickFiles): File? =
     runCatching {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
@@ -324,14 +328,19 @@ private fun boundImageBytesToCache(context: Context, bytes: ByteArray, square: I
                 context.cacheDir,
                 "chaty_pick_${System.currentTimeMillis()}.jpg",
             )
-            file.outputStream().use { oriented.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+            files.track(file); files.begin(file)
+            try { file.outputStream().use { oriented.compress(Bitmap.CompressFormat.JPEG, 95, it) } }
+            finally { files.end(file) }
             if (oriented !== decoded) oriented.recycle()
             decoded.recycle()
             file
         }.getOrNull()
 
-/** Port of image_editor_cropper_dialog.dart as a full-screen dialog. */
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+/** Port of image_editor_cropper_dialog.dart as a full-screen dialog.
+ *  The dialog window draws edge-to-edge, so the content column is padded by
+ *  the safe-drawing + mandatory-gesture insets: the Cancel / Crop & Use row
+ *  must stay fully above the gesture/3-button navigation area on every
+ *  device (same inset policy as the camera and contact-picker screens). */
 @Composable
 fun ProfileImageCropperDialog(
     sourceFile: File,
@@ -339,6 +348,13 @@ fun ProfileImageCropperDialog(
     title: String,
     onDone: (File?) -> Unit,
     onError: (String) -> Unit = {},
+) = ProfileImageCropperOwnedDialog(sourceFile, isAvatar, title, onDone, onError, null, { true })
+
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+@Composable
+private fun ProfileImageCropperOwnedDialog(
+    sourceFile: File, isAvatar: Boolean, title: String, onDone: (File?) -> Unit, onError: (String) -> Unit,
+    files: ProfilePickFiles?, isCurrent: () -> Boolean,
 ) {
     val theme = LocalThemeConfig.current
     val context = LocalContext.current
@@ -371,7 +387,8 @@ fun ProfileImageCropperDialog(
         Column(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black),
+                .background(Color.Black)
+                .windowInsetsPadding(WindowInsets.safeDrawing.union(WindowInsets.mandatorySystemGestures)),
         ) {
             // App bar: close / title / reset / rotate.
             Row(
@@ -525,9 +542,12 @@ fun ProfileImageCropperDialog(
                                     userOffset = userOffset,
                                     cropWpx = cropWpx,
                                     cropHpx = cropHpx,
+                                    files = files,
                                 )
                                 isProcessing = false
-                                onDone(out)
+                                if (isCurrent()) onDone(out) else files?.close()
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
                             } catch (e: Throwable) {
                                 isProcessing = false
                                 onError("Failed to save cropped image: ${e.message ?: e}")
@@ -581,7 +601,10 @@ private suspend fun captureCrop(
     userOffset: Offset,
     cropWpx: Float,
     cropHpx: Float,
+    files: ProfilePickFiles? = null,
 ): File = withContext(Dispatchers.IO) {
+    if (files != null && !files.tryBegin(sourceFile)) throw kotlinx.coroutines.CancellationException("Profile picker closed")
+    try {
     // Full-quality decode (bounded) with EXIF orientation applied.
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(sourceFile.absolutePath, bounds)
@@ -632,9 +655,11 @@ private suspend fun captureCrop(
         context.cacheDir,
         "cropped_" + tag + "_" + System.currentTimeMillis() + ".png",
     )
-    file.writeBytes(buffer)
+    files?.track(file); files?.begin(file)
+    try { file.writeBytes(buffer) } finally { files?.end(file) }
     if (file.length() == 0L) {
         throw Exception("The crop could not be saved. Try again.")
     }
     file
+    } finally { files?.end(sourceFile) }
 }
