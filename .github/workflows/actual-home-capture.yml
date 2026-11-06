@@ -62,10 +62,15 @@ jobs:
           def scroll():adb('shell','input','swipe','540','1700','540','650','500')
           adb('shell','monkey','-p',os.environ['TEST_PACKAGE'],'-c','android.intent.category.LAUNCHER','1')
           time.sleep(8);click('Register');time.sleep(3)
+          capture('00-blank-register')
+          (out/'00-blank-register.xml').write_bytes(adb('shell','cat','/sdcard/view.xml'))
           # Match fields by native editable node/accessibility label, never record filled hierarchy.
           fields=[('Email',os.environ['TEST_EMAIL']),('Username',os.environ['TEST_USERNAME']),('Password',os.environ['TEST_PASSWORD'])]
           for label,value in fields:
-           ns=nodes();n=next((n for n in ns if n.get('class')=='android.widget.EditText' and label.lower() in (n.get('content-desc','')+' '+n.get('text','')).lower()),None)
+           ns=nodes();n=None
+           for edit in ns:
+            if edit.get('class')=='android.widget.EditText' and any(label.lower()==(c.get('content-desc','') or c.get('text','')).lower() for c in edit.iter('node')):
+             n=edit;break
            if n is None:raise RuntimeError('Native editable field missing: '+label)
            tap(n);adb('shell','input','text',value)
            adb('shell','input','keyevent','4')
