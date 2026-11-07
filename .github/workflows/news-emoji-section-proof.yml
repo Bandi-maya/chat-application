@@ -230,6 +230,22 @@ jobs:
         sudo udevadm trigger --name-match=kvm
 
         '
+    - name: Preserve capture diagnostics and wait for section transition
+      run: 'python3 - <<''P''
+
+        from pathlib import Path
+
+        p=Path(''ci/capture-news-emoji-section.py'');s=p.read_text()
+
+        s=s.replace("tap(''News'');time.sleep(3)\nassert any(n.get(''text'')==''News Emoji'' for n in nodes())", "snap(''00-before-news-tap'')\ntap(''News'')\nfor
+        _ in range(15):\n if any(n.get(''text'')==''News Emoji'' for n in nodes()):break\n time.sleep(2)\nsnap(''00-after-news-tap'')\nassert
+        any(n.get(''text'')==''News Emoji'' for n in nodes())")
+
+        p.write_text(s)
+
+        P
+
+        '
     - name: Capture real emoji component in offline fixture
       uses: reactivecircus/android-emulator-runner@v2
       with:
