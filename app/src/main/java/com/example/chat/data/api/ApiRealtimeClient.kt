@@ -499,7 +499,7 @@ class ApiRealtimeClient(
             return url + (if (url.contains('?')) "&" else "?") + "token=" + encoded
         }
 
-        const val PING_INTERVAL_MS = 45_000L  // proxies kill idle sockets at 60-120s
+        const val PING_INTERVAL_MS = 25_000L  // Dart Timer.periodic(25s); also keeps proxies from killing the socket
         /** No pong for this many ms => the connection is silently dead. */
         const val PONG_TIMEOUT_MS = 2 * PING_INTERVAL_MS
         const val RECONNECT_DELAY_MS = 4_000L

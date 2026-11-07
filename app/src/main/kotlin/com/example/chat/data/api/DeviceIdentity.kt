@@ -1,6 +1,6 @@
 package com.example.chat.data.api
 
-import android.util.Base64
+import org.bouncycastle.util.encoders.Base64
 import com.example.chat.data.e2ee.SecureKeyValueStore
 import java.security.SecureRandom
 import java.util.UUID
@@ -55,7 +55,7 @@ class DeviceIdentityManager(
             DeviceIdentity(
                 deviceId = storedId,
                 publicKeyBase64 = storedPublic,
-                privateKeyBytes = Base64.decode(storedPrivate, Base64.DEFAULT),
+                privateKeyBytes = Base64.decode(storedPrivate),
             )
         } else {
             if (storedId != null || storedPrivate != null || storedPublic != null) {
@@ -67,13 +67,13 @@ class DeviceIdentityManager(
             val publicKey = privateKey.generatePublicKey().encoded
             val created = DeviceIdentity(
                 deviceId = UUID.randomUUID().toString(),
-                publicKeyBase64 = Base64.encodeToString(publicKey, Base64.NO_WRAP),
+                publicKeyBase64 = Base64.toBase64String(publicKey),
                 privateKeyBytes = privateKey.encoded,
             )
             secureStore.writeAll(
                 mapOf(
                     KEY_DEVICE_ID to created.deviceId,
-                    KEY_PRIVATE to Base64.encodeToString(privateKey.encoded, Base64.NO_WRAP),
+                    KEY_PRIVATE to Base64.toBase64String(privateKey.encoded),
                     KEY_PUBLIC to created.publicKeyBase64,
                 ),
             )
@@ -99,7 +99,7 @@ class DeviceIdentityManager(
         val signature = identity.sign(refreshToken.toByteArray(Charsets.UTF_8))
         return mapOf(
             HEADER_DEVICE_ID to identity.deviceId,
-            HEADER_DEVICE_PROOF to Base64.encodeToString(signature, Base64.NO_WRAP),
+            HEADER_DEVICE_PROOF to Base64.toBase64String(signature),
         )
     }
 

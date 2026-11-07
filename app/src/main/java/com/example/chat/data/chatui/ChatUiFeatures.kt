@@ -94,9 +94,15 @@ class ScheduledSendQueue {
 
     fun cancel(id: String): Boolean = entries.removeAll { it.id == id }
 
-    /** Entries due now: scheduled time reached, or send-when-online and we are online. */
-    fun due(nowMillis: Long, online: Boolean): List<Entry> = entries.filter {
-        if (it.fireAtMillis != null) it.fireAtMillis <= nowMillis else online
+    /** Entries due now: a scheduled time was reached, or the entry is
+     *  send-when-online and we are online. When any timed entry fires, the
+     *  whole queue drains with it - send-when-online entries ride the same
+     *  flush instead of waiting for a separate connectivity event. */
+    fun due(nowMillis: Long, online: Boolean): List<Entry> {
+        val timedFiring = entries.any { it.fireAtMillis != null && it.fireAtMillis <= nowMillis }
+        return entries.filter {
+            if (it.fireAtMillis != null) it.fireAtMillis <= nowMillis else online || timedFiring
+        }
     }
 
     fun markSent(ids: Set<String>) { entries.removeAll { it.id in ids } }

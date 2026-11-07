@@ -7,6 +7,7 @@ import com.example.chat.data.services.CallTransportState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -85,7 +86,9 @@ class CallIceRestartTest {
         val offersBefore = sender.sent.count { it.second["signal_type"] == "offer" }
 
         media.onIceFailed?.invoke()
-        advanceUntilIdle()
+        // The restart re-offer is launched on the service scope (backgroundScope
+        // here); advanceUntilIdle skips background work, so runCurrent drives it.
+        runCurrent()
 
         assertEquals(1, media.restartCount)
         val restartOffers = sender.sent.filter {
@@ -146,7 +149,8 @@ class CallIceRestartTest {
             "signal_type" to "offer", "call_id" to "c-in", "sender_id" to "peer",
             "ice_restart" to true, "sdp" to "restart-offer",
         ))
-        advanceUntilIdle()
+        // Same background-launch reasoning as the outgoing test above.
+        runCurrent()
 
         assertTrue(media.remoteDescriptions.contains("restart-offer" to "offer"))
         val restartAnswers = sender.sent.filter {

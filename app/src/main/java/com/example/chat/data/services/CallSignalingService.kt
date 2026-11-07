@@ -1276,10 +1276,17 @@ class CallSignalingService(
      *  callee restarts locally and waits for that offer. */
     private fun attemptIceRestart(expectedAccount: Any?, callId: String, peer: CallMediaController) {
         val session = currentSession ?: return
-        if (session.callId != callId ||
-            (session.state != CallSessionState.connected &&
-                session.state != CallSessionState.reconnecting)
-        ) return
+        if (session.callId != callId) return
+        if (session.state != CallSessionState.connected &&
+            session.state != CallSessionState.reconnecting
+        ) {
+            // ICE failed before the transport was established (initiating,
+            // ringing, connecting): there is no live media path to restart,
+            // so the call itself has failed. Matches the Dart behaviour the
+            // parity tests pin down.
+            if (!session.state.isTerminal) markTransportFailed("ICE negotiation failed.")
+            return
+        }
         if (iceRestartAttempts >= 3) {
             markTransportFailed("ICE negotiation failed after restart attempts.")
             return

@@ -51,7 +51,16 @@ class PickerFavoritesStore(private val maxRecents: Int = 24) {
     private val recents = ArrayDeque<String>()
 
     fun toggleFavorite(id: String): Boolean =
-        if (favorites.remove(id)) false else { favorites.add(id); true }
+        if (favorites.remove(id)) {
+            // Un-favourited items drop to the end of recents (least recent),
+            // so the picker row stays stable instead of jumping back to its
+            // old recency slot.
+            recents.remove(id)
+            recents.addLast(id)
+            false
+        } else {
+            favorites.add(id); true
+        }
 
     fun isFavorite(id: String): Boolean = id in favorites
 

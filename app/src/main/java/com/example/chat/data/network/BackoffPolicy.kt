@@ -26,10 +26,13 @@ class BackoffPolicy(
      *  around the raw backoff for callers that need a stable first retry. */
     fun delayMs(attempt: Int): Long {
         if (!fullJitter && attempt <= 0) return baseMs
-        val raw = minOf(maxMs, baseMs shl attempt.coerceAtMost(20))
+        val ceiling = baseMs shl attempt.coerceAtMost(20)
         if (fullJitter) {
-            return (random() * raw).toLong().coerceIn(0L, maxMs)
+            // Multiply the UNCAPPED backoff and clamp afterwards: random ~1
+            // must be able to reach the cap itself, not cap * random.
+            return (random() * ceiling).toLong().coerceIn(0L, maxMs)
         }
+        val raw = minOf(maxMs, ceiling)
         val spread = (raw * jitterFraction).toLong()
         val jitter = ((random() * 2.0 - 1.0) * spread).toLong()
         return (raw + jitter).coerceIn(baseMs, maxMs)

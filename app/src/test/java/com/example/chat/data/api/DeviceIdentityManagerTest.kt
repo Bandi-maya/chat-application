@@ -3,6 +3,7 @@ package com.example.chat.data.api
 import com.example.chat.data.e2ee.SecureKeyValueStore
 import kotlinx.coroutines.test.runTest
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.util.encoders.Base64
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.junit.Assert.assertEquals
@@ -39,9 +40,9 @@ class DeviceIdentityManagerTest {
     fun proofIsAValidEd25519SignatureOverTheToken() = runTest {
         val manager = DeviceIdentityManager(InMemoryStore())
         val headers = manager.proofHeaders("refresh-token-value")
-        val signature = android.util.Base64.decode(headers["x-device-proof"], android.util.Base64.NO_WRAP)
+        val signature = Base64.decode(headers["x-device-proof"])
         val publicKey = Ed25519PublicKeyParameters(
-            android.util.Base64.decode(manager.getOrCreate().publicKeyBase64, android.util.Base64.NO_WRAP), 0,
+            Base64.decode(manager.getOrCreate().publicKeyBase64), 0,
         )
         val verifier = Ed25519Signer()
         verifier.init(false, publicKey)
