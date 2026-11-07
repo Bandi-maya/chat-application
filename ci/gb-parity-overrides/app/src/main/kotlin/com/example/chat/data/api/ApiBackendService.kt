@@ -1781,7 +1781,10 @@ class ApiBackendService(
         val expected = expectedScope ?: authSnapshot()
         return withContext(Dispatchers.IO) {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            val url = accountClient.uploadProfilePhoto(expected, { authSnapshot() === expected }, filename, bytes)
+            val url = accountClient.uploadProfilePhoto(filename, bytes)
+            // Scope guard: if the account changed mid-upload, the URL belongs
+            // to the old account - drop it instead of persisting it.
+            if (authSnapshot() !== expected) throw ApiScopeChangedException()
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             var changed = false
             if (!withAuthScope(expected) {

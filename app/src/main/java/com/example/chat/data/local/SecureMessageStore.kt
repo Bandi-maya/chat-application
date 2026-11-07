@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.example.chat.data.e2ee.SecureKeyValueStore
 import java.security.SecureRandom
-import net.sqlcipher.database.SupportFactory
+import net.zetetic.database.sqlcipher.SupportFactory
 
 /** Owns the Room+SQLCipher database handle (matrices 11/18). The 32-byte
  *  passphrase is generated on first use and stored in the Keystore-backed
