@@ -53,7 +53,7 @@
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/AttachmentSheet.kt": "ea5b2d15c3c57bc187001f1f78b4968b51234dd91f15b054671b5075b5e7fc4e",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/ChatComposer.kt": "4084897be08d4c274f05ccd815edad9b2fa69aa6d8138a0ba905ac68f0d9d471",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/ChatTimelinePositionPolicy.kt": "250664d64b57ecc24c42e940cfb95b1fd6ed876e7e452d1b6279f51145947ce2",
-    "app/src/main/kotlin/com/example/chat/ui/chats/detail/ChatyEmojiPicker.kt": "f566dac787701271e4c78a7d8990752ae4bb8a37289d0f5865ab83b88fce8359",
+    "app/src/main/kotlin/com/example/chat/ui/chats/detail/ChatyEmojiPicker.kt": "b2d3e09fafd407ecedccad8fd4b7d8b4aa69855f9cac459e08ee0889ac82aab4",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/CompactAlbumPreview.kt": "ad04a7103add7c92dbfece0188575369a0b9bc6e8b61e67d1d7137e1192ee255",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionDetailSheet.kt": "4cd6bf40e70246e4c8dca8eacdae5ea986b65e5b3e24ddcb08f80fa8458f409e",
     "app/src/main/kotlin/com/example/chat/ui/chats/detail/GroupMemberQuickView.kt": "02fa8188747b3d4662f542c810bb214e6bf2fc21b4589995d87994e2d0fdf832",
