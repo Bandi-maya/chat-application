@@ -383,5 +383,30 @@
   "hugeicons": "MusicNote01",
   "majesticons": "music-note-line",
   "status": "both families mapped; verify glyph visually before use"
+ },
+ "mail": {
+  "hugeicons": "Mail01",
+  "majesticons": "mail-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "eye": {
+  "hugeicons": "View",
+  "majesticons": "eye-line",
+  "status": "both families mapped; verify glyph visually before use"
+ },
+ "eyeOff": {
+  "hugeicons": "ViewOffSlash",
+  "majesticons": "eye-off-line",
+  "status": "both families mapped; eye+slash form chosen by render comparison over ViewOff (lashes) for cross-pack consistency"
+ },
+ "workspace": {
+  "hugeicons": "Building03",
+  "majesticons": "ADAPTED (authored, see provenance.json)",
+  "status": "Majesticons has no building glyph; line/solid building authored in family style, never presented as genuine"
+ },
+ "info": {
+  "hugeicons": "InformationCircle",
+  "majesticons": "info-circle-line",
+  "status": "both families mapped; verify glyph visually before use"
  }
 }

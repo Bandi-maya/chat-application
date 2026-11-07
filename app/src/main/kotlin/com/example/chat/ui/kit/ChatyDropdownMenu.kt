@@ -73,7 +73,7 @@ fun ChatyDropdownMenu(
     modifier: Modifier = Modifier,
     rememberKey: String? = null,
     shape: Shape = ChatyModalShape,
-    containerColor: Color = LocalAppColors.current.surfaceElevated,
+    containerColor: Color = androidx.compose.ui.graphics.lerp(LocalAppColors.current.surface, LocalAppColors.current.primary, 0.035f),
     border: BorderStroke? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -88,14 +88,16 @@ fun ChatyDropdownMenu(
         androidx.compose.foundation.shape.RoundedCornerShape(presentation.menuCornerDp.dp) else shape
     val configuration = LocalConfiguration.current
     val maxMenuWidth = (configuration.screenWidthDp.dp - 16.dp).coerceAtLeast(1.dp)
-    val maxMenuHeight = (configuration.screenHeightDp.dp * 0.8f).coerceAtLeast(1.dp)
+    var availableBelowPx by remember { androidx.compose.runtime.mutableIntStateOf(Int.MAX_VALUE) }
+    val density = LocalDensity.current
+    val maxMenuHeight = minOf((configuration.screenHeightDp.dp * 0.8f), with(density) { availableBelowPx.toDp() }).coerceAtLeast(1.dp)
     val margin = with(LocalDensity.current) { 8.dp.roundToPx() }
     // User directive: the menu scales/fades out from the tapped anchor, not a
     // fixed corner. The position provider reports where the anchor's centre falls
     // inside the placed popup; that point becomes the transform origin.
     var menuTransformOrigin by remember { mutableStateOf(TransformOrigin.Center) }
     val position = remember(margin) {
-        ChatyMenuPositionProvider(margin) { ox, oy -> menuTransformOrigin = TransformOrigin(ox, oy) }
+        ChatyMenuPositionProvider(margin, preferBelow = true, onAvailableHeight = { availableBelowPx = it }) { ox, oy -> menuTransformOrigin = TransformOrigin(ox, oy) }
     }
     val menuScrollState = remember(rememberKey) { ScrollState(rememberKey?.let { chatyMenuScrollMemory[it] } ?: 0) }
     if (rememberKey != null) {
@@ -114,7 +116,7 @@ fun ChatyDropdownMenu(
                 androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(presentation.menuExitMs), targetScale = 0.98f, transformOrigin = menuTransformOrigin),
         ) {
         Column(
-            modifier.shadow(12.dp, effectiveShape).clip(effectiveShape)
+            modifier.shadow(8.dp, effectiveShape).clip(effectiveShape)
                 .background(containerColor)
                 .border(border ?: BorderStroke(1.dp, colors.border), effectiveShape)
                 .widthIn(max = maxMenuWidth)
@@ -160,6 +162,8 @@ fun ChatyDropdownMenuItem(
 /** Keeps menus on screen and flips above the anchor when there is no room below. */
 internal class ChatyMenuPositionProvider(
     private val margin: Int,
+    private val preferBelow: Boolean = false,
+    private val onAvailableHeight: ((Int) -> Unit)? = null,
     private val onOrigin: ((Float, Float) -> Unit)? = null,
 ) : PopupPositionProvider {
     override fun calculatePosition(
@@ -173,9 +177,10 @@ internal class ChatyMenuPositionProvider(
         val maxX = (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)
         val maxY = (windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin)
         val below = anchorBounds.bottom + margin
-        val preferredY = if (below + popupContentSize.height <= windowSize.height - margin) below
+        onAvailableHeight?.invoke((windowSize.height - below - margin).coerceAtLeast(1))
+        val preferredY = if (preferBelow || below + popupContentSize.height <= windowSize.height - margin) below
             else anchorBounds.top - popupContentSize.height - margin
-        val placed = IntOffset(preferredX.coerceIn(margin, maxX), preferredY.coerceIn(margin, maxY))
+        val placed = IntOffset(preferredX.coerceIn(margin, maxX), preferredY.coerceIn(margin, if (preferBelow) (windowSize.height - margin).coerceAtLeast(margin) else maxY))
         if (onOrigin != null && popupContentSize.width > 0 && popupContentSize.height > 0) {
             val anchorCenterX = (anchorBounds.left + anchorBounds.right) / 2f
             val originX = ((anchorCenterX - placed.x) / popupContentSize.width).coerceIn(0f, 1f)

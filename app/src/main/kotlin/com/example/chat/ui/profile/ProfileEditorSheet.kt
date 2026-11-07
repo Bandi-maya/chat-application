@@ -18,7 +18,7 @@ import androidx.compose.material.icons.rounded.Photo
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
@@ -163,7 +163,7 @@ fun ProfileEditorSheet(
                         onClick = { uploadPhoto(ProfileMediaSource.camera) },
                         enabled = !photoBusy,
                     ) {
-                        Icon(Icons.Rounded.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Camera")
                     }
@@ -232,7 +232,7 @@ fun ProfileEditorSheet(
                     CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
                 } else {
-                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                 }
                 Text(if (saving) "Saving…" else "Save profile")

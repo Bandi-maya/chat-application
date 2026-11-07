@@ -41,7 +41,7 @@ import androidx.compose.material.icons.rounded.ViewList
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -260,14 +260,14 @@ fun CustomFilePickerScreen(
                         },
                         modifier = Modifier.fillMaxWidth().height(42.dp),
                         placeholder = { Text("Search files, documents, photos...") },
-                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, modifier = Modifier.size(20.dp)) },
                         trailingIcon = {
                             if (searchText.isNotEmpty()) {
                                 IconButton(onClick = {
                                     searchText = ""
                                     libraryService.setSearchQuery("")
                                 }) {
-                                    Icon(Icons.Rounded.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.clear, semanticLabel = "Clear", modifier = Modifier.size(18.dp))
                                 }
                             }
                         },
@@ -573,7 +573,7 @@ private fun GridItem(
                 contentAlignment = Alignment.Center,
             ) {
                 if (isSelected) {
-                    Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, color = Color.White, modifier = Modifier.size(14.dp))
                 }
             }
         }
@@ -635,7 +635,7 @@ private fun ListItemRow(
                 contentAlignment = Alignment.Center,
             ) {
                 if (isSelected) {
-                    Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, color = Color.White, modifier = Modifier.size(14.dp))
                 }
             }
         }
@@ -660,8 +660,8 @@ private fun ItemPreview(item: MediaFileDescriptor) {
 @Composable
 private fun CategoryIcon(category: MediaCategory, size: Int = 32) {
     when (category) {
-        MediaCategory.image -> Icon(Icons.Rounded.Image, contentDescription = null,
-            tint = Color(0xFF38BDF8), modifier = Modifier.size(size.dp))
+        MediaCategory.image -> com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.gallery, semanticLabel = null,
+            color = Color(0xFF38BDF8), modifier = Modifier.size(size.dp))
         MediaCategory.video -> ChatyMediaIcon(icon = ChatyIconType.video, size = size.dp, color = Color(0xFFA855F7))
         MediaCategory.audio -> ChatyMediaIcon(icon = ChatyIconType.audio, size = size.dp, color = Color(0xFF10B981))
         MediaCategory.pdf -> ChatyMediaIcon(icon = ChatyIconType.pdf, size = size.dp, color = Color(0xFFEF4444))

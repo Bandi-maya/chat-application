@@ -28,7 +28,7 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.TaskAlt
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -157,13 +157,13 @@ private fun HomeScreenMini(t: ThemeConfig, l: PreviewLayout?) {
                 Box(
                     Modifier.weight(1f).height(12.dp).background(tc(t.cardColor), RoundedCornerShape(6.dp)),
                     contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Rounded.Search, null, Modifier.size(9.dp), tint = tc(t.secondaryTextColor)) }
+                ) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, modifier = Modifier.size(9.dp), color = tc(t.secondaryTextColor)) }
             } else {
                 Text(
                     "Chats", Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                     color = tc(t.primaryTextColor), fontSize = fixedSp(if (prominent) 10.5f else 9f), fontWeight = FontWeight.ExtraBold,
                 )
-                Icon(Icons.Rounded.Search, null, Modifier.size(10.dp), tint = tc(t.secondaryTextColor))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, modifier = Modifier.size(10.dp), color = tc(t.secondaryTextColor))
             }
         }
         if (showStories) {
@@ -195,7 +195,7 @@ private fun HomeScreenMini(t: ThemeConfig, l: PreviewLayout?) {
                 Modifier.align(Alignment.BottomEnd).padding(end = 6.dp, bottom = 5.dp).size(14.dp)
                     .background(tc(t.accentColor), RoundedCornerShape(5.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.Add, null, Modifier.size(10.dp), tint = tc(t.outgoingTextColor)) }
+            ) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null, modifier = Modifier.size(10.dp), color = tc(t.outgoingTextColor)) }
         }
         NavBarMini(t, l)
     }
@@ -234,7 +234,7 @@ private fun ConversationMini(t: ThemeConfig, layout: PreviewLayout?) {
             Box(Modifier.size(11.dp).background(tc(t.cardColor), CircleShape))
             Spacer(Modifier.width(4.dp))
             Text("Maya", Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, color = tc(t.primaryTextColor), fontSize = fixedSp(8.5f), fontWeight = FontWeight.Bold)
-            Icon(Icons.Rounded.MoreVert, null, Modifier.size(10.dp), tint = tc(t.secondaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = null, modifier = Modifier.size(10.dp), color = tc(t.secondaryTextColor))
         }
         Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 5.dp, vertical = 6.dp), verticalArrangement = Arrangement.Bottom) {
             PreviewBubble(t, false, "Lunch?", tc(t.incomingBubbleColor), tc(t.incomingTextColor), tc(t.secondaryTextColor).alpha(0.12f))
@@ -302,7 +302,14 @@ private fun NavBarMini(t: ThemeConfig, layout: PreviewLayout?) {
             val raised = raisedCenter && i == ids.size / 2
             val chip = active && style in setOf("Active Pill Chip", "Soft Square Tile", "Circle Accent Pop")
             val iconTint = if (raised) tc(t.outgoingTextColor) else if (active) tc(t.accentColor) else inactive
-            val icon: @Composable () -> Unit = { Icon(navIcon(ids[i]), null, Modifier.size(if (raised) 10.dp else 9.dp), tint = iconTint) }
+            val icon: @Composable () -> Unit = {
+                if (ids[i] == "updates") {
+                    com.example.chat.ui.icons.ChatyIcon(
+                        com.example.chat.ui.icons.ChatyIconId.updates, selected = active,
+                        modifier = Modifier.size(if (raised) 10.dp else 9.dp), color = iconTint,
+                    )
+                } else Icon(navIcon(ids[i]), null, Modifier.size(if (raised) 10.dp else 9.dp), tint = iconTint)
+            }
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 if (active && style == "Top Indicator Line") Box(Modifier.size(10.dp, 1.5.dp).background(tc(t.accentColor)))
                 else if (style == "Top Indicator Line") Spacer(Modifier.height(1.5.dp))

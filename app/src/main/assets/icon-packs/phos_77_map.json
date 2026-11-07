@@ -378,5 +378,30 @@
   "phone",
   "regular",
   "same glyph as calls"
+ ],
+ "mail": [
+  "envelope-simple",
+  "regular",
+  "chosen over envelope (X flaps) by render comparison: cleaner single flap, matches other packs"
+ ],
+ "eye": [
+  "eye",
+  "regular",
+  ""
+ ],
+ "eyeOff": [
+  "eye-slash",
+  "regular",
+  "chosen over eye-closed: eye+slash matches the shared eyeOff semantic"
+ ],
+ "workspace": [
+  "building-office",
+  "regular",
+  ""
+ ],
+ "info": [
+  "info",
+  "regular",
+  ""
  ]
 }

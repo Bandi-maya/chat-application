@@ -41,7 +41,7 @@ import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -234,7 +234,7 @@ internal fun UpdatesComposerSheet(
                 if (busyType == "text") {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 } else {
-                    Icon(Icons.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.send, semanticLabel = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Publish Update")
                 }
@@ -337,7 +337,7 @@ internal fun StatusViewerDialog(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
                 }
                 Spacer(Modifier.width(8.dp))
                 val owner = getUser(status.userId)
@@ -352,7 +352,7 @@ internal fun StatusViewerDialog(
                 )
                 if (status.userId == currentUser.id) {
                     IconButton(onClick = { confirmDelete = true }) {
-                        Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete status", tint = colors.error)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.deleteOutline, semanticLabel = "Delete status", color = colors.error)
                     }
                 }
             }
@@ -527,7 +527,7 @@ private fun ViewsControl(
             Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null, tint = colors.primary, modifier = Modifier.size(16.dp))
             Spacer(Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.RemoveRedEye, contentDescription = null, tint = colors.primary, modifier = Modifier.size(16.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eye, semanticLabel = null, color = colors.primary, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
                     "$count ${if (count == 1) "view" else "views"}",
@@ -591,7 +591,7 @@ internal fun StatusViewersSheet(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
                 ) {
-                    Icon(Icons.Rounded.RemoveRedEye, contentDescription = null, tint = colors.foregroundTertiary, modifier = Modifier.size(40.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eye, semanticLabel = null, color = colors.foregroundTertiary, modifier = Modifier.size(40.dp))
                     Spacer(Modifier.height(8.dp))
                     Text("Unable to load views", color = colors.foreground, fontWeight = FontWeight.Bold)
                     Text(
@@ -609,7 +609,7 @@ internal fun StatusViewersSheet(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
                 ) {
-                    Icon(Icons.Rounded.RemoveRedEye, contentDescription = null, tint = colors.foregroundTertiary, modifier = Modifier.size(40.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eye, semanticLabel = null, color = colors.foregroundTertiary, modifier = Modifier.size(40.dp))
                     Spacer(Modifier.height(8.dp))
                     Text("No views yet", color = colors.foreground, fontWeight = FontWeight.Bold)
                     Text(

@@ -1,5 +1,16 @@
 package com.example.chat.ui.chats
 
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+
+import androidx.compose.foundation.rememberScrollState
+
+import androidx.compose.foundation.verticalScroll
+
 import com.example.chat.ReleaseFeatures
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -65,7 +76,7 @@ import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -861,7 +872,7 @@ fun ChatDetailScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).imePadding()) {
         Column(Modifier.fillMaxSize()) {
-            if (isSelectionMode) {
+            if (isSelectionMode && contextMenuMessage == null) {
                 SelectionHeader(theme, selectedMessages.size) { selectedIds = emptySet() }
             } else if (searchOpen) {
                 SearchHeader(
@@ -954,7 +965,8 @@ fun ChatDetailScreen(
 
             // No strip banner in chats: the header signal icon is the only Connection Health tap target.
 
-            Box(Modifier.weight(1f).fillMaxWidth()) {
+            var messageRegionTop by remember { mutableStateOf(0f) }
+            Box(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { messageRegionTop = it.boundsInWindow().top }) {
                 ChatWallpaper(
                     theme = theme,
                     wallpaperType = wallpaperType,
@@ -1180,10 +1192,15 @@ fun ChatDetailScreen(
                         }
                     }
                 }
+                AnchoredMessageContextMenu(
+                    messageState = contextMenuMessageState, anchorRect = contextMenuAnchor, regionTop = messageRegionTop,
+                    currentUserId = currentUserId, theme = theme, onAction = ::runAction,
+                    onToggleReaction = onToggleReaction, reactionTargetState = emojiReactionTargetState,
+                )
             }
 
             // Quick replies overlay (Dart _showQuickReplyOverlay section).
-            if (composerText.contains("#") && quickReplies.isNotEmpty()) {
+            if (!isSelectionMode && composerText.contains("#") && quickReplies.isNotEmpty()) {
                 QuickReplyOverlay(
                     theme = theme,
                     replies = quickReplies,
@@ -1196,8 +1213,8 @@ fun ChatDetailScreen(
                 BannerRow(
                     theme = theme,
                     icon = {
-                        Icon(Icons.Rounded.Edit, contentDescription = null,
-                            tint = Color(theme.accentColor), modifier = Modifier.size(18.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.edit, semanticLabel = null,
+                            color = Color(theme.accentColor), modifier = Modifier.size(18.dp))
                     },
                     title = "Editing message",
                     titleColor = Color(theme.accentColor),
@@ -1214,8 +1231,8 @@ fun ChatDetailScreen(
                 BannerRow(
                     theme = theme,
                     icon = {
-                        Icon(Icons.Rounded.Reply, contentDescription = null,
-                            tint = Color(theme.accentColor), modifier = Modifier.size(18.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.reply, semanticLabel = null,
+                            color = Color(theme.accentColor), modifier = Modifier.size(18.dp))
                     },
                     title = "Replying to ${resolveSenderName(target.senderId)}",
                     titleColor = Color(theme.accentColor),
@@ -1224,6 +1241,45 @@ fun ChatDetailScreen(
                 )
             }
 
+            if (isSelectionMode) {
+                    Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+                SelectionActions(
+                    theme = theme,
+                    actions = if (onForwardSelection != null || selectedMessages.size == 1) selectionActions
+                        else selectionActions - com.example.chat.ui.chats.detail.SelectionAction.forward,
+                    onCopy = {
+                        val msgs = messages
+                            .filter { selectedIds.contains(it.id) }
+                            .joinToString("\n") { m ->
+                                if (hideDateAndName) {
+                                    m.text
+                                } else {
+                                    val timeStr = selectionCopyFormatter.format(
+                                        m.createdAt.atZone(ZoneId.systemDefault()),
+                                    )
+                                    "[$timeStr, ${resolveSenderName(m.senderId)}]: ${m.text}"
+                                }
+                            }
+                        clipboard.setText(AnnotatedString(msgs))
+                        selectedIds = emptySet()
+                        scope.launch { snackbarHostState.showSnackbar("Messages copied") }
+                    },
+                    onForward = {
+                        onForwardSelection?.invoke(selectedMessages)
+                            ?: selectedMessages.singleOrNull()?.let(onForward)
+                        selectedIds = emptySet()
+                    },
+                    onStar = {
+                        selectedIds.forEach(onToggleStar)
+                        selectedIds = emptySet()
+                    },
+                    onDelete = {
+                        selectedIds.forEach { onDeleteMessage(it, false) }
+                        selectedIds = emptySet()
+                    },
+                )
+                    }
+            } else {
             // Dart composer bar container (chat_detail_screen.dart:3233): bg =
             // conv.uiEntryBackgroundColor ?: surfaceColor, top border cardColor.
             val composerBarBg = convPrefs.uiEntryBackgroundColor?.let(::Color)
@@ -1241,7 +1297,7 @@ fun ChatDetailScreen(
                             strokeWidth = 1.dp.toPx(),
                         )
                     }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 ChatEntryBar(
                     entryStyle = entryStyle,
@@ -1292,45 +1348,9 @@ fun ChatDetailScreen(
                 )
             }
         }
-                if (isSelectionMode) {
-                    Box(Modifier.align(Alignment.Center).padding(horizontal = 8.dp)) {
-                SelectionActions(
-                    theme = theme,
-                    actions = if (onForwardSelection != null || selectedMessages.size == 1) selectionActions
-                        else selectionActions - com.example.chat.ui.chats.detail.SelectionAction.forward,
-                    onCopy = {
-                        val msgs = messages
-                            .filter { selectedIds.contains(it.id) }
-                            .joinToString("\n") { m ->
-                                if (hideDateAndName) {
-                                    m.text
-                                } else {
-                                    val timeStr = selectionCopyFormatter.format(
-                                        m.createdAt.atZone(ZoneId.systemDefault()),
-                                    )
-                                    "[$timeStr, ${resolveSenderName(m.senderId)}]: ${m.text}"
-                                }
-                            }
-                        clipboard.setText(AnnotatedString(msgs))
-                        selectedIds = emptySet()
-                        scope.launch { snackbarHostState.showSnackbar("Messages copied") }
-                    },
-                    onForward = {
-                        onForwardSelection?.invoke(selectedMessages)
-                            ?: selectedMessages.singleOrNull()?.let(onForward)
-                        selectedIds = emptySet()
-                    },
-                    onStar = {
-                        selectedIds.forEach(onToggleStar)
-                        selectedIds = emptySet()
-                    },
-                    onDelete = {
-                        selectedIds.forEach { onDeleteMessage(it, false) }
-                        selectedIds = emptySet()
-                    },
-                )
-                    }
-                }
+
+            }
+
         }
     }
 
@@ -1459,17 +1479,6 @@ fun ChatDetailScreen(
         onCloseStarred = { showStarredInChat = false },
         onCloseCopy = { copySelectionMessage = null }, onCloseInfo = { infoMessage = null },
         onJumpToMessage = { id -> highlightedMessageId = id; pendingScrollTarget = id; showStarredInChat = false },
-    )
-
-    // Keep the anchored menu's generated Compose code out of the large conversation method.
-    AnchoredMessageContextMenu(
-        messageState = contextMenuMessageState,
-        anchorRect = contextMenuAnchor,
-        currentUserId = currentUserId,
-        theme = theme,
-        onAction = ::runAction,
-        onToggleReaction = onToggleReaction,
-        reactionTargetState = emojiReactionTargetState,
     )
 
     // Dart _showTaskContextMenu (chat_detail_screen.dart:1208-1254): section titled
@@ -1757,10 +1766,9 @@ private fun ConversationHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(
-                Icons.Rounded.ChevronLeft,
-                contentDescription = "Back",
-                tint = Color(theme.primaryTextColor),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                semanticLabel = "Back",
+                color = Color(theme.primaryTextColor),
             )
         }
         Row(
@@ -1847,43 +1855,40 @@ private fun ConversationHeader(
                 Color(theme.secondaryTextColor)
             }
             IconButton(onClick = { onStartCall(false) }) {
-                Icon(
-                    Icons.Rounded.Call,
-                    contentDescription = if (callsAllowed) {
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio,
+                    semanticLabel = if (callsAllowed) {
                         "Voice call"
                     } else {
                         "Voice call • contact acceptance required"
                     },
-                    tint = callTint,
+                    color = callTint,
                 )
             }
             IconButton(onClick = { onStartCall(true) }) {
-                Icon(
-                    Icons.Rounded.VideoCameraFront,
-                    contentDescription = if (callsAllowed) {
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callVideo,
+                    semanticLabel = if (callsAllowed) {
                         "Video call"
                     } else {
                         "Video call • contact acceptance required"
                     },
-                    tint = callTint,
+                    color = callTint,
                 )
             }
         }
         connectionState?.let { state ->
-            Box(Modifier.padding(horizontal = 4.dp)) {
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                 ConnectionHealthIndicator(
                     health = state.health,
-                    size = 15.dp,
+                    size = 24.dp,
                     onTap = onConnectionDetailsTap,
                 )
             }
         }
         Box {
             IconButton(modifier = Modifier.testTag("chat-options"), onClick = { onMenuOpenChange(true) }) {
-                Icon(
-                    Icons.Rounded.MoreVert,
-                    contentDescription = "Chat options",
-                    tint = Color(theme.primaryTextColor),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions,
+                    semanticLabel = "Chat options",
+                    color = Color(theme.primaryTextColor),
                 )
             }
             var moreMenuPage by remember(menuOpen) { mutableStateOf(false) }
@@ -1891,7 +1896,7 @@ private fun ConversationHeader(
                 val menuIconTint = Color(theme.secondaryTextColor)
                 if (!moreMenuPage) {
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Outlined.Person, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.profile, semanticLabel = null, color = menuIconTint, modifier = Modifier.size(20.dp)) },
                         text = {
                             Text(
                                 if (conversation.isGroup) "View group info" else "View contact info",
@@ -1903,20 +1908,21 @@ private fun ConversationHeader(
                         },
                     )
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Outlined.Search, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, color = menuIconTint, modifier = Modifier.size(20.dp)) },
                         text = { Text("Search") },
                         onClick = onSearch,
                     )
                     if (onToggleGhostMode != null) {
                         DropdownMenuItem(
                             modifier = Modifier.testTag("chat-ghost-toggle"),
+                            leadingIcon = { com.example.chat.ui.icons.ChatyGhostIcon(menuIconTint) },
                             text = { Text(if (ghostModeEnabled) "Turn off Ghost mode" else "Turn on Ghost mode") },
                             onClick = { onMenuOpenChange(false); onToggleGhostMode() },
                         )
                     }
                     if (onToggleMute != null) {
                         DropdownMenuItem(
-                            leadingIcon = { Icon(if (conversation.isMuted) Icons.Outlined.Notifications else Icons.Outlined.NotificationsOff, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                            leadingIcon = { com.example.chat.ui.icons.ChatyIcon(if (conversation.isMuted) com.example.chat.ui.icons.ChatyIconId.unmute else com.example.chat.ui.icons.ChatyIconId.mute, color = menuIconTint, size = 20.dp) },
                             text = {
                                 Text(
                                     if (conversation.isMuted) {
@@ -1933,13 +1939,13 @@ private fun ConversationHeader(
                         )
                     }
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Outlined.Image, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.gallery, semanticLabel = null, color = menuIconTint, modifier = Modifier.size(20.dp)) },
                         text = { Text("Chat wallpaper") },
                         onClick = onOpenWallpaperPicker,
                     )
                     if (onOpenAppearance != null) {
                         DropdownMenuItem(
-                            leadingIcon = { Icon(Icons.Outlined.Palette, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                            leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.palette, color = menuIconTint, size = 20.dp) },
                             text = { Text("Chat theme") },
                             onClick = {
                                 onMenuOpenChange(false)
@@ -1950,24 +1956,24 @@ private fun ConversationHeader(
                     HorizontalDivider(thickness = 0.8.dp, color = menuIconTint.copy(alpha = 0.15f))
                     DropdownMenuItem(
                         text = { Text("More") },
-                        trailingIcon = { Icon(Icons.Rounded.ChevronRight, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                        trailingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = menuIconTint, modifier = Modifier.size(20.dp)) },
                         onClick = { moreMenuPage = true },
                     )
                 } else {
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ArrowBack, null, tint = menuIconTint, modifier = Modifier.size(20.dp)) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = null, color = menuIconTint, modifier = Modifier.size(20.dp)) },
                         text = { Text("Back") },
                         onClick = { moreMenuPage = false },
                     )
                     HorizontalDivider(thickness = 0.8.dp, color = menuIconTint.copy(alpha = 0.15f))
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null, tint = Color(theme.dangerColor), modifier = Modifier.size(20.dp)) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.deleteOutline, semanticLabel = null, color = Color(theme.dangerColor), modifier = Modifier.size(20.dp)) },
                         text = { Text("Clear conversation", color = Color(theme.dangerColor)) },
                         onClick = onClearConversation,
                     )
                     if (conversation.isDirect && onBlockContact != null) {
                         DropdownMenuItem(
-                            leadingIcon = { Icon(Icons.Outlined.Block, null, tint = Color(theme.dangerColor), modifier = Modifier.size(20.dp)) },
+                            leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.block, color = Color(theme.dangerColor), size = 20.dp) },
                             text = { Text("Block contact", color = Color(theme.dangerColor)) },
                             onClick = {
                                 onMenuOpenChange(false)
@@ -1987,6 +1993,7 @@ private fun ConversationHeader(
 private fun AnchoredMessageContextMenu(
     messageState: androidx.compose.runtime.MutableState<ChatMessage?>,
     anchorRect: Rect?,
+    regionTop: Float,
     currentUserId: String,
     theme: ThemeConfig,
     onAction: (ChatMessage, MessageActionType) -> Unit,
@@ -2004,41 +2011,55 @@ private fun AnchoredMessageContextMenu(
         val primary = order.mapNotNull { type -> available.firstOrNull { it.type == type } }
         val secondary = available.filter { it.type !in order }
         val actions = if (extraActions) secondary else primary
-        AppContextMenu(
-            onDismiss = { messageState.value = null },
-            sections = listOf(ContextMenuSection(items = buildList {
-                if (extraActions) add(ContextMenuItem(label = "Back", onTap = {
-                    messageState.value = menuMessage; extraActions = false
-                }))
-                actions.forEach { act -> add(ContextMenuItem(
-                    icon = actionIcon(act, menuMessage),
-                    label = if (act.type == MessageActionType.deleteForMe) "Delete for me" else act.label,
-                    isDestructive = act.isDestructive,
-                    onTap = { onAction(menuMessage, act.type) },
-                )) }
-                if (!extraActions && secondary.isNotEmpty()) add(ContextMenuItem(label = "More", onTap = {
-                    // AppContextMenu dismisses before its callback; reopen the SAME anchored selection menu.
-                    messageState.value = menuMessage; extraActions = true
-                }, trailing = { Icon(Icons.Rounded.ChevronRight, null) }))
-            })),
-            backgroundColor = Color(theme.surfaceColor),
-            primaryTextColor = Color(theme.primaryTextColor),
-            secondaryTextColor = Color(theme.secondaryTextColor),
-            destructiveColor = Color(theme.dangerColor),
-            // User directive: the single-message selection menu presents
-            // bottom-center (sheet), not anchored mid-screen at the bubble.
-            anchorRect = null,
-            // Reactions are deferred to the next release (see ReleaseFeatures).
-            reactionRail = if (ReleaseFeatures.MESSAGE_REACTIONS) {
-                ReactionRail(
-                    emojis = listOf("❤️", "👍", "😂", "😮", "😢", "🙏"),
-                    onReact = { emoji -> onToggleReaction(menuMessage.id, emoji) },
-                    onAdd = { reactionTargetState.value = menuMessage },
-                )
-            } else {
-                null
-            },
-        )
+        androidx.activity.compose.BackHandler { messageState.value = null }
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+            val colors = com.example.chat.ui.theme.LocalAppColors.current
+            val surface = androidx.compose.ui.graphics.lerp(colors.surface, colors.primary, 0.035f)
+            Box(Modifier.fillMaxSize().background(colors.foreground.copy(alpha = 0.25f))
+                .clickable { messageState.value = null })
+            val anchorY = with(androidx.compose.ui.platform.LocalDensity.current) { ((anchorRect?.top ?: regionTop) - regionTop).toDp() }
+            // Bound the anchor from the live viewport, not a fixed menu-height guess.
+            // Leave at least three quarters of available height for scaled actions/footer.
+            val menuOffset = anchorY.coerceIn(12.dp, (maxHeight * 0.25f).coerceAtLeast(12.dp))
+            Column(Modifier.align(Alignment.TopStart).padding(horizontal = 12.dp).offset(y = menuOffset).widthIn(max = 280.dp)
+                .heightIn(max = (maxHeight - menuOffset - 12.dp).coerceAtLeast(1.dp))) {
+                if (ReleaseFeatures.MESSAGE_REACTIONS) {
+                    Row(Modifier.fillMaxWidth().background(surface, CircleShape).horizontalScroll(rememberScrollState()).padding(4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly) {
+                        listOf("👍", "❤️", "😂", "😮", "😢", "🙏").forEach { emoji ->
+                            Box(Modifier.size(48.dp).clickable {
+                                onToggleReaction(menuMessage.id, emoji); messageState.value = null
+                            }, contentAlignment = Alignment.Center) { com.example.chat.ui.chats.detail.AnimatedEmojiView(unicode = emoji, size = 23f, animate = false, mode = com.example.chat.ui.chats.detail.EmojiDisplayMode.reaction) }
+                        }
+                        IconButton(onClick = { reactionTargetState.value = menuMessage; messageState.value = null }, modifier = Modifier.size(48.dp)) {
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, color = colors.foreground, semanticLabel = "More reactions")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                Column(Modifier.fillMaxWidth().weight(1f, fill = false)
+                    .clip(com.example.chat.ui.kit.ChatyModalShape).background(surface)) {
+                    Text("Message options", Modifier.padding(16.dp), fontWeight = FontWeight.Bold, color = colors.foreground)
+                    Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
+                        if (extraActions) com.example.chat.ui.kit.ChatyDropdownMenuItem(text = { Text("Back") }, onClick = { extraActions = false })
+                        actions.forEach { act ->
+                            com.example.chat.ui.kit.ChatyDropdownMenuItem(
+                                text = { Text(if (act.type == MessageActionType.deleteForMe) "Delete for me" else act.label,
+                                    color = if (act.isDestructive) Color(theme.dangerColor) else colors.foreground) },
+                                leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.chats.detail.actionIconId(act, menuMessage), color = if (act.isDestructive) Color(theme.dangerColor) else colors.foreground) },
+                                onClick = { messageState.value = null; onAction(menuMessage, act.type) },
+                            )
+                        }
+                    }
+                    // Navigation to the second action page stays outside the scrolling viewport,
+                    // so a short display or larger font cannot hide half of its row behind Close.
+                    if (!extraActions && secondary.isNotEmpty()) com.example.chat.ui.kit.ChatyDropdownMenuItem(
+                        text = { Text("More") }, trailingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight) }, onClick = { extraActions = true })
+                    androidx.compose.material3.Button(onClick = { messageState.value = null }, shape = CircleShape,
+                        modifier = Modifier.padding(12.dp).fillMaxWidth().heightIn(min = 48.dp)) { Text("Close") }
+                }
+            }
+        }
     }
 
 }
@@ -2047,7 +2068,7 @@ private fun AnchoredMessageContextMenu(
 private fun SelectionHeader(theme: ThemeConfig, count: Int, onCancel: () -> Unit) {
     Row(Modifier.fillMaxWidth().background(Color(theme.surfaceColor)), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onCancel) {
-            Icon(Icons.Rounded.Close, "Cancel selection", tint = Color(theme.primaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Cancel selection", color = Color(theme.primaryTextColor))
         }
         Text("$count selected", color = Color(theme.primaryTextColor), fontWeight = FontWeight.W700, fontSize = 16.sp)
     }
@@ -2066,16 +2087,16 @@ private fun SelectionActions(
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically) {
         if (com.example.chat.ui.chats.detail.SelectionAction.forward in actions) SelectionActionButton(theme, "Forward", onForward) {
-            Icon(Icons.AutoMirrored.Rounded.Forward, null, tint = Color(theme.primaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.forward, semanticLabel = null, color = Color(theme.primaryTextColor))
         }
         if (com.example.chat.ui.chats.detail.SelectionAction.copy in actions) SelectionActionButton(theme, "Copy", onCopy) {
-            Icon(Icons.Rounded.ContentCopy, null, tint = Color(theme.primaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.copy, semanticLabel = null, color = Color(theme.primaryTextColor))
         }
         if (com.example.chat.ui.chats.detail.SelectionAction.delete in actions) SelectionActionButton(theme, "Delete", onDelete) {
-            Icon(Icons.Rounded.DeleteOutline, null, tint = Color(theme.primaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.deleteOutline, semanticLabel = null, color = Color(theme.primaryTextColor))
         }
         if (com.example.chat.ui.chats.detail.SelectionAction.star in actions) SelectionActionButton(theme, "Star", onStar) {
-            Icon(Icons.Rounded.StarBorder, null, tint = Color(theme.primaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.star, color = Color(theme.primaryTextColor))
         }
     }
 }
@@ -2119,8 +2140,8 @@ private fun BannerRow(
             )
         }
         IconButton(onClick = onClose) {
-            Icon(Icons.Rounded.Close, contentDescription = "Cancel",
-                tint = Color(theme.primaryTextColor), modifier = Modifier.size(18.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Cancel",
+                color = Color(theme.primaryTextColor), modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -2148,10 +2169,9 @@ private fun SearchHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onBack) {
-            Icon(
-                Icons.Rounded.ChevronLeft,
-                contentDescription = "Back",
-                tint = Color(theme.primaryTextColor),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                semanticLabel = "Back",
+                color = Color(theme.primaryTextColor),
             )
         }
         Box(Modifier.weight(1f)) {
@@ -2199,10 +2219,9 @@ private fun SearchHeader(
             }
         }
         IconButton(onClick = onClose) {
-            Icon(
-                Icons.Rounded.Close,
-                contentDescription = "Clear search",
-                tint = Color(theme.primaryTextColor),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close,
+                semanticLabel = "Clear search",
+                color = Color(theme.primaryTextColor),
             )
         }
     }
@@ -2302,10 +2321,9 @@ private fun WallpaperPickerSheet(
                     modifier = Modifier.weight(1f),
                 )
                 if (currentId == id) {
-                    Icon(
-                        Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = Color(theme.accentColor),
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check,
+                        semanticLabel = null,
+                        color = Color(theme.accentColor),
                     )
                 }
             }

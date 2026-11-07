@@ -18,7 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Tab
@@ -375,10 +375,9 @@ fun EffectPickerSheet(
                                         .background(colors.surface),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Icon(
-                                        Icons.Rounded.Favorite,
-                                        contentDescription = null,
-                                        tint = colors.primary,
+                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.favouriteFilled,
+                                        semanticLabel = null,
+                                        color = colors.primary,
                                         modifier = Modifier.size(12.dp),
                                     )
                                 }

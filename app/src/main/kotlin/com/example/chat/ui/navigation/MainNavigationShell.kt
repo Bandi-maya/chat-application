@@ -116,6 +116,7 @@ fun MainNavigationShell(
     /** Read-only picker thumbnails reveal the selected drawer; normal app previews stay closed. */
     previewMenusOpen: Boolean = false,
     rootHeaderActions: @Composable () -> Unit = {},
+    unreadCounts: Map<String, Int> = emptyMap(),
 ) {
     val scope = rememberCoroutineScope()
 
@@ -340,6 +341,7 @@ fun MainNavigationShell(
                 AppNavigationMode.basicTabStyle,
                 AppNavigationMode.gestureTabs,
             ) -> PresetNavigationShell(
+                unreadCounts = unreadCounts,
                 referenceDefaultPresentation = prefs.homeStyle?.let(com.example.chat.core.preferences.HomePresentationPolicy::isDefault) ?: false,
                 rootHeaderActions = rootHeaderActions,
                 animationsDisabled = prefs.animationsDisabled,
@@ -688,7 +690,7 @@ fun NavDestinationIcon(
     }
     // Null-mapping destinations: only the synthetic 'more' item and unknown
     // ids reach this glyph fallback.
-    androidx.compose.material3.Icon(
+    com.example.chat.ui.icons.ChatyPackAwareIcon(
         Icons.Rounded.MoreHoriz,
         contentDescription = NavigationCatalog.labelFor(id),
         tint = tint,

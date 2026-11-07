@@ -35,7 +35,7 @@ import androidx.compose.material.icons.outlined.PushPin as OutlinedPushPin
 import androidx.compose.material.icons.rounded.Videocam
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import com.example.chat.ui.kit.ChatyTextButton
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -203,7 +203,7 @@ fun ChatsHomeScreen(
             @Composable {
                 com.example.chat.ui.chats.detail.ConnectionHealthIndicator(
                     health = state.health,
-                    size = 15.dp,
+                    size = 24.dp,
                     onTap = onOpenConnectionDetail,
                 )
             }
@@ -393,7 +393,7 @@ fun ChatsHomeScreen(
                     onValueChange = { messageNumberText = it },
                     label = { Text("Phone number") },
                     placeholder = { Text("Include country code (+1...)") },
-                    leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
+                    leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, semanticLabel = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                 )
@@ -509,7 +509,7 @@ fun ChatsHomeScreen(
                             onSnack = onSnack,
                             headerExtras = effectiveHeaderExtras,
                         )
-                        Box(Modifier.align(Alignment.TopEnd)) {
+                        Box(Modifier.align(Alignment.BottomEnd)) {
                             HomeOverflowMenu(
                                 expanded = overflowOpen,
                                 onDismiss = { overflowOpen = false },
@@ -793,10 +793,9 @@ private fun HomeConversationList(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            Icons.Outlined.Archive,
-                            contentDescription = null,
-                            tint = Color(theme.secondaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.archive,
+                            semanticLabel = null,
+                            color = Color(theme.secondaryTextColor),
                             modifier = Modifier.width(22.dp).height(22.dp),
                         )
                         Spacer(Modifier.width(24.dp))
@@ -839,13 +838,13 @@ private fun HomeConversationList(
                         leadingActions = if (conversation.type == ConversationType.direct) {
                             listOf(
                                 HomeSwipeAction(
-                                    icon = Icons.Rounded.Call,
+                                    icon = com.example.chat.ui.icons.ChatyIconId.callAudio,
                                     label = "Call",
                                     color = Color(theme.successColor),
                                     onTriggered = { onStartCall(conversation, false) },
                                 ),
                                 HomeSwipeAction(
-                                    icon = Icons.Rounded.Videocam,
+                                    icon = com.example.chat.ui.icons.ChatyIconId.callVideo,
                                     label = "Video",
                                     color = Color(theme.accentColor),
                                     onTriggered = { onStartCall(conversation, true) },
@@ -856,19 +855,19 @@ private fun HomeConversationList(
                         },
                         actions = listOf(
                             HomeSwipeAction(
-                                icon = if (conversation.isPinned) Icons.Rounded.PushPin else Icons.Outlined.OutlinedPushPin,
+                                icon = if (conversation.isPinned) com.example.chat.ui.icons.ChatyIconId.unpin else com.example.chat.ui.icons.ChatyIconId.pin,
                                 label = if (conversation.isPinned) "Unpin" else "Pin",
                                 color = Color(theme.accentColor),
                                 onTriggered = { onTogglePin(conversation.id) },
                             ),
                             HomeSwipeAction(
-                                icon = if (conversation.isMuted) Icons.Rounded.NotificationsActive else Icons.Rounded.NotificationsOff,
+                                icon = if (conversation.isMuted) com.example.chat.ui.icons.ChatyIconId.unmute else com.example.chat.ui.icons.ChatyIconId.mute,
                                 label = if (conversation.isMuted) "Unmute" else "Mute",
                                 color = com.example.chat.ui.core.theme.ChatyColors(theme).warning,
                                 onTriggered = { onToggleMute(conversation.id) },
                             ),
                             HomeSwipeAction(
-                                icon = Icons.Outlined.Archive,
+                                icon = com.example.chat.ui.icons.ChatyIconId.archive,
                                 label = "Archive",
                                 color = Color(theme.secondaryTextColor),
                                 onTriggered = { onToggleArchive(conversation.id) },

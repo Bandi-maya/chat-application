@@ -35,7 +35,7 @@ import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -78,7 +78,7 @@ fun ReferenceLayoutContentSurface(
     surfaceOverride: Color? = null,
     content: @Composable () -> Unit,
 ) {
-    val surface = surfaceOverride ?: lightSurface
+    val surface = surfaceOverride ?: androidx.compose.ui.graphics.lerp(lightSurface, com.example.chat.ui.theme.LocalAppColors.current.primary, if (isDark) 0.08f else 0.035f)
     Box(modifier.then(if (rounded) Modifier.clip(RoundedCornerShape(24.dp)).background(surface) else Modifier)) {
         androidx.compose.runtime.CompositionLocalProvider(
             LocalReferenceContentSurface provides if (rounded) surface else null,
@@ -101,6 +101,7 @@ internal fun PresetNavigationShell(
     animationsDisabled: Boolean = false,
     rootHeaderActions: @Composable () -> Unit = {},
     referenceDefaultPresentation: Boolean = false,
+    unreadCounts: Map<String, Int> = emptyMap(),
     /** OneUI center-button dock: the raised circle in the dock middle. */
     onCenterAction: () -> Unit = {},
 ) {
@@ -133,7 +134,7 @@ internal fun PresetNavigationShell(
     }
 
     val activeId = navItemIds.getOrNull(selectedIndex)
-    val collapseRangePx = with(LocalDensity.current) { ReferenceLayoutMetrics.expandedIdentityHeightDp.dp.toPx() }
+    val collapseRangePx = with(LocalDensity.current) { ReferenceLayoutMetrics.compactIdentityHeightDp.dp.toPx() }
     var headerOffsetPx by remember(activeId, mode) { mutableFloatStateOf(0f) }
     val headerCollapse = if (isOneUi && collapseRangePx > 0f) -headerOffsetPx / collapseRangePx else 0f
     val headerScroll = remember(activeId, mode, collapseRangePx) {
@@ -153,23 +154,23 @@ internal fun PresetNavigationShell(
         val shellOwnsHeading = (isOneUi || isIos) && activeId in setOf("calls", "updates", "settings", "tasks")
         Column(Modifier.fillMaxSize().padding(bottom = barHeight.dp)) {
             if (shellOwnsHeading) {
-                Row(Modifier.fillMaxWidth().height(if (isOneUi) (ReferenceLayoutMetrics.expandedIdentityHeightDp * (1f - headerCollapse)).dp else 56.dp)
-                    .padding(top = if (isOneUi) (ReferenceLayoutMetrics.actionBarHeightDp * (1f - headerCollapse)).dp else 0.dp)
+                Row(Modifier.fillMaxWidth().height(if (isOneUi) (ReferenceLayoutMetrics.compactIdentityHeightDp * (1f - headerCollapse)).dp else 56.dp)
+                    .padding(top = 0.dp)
                     .then(if (isOneUi) Modifier.clipToBounds().alpha(1f - headerCollapse) else Modifier)
                     .padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = if (isOneUi) Arrangement.Center else Arrangement.Start) {
+                    horizontalArrangement = Arrangement.Start) {
                     if (isOneUi) {
                         NavDestinationIcon(activeId!!, size = ReferenceLayoutMetrics.identityIconSizeDp, tint = foreground)
                         Spacer(Modifier.width(8.dp))
                     }
                     Text(NavigationCatalog.labelFor(activeId!!), color = foreground,
-                        fontSize = if (isOneUi) ReferenceLayoutMetrics.identityTextSizeSp.sp else 20.sp, fontWeight = FontWeight.Bold,
+                        fontSize = if (isOneUi) ReferenceLayoutMetrics.compactIdentityTextSizeSp.sp else 20.sp, fontWeight = FontWeight.Bold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = if (isOneUi) Modifier else Modifier.weight(1f))
                     if (!isOneUi && activeId != "settings") rootHeaderActions() // Settings hosts its own edit/search/QR row; the avatar already opens Settings.
                 }
             }
-            if (shellOwnsHeading && isOneUi) Row(
+            if (shellOwnsHeading && isOneUi && activeId != "settings") Row(
                 Modifier.fillMaxWidth().height(ReferenceLayoutMetrics.actionBarHeightDp.dp).padding(end = 4.dp),
                 horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -234,9 +235,15 @@ internal fun PresetNavigationShell(
                     when {
                         isOneUi -> Column(selectedModifier, horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center) {
-                            Text(label, color = tint, fontSize = 16.sp,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(label, color = tint, fontSize = 16.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val unread = unreadCounts[id] ?: 0
+                                if (unread > 0) Box(Modifier.background(accent, CircleShape).padding(horizontal = 5.dp, vertical = 1.dp), contentAlignment = Alignment.Center) {
+                                    Text(if (unread > 99) "99+" else unread.toString(), color = colors.onPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
                             Spacer(Modifier.height(4.dp))
                             // Fixed geometry keeps selection from shifting the label.
                             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -307,7 +314,7 @@ internal fun PresetNavigationShell(
                         .clickable { onCenterAction() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Rounded.CameraAlt, contentDescription = "Quick action", tint = colors.onPrimary,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = "Quick action", color = colors.onPrimary,
                         modifier = Modifier.size(24.dp))
                 }
             }
@@ -533,7 +540,7 @@ internal fun BottomShell(
                     .clickable(onClick = onCenterAction),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.CameraAlt, contentDescription = "Quick action", tint = colors.onPrimary,
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = "Quick action", color = colors.onPrimary,
                     modifier = Modifier.size(24.dp))
             }
         }
@@ -817,7 +824,7 @@ internal fun MoreDestinationsSheet(
                     Text("Quick access to extended views & settings", color = colors.foregroundSecondary, fontSize = 12.sp)
                 }
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close", tint = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close", color = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
                 }
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(colors.divider))
@@ -848,10 +855,9 @@ internal fun MoreDestinationsSheet(
                         fontSize = 14.5.sp,
                         modifier = Modifier.weight(1f),
                     )
-                    Icon(
-                        Icons.Rounded.ArrowForwardIos,
-                        contentDescription = null,
-                        tint = colors.foregroundTertiary,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+                        semanticLabel = null,
+                        color = colors.foregroundTertiary,
                         modifier = Modifier.size(14.dp),
                     )
                 }

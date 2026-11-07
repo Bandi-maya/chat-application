@@ -30,7 +30,7 @@ import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.TagFaces
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -216,7 +216,7 @@ fun ChatyEmojiPickerSheet(
                     onEmojiPicked("")
                 }
             }) {
-                Icon(Icons.Rounded.Close, contentDescription = "Close", tint = headerForeground)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close", color = headerForeground)
             }
         }
 
@@ -392,7 +392,7 @@ fun ChatyEmojiPickerSheet(
             horizontalArrangement = Arrangement.End,
         ) {
             IconButton(onClick = { searchOpen = !searchOpen; if (!searchOpen) searchQuery = "" }) {
-                Icon(Icons.Rounded.Search, contentDescription = "Search emoji", tint = accent)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = "Search emoji", color = accent)
             }
         }
         }

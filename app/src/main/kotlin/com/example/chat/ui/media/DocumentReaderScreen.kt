@@ -43,7 +43,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -234,7 +234,7 @@ fun DocumentReaderScreen(
                 ),
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back")
                     }
                 },
                 title = {
@@ -280,12 +280,12 @@ fun DocumentReaderScreen(
                         )
                     }
                     IconButton(onClick = { shareFile() }) {
-                        Icon(Icons.Rounded.Share, contentDescription = "Share")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.share, semanticLabel = "Share")
                     }
                     Box {
                         var menuOpen by remember { mutableStateOf(false) }
                         IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = "More")
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = "More")
                         }
                         DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             if (totalPages > 1) {
@@ -319,7 +319,7 @@ fun DocumentReaderScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = { currentPage-- }, enabled = currentPage > 1) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "Previous page")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Previous page")
                     }
                     Box(
                         modifier = Modifier
@@ -332,7 +332,7 @@ fun DocumentReaderScreen(
                         Text("Page $currentPage of $totalPages", fontWeight = FontWeight.W700, fontSize = 13.sp)
                     }
                     IconButton(onClick = { currentPage++ }, enabled = currentPage < totalPages) {
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Next page")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = "Next page")
                     }
                 }
             }
@@ -346,13 +346,13 @@ fun DocumentReaderScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
-                        Icon(Icons.Rounded.ErrorOutline, contentDescription = null,
-                            tint = Color(0xFFFF5252), modifier = Modifier.size(44.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.errorOutline, semanticLabel = null,
+                            color = Color(0xFFFF5252), modifier = Modifier.size(44.dp))
                         Spacer(Modifier.height(12.dp))
                         Text(contentError!!, textAlign = TextAlign.Center)
                         Spacer(Modifier.height(16.dp))
                         OutlinedButton(onClick = { openExternal() }) {
-                            Icon(Icons.Rounded.OpenInNew, contentDescription = null)
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.openInNew, semanticLabel = null)
                             Spacer(Modifier.width(6.dp))
                             Text("Try External App")
                         }
@@ -481,13 +481,13 @@ fun DocumentReaderScreen(
                         Spacer(Modifier.height(24.dp))
                         Row {
                             OutlinedButton(onClick = { openExternal() }) {
-                                Icon(Icons.Rounded.OpenInNew, contentDescription = null)
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.openInNew, semanticLabel = null)
                                 Spacer(Modifier.width(6.dp))
                                 Text("Open External")
                             }
                             Spacer(Modifier.width(14.dp))
                             Button(onClick = { shareFile() }) {
-                                Icon(Icons.Rounded.Share, contentDescription = null)
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.share, semanticLabel = null)
                                 Spacer(Modifier.width(6.dp))
                                 Text("Share File")
                             }
@@ -561,13 +561,13 @@ fun DocumentReaderScreen(
                 Spacer(Modifier.height(14.dp))
                 Row {
                     OutlinedButton(onClick = { showDetails = false; openExternal() }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Rounded.OpenInNew, contentDescription = null)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.openInNew, semanticLabel = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Open External")
                     }
                     Spacer(Modifier.width(12.dp))
                     Button(onClick = { showDetails = false; shareFile() }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Rounded.Share, contentDescription = null)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.share, semanticLabel = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Share File")
                     }

@@ -35,7 +35,7 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.ToggleOn
 import androidx.compose.material.icons.rounded.VerticalAlignTop
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -74,7 +74,7 @@ private fun ToastPreview(text: String, hasAvatar: Boolean, hasElevation: Boolean
     ) {
         if (hasAvatar) {
             Box(Modifier.size(24.dp).background(Color.White.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.Person, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.profile, semanticLabel = null, color = Color.White, modifier = Modifier.size(14.dp))
             }
             Spacer(Modifier.width(8.dp))
         }

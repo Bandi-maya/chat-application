@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -90,10 +90,10 @@ fun ChatySelectionModal(
                         fontWeight = FontWeight.Bold, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     ChatyChoiceTile("Cancel", onDismiss, Modifier.weight(0.8f))
                     ChatyChoiceTile(applyLabel, onApply, Modifier.weight(0.8f), enabled = applyEnabled, prominent = true, leadingIcon = com.example.chat.ui.icons.ChatyIconId.check)
-                    IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = "Close $title", tint = colors.foregroundSecondary) }
+                    IconButton(onClick = onDismiss) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close $title", color = colors.foregroundSecondary) }
                 } else Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(title, Modifier.weight(1f), color = colors.foreground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = "Close $title", tint = colors.foregroundSecondary) }
+                    IconButton(onClick = onDismiss) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close $title", color = colors.foregroundSecondary) }
                 }
                 Spacer(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
                 Box(Modifier.weight(1f, fill = false).fillMaxWidth()) { content() }

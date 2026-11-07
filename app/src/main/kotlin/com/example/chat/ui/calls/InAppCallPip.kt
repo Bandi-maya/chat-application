@@ -20,7 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CallEnd
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Minimize
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -183,10 +183,9 @@ fun InAppCallPip(
                         )
                     }
                     IconButton(onClick = onEndCall) {
-                        Icon(
-                            Icons.Rounded.CallEnd,
-                            contentDescription = "End call",
-                            tint = bundleTokens?.declineColor ?: com.example.chat.ui.theme.LocalAppColors.current.error,
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd,
+                            semanticLabel = "End call",
+                            color = bundleTokens?.declineColor ?: com.example.chat.ui.theme.LocalAppColors.current.error,
                             modifier = Modifier.size(22.dp),
                         )
                     }

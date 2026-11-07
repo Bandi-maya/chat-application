@@ -38,7 +38,7 @@ import androidx.compose.material.icons.rounded.Undo
 import androidx.compose.material.icons.rounded.Update
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
@@ -205,7 +205,7 @@ fun ComponentStylesScreen(
                     }
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = colors.foreground)
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = "More", color = colors.foreground)
                         }
                         DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                             DropdownMenuItem(
@@ -314,10 +314,10 @@ private fun LivePreviewCard(
                 avatar = { StylesAvatarCore(initials = "AM", color = Color(0xFF3B82F6), size = 36) },
                 actions = {
                     IconButton(onClick = {}, enabled = false) {
-                        Icon(Icons.Outlined.Call, "Voice call preview", tint = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, semanticLabel = "Voice call preview", color = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
                     }
                     IconButton(onClick = {}, enabled = false) {
-                        Icon(Icons.Outlined.Videocam, "Video call preview", tint = colors.foregroundSecondary, modifier = Modifier.size(22.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callVideo, semanticLabel = "Video call preview", color = colors.foregroundSecondary, modifier = Modifier.size(22.dp))
                     }
                 },
             ),
@@ -359,10 +359,9 @@ private fun LivePreviewCard(
                         color = colors.primary,
                     )
                     Spacer(Modifier.width(6.dp))
-                    Icon(
-                        Icons.Rounded.DoneAll,
-                        contentDescription = null,
-                        tint = colors.primary,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.messageCheckDouble,
+                        semanticLabel = null,
+                        color = colors.primary,
                         modifier = Modifier.size(16.dp),
                     )
                 }
@@ -553,7 +552,7 @@ private fun ProfileRow(label: String, selected: Boolean, onTap: () -> Unit) {
             color = colors.foreground,
         )
         if (selected) {
-            Icon(Icons.Rounded.Check, contentDescription = null, tint = colors.primary)
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, color = colors.primary)
         }
     }
 }

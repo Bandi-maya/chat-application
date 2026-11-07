@@ -32,7 +32,7 @@ import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -200,7 +200,7 @@ fun NewChatScreen(
                         onBack()
                     }
                 }) {
-                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
                 }
                 Text(
                     if (isCreatingGroup) {
@@ -261,20 +261,18 @@ fun NewChatScreen(
                     onValueChange = { onSearchChanged(it) },
                     hint = "Search @username or name...",
                     leading = {
-                        Icon(
-                            Icons.Rounded.Search,
-                            contentDescription = null,
-                            tint = colors.foregroundTertiary,
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search,
+                            semanticLabel = null,
+                            color = colors.foregroundTertiary,
                             modifier = Modifier.size(20.dp),
                         )
                     },
                     trailing = if (searchText.isNotEmpty()) {
                         {
                             IconButton(onClick = { onSearchChanged("") }, modifier = Modifier.size(32.dp)) {
-                                Icon(
-                                    Icons.Rounded.Close,
-                                    contentDescription = "Clear search",
-                                    tint = colors.foregroundSecondary,
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close,
+                                    semanticLabel = "Clear search",
+                                    color = colors.foregroundSecondary,
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
@@ -418,10 +416,9 @@ fun NewChatScreen(
                                         ),
                                     )
                                 } else {
-                                    Icon(
-                                        Icons.Rounded.ChevronRight,
-                                        contentDescription = null,
-                                        tint = colors.foregroundTertiary,
+                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+                                        semanticLabel = null,
+                                        color = colors.foregroundTertiary,
                                         modifier = Modifier.size(20.dp),
                                     )
                                 }
@@ -593,7 +590,7 @@ private fun NewChatEntryCard(
             Text(title, color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             Text(subtitle, color = colors.foregroundSecondary, fontSize = 12.sp)
         }
-        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = chevronTint)
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = chevronTint)
     }
 }
 

@@ -34,7 +34,7 @@ import androidx.compose.material3.CardDefaults
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -151,7 +151,7 @@ fun StarredMessagesScreen(
                 navigationIcon = {
                     // Dart AppBar automaticallyImplyLeading on a pushed route.
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ChevronLeft, "Back")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back")
                     }
                 },
                 actions = {
@@ -188,7 +188,7 @@ fun StarredMessagesScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     placeholder = { Text("Search starred messages") },
-                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null) },
                     trailingIcon = if (query.isEmpty()) {
                         null
                     } else {
@@ -199,9 +199,8 @@ fun StarredMessagesScreen(
                                     query = ""
                                 },
                             ) {
-                                Icon(
-                                    Icons.Rounded.Close,
-                                    contentDescription = "Clear search",
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close,
+                                    semanticLabel = "Clear search",
                                 )
                             }
                         }
@@ -392,10 +391,9 @@ private fun StarredMessageRow(
                         .clickable { menuOpen = true }
                         .padding(12.dp),
                 ) {
-                    Icon(
-                        Icons.Rounded.Star,
-                        contentDescription = "Message options",
-                        tint = colors.primary,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.starFilled,
+                        semanticLabel = "Message options",
+                        color = colors.primary,
                         modifier = Modifier.size(19.dp),
                     )
                     Spacer(Modifier.height(3.dp))
@@ -410,7 +408,7 @@ private fun StarredMessageRow(
                 ) {
                     DropdownMenuItem(
                         leadingIcon = {
-                            Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null)
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats, semanticLabel = null)
                         },
                         text = { Text("Open conversation") },
                         onClick = {
@@ -420,7 +418,7 @@ private fun StarredMessageRow(
                     )
                     DropdownMenuItem(
                         leadingIcon = {
-                            Icon(Icons.Rounded.StarBorder, contentDescription = null)
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.star, semanticLabel = null)
                         },
                         text = { Text("Remove star") },
                         onClick = {

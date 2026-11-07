@@ -22,7 +22,7 @@ import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -78,7 +78,7 @@ fun NotificationsInboxScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Outlined.ArrowBack, contentDescription = "Back")
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back")
             }
             Column(Modifier.weight(1f)) {
                 Text("Notifications", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
@@ -94,7 +94,7 @@ fun NotificationsInboxScreen(
                 }
             }
             IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Outlined.Settings, contentDescription = "Notification settings")
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.settings, semanticLabel = "Notification settings")
             }
         }
 
@@ -110,8 +110,7 @@ fun NotificationsInboxScreen(
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            Icons.Outlined.NotificationsNone,
+                        Icon(Icons.Outlined.NotificationsNone,
                             contentDescription = null,
                             modifier = Modifier.size(30.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -176,8 +175,7 @@ private fun NotificationActivityRow(entry: ChatyEventNotification) {
                 .background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                Icons.Outlined.NotificationsNone,
+            Icon(Icons.Outlined.NotificationsNone,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
             )

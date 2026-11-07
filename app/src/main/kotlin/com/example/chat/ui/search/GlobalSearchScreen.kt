@@ -25,7 +25,7 @@ import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import com.example.chat.ui.kit.ChatyActionButton
 import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.material3.IconButton
@@ -176,7 +176,7 @@ fun GlobalSearchScreen(
             modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp, vertical = 6.dp),
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -187,10 +187,9 @@ fun GlobalSearchScreen(
                     .background(colors.inputFill)
                     .padding(horizontal = 16.dp),
             ) {
-                Icon(
-                    Icons.Rounded.Search,
-                    contentDescription = null,
-                    tint = colors.foreground.copy(alpha = 0.5f),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search,
+                    semanticLabel = null,
+                    color = colors.foreground.copy(alpha = 0.5f),
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(8.dp))
@@ -228,7 +227,7 @@ fun GlobalSearchScreen(
                     query = ""
                     queueSearch("")
                 }) {
-                    Icon(Icons.Rounded.Clear, contentDescription = "Clear", tint = colors.foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.clear, semanticLabel = "Clear", color = colors.foreground)
                 }
             } else {
                 Spacer(Modifier.width(48.dp))
@@ -425,10 +424,9 @@ private fun ConversationTile(
                 fontSize = 12.sp,
             )
         }
-        Icon(
-            Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint = colors.foreground.copy(alpha = 0.35f),
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+            semanticLabel = null,
+            color = colors.foreground.copy(alpha = 0.35f),
         )
     }
 }

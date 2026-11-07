@@ -23,11 +23,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,6 +40,14 @@ import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.LockReset
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -61,10 +70,9 @@ fun AuthBackButton(onClick: () -> Unit) {
     val colors = LocalAppColors.current
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         IconButton(onClick = onClick, modifier = Modifier.size(48.dp).testTag("auth-back").semantics { contentDescription = "Back" }) {
-            Icon(
-                Icons.Rounded.ChevronLeft,
-                contentDescription = null,
-                tint = colors.foreground,
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                semanticLabel = null,
+                color = colors.foreground,
                 modifier = Modifier.size(24.dp),
             )
         }
@@ -85,9 +93,20 @@ fun AuthTextField(
     error: String? = null,
     prefixIcon: (@Composable () -> Unit)? = null,
     suffixIcon: (@Composable () -> Unit)? = null,
+    capsule: Boolean = false,
+    microMotion: Boolean = capsule,
 ) {
     val colors = LocalAppColors.current
     val focus = LocalFocusManager.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val reduced = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val focusTint by androidx.compose.animation.animateColorAsState(
+        targetValue = if (focused) c(theme.accentColor) else colors.border,
+        animationSpec = androidx.compose.animation.core.tween(if (reduced) 0 else com.example.chat.ui.kit.ChatyMotion.fastMs),
+        label = "auth-focus-outline",
+    )
+    val floatingLabel: (@Composable () -> Unit)? = if (capsule) null else ({ Text(label) })
     Column(modifier = modifier) {
         Text(
             label,
@@ -99,9 +118,9 @@ fun AuthTextField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth().testTag("auth-field-" + label.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-'))
+            modifier = Modifier.fillMaxWidth().heightIn(min = if (capsule) AuthCapsuleTokens.controlHeight else 0.dp).testTag("auth-field-" + label.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-'))
                 .semantics { contentDescription = label },
-            label = { Text(label) },
+            label = floatingLabel,
             placeholder = {
                 Text(
                     hintText,
@@ -113,18 +132,27 @@ fun AuthTextField(
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Next),
             keyboardActions = KeyboardActions(onNext = { if (!focus.moveFocus(FocusDirection.Next)) focus.clearFocus() }),
             isError = error != null,
-            supportingText = error?.let { { Text(it, color = c(theme.dangerColor), fontSize = 12.sp) } },
+            supportingText = error?.let { message -> {
+                Row(verticalAlignment = Alignment.Top, modifier = if (capsule) Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite } else Modifier) {
+                    if (capsule) {
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.errorOutline, size = 18.dp, color = c(theme.dangerColor))
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text(message, color = c(theme.dangerColor), fontSize = 12.sp)
+                }
+            } },
             leadingIcon = prefixIcon,
             trailingIcon = suffixIcon,
             singleLine = true,
-            shape = RoundedCornerShape(16.dp),
+            interactionSource = interaction,
+            shape = if (capsule) AuthCapsuleTokens.shape else RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = c(theme.primaryTextColor),
                 unfocusedTextColor = c(theme.primaryTextColor),
                 focusedContainerColor = colors.inputFill,
                 unfocusedContainerColor = colors.inputFill,
                 errorContainerColor = colors.inputFill,
-                focusedBorderColor = c(theme.accentColor),
+                focusedBorderColor = if (microMotion) focusTint else c(theme.accentColor),
                 unfocusedBorderColor = colors.border,
                 errorBorderColor = c(theme.dangerColor),
                 cursorColor = c(theme.accentColor),
@@ -140,12 +168,13 @@ fun AuthPrimaryButton(
     theme: ThemeConfig,
     onClick: () -> Unit,
     isLoading: Boolean = false,
+    capsule: Boolean = false,
 ) {
     Button(
         onClick = onClick,
         enabled = !isLoading,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = if (capsule) AuthCapsuleTokens.controlHeight else 52.dp),
+        shape = if (capsule) AuthCapsuleTokens.shape else RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = c(theme.accentColor),
             contentColor = c(theme.onAccentColor),
@@ -313,4 +342,121 @@ private fun ModeTab(
             maxLines = 1,
         )
     }
+}
+
+
+/** Approved capsule login tokens, opt-in until each later screen is approved. */
+internal object AuthCapsuleTokens {
+    val tapTarget = 48.dp
+    const val checkboxMs = 180
+    val controlHeight = 56.dp
+    val shape = CircleShape
+}
+
+@Composable
+internal fun AuthTextLink(
+    text: String,
+    theme: ThemeConfig,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
+    androidx.compose.material3.TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().heightIn(min = AuthCapsuleTokens.tapTarget),
+        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = c(theme.accentColor)),
+    ) { Text(text, fontSize = 13.5.sp) }
+}
+
+/** No destination, persistence or authentication changes: caller owns mode state. */
+@Composable
+internal fun AuthCapsuleModeSelector(
+    theme: ThemeConfig,
+    useOrganization: Boolean,
+    onSelect: (Boolean) -> Unit,
+) {
+    val labelStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val widestLabel = with(density) {
+        listOf("Normal", "Organization").maxOf {
+            textMeasurer.measure(androidx.compose.ui.text.AnnotatedString(it), style = labelStyle,
+                softWrap = false).size.width
+        }.toDp()
+    }
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        Modifier.fillMaxWidth().semantics { isTraversalGroup = true }
+            .background(c(argbWithAlpha(theme.secondaryTextColor, 0.06)), AuthCapsuleTokens.shape)
+            .border(1.dp, c(argbWithAlpha(theme.secondaryTextColor, 0.2)), AuthCapsuleTokens.shape)
+            .padding(3.dp).selectableGroup(),
+    ) {
+        // Measure with the actual device font scale. Keep whole labels and48dp targets,
+        // stack instead of shrinking text or splitting Organization mid-word.
+        val sideBySide = maxWidth >= (widestLabel + 20.dp + 8.dp + 20.dp) * 2
+        if (sideBySide) {
+            Row(Modifier.fillMaxWidth()) {
+                listOf(false to "Normal", true to "Organization").forEach { (organization, label) ->
+                    AuthCapsuleModeOption(theme, organization, label, useOrganization, onSelect,
+                        Modifier.weight(1f), labelStyle)
+                }
+            }
+        } else {
+            Column(Modifier.fillMaxWidth()) {
+                listOf(false to "Normal", true to "Organization").forEach { (organization, label) ->
+                    AuthCapsuleModeOption(theme, organization, label, useOrganization, onSelect,
+                        Modifier.fillMaxWidth(), labelStyle)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuthCapsuleModeOption(
+    theme: ThemeConfig,
+    organization: Boolean,
+    label: String,
+    useOrganization: Boolean,
+    onSelect: (Boolean) -> Unit,
+    modifier: Modifier,
+    labelStyle: androidx.compose.ui.text.TextStyle,
+) {
+    val selected = organization == useOrganization
+    val reduced = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val fill by androidx.compose.animation.animateColorAsState(
+        targetValue = if (selected) c(theme.accentColor) else Color.Transparent,
+        animationSpec = androidx.compose.animation.core.tween(
+            durationMillis = if (reduced) 0 else com.example.chat.ui.kit.ChatyMotion.fastMs,
+            easing = com.example.chat.ui.kit.ChatyMotion.standard,
+        ), label = "auth-mode-fill",
+    )
+    val foreground = if (selected) c(theme.onAccentColor) else c(theme.secondaryTextColor)
+    Row(
+        modifier.heightIn(min = AuthCapsuleTokens.tapTarget)
+            .background(fill, AuthCapsuleTokens.shape)
+            .selectable(selected, role = androidx.compose.ui.semantics.Role.Tab, onClick = { onSelect(organization) })
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+    ) {
+        if (organization) AuthRoleIcon("workspace", theme, color = foreground)
+        else com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.profile, size = 20.dp, color = foreground)
+        Spacer(Modifier.width(8.dp))
+        Text(label, color = foreground, style = labelStyle,
+            softWrap = false, maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    }
+}
+
+/** Resolve through the persisted selected pack, including per-icon variants. */
+@Composable
+internal fun AuthRoleIcon(role: String, theme: ThemeConfig, label: String? = null, color: Color = c(theme.secondaryTextColor)) {
+    val id = when (role) {
+        "workspace" -> com.example.chat.ui.icons.ChatyIconId.workspace
+        "eye" -> com.example.chat.ui.icons.ChatyIconId.eye
+        "eyeOff" -> com.example.chat.ui.icons.ChatyIconId.eyeOff
+        "info" -> com.example.chat.ui.icons.ChatyIconId.info
+        else -> com.example.chat.ui.icons.ChatyIconId.mail
+    }
+    com.example.chat.ui.icons.ChatyIcon(id, size = 20.dp, color = color, semanticLabel = label)
 }

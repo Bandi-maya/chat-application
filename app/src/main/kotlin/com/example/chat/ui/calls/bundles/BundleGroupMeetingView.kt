@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -246,7 +247,7 @@ fun BundleParticipantInviteSheet(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Rounded.ArrowBack, "Back", tint = Color.White)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = Color.White)
                 }
                 Text(
                     text = "Invite People",
@@ -262,7 +263,7 @@ fun BundleParticipantInviteSheet(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = { Text("Search", color = tokens.secondaryText) },
-                leadingIcon = { Icon(Icons.Rounded.Search, null, tint = tokens.secondaryText) },
+                leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, color = tokens.secondaryText) },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = tokens.cardBackground,
                     unfocusedContainerColor = tokens.cardBackground,

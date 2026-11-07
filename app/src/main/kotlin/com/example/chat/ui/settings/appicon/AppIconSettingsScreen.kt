@@ -42,7 +42,7 @@ import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -434,7 +434,7 @@ fun AppIconSettingsScreen(
                     fontWeight = FontWeight.W800,
                 )
                 SourceSheetTile(
-                    icon = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null) },
+                    icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.gallery, semanticLabel = null) },
                     title = "Photos",
                     subtitle = "Choose an image with Android Photo Picker",
                     onClick = {
@@ -443,7 +443,7 @@ fun AppIconSettingsScreen(
                     },
                 )
                 SourceSheetTile(
-                    icon = { Icon(Icons.Outlined.PhotoCamera, contentDescription = null) },
+                    icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = null) },
                     title = "Camera",
                     subtitle = "Capture a new image",
                     onClick = {
@@ -551,7 +551,7 @@ private fun AddCustomIconOption(
             Modifier.size(64.dp).background(scheme.surfaceVariant, RoundedCornerShape(15.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.Add, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(32.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null, color = scheme.primary, modifier = Modifier.size(32.dp))
         }
     }
 }
@@ -604,10 +604,9 @@ private fun IconTileShell(
                             .background(scheme.primary, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            Icons.Rounded.Check,
-                            contentDescription = null,
-                            tint = scheme.onPrimary,
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check,
+                            semanticLabel = null,
+                            color = scheme.onPrimary,
                             modifier = Modifier.size(15.dp),
                         )
                     }

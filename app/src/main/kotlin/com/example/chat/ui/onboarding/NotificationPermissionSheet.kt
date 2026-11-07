@@ -20,7 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
@@ -191,8 +191,7 @@ private fun NotificationPermissionSheet(
                     .background(colors.primary.copy(alpha = 0.12f), CircleShape)
                     .padding(20.dp),
             ) {
-                Icon(
-                    Icons.Rounded.NotificationsActive,
+                Icon(Icons.Rounded.NotificationsActive,
                     contentDescription = null,
                     tint = colors.primary,
                     modifier = Modifier.size(40.dp),

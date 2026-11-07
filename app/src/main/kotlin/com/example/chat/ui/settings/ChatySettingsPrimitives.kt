@@ -46,7 +46,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
@@ -287,7 +287,7 @@ fun ChatySettingsTile(
             trail()
         } else if (onTap != null) {
             Spacer(Modifier.width(16.dp))
-            Icon(Icons.Rounded.ChevronRight, null, tint = colors.foreground.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foreground.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -449,7 +449,7 @@ fun <T> ChatyChoiceTile(
                 color = colors.foregroundSecondary, fontSize = 14.sp,
             )
         }
-        Icon(Icons.Rounded.ChevronRight, null, tint = colors.foreground.copy(alpha = 0.6f))
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foreground.copy(alpha = 0.6f))
     }
     if (showChoices) com.example.chat.ui.kit.ChatySingleChoiceModal(
         title = "Select $title", value = selectedOption, options = options, labelBuilder = optionLabel,
@@ -512,7 +512,7 @@ fun ChatyDangerTile(title: String, onTap: () -> Unit, subtitle: String? = null) 
         title = title,
         subtitle = subtitle,
         onTap = onTap,
-        trailing = { Icon(Icons.Rounded.ArrowForwardIos, null, tint = colors.error, modifier = Modifier.size(16.dp)) },
+        trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.error, modifier = Modifier.size(16.dp)) },
     )
 }
 

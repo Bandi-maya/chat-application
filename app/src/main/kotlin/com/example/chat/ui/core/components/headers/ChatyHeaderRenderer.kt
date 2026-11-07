@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -81,7 +81,7 @@ fun ChatyHeaderRenderer(
         HeaderBar(modifier, bg, fg, 1.dp, 56.dp,
             leading = {
                 IconButton(onClick = { data.onClearSelection?.invoke() }) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close selection", tint = fg)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close selection", color = fg)
                 }
             },
             title = { Text("${data.selectionCount} selected", color = fg, fontSize = 17.sp, fontWeight = FontWeight.W700) },

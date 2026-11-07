@@ -55,7 +55,8 @@ enum class ChatyIconThemeId(val title: String, val description: String) {
 
 /** Canonical semantic identifiers for all Chaty system icons (chaty_icon_registry.dart). */
 enum class ChatyIconId {
-    chats, updates, calls, profile, tasks, groups, desktop, more, moreOptions, search, settings, close, check, tune, chevronRight, back, send, emoji, attachment, attachmentPlus, microphone, microphoneOff, pin, unpin, archive, lock, unlock, mute, unmute, favourite, favouriteFilled, delete, reply, forward, edit, copy, share, camera, cameraFlip, cameraShutter, cameraFlashOn, cameraFlashOff, gallery, callAudio, callVideo, callVideoOff, callEnd, cameraSwitch, screenShare, screenShareStop, speaker, earpiece, signal, messageCheckSingle, messageCheckDouble, messageClock, pictureInPicture, autoAwesome, fullscreen, fullscreenExit, openInNew, clear, addTask, editOutline, videoCam, voiceCall, logout, deleteOutline, schedule, scheduleSend, sync, checkSingle, checkDouble, errorOutline, pause, playArrow, musicNote
+    chats, updates, calls, profile, tasks, groups, desktop, more, moreOptions, search, settings, close, check, tune, chevronRight, back, send, emoji, attachment, attachmentPlus, microphone, microphoneOff, pin, unpin, archive, lock, unlock, mute, unmute, favourite, favouriteFilled, delete, reply, forward, edit, copy, share, camera, cameraFlip, cameraShutter, cameraFlashOn, cameraFlashOff, gallery, callAudio, callVideo, callVideoOff, callEnd, cameraSwitch, screenShare, screenShareStop, speaker, earpiece, signal, messageCheckSingle, messageCheckDouble, messageClock, pictureInPicture, autoAwesome, fullscreen, fullscreenExit, openInNew, clear, addTask, editOutline, videoCam, voiceCall, logout, deleteOutline, schedule, scheduleSend, sync, checkSingle, checkDouble, errorOutline, pause, playArrow, musicNote, mail, eye, eyeOff, workspace, info, star, starFilled, report, block, selectAll, rotateRight, rotateLeft, reset, add, wallpaper, palette, markRead, markUnread, unarchive, ghost, translate, home, shield, fingerprint, atSign, chevronDown, chevronUp, textFormat, paint, dialpad, personAdd, layout, storage, wifi, permissions, backup, clean, widgets, touch, qrCode, link, history, calendar, folder, document, notifications, notificationsOff, checkCircle, addCircle, minusCircle, groupAdd, replyAll, key, menu, grid, list, location, download, upload, quote, poll, refresh, notificationDot, personSearch, contacts, clipboard, crop, filter, speed, stories, waveform, layers, alignTop, freeze, style, deleteSweep, checklist, searchOff, mediaError, badge, deviceLock, keyboard, timer, personOff, playCircle, sidebar, pattern, password, paintFill, cloudOff, cast, sun, moon, arrowUp, arrowRight, minus, locate, restore, undo, help, warning, cut, pinCode, organization, organizationAdd, personRemove, keyOff, syncProblem, mediaLibrary, devices, cloudDownload, entry, profileCard, contactLabel, forwardInbox, dock, bubbleChart, premium, bolt, backspace, campaign, speakerGroup, ringVolume, robot, mosaic, gif, carousel, hd, subtitles, toggle, radial, extension, screenshot, cube, brain, corner, online, layersOff, community, science, mapPin, shuffle, repeat, repeatOne, replayTen, forwardTen, fit, aspectRatio, videoLibrary, photoAdd, fileOpen, fileUpload, headphones, headset, bluetooth, usb, ethernet, wifiOff, cloudCheck, cloudSync, language, swipe, callIncoming, callOutgoing, callMissed, shieldMoon, diamond, animation, numberOne, verified, medal, lightbulb, angleRoute, airplane, inbox, calendarOff, manageSearch, moveDown, alignBottom, addBox, alarm, alarmAdd, fileRules, kanban, note, lockReset, phone, tv, navigation
+
 }
 
 /** Port of _ChatyIconVectorPainter. Pure drawing against IconCanvas so it is JVM-testable. */
@@ -64,6 +65,10 @@ object ChatyIconPainter {
         // Asset themes are drawn by ChatyIcon's VectorDrawable route, never procedural substitutes.
         if (ChatyIconPackCatalog.isAssetPack(theme)) return
         if (ChatyThemeStyles.paint(canvas, sizeWidth, icon, theme, iconColor)) return
+        if (icon in setOf(ChatyIconId.star, ChatyIconId.starFilled, ChatyIconId.report, ChatyIconId.block, ChatyIconId.selectAll, ChatyIconId.rotateRight, ChatyIconId.rotateLeft, ChatyIconId.reset, ChatyIconId.add, ChatyIconId.wallpaper, ChatyIconId.palette, ChatyIconId.markRead, ChatyIconId.markUnread, ChatyIconId.unarchive, ChatyIconId.ghost, ChatyIconId.translate, ChatyIconId.home, ChatyIconId.shield, ChatyIconId.fingerprint, ChatyIconId.atSign, ChatyIconId.chevronDown, ChatyIconId.chevronUp, ChatyIconId.textFormat, ChatyIconId.paint, ChatyIconId.dialpad, ChatyIconId.personAdd, ChatyIconId.layout, ChatyIconId.storage, ChatyIconId.wifi, ChatyIconId.permissions, ChatyIconId.backup, ChatyIconId.clean, ChatyIconId.widgets, ChatyIconId.touch, ChatyIconId.qrCode, ChatyIconId.link, ChatyIconId.history, ChatyIconId.calendar, ChatyIconId.folder, ChatyIconId.document, ChatyIconId.notifications, ChatyIconId.notificationsOff, ChatyIconId.checkCircle, ChatyIconId.addCircle, ChatyIconId.minusCircle, ChatyIconId.groupAdd, ChatyIconId.replyAll, ChatyIconId.key, ChatyIconId.menu, ChatyIconId.grid, ChatyIconId.list, ChatyIconId.location, ChatyIconId.download, ChatyIconId.upload, ChatyIconId.quote, ChatyIconId.poll, ChatyIconId.refresh, ChatyIconId.notificationDot, ChatyIconId.personSearch, ChatyIconId.contacts, ChatyIconId.clipboard, ChatyIconId.crop, ChatyIconId.filter, ChatyIconId.speed, ChatyIconId.stories, ChatyIconId.waveform, ChatyIconId.layers, ChatyIconId.alignTop, ChatyIconId.freeze, ChatyIconId.style, ChatyIconId.deleteSweep, ChatyIconId.checklist, ChatyIconId.searchOff, ChatyIconId.mediaError, ChatyIconId.badge, ChatyIconId.deviceLock, ChatyIconId.keyboard, ChatyIconId.timer, ChatyIconId.personOff, ChatyIconId.playCircle, ChatyIconId.sidebar, ChatyIconId.pattern, ChatyIconId.password, ChatyIconId.paintFill, ChatyIconId.cloudOff, ChatyIconId.cast, ChatyIconId.sun, ChatyIconId.moon, ChatyIconId.arrowUp, ChatyIconId.arrowRight, ChatyIconId.minus, ChatyIconId.locate, ChatyIconId.restore, ChatyIconId.undo, ChatyIconId.help, ChatyIconId.warning, ChatyIconId.cut, ChatyIconId.pinCode, ChatyIconId.organization, ChatyIconId.organizationAdd, ChatyIconId.personRemove, ChatyIconId.keyOff, ChatyIconId.syncProblem, ChatyIconId.mediaLibrary, ChatyIconId.devices, ChatyIconId.cloudDownload, ChatyIconId.entry, ChatyIconId.profileCard, ChatyIconId.contactLabel, ChatyIconId.forwardInbox, ChatyIconId.dock, ChatyIconId.bubbleChart, ChatyIconId.premium, ChatyIconId.bolt, ChatyIconId.backspace, ChatyIconId.campaign, ChatyIconId.speakerGroup, ChatyIconId.ringVolume, ChatyIconId.robot, ChatyIconId.mosaic, ChatyIconId.gif, ChatyIconId.carousel, ChatyIconId.hd, ChatyIconId.subtitles, ChatyIconId.toggle, ChatyIconId.radial, ChatyIconId.extension, ChatyIconId.screenshot, ChatyIconId.cube, ChatyIconId.brain, ChatyIconId.corner, ChatyIconId.online, ChatyIconId.layersOff, ChatyIconId.community, ChatyIconId.science, ChatyIconId.mapPin, ChatyIconId.shuffle, ChatyIconId.repeat, ChatyIconId.repeatOne, ChatyIconId.replayTen, ChatyIconId.forwardTen, ChatyIconId.fit, ChatyIconId.aspectRatio, ChatyIconId.videoLibrary, ChatyIconId.photoAdd, ChatyIconId.fileOpen, ChatyIconId.fileUpload, ChatyIconId.headphones, ChatyIconId.headset, ChatyIconId.bluetooth, ChatyIconId.usb, ChatyIconId.ethernet, ChatyIconId.wifiOff, ChatyIconId.cloudCheck, ChatyIconId.cloudSync, ChatyIconId.language, ChatyIconId.swipe, ChatyIconId.callIncoming, ChatyIconId.callOutgoing, ChatyIconId.callMissed, ChatyIconId.shieldMoon, ChatyIconId.diamond, ChatyIconId.animation, ChatyIconId.numberOne, ChatyIconId.verified, ChatyIconId.medal, ChatyIconId.lightbulb, ChatyIconId.angleRoute, ChatyIconId.airplane, ChatyIconId.inbox, ChatyIconId.calendarOff, ChatyIconId.manageSearch, ChatyIconId.moveDown, ChatyIconId.alignBottom, ChatyIconId.addBox, ChatyIconId.alarm, ChatyIconId.alarmAdd, ChatyIconId.fileRules, ChatyIconId.kanban, ChatyIconId.note, ChatyIconId.lockReset, ChatyIconId.phone, ChatyIconId.tv, ChatyIconId.navigation)) {
+            ChatyBaseOutlines.paint(canvas, sizeWidth, icon, iconColor)
+            return
+        }
         val s = sizeWidth
         val scale = s / 24.0
         canvas.save()
@@ -182,6 +187,11 @@ object ChatyIconPainter {
             ChatyIconId.pause -> p._paintPause(canvas, strokePaint, fillPaint)
             ChatyIconId.playArrow -> p._paintPlayArrow(canvas, strokePaint, fillPaint)
             ChatyIconId.musicNote -> p._paintMusicNote(canvas, strokePaint, fillPaint)
+            ChatyIconId.mail -> p._paintMail(canvas, strokePaint, fillPaint)
+            ChatyIconId.eye -> p._paintEye(canvas, strokePaint, fillPaint, off = false)
+            ChatyIconId.eyeOff -> p._paintEye(canvas, strokePaint, fillPaint, off = true)
+            ChatyIconId.workspace -> p._paintWorkspace(canvas, strokePaint, fillPaint, secondaryFillPaint)
+            ChatyIconId.info -> p._paintInfo(canvas, strokePaint, fillPaint)
                 else -> {}
             }
         }
@@ -2379,5 +2389,372 @@ object ChatyIconPainter {
         else -> {}
     }
   }
+
+  fun _paintMail(canvas: IconCanvas, stroke: Paint, fill: Paint) {
+    when (theme) {
+      ChatyIconThemeId.chatySigil -> {
+        // Orbital envelope with counter-space dot under the flap
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(3.0, 5.0, 18.0, 14.0), Radius.circular(2.5)), stroke);
+        val flap = Path().apply { moveTo(4.5, 8.0); lineTo(12.0, 13.5); lineTo(19.5, 8.0) };
+        canvas.drawPath(flap, stroke);
+        canvas.drawCircle(Offset(12.0, 16.2), 1.2, fill);
+        }
+      ChatyIconThemeId.precisionContour -> {
+        // Hairline rectangular envelope with sharp flap
+        canvas.drawRect(Rect.fromLTWH(4.0, 6.0, 16.0, 12.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(4.0, 6.5), Offset(12.0, 12.5), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(12.0, 12.5), Offset(20.0, 6.5), stroke.apply { strokeWidth = 1.2 });
+        }
+      ChatyIconThemeId.monolithicCutout -> {
+        // Solid envelope with stenciled flap slit
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(3.5, 5.5, 17.0, 13.0), Radius.circular(2.0)), fill);
+        val slit = Paint().apply { color = Colors.white; strokeWidth = 1.4; style = PaintingStyle.stroke; strokeCap = StrokeCap.round };
+        canvas.drawLine(Offset(6.5, 8.0), Offset(12.0, 12.0), slit);
+        canvas.drawLine(Offset(12.0, 12.0), Offset(17.5, 8.0), slit);
+        }
+      ChatyIconThemeId.origamiGeometry -> {
+        // Faceted paper envelope with crease flap
+        val body = Path().apply { moveTo(4.0, 6.0); lineTo(20.0, 6.0); lineTo(20.0, 18.0); lineTo(4.0, 18.0); close() };
+        canvas.drawPath(body, stroke);
+        canvas.drawLine(Offset(4.0, 6.0), Offset(12.0, 13.0), stroke);
+        canvas.drawLine(Offset(12.0, 13.0), Offset(20.0, 6.0), stroke);
+        }
+      ChatyIconThemeId.organicMotion -> {
+        // Fluid pebble envelope with curved flap
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(4.0, 6.0, 16.0, 12.0), Radius.circular(6.0)), stroke);
+        val flap = Path().apply { moveTo(5.0, 8.5); quadraticBezierTo(12.0, 14.5, 19.0, 8.5) };
+        canvas.drawPath(flap, stroke);
+        }
+      ChatyIconThemeId.pixelPrecision -> {
+        // Authentic 8-bit stepped pixel envelope
+        canvas.drawRect(Rect.fromLTWH(4, 6, 16, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(4, 16, 16, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(4, 8, 2, 8), fill);
+        canvas.drawRect(Rect.fromLTWH(18, 8, 2, 8), fill);
+        canvas.drawRect(Rect.fromLTWH(6, 8, 2, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(8, 10, 2, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(10, 12, 4, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(14, 10, 2, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(16, 8, 2, 2), fill);
+        }
+      ChatyIconThemeId.technicalBlueprint -> {
+        // CAD envelope schematic with datum ticks
+        canvas.drawRect(Rect.fromLTWH(4.0, 6.0, 16.0, 12.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(4.0, 6.5), Offset(12.0, 12.5), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(12.0, 12.5), Offset(20.0, 6.5), stroke.apply { strokeWidth = 1.2 });
+        val datum = Paint().apply { color = stroke.color.withValues(alpha = 0.4); strokeWidth = 0.8; style = PaintingStyle.stroke };
+        canvas.drawLine(Offset(2.0, 6.0), Offset(3.0, 6.0), datum);
+        canvas.drawLine(Offset(2.0, 18.0), Offset(3.0, 18.0), datum);
+        canvas.drawLine(Offset(12.0, 19.0), Offset(12.0, 20.0), datum);
+        }
+      ChatyIconThemeId.sculptedVolume -> {
+        // Dimensional envelope with raised plate
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5.0, 7.0, 17.0, 13.0), Radius.circular(2.5)), plateOf(fill));
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(3.5, 5.5, 17.0, 13.0), Radius.circular(2.5)), stroke.apply { strokeWidth = 1.9 });
+        val flap = Path().apply { moveTo(5.0, 8.0); lineTo(12.0, 13.5); lineTo(19.0, 8.0) };
+        canvas.drawPath(flap, stroke.apply { strokeWidth = 1.9 });
+        }
+      ChatyIconThemeId.expressiveInk -> {
+        // Bold brush envelope with sweeping flap
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(3.5, 5.5, 17.0, 13.0), Radius.circular(2.5)), stroke.apply { strokeWidth = 2.4 });
+        val flap = Path().apply { moveTo(4.5, 8.0); quadraticBezierTo(12.0, 14.0, 19.5, 8.0) };
+        canvas.drawPath(flap, stroke.apply { strokeWidth = 2.6 });
+        }
+      ChatyIconThemeId.signalLanguage -> {
+        // Telemetry envelope with arrival pulse
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(3.5, 5.5, 17.0, 13.0), Radius.circular(2.5)), stroke);
+        canvas.drawLine(Offset(4.5, 8.0), Offset(12.0, 13.5), stroke);
+        canvas.drawLine(Offset(12.0, 13.5), Offset(19.5, 8.0), stroke);
+        canvas.drawArc(Rect.fromLTWH(19, 2, 4, 4), -PI / 2, PI, false, stroke.apply { strokeWidth = 1.2 });
+        }
+        else -> {}
+    }
+  }
+
+  fun _paintEye(canvas: IconCanvas, stroke: Paint, fill: Paint, off: Boolean) {
+    when (theme) {
+      ChatyIconThemeId.chatySigil -> {
+        // Orbital almond eye with counter-space pupil
+        val almond = Path().apply { moveTo(2.5, 12.0); quadraticBezierTo(12.0, 4.5, 21.5, 12.0); quadraticBezierTo(12.0, 19.5, 2.5, 12.0); close() };
+        canvas.drawPath(almond, stroke);
+        canvas.drawCircle(Offset(12.0, 12.0), 3.2, stroke);
+        canvas.drawCircle(Offset(12.0, 12.0), 1.2, fill);
+        }
+      ChatyIconThemeId.precisionContour -> {
+        // Hairline angular eye
+        val almond = Path().apply { moveTo(3.0, 12.0); lineTo(12.0, 5.5); lineTo(21.0, 12.0); lineTo(12.0, 18.5); close() };
+        canvas.drawPath(almond, stroke.apply { strokeWidth = 1.2 });
+        canvas.drawCircle(Offset(12.0, 12.0), 2.8, stroke.apply { strokeWidth = 1.2 });
+        }
+      ChatyIconThemeId.monolithicCutout -> {
+        // Solid eye with stenciled pupil
+        val almond = Path().apply { moveTo(2.5, 12.0); quadraticBezierTo(12.0, 4.5, 21.5, 12.0); quadraticBezierTo(12.0, 19.5, 2.5, 12.0); close() };
+        canvas.drawPath(almond, fill);
+        canvas.drawCircle(Offset(12.0, 12.0), 2.5, Paint().apply { color = Colors.white; style = PaintingStyle.fill });
+        if (off) {
+          canvas.drawLine(Offset(4.5, 4.5), Offset(19.5, 19.5), Paint().apply { color = Colors.white; strokeWidth = 2.0; style = PaintingStyle.stroke; strokeCap = StrokeCap.round });
+        }
+        }
+      ChatyIconThemeId.origamiGeometry -> {
+        // Faceted origami eye with diamond pupil
+        val almond = Path().apply { moveTo(3.0, 12.0); lineTo(12.0, 6.0); lineTo(21.0, 12.0); lineTo(12.0, 18.0); close() };
+        canvas.drawPath(almond, stroke);
+        val pupil = Path().apply { moveTo(12.0, 9.5); lineTo(14.5, 12.0); lineTo(12.0, 14.5); lineTo(9.5, 12.0); close() };
+        canvas.drawPath(pupil, stroke);
+        }
+      ChatyIconThemeId.organicMotion -> {
+        // Fluid droplet eye
+        val almond = Path().apply { moveTo(3.0, 12.0); quadraticBezierTo(7.0, 5.0, 12.0, 5.2); quadraticBezierTo(17.0, 5.0, 21.0, 12.0); quadraticBezierTo(17.0, 19.0, 12.0, 18.8); quadraticBezierTo(7.0, 19.0, 3.0, 12.0); close() };
+        canvas.drawPath(almond, stroke);
+        canvas.drawCircle(Offset(12.0, 12.0), 3.0, stroke);
+        canvas.drawCircle(Offset(12.0, 12.0), 1.2, fill);
+        }
+      ChatyIconThemeId.pixelPrecision -> {
+        // Authentic 8-bit stepped pixel eye
+        canvas.drawRect(Rect.fromLTWH(8, 6, 8, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(5, 8, 14, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(3, 10, 18, 5), fill);
+        canvas.drawRect(Rect.fromLTWH(5, 15, 14, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(8, 17, 8, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(10, 10, 4, 4), Paint().apply { color = Colors.white; style = PaintingStyle.fill });
+        if (off) {
+          val w = Paint().apply { color = Colors.white; style = PaintingStyle.fill };
+          for (i in 0..6) canvas.drawRect(Rect.fromLTWH(5.0 + 2 * i, 5.0 + 2 * i, 2.0, 2.0), w);
+        }
+        }
+      ChatyIconThemeId.technicalBlueprint -> {
+        // CAD optical schematic with datum crosshairs
+        val almond = Path().apply { moveTo(2.5, 12.0); quadraticBezierTo(12.0, 4.5, 21.5, 12.0); quadraticBezierTo(12.0, 19.5, 2.5, 12.0); close() };
+        canvas.drawPath(almond, stroke.apply { strokeWidth = 1.2 });
+        canvas.drawCircle(Offset(12.0, 12.0), 3.0, stroke.apply { strokeWidth = 1.2 });
+        val datum = Paint().apply { color = stroke.color.withValues(alpha = 0.4); strokeWidth = 0.8; style = PaintingStyle.stroke };
+        canvas.drawLine(Offset(12.0, 2.0), Offset(12.0, 4.0), datum);
+        canvas.drawLine(Offset(12.0, 20.0), Offset(12.0, 22.0), datum);
+        canvas.drawLine(Offset(1.0, 12.0), Offset(2.2, 12.0), datum);
+        canvas.drawLine(Offset(21.8, 12.0), Offset(23.0, 12.0), datum);
+        }
+      ChatyIconThemeId.sculptedVolume -> {
+        // Dimensional eye with offset depth plate
+        val almond = Path().apply { moveTo(2.5, 12.0); quadraticBezierTo(12.0, 4.5, 21.5, 12.0); quadraticBezierTo(12.0, 19.5, 2.5, 12.0); close() };
+        canvas.drawPath(almond, stroke.apply { strokeWidth = 2.2 });
+        canvas.drawCircle(Offset(12.0, 12.0), 3.0, fill);
+        canvas.drawCircle(Offset(13.0, 11.0), 1.2, Paint().apply { color = fill.color.withValues(alpha = 0.35); style = PaintingStyle.fill });
+        }
+      ChatyIconThemeId.expressiveInk -> {
+        // Bold brush eye
+        val almond = Path().apply { moveTo(2.5, 12.0); quadraticBezierTo(12.0, 4.5, 21.5, 12.0); quadraticBezierTo(12.0, 19.5, 2.5, 12.0); close() };
+        canvas.drawPath(almond, stroke.apply { strokeWidth = 2.6 });
+        canvas.drawCircle(Offset(12.0, 12.0), 3.0, fill);
+        }
+      ChatyIconThemeId.signalLanguage -> {
+        // Telemetry watch signal with broadcast pulse
+        val almond = Path().apply { moveTo(2.5, 12.0); quadraticBezierTo(12.0, 4.5, 21.5, 12.0); quadraticBezierTo(12.0, 19.5, 2.5, 12.0); close() };
+        canvas.drawPath(almond, stroke);
+        canvas.drawCircle(Offset(12.0, 12.0), 2.8, fill);
+        canvas.drawArc(Rect.fromLTWH(19, 2, 4, 4), -PI / 2, PI, false, stroke.apply { strokeWidth = 1.2 });
+        }
+        else -> {}
+    }
+    if (off && theme != ChatyIconThemeId.monolithicCutout && theme != ChatyIconThemeId.pixelPrecision) {
+      canvas.drawLine(Offset(4.0, 4.0), Offset(20.0, 20.0), stroke);
+    }
+  }
+
+  fun _paintWorkspace(canvas: IconCanvas, stroke: Paint, fill: Paint, secondary: Paint) {
+    when (theme) {
+      ChatyIconThemeId.chatySigil -> {
+        // Orbital office block with counter-space windows
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5.0, 3.5, 14.0, 17.0), Radius.circular(1.5)), stroke);
+        canvas.drawRect(Rect.fromLTWH(8.2, 7.0, 1.7, 1.7), fill);
+        canvas.drawRect(Rect.fromLTWH(14.1, 7.0, 1.7, 1.7), fill);
+        canvas.drawRect(Rect.fromLTWH(8.2, 10.6, 1.7, 1.7), fill);
+        canvas.drawRect(Rect.fromLTWH(14.1, 10.6, 1.7, 1.7), fill);
+        val door = Path().apply { moveTo(10.0, 20.5); lineTo(10.0, 16.0); lineTo(14.0, 16.0); lineTo(14.0, 20.5) };
+        canvas.drawPath(door, stroke);
+        }
+      ChatyIconThemeId.precisionContour -> {
+        // Hairline wireframe office block
+        canvas.drawRect(Rect.fromLTWH(5.0, 3.5, 14.0, 17.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(8.5, 7.5), Offset(10.5, 7.5), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(13.5, 7.5), Offset(15.5, 7.5), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(8.5, 11.0), Offset(10.5, 11.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(13.5, 11.0), Offset(15.5, 11.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(10.0, 20.5), Offset(10.0, 16.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(14.0, 20.5), Offset(14.0, 16.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(10.0, 16.0), Offset(14.0, 16.0), stroke.apply { strokeWidth = 1.2 });
+        }
+      ChatyIconThemeId.monolithicCutout -> {
+        // Solid office block with stenciled windows and doorway
+        canvas.drawRect(Rect.fromLTWH(5.0, 3.5, 14.0, 17.0), fill);
+        val cut = Paint().apply { color = Colors.white; style = PaintingStyle.fill };
+        canvas.drawRect(Rect.fromLTWH(8.2, 7.0, 2.0, 2.0), cut);
+        canvas.drawRect(Rect.fromLTWH(13.8, 7.0, 2.0, 2.0), cut);
+        canvas.drawRect(Rect.fromLTWH(8.2, 10.6, 2.0, 2.0), cut);
+        canvas.drawRect(Rect.fromLTWH(13.8, 10.6, 2.0, 2.0), cut);
+        canvas.drawRect(Rect.fromLTWH(10.8, 15.5, 2.4, 5.0), cut);
+        }
+      ChatyIconThemeId.origamiGeometry -> {
+        // Faceted origami tower with folded door
+        val body = Path().apply { moveTo(5.0, 20.5); lineTo(5.0, 3.5); lineTo(19.0, 3.5); lineTo(19.0, 20.5); close() };
+        canvas.drawPath(body, stroke);
+        canvas.drawLine(Offset(8.5, 7.5), Offset(10.5, 7.5), stroke);
+        canvas.drawLine(Offset(13.5, 7.5), Offset(15.5, 7.5), stroke);
+        canvas.drawLine(Offset(8.5, 11.0), Offset(10.5, 11.0), stroke);
+        canvas.drawLine(Offset(13.5, 11.0), Offset(15.5, 11.0), stroke);
+        val door = Path().apply { moveTo(10.0, 20.5); lineTo(10.0, 16.0); lineTo(14.0, 16.0); lineTo(14.0, 20.5) };
+        canvas.drawPath(door, stroke);
+        }
+      ChatyIconThemeId.organicMotion -> {
+        // Fluid pebble office block with round windows
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5.0, 4.0, 14.0, 16.5), Radius.circular(5.0)), stroke);
+        canvas.drawCircle(Offset(9.0, 8.0), 1.2, stroke);
+        canvas.drawCircle(Offset(15.0, 8.0), 1.2, stroke);
+        canvas.drawCircle(Offset(9.0, 11.6), 1.2, stroke);
+        canvas.drawCircle(Offset(15.0, 11.6), 1.2, stroke);
+        val door = Path().apply { moveTo(10.0, 20.5); lineTo(10.0, 16.0); quadraticBezierTo(12.0, 14.8, 14.0, 16.0); lineTo(14.0, 20.5) };
+        canvas.drawPath(door, stroke);
+        }
+      ChatyIconThemeId.pixelPrecision -> {
+        // Authentic 8-bit stepped pixel office block
+        canvas.drawRect(Rect.fromLTWH(6, 4, 12, 17), fill);
+        val cut = Paint().apply { color = Colors.white; style = PaintingStyle.fill };
+        canvas.drawRect(Rect.fromLTWH(8, 7, 2, 2), cut);
+        canvas.drawRect(Rect.fromLTWH(14, 7, 2, 2), cut);
+        canvas.drawRect(Rect.fromLTWH(8, 11, 2, 2), cut);
+        canvas.drawRect(Rect.fromLTWH(14, 11, 2, 2), cut);
+        canvas.drawRect(Rect.fromLTWH(11, 16, 2, 5), cut);
+        }
+      ChatyIconThemeId.technicalBlueprint -> {
+        // CAD office elevation with datum baseline
+        canvas.drawRect(Rect.fromLTWH(5.0, 3.5, 14.0, 17.0), stroke.apply { strokeWidth = 1.2 });
+        val thin = Paint().apply { color = stroke.color; strokeWidth = 0.8; style = PaintingStyle.stroke };
+        canvas.drawRect(Rect.fromLTWH(8.0, 6.5, 2.0, 2.0), thin);
+        canvas.drawRect(Rect.fromLTWH(14.0, 6.5, 2.0, 2.0), thin);
+        canvas.drawRect(Rect.fromLTWH(8.0, 10.0, 2.0, 2.0), thin);
+        canvas.drawRect(Rect.fromLTWH(14.0, 10.0, 2.0, 2.0), thin);
+        canvas.drawLine(Offset(10.0, 20.5), Offset(10.0, 16.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(14.0, 20.5), Offset(14.0, 16.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(10.0, 16.0), Offset(14.0, 16.0), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(3.0, 20.5), Offset(21.0, 20.5), thin);
+        }
+      ChatyIconThemeId.sculptedVolume -> {
+        // Dimensional office block with offset plate
+        canvas.drawRect(Rect.fromLTWH(6.4, 4.9, 14.0, 17.0), secondary);
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5.0, 3.5, 14.0, 17.0), Radius.circular(1.5)), stroke.apply { strokeWidth = 1.9 });
+        canvas.drawRect(Rect.fromLTWH(8.2, 7.0, 1.7, 1.7), fill);
+        canvas.drawRect(Rect.fromLTWH(14.1, 7.0, 1.7, 1.7), fill);
+        canvas.drawRect(Rect.fromLTWH(8.2, 10.6, 1.7, 1.7), fill);
+        canvas.drawRect(Rect.fromLTWH(14.1, 10.6, 1.7, 1.7), fill);
+        val door = Path().apply { moveTo(10.0, 20.5); lineTo(10.0, 16.0); lineTo(14.0, 16.0); lineTo(14.0, 20.5) };
+        canvas.drawPath(door, stroke.apply { strokeWidth = 1.9 });
+        }
+      ChatyIconThemeId.expressiveInk -> {
+        // Bold brush office block
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5.0, 3.5, 14.0, 17.0), Radius.circular(1.5)), stroke.apply { strokeWidth = 2.4 });
+        canvas.drawLine(Offset(8.3, 7.5), Offset(10.3, 7.5), stroke.apply { strokeWidth = 2.2 });
+        canvas.drawLine(Offset(13.7, 7.5), Offset(15.7, 7.5), stroke.apply { strokeWidth = 2.2 });
+        canvas.drawLine(Offset(8.3, 11.0), Offset(10.3, 11.0), stroke.apply { strokeWidth = 2.2 });
+        canvas.drawLine(Offset(13.7, 11.0), Offset(15.7, 11.0), stroke.apply { strokeWidth = 2.2 });
+        val door = Path().apply { moveTo(10.0, 20.5); lineTo(10.0, 16.0); lineTo(14.0, 16.0); lineTo(14.0, 20.5) };
+        canvas.drawPath(door, stroke.apply { strokeWidth = 2.4 });
+        }
+      ChatyIconThemeId.signalLanguage -> {
+        // Telemetry office block with status pulse
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(5.0, 3.5, 14.0, 17.0), Radius.circular(1.5)), stroke);
+        canvas.drawRect(Rect.fromLTWH(8.2, 7.0, 1.7, 1.7), fill);
+        canvas.drawRect(Rect.fromLTWH(14.1, 7.0, 1.7, 1.7), fill);
+        canvas.drawRect(Rect.fromLTWH(8.2, 10.6, 1.7, 1.7), fill);
+        canvas.drawRect(Rect.fromLTWH(14.1, 10.6, 1.7, 1.7), fill);
+        val door = Path().apply { moveTo(10.0, 20.5); lineTo(10.0, 16.0); lineTo(14.0, 16.0); lineTo(14.0, 20.5) };
+        canvas.drawPath(door, stroke);
+        canvas.drawArc(Rect.fromLTWH(19, 2, 4, 4), -PI / 2, PI, false, stroke.apply { strokeWidth = 1.2 });
+        }
+        else -> {}
+    }
+  }
+
+  fun _paintInfo(canvas: IconCanvas, stroke: Paint, fill: Paint) {
+    when (theme) {
+      ChatyIconThemeId.chatySigil -> {
+        // Orbital info ring with counter-space dot
+        canvas.drawCircle(Offset(12.0, 12.0), 9.0, stroke);
+        canvas.drawLine(Offset(12.0, 10.8), Offset(12.0, 16.2), stroke);
+        canvas.drawCircle(Offset(12.0, 7.6), 1.4, fill);
+        }
+      ChatyIconThemeId.precisionContour -> {
+        // Hairline info ring with square datum dot
+        canvas.drawCircle(Offset(12.0, 12.0), 9.0, stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(12.0, 11.0), Offset(12.0, 16.5), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawRect(Rect.fromLTWH(11.2, 7.2, 1.6, 1.6), fill);
+        }
+      ChatyIconThemeId.monolithicCutout -> {
+        // Solid info disc with stenciled i
+        canvas.drawCircle(Offset(12.0, 12.0), 9.5, fill);
+        val cut = Paint().apply { color = Colors.white; style = PaintingStyle.stroke; strokeWidth = 2.0; strokeCap = StrokeCap.round };
+        canvas.drawLine(Offset(12.0, 11.0), Offset(12.0, 16.5), cut);
+        canvas.drawCircle(Offset(12.0, 8.0), 1.5, Paint().apply { color = Colors.white; style = PaintingStyle.fill });
+        }
+      ChatyIconThemeId.origamiGeometry -> {
+        // Faceted octagon info with diamond dot
+        val oct = Path().apply { moveTo(8.5, 3.5); lineTo(15.5, 3.5); lineTo(20.5, 8.5); lineTo(20.5, 15.5); lineTo(15.5, 20.5); lineTo(8.5, 20.5); lineTo(3.5, 15.5); lineTo(3.5, 8.5); close() };
+        canvas.drawPath(oct, stroke);
+        canvas.drawLine(Offset(12.0, 11.0), Offset(12.0, 16.5), stroke);
+        val dot = Path().apply { moveTo(12.0, 6.8); lineTo(13.2, 8.0); lineTo(12.0, 9.2); lineTo(10.8, 8.0); close() };
+        canvas.drawPath(dot, fill);
+        }
+      ChatyIconThemeId.organicMotion -> {
+        // Fluid info blob
+        canvas.drawCircle(Offset(12.0, 12.0), 8.8, stroke.apply { strokeWidth = 2.1 });
+        val stem = Path().apply { moveTo(12.0, 10.8); quadraticBezierTo(12.3, 13.5, 12.0, 16.2) };
+        canvas.drawPath(stem, stroke.apply { strokeWidth = 2.1 });
+        canvas.drawCircle(Offset(12.0, 7.6), 1.4, fill);
+        }
+      ChatyIconThemeId.pixelPrecision -> {
+        // Authentic 8-bit stepped pixel info disc
+        canvas.drawRect(Rect.fromLTWH(8, 4, 8, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(5, 6, 14, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(3, 8, 18, 8), fill);
+        canvas.drawRect(Rect.fromLTWH(5, 16, 14, 2), fill);
+        canvas.drawRect(Rect.fromLTWH(8, 18, 8, 2), fill);
+        val cut = Paint().apply { color = Colors.white; style = PaintingStyle.fill };
+        canvas.drawRect(Rect.fromLTWH(11, 7, 2, 2), cut);
+        canvas.drawRect(Rect.fromLTWH(11, 11, 2, 5), cut);
+        }
+      ChatyIconThemeId.technicalBlueprint -> {
+        // CAD info bubble with datum crosshairs
+        canvas.drawCircle(Offset(12.0, 12.0), 9.0, stroke.apply { strokeWidth = 1.2 });
+        canvas.drawLine(Offset(12.0, 11.0), Offset(12.0, 16.5), stroke.apply { strokeWidth = 1.2 });
+        canvas.drawCircle(Offset(12.0, 7.8), 1.1, fill);
+        val datum = Paint().apply { color = stroke.color.withValues(alpha = 0.4); strokeWidth = 0.8; style = PaintingStyle.stroke };
+        canvas.drawLine(Offset(12.0, 1.0), Offset(12.0, 3.0), datum);
+        canvas.drawLine(Offset(12.0, 21.0), Offset(12.0, 23.0), datum);
+        canvas.drawLine(Offset(1.0, 12.0), Offset(3.0, 12.0), datum);
+        canvas.drawLine(Offset(21.0, 12.0), Offset(23.0, 12.0), datum);
+        }
+      ChatyIconThemeId.sculptedVolume -> {
+        // Dimensional info disc with offset plate
+        canvas.drawCircle(Offset(13.4, 13.4), 9.0, plateOf(fill));
+        canvas.drawCircle(Offset(12.0, 12.0), 9.0, stroke.apply { strokeWidth = 1.9 });
+        canvas.drawLine(Offset(12.0, 10.8), Offset(12.0, 16.2), stroke.apply { strokeWidth = 1.9 });
+        canvas.drawCircle(Offset(12.0, 7.6), 1.4, fill);
+        }
+      ChatyIconThemeId.expressiveInk -> {
+        // Bold brush info
+        canvas.drawCircle(Offset(12.0, 12.0), 9.0, stroke.apply { strokeWidth = 2.6 });
+        canvas.drawLine(Offset(12.0, 10.8), Offset(12.0, 16.2), stroke.apply { strokeWidth = 2.6 });
+        canvas.drawCircle(Offset(12.0, 7.6), 1.5, fill);
+        }
+      ChatyIconThemeId.signalLanguage -> {
+        // Telemetry info signal with pulse
+        canvas.drawCircle(Offset(12.0, 12.0), 9.0, stroke);
+        canvas.drawLine(Offset(12.0, 10.8), Offset(12.0, 16.2), stroke);
+        canvas.drawCircle(Offset(12.0, 7.6), 1.3, fill);
+        canvas.drawArc(Rect.fromLTWH(19, 2, 4, 4), -PI / 2, PI, false, stroke.apply { strokeWidth = 1.2 });
+        }
+        else -> {}
+    }
+  }
+
+  private fun plateOf(fill: Paint): Paint = Paint().apply { color = fill.color.withValues(alpha = 0.3); style = PaintingStyle.fill; isAntiAlias = true }
     }
 }

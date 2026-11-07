@@ -27,7 +27,7 @@ import androidx.compose.material.icons.rounded.RotateLeft
 import androidx.compose.material.icons.rounded.RotateRight
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -313,12 +313,12 @@ fun CustomBrandIconEditor(
                         IconButton(
                             onClick = { if (!saving) quarterTurns = (quarterTurns + 3) % 4 },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(),
-                        ) { Icon(Icons.Rounded.RotateLeft, contentDescription = "Rotate left") }
+                        ) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.rotateLeft, semanticLabel = "Rotate left") }
                         Spacer(Modifier.width(12.dp))
                         IconButton(
                             onClick = { if (!saving) quarterTurns = (quarterTurns + 1) % 4 },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(),
-                        ) { Icon(Icons.Rounded.RotateRight, contentDescription = "Rotate right") }
+                        ) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.rotateRight, semanticLabel = "Rotate right") }
                     }
                     Spacer(Modifier.weight(1f))
                     Button(
@@ -332,7 +332,7 @@ fun CustomBrandIconEditor(
                                 modifier = Modifier.size(18.dp),
                             )
                         } else {
-                            Icon(Icons.Rounded.Check, contentDescription = null)
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null)
                         }
                         Spacer(Modifier.width(8.dp))
                         Text(if (saving) "Saving…" else "Add & apply icon")

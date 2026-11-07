@@ -145,5 +145,7 @@
  "pikaiconsStroke:updates": "ADAPTED: authored status ring (stroked ring r8.5 + filled dot r3) per ChatyBaseOutlines; replaces bell mis-mapping",
  "pikaiconsSolid:updates": "ADAPTED: authored status ring (stroked ring r8.5 + filled dot r3) per ChatyBaseOutlines; replaces bell mis-mapping",
  "majesticonsLine:earpiece": "ADAPTED: authored upright phone slab w/ earpiece slit + home dot per ChatyBaseOutlines (R7.5 2.5 9 19); replaces handset mis-mapping",
- "majesticonsSolid:earpiece": "ADAPTED: solid upright slab w/ slit + dot cutouts per ChatyBaseOutlines; replaces handset mis-mapping"
+ "majesticonsSolid:earpiece": "ADAPTED: solid upright slab w/ slit + dot cutouts per ChatyBaseOutlines; replaces handset mis-mapping",
+ "majesticonsLine:workspace": "ADAPTED: authored building in Majesticons line style (stroke 2, round caps/joins); Majesticons has no genuine building glyph; user approved family-style SVG adaptations 2026-11-03",
+ "majesticonsSolid:workspace": "ADAPTED: authored building in Majesticons solid style (evenodd fill); Majesticons has no genuine building glyph; user approved family-style SVG adaptations 2026-11-03"
 }

@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.LooksOne
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -110,7 +111,7 @@ internal fun MediaReviewScreen(items: List<MediaReviewItem>, onCancel: () -> Uni
                 ownedEdits.filter { it.path !in finalPaths }.forEach { it.delete() }
                 onSend(ReviewedMedia(current, caption.trim(), viewOnce)); submitted = true
             }, modifier = Modifier.padding(start = 8.dp).size(48.dp)) {
-                Icon(Icons.AutoMirrored.Rounded.Send, "Send attachment")
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.send, semanticLabel = "Send attachment")
             }
         }
     }

@@ -94,7 +94,7 @@ fun CallExperienceBundlePickerScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ArrowBack, contentDescription = "Back")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back")
                     }
                     Spacer(Modifier.width(8.dp))
                     Column {
@@ -199,7 +199,7 @@ fun CallExperienceBundlePickerScreen(
                                 shape = RoundedCornerShape(16.dp),
                                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                             ) {
-                                Icon(Icons.Rounded.Visibility, null, modifier = Modifier.size(16.dp))
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eye, semanticLabel = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text("Interactive Preview", fontSize = 13.sp)
                             }
@@ -215,7 +215,7 @@ fun CallExperienceBundlePickerScreen(
                                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                             ) {
                                 if (isSelected) {
-                                    Icon(Icons.Rounded.Check, null, modifier = Modifier.size(16.dp))
+                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
                                     Text("Applied", fontSize = 13.sp)
                                 } else {
@@ -296,7 +296,7 @@ fun CallBundleLivePreviewScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = onClose) {
-                                Icon(Icons.Rounded.Close, "Close", tint = Color.White)
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close", color = Color.White)
                             }
                             Text(
                                 text = "Preview: ${bundleId.displayName}",

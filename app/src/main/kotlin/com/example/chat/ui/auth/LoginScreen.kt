@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,7 +26,7 @@ import androidx.compose.material.icons.rounded.DomainAdd
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -153,14 +154,18 @@ fun LoginScreen(
         ) {
             Column(
                 modifier = Modifier
-                    .widthIn(max = 440.dp)
+                    .widthIn(max = 400.dp)
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 20.dp),
             ) {
-                AuthBackButton(onClick = onBack)
+                TextButton(onClick = onBack, modifier = Modifier.heightIn(min = AuthCapsuleTokens.tapTarget)) {
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, size = 20.dp, color = Color(theme.accentColor))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Back", color = Color(theme.secondaryTextColor))
+                }
                 Spacer(Modifier.height(24.dp))
                 Text(
-                    "Welcome Back!",
+                    "Welcome back",
                     color = Color(theme.primaryTextColor),
                     fontSize = 28.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -168,13 +173,13 @@ fun LoginScreen(
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Sign in with your email address or Chaty username.",
+                    "Sign in to Chaty.",
                     color = Color(theme.secondaryTextColor),
                     fontSize = 14.sp,
                 )
                 Spacer(Modifier.height(24.dp))
 
-                WorkspaceModeSelector(
+                AuthCapsuleModeSelector(
                     theme = theme,
                     useOrganization = useOrganization,
                     onSelect = { useOrganization = it; errorMessage = null },
@@ -183,19 +188,15 @@ fun LoginScreen(
 
                 if (useOrganization) {
                     AuthTextField(
-                        label = "Organization / Workspace ID",
-                        hintText = "e.g. acme-corp or school_123",
+                        label = "Workspace ID",
+                        hintText = "e.g. acme-corp",
+                        capsule = true,
                         theme = theme,
                         value = workspace,
                         onValueChange = { workspace = it },
                         error = workspaceError,
                         prefixIcon = {
-                            Icon(
-                                Icons.Rounded.Apartment,
-                                contentDescription = null,
-                                tint = Color(argbWithAlpha(theme.secondaryTextColor, 0.7)),
-                                modifier = Modifier.size(20.dp),
-                            )
+                            AuthRoleIcon("workspace", theme)
                         },
                     )
                     Spacer(Modifier.height(18.dp))
@@ -203,7 +204,9 @@ fun LoginScreen(
 
                 AuthTextField(
                     label = "Email or username",
-                    hintText = "name@example.com or @username",
+                    hintText = "Email or @username",
+                    capsule = true,
+                    prefixIcon = { AuthRoleIcon("mail", theme) },
                     theme = theme,
                     value = identifier,
                     onValueChange = { identifier = it },
@@ -214,6 +217,8 @@ fun LoginScreen(
                 AuthTextField(
                     label = "Password",
                     hintText = "Enter password",
+                    capsule = true,
+                    prefixIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock, size = 20.dp, color = Color(theme.secondaryTextColor)) },
                     theme = theme,
                     value = password,
                     onValueChange = { password = it },
@@ -221,15 +226,21 @@ fun LoginScreen(
                     error = passwordError,
                     suffixIcon = {
                         IconButton(onClick = { obscurePassword = !obscurePassword }) {
-                            Icon(
-                                if (obscurePassword) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                                contentDescription = if (obscurePassword) "Show password" else "Hide password",
-                                tint = Color(argbWithAlpha(theme.secondaryTextColor, 0.6)),
-                                modifier = Modifier.size(20.dp),
-                            )
+                            AuthRoleIcon(if (obscurePassword) "eyeOff" else "eye", theme,
+                                if (obscurePassword) "Show password" else "Hide password")
                         }
                     },
                 )
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    TextButton(onClick = onForgotPassword, modifier = Modifier.heightIn(min = AuthCapsuleTokens.tapTarget)) {
+                        Text(
+                            "Forgot Password?",
+                            color = Color(theme.accentColor),
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
                 Spacer(Modifier.height(22.dp))
 
                 errorMessage?.let { msg ->
@@ -249,10 +260,9 @@ fun LoginScreen(
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            Icons.Rounded.Info,
-                            contentDescription = null,
-                            tint = Color(theme.dangerColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.info,
+                            semanticLabel = null,
+                            color = Color(theme.dangerColor),
                             modifier = Modifier.size(18.dp),
                         )
                         Spacer(Modifier.width(8.dp))
@@ -302,30 +312,16 @@ fun LoginScreen(
                     }
                 }
 
-                AuthPrimaryButton(text = "Log In", theme = theme, onClick = { handleLogin() }, isLoading = isLoading)
-                Spacer(Modifier.height(14.dp))
-
-                RegisterOrgCard(theme = theme, onClick = onRegisterOrganization)
-
+                AuthPrimaryButton(text = "Log In", theme = theme, onClick = { handleLogin() }, isLoading = isLoading, capsule = true)
                 Spacer(Modifier.height(8.dp))
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    TextButton(onClick = onForgotPassword) {
-                        Text(
-                            "Forgot Password?",
-                            color = Color(theme.secondaryTextColor),
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "Don't have an account? ",
-                        color = Color(theme.secondaryTextColor),
+                        "New to Chaty? ",
+                        color = Color(theme.accentColor),
                         fontSize = 13.5.sp,
                     )
                     Text(
@@ -333,12 +329,14 @@ fun LoginScreen(
                         color = Color(theme.accentColor),
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable(onClick = onRegister),
+                        modifier = Modifier.heightIn(min = AuthCapsuleTokens.tapTarget).clickable(onClick = onRegister).padding(vertical = 14.dp),
                     )
                 }
                 Spacer(Modifier.height(16.dp))
+                androidx.compose.material3.HorizontalDivider(color = Color(argbWithAlpha(theme.secondaryTextColor, 0.2)))
+                AuthTextLink("Register a New Organization", theme, onRegisterOrganization)
                 if (demoLogin != null) {
-                    DemoLoginCard(theme = theme, enabled = !isLoading, onClick = {
+                    AuthTextLink(text = "Try demo", theme = theme, enabled = !isLoading, onClick = {
                         errorMessage = null
                         storageFailure = null
                         isLoading = true
@@ -376,10 +374,9 @@ private fun DemoLoginCard(theme: ThemeConfig, enabled: Boolean, onClick: () -> U
                 .background(Color(argbWithAlpha(theme.accentColor, 0.15)), RoundedCornerShape(10.dp))
                 .padding(7.dp),
         ) {
-            Icon(
-                Icons.Rounded.Info,
-                contentDescription = null,
-                tint = Color(theme.accentColor),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.info,
+                semanticLabel = null,
+                color = Color(theme.accentColor),
                 modifier = Modifier.size(20.dp),
             )
         }
@@ -398,10 +395,9 @@ private fun DemoLoginCard(theme: ThemeConfig, enabled: Boolean, onClick: () -> U
                 fontSize = 11.5.sp,
             )
         }
-        Icon(
-            Icons.Rounded.ArrowForwardIos,
-            contentDescription = null,
-            tint = Color(theme.accentColor),
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+            semanticLabel = null,
+            color = Color(theme.accentColor),
             modifier = Modifier.size(14.dp),
         )
     }
@@ -445,10 +441,9 @@ private fun RegisterOrgCard(theme: ThemeConfig, onClick: () -> Unit) {
                 fontSize = 11.5.sp,
             )
         }
-        Icon(
-            Icons.Rounded.ArrowForwardIos,
-            contentDescription = null,
-            tint = Color(theme.accentColor),
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+            semanticLabel = null,
+            color = Color(theme.accentColor),
             modifier = Modifier.size(14.dp),
         )
     }

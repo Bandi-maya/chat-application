@@ -88,7 +88,17 @@ class ChatyThemeStylesTest {
         val assets = assetNames.map(ChatyIconThemeId::valueOf)
         assertEquals(assetNames.toSet(), ChatyIconThemeId.entries.filter(ChatyIconPackCatalog::isAssetPack).map { it.name }.toSet())
         assertEquals(6, assets.size)
-        assertEquals(77, ChatyIconId.entries.size)
+        // Original82 IDs stay byte-for-byte in order; new roles append only.
+        assertEquals(266, ChatyIconId.entries.size)
+        assertEquals(listOf("chats", "updates", "calls", "profile", "tasks", "groups", "desktop", "more", "moreOptions", "search", "settings", "close", "check", "tune", "chevronRight", "back", "send", "emoji", "attachment", "attachmentPlus", "microphone", "microphoneOff", "pin", "unpin", "archive", "lock", "unlock", "mute", "unmute", "favourite", "favouriteFilled", "delete", "reply", "forward", "edit", "copy", "share", "camera", "cameraFlip", "cameraShutter", "cameraFlashOn", "cameraFlashOff", "gallery", "callAudio", "callVideo", "callVideoOff", "callEnd", "cameraSwitch", "screenShare", "screenShareStop", "speaker", "earpiece", "signal", "messageCheckSingle", "messageCheckDouble", "messageClock", "pictureInPicture", "autoAwesome", "fullscreen", "fullscreenExit", "openInNew", "clear", "addTask", "editOutline", "videoCam", "voiceCall", "logout", "deleteOutline", "schedule", "scheduleSend", "sync", "checkSingle", "checkDouble", "errorOutline", "pause", "playArrow", "musicNote", "mail", "eye", "eyeOff", "workspace", "info"), ChatyIconId.entries.take(82).map { it.name })
+        assertEquals(listOf("star", "starFilled", "report", "block", "selectAll", "rotateRight", "rotateLeft", "reset", "add", "wallpaper", "palette", "markRead", "markUnread", "unarchive", "ghost", "translate"), ChatyIconId.entries.drop(82).take(16).map { it.name })
+        assertEquals(listOf("home", "shield", "fingerprint", "atSign", "chevronDown", "chevronUp", "textFormat", "paint", "dialpad", "personAdd", "layout", "storage", "wifi", "permissions", "backup", "clean", "widgets", "touch", "qrCode", "link", "history", "calendar", "folder", "document"), ChatyIconId.entries.drop(98).take(24).map { it.name })
+        assertEquals(listOf("notifications", "notificationsOff", "checkCircle", "addCircle", "minusCircle", "groupAdd", "replyAll", "key", "menu", "grid", "list", "location", "download", "upload", "quote", "poll", "refresh", "notificationDot", "personSearch", "contacts", "clipboard", "crop", "filter", "speed"), ChatyIconId.entries.drop(122).take(24).map { it.name })
+        assertEquals(listOf("stories", "waveform", "layers", "alignTop", "freeze", "style", "deleteSweep", "checklist", "searchOff", "mediaError", "badge", "deviceLock", "keyboard", "timer", "personOff", "playCircle", "sidebar", "pattern", "password", "paintFill", "cloudOff", "cast", "sun", "moon"), ChatyIconId.entries.drop(146).take(24).map { it.name })
+        assertEquals(listOf("arrowUp", "arrowRight", "minus", "locate", "restore", "undo", "help", "warning", "cut", "pinCode", "organization", "organizationAdd", "personRemove", "keyOff", "syncProblem", "mediaLibrary", "devices", "cloudDownload", "entry", "profileCard", "contactLabel", "forwardInbox", "dock", "bubbleChart"), ChatyIconId.entries.drop(170).take(24).map { it.name })
+        assertEquals(listOf("premium", "bolt", "backspace", "campaign", "speakerGroup", "ringVolume", "robot", "mosaic", "gif", "carousel", "hd", "subtitles", "toggle", "radial", "extension", "screenshot", "cube", "brain", "corner", "online", "layersOff", "community", "science", "mapPin"), ChatyIconId.entries.drop(194).take(24).map { it.name })
+        assertEquals(listOf("shuffle", "repeat", "repeatOne", "replayTen", "forwardTen", "fit", "aspectRatio", "videoLibrary", "photoAdd", "fileOpen", "fileUpload", "headphones", "headset", "bluetooth", "usb", "ethernet", "wifiOff", "cloudCheck", "cloudSync", "language", "swipe", "callIncoming", "callOutgoing", "callMissed"), ChatyIconId.entries.drop(218).take(24).map { it.name })
+        assertEquals(listOf("shieldMoon", "diamond", "animation", "numberOne", "verified", "medal", "lightbulb", "angleRoute", "airplane", "inbox", "calendarOff", "manageSearch", "moveDown", "alignBottom", "addBox", "alarm", "alarmAdd", "fileRules", "kanban", "note", "lockReset", "phone", "tv", "navigation"), ChatyIconId.entries.drop(242).map { it.name })
         for (theme in assets) {
             assertFalse(theme.name, ChatyThemeStyles.handArt.keys.any { it.startsWith("${theme.name}:") })
             for (icon in ChatyIconId.entries) {
@@ -105,4 +115,45 @@ class ChatyThemeStylesTest {
         }
     }
 
+
+    @Test fun `five new semantic ids have base outlines and draw in every procedural theme`() {
+        val newIds = listOf(ChatyIconId.mail, ChatyIconId.eye, ChatyIconId.eyeOff, ChatyIconId.workspace, ChatyIconId.info)
+        val procedural = ChatyIconThemeId.entries.filterNot(ChatyIconPackCatalog::isAssetPack)
+        assertEquals(10, procedural.size)
+        for (id in newIds) {
+            assertTrue("$id missing base outline", ChatyBaseOutlines.shapes.containsKey(id))
+            val base = Rec()
+            assertTrue("$id base outline paints", ChatyBaseOutlines.paint(base, 24.0, id, Colors.white))
+            assertTrue("$id base outline draws", base.draws > 0)
+            for (theme in procedural) {
+                val c = Rec()
+                ChatyIconPainter.paint(c, 24.0, id, theme, Colors.white)
+                assertTrue("${theme.name}:$id painter draws", c.draws > 0)
+                assertEquals("${theme.name}:$id balanced", c.saves, c.restores)
+            }
+        }
+    }
+
+    @Test fun `painter covers every icon in every procedural theme and no asset theme`() {
+        for (id in ChatyIconId.entries) {
+            for (theme in ChatyIconThemeId.entries) {
+                val c = Rec()
+                ChatyIconPainter.paint(c, 24.0, id, theme, Colors.white)
+                assertEquals("${theme.name}:${id.name} balanced", c.saves, c.restores)
+                if (ChatyIconPackCatalog.isAssetPack(theme)) {
+                    assertEquals("${theme.name}:${id.name} asset theme must not draw procedurally", 0, c.draws)
+                } else {
+                    assertTrue("${theme.name}:${id.name} procedural theme must draw", c.draws > 0)
+                }
+            }
+        }
+    }
+
+    @Test fun `eyeOff is eye plus slash in base outlines`() {
+        val eye = ChatyBaseOutlines.shapes.getValue(ChatyIconId.eye)
+        val eyeOff = ChatyBaseOutlines.shapes.getValue(ChatyIconId.eyeOff)
+        assertEquals(eyeOff.take(eye.size), eye)
+        assertEquals(1, eyeOff.size - eye.size)
+        assertEquals("M4 4 L20 20", eyeOff.last().d)
+    }
 }

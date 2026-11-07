@@ -43,7 +43,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Send
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -143,7 +143,7 @@ private fun StripBox(accent: Color, content: @Composable RowScope.() -> Unit) {
 @Composable
 private fun SmallClose(onClick: (() -> Unit)?) {
     IconButton(onClick = { onClick?.invoke() }, modifier = Modifier.size(28.dp)) {
-        Icon(Icons.Rounded.Close, "Close", Modifier.size(18.dp), tint = LocalAppColors.current.foreground)
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close", modifier = Modifier.size(18.dp), color = LocalAppColors.current.foreground)
     }
 }
 
@@ -165,7 +165,7 @@ private fun ReplyStrip(data: ChatyComposerData) {
 private fun EditStrip(data: ChatyComposerData) {
     val c = LocalAppColors.current
     StripBox(c.warning) {
-        Icon(Icons.Rounded.Edit, null, Modifier.size(16.dp), tint = c.foreground)
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.edit, semanticLabel = null, modifier = Modifier.size(16.dp), color = c.foreground)
         Spacer(Modifier.width(8.dp))
         Text("Editing message", color = c.foreground, fontSize = 12.5.sp, fontWeight = FontWeight.W600, modifier = Modifier.weight(1f).padding(vertical = 6.dp))
         SmallClose(data.onCancelEdit)
@@ -189,7 +189,7 @@ private fun InputRow(variantId: String, data: ChatyComposerData, reducedMotion: 
 private fun RecordingRow(data: ChatyComposerData) {
     val c = LocalAppColors.current
     Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = { data.onMicCancel?.invoke() }) { Icon(Icons.Rounded.DeleteOutline, "Cancel recording", tint = c.error) }
+        IconButton(onClick = { data.onMicCancel?.invoke() }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.deleteOutline, semanticLabel = "Cancel recording", color = c.error) }
         Spacer(Modifier.width(8.dp))
         Text(data.recordingDurationLabel ?: "0:00", color = c.foreground, fontSize = 14.sp, fontWeight = FontWeight.W700)
         Spacer(Modifier.width(12.dp))
@@ -207,7 +207,7 @@ private fun RecordingRow(data: ChatyComposerData) {
         Box(
             Modifier.size(40.dp).clip(CircleShape).background(c.primary).clickable { data.onSend() },
             contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Rounded.Send, null, Modifier.size(18.dp), tint = Color.White) }
+        ) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.send, semanticLabel = null, modifier = Modifier.size(18.dp), color = Color.White) }
     }
 }
 
@@ -328,8 +328,8 @@ private fun ActionBubble(isSend: Boolean, onSend: () -> Unit, onMicPress: () -> 
     ) {
         val ms = if (reducedMotion) 0 else 160
         AnimatedContent(isSend, transitionSpec = { fadeIn(tween(ms)) togetherWith fadeOut(tween(ms)) }, label = "actionBubble") { send ->
-            if (send) Icon(Icons.Rounded.Send, null, Modifier.size(20.dp), tint = Color.White)
-            else Icon(Icons.Rounded.Mic, null, Modifier.size(22.dp), tint = Color.White)
+            if (send) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.send, semanticLabel = null, modifier = Modifier.size(20.dp), color = Color.White)
+            else com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.microphone, semanticLabel = null, modifier = Modifier.size(22.dp), color = Color.White)
         }
     }
 }

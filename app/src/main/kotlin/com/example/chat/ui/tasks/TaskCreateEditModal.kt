@@ -30,7 +30,7 @@ import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonOutline
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -245,7 +245,7 @@ fun TaskCreateEditModal(
                     fontWeight = FontWeight.ExtraBold,
                 )
                 IconButton(onClick = { if (!isSaving) onDismiss() }) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close", tint = colors.foregroundSecondary)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close", color = colors.foregroundSecondary)
                 }
             }
             Spacer(Modifier.height(16.dp))

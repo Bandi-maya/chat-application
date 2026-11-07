@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -288,7 +289,7 @@ private fun AppleIosOngoingCall(
                     .clickable { onEndCall() },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.CallEnd, "End Call", tint = Color.White, modifier = Modifier.size(36.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = "End Call", color = Color.White, modifier = Modifier.size(36.dp))
             }
         }
     }
@@ -398,7 +399,7 @@ private fun SamsungOneUiOngoingCall(
                         contentAlignment = Alignment.Center,
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.CallEnd, null, tint = Color.White)
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = null, color = Color.White)
                             Spacer(Modifier.width(8.dp))
                             Text("End Call", color = Color.White, fontWeight = FontWeight.Bold)
                         }
@@ -475,7 +476,7 @@ private fun GoogleLatestOngoingCall(
                             .clickable { onEndCall() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Rounded.CallEnd, "End Call", tint = Color.White)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = "End Call", color = Color.White)
                     }
                 }
             }
@@ -545,7 +546,7 @@ private fun GoogleClassicOngoingCall(
                         .clickable { onEndCall() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Rounded.CallEnd, null, tint = Color.White)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = null, color = Color.White)
                 }
             }
         }
@@ -620,7 +621,7 @@ private fun VivoIqooOngoingCall(
                             .clickable { onEndCall() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Rounded.CallEnd, null, tint = Color.White)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = null, color = Color.White)
                     }
                 }
             }
@@ -716,7 +717,7 @@ private fun AzureRingVerticalOngoingCall(
                             .clickable { onEndCall() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Rounded.CallEnd, "End call", tint = Color.White, modifier = Modifier.size(30.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = "End call", color = Color.White, modifier = Modifier.size(30.dp))
                     }
                     AzureGridButton(Icons.Rounded.PictureInPicture, "Minimize", false, onMinimize)
                 }
@@ -811,7 +812,7 @@ private fun MonoChevronDarkOngoingCall(
                         .clickable { onEndCall() },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Rounded.CallEnd, "End call", tint = Color.White, modifier = Modifier.size(30.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = "End call", color = Color.White, modifier = Modifier.size(30.dp))
                 }
             }
         }
@@ -888,7 +889,7 @@ private fun NextcloudTalkOngoingCall(
                     .clickable { onEndCall() },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.CallEnd, "End call", tint = Color.White, modifier = Modifier.size(28.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = "End call", color = Color.White, modifier = Modifier.size(28.dp))
             }
         }
         Row(

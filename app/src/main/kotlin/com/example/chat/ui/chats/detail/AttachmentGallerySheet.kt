@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -134,7 +135,7 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
             item(key = "camera") {
                 Box(Modifier.fillMaxWidth().aspectRatio(1f).background(Color(theme.cardColor)).clickable(onClick = onCamera)
                     .semantics { contentDescription = "Open camera" }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.PhotoCamera, null, tint = accent, modifier = Modifier.size(36.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = null, color = accent, modifier = Modifier.size(36.dp))
                 }
             }
             items(images, key = { it.uri.toString() }) { item ->
@@ -160,7 +161,7 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
         }
         if (selected.size >= maxSelection.coerceIn(1, 100)) Text("Selection limit reached. Review or remove a photo.", color = foreground,
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
-        if (!secondReference) TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = onVoiceNote) { Icon(Icons.Rounded.Mic, null); Text("Record voice note") }
+        if (!secondReference) TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = onVoiceNote) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.microphone, semanticLabel = null); Text("Record voice note") }
         if (!secondReference) Row(Modifier.padding(8.dp).fillMaxWidth().semantics { contentDescription = "Attachment type options" }.clip(RoundedCornerShape(attachmentRadius)).background(Color(theme.cardColor))
             .horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp)) {
             val actions = listOf(Triple("Gallery", Icons.Rounded.PhotoLibrary, AttachmentAction.image),
@@ -173,16 +174,10 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
             // longer label at large fonts; the existing horizontal scroll reveals it.
             val directWidth = (104f * androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)).dp
             for ((label, icon, action) in actions) Column(Modifier.widthIn(min = if (action == AttachmentAction.chatyDirect) directWidth else 76.dp)
-                // One semantics node for the whole dock item: mergeDescendants pulls
-                // clickable's onClick node (and the Text label) up into this node, so
-                // the content description and the click action live on the SAME node.
-                // The Icon's own content description is dropped - under the merge it
-                // would be concatenated into this node's description; the icon is
-                // decorative inside an already-labeled clickable.
-                .semantics(mergeDescendants = true) { contentDescription = "Attachment option $label" }
+                .semantics { contentDescription = "Attachment option $label" }
                 .clickable { if (action == AttachmentAction.image) reload++ else onAction(action) }
                 .padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(icon, null, tint = if (action == AttachmentAction.image) accent else foreground)
+                Icon(icon, label, tint = if (action == AttachmentAction.image) accent else foreground)
                 Text(label, color = if (action == AttachmentAction.image) accent else foreground, style = MaterialTheme.typography.labelMedium)
             }
         }

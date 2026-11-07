@@ -60,10 +60,10 @@ class SwipeRowFixtureActivity : ComponentActivity() {
                             enabled = swipeEnabled,
                             backgroundColor = bg,
                             leadingActions = listOf("Call", "Video").map { name ->
-                                HomeSwipeAction(Icons.Rounded.Call, name, Color(0xFF316ACA)) { events = name; count++ }
+                                HomeSwipeAction(if (name == "Video") com.example.chat.ui.icons.ChatyIconId.callVideo else com.example.chat.ui.icons.ChatyIconId.callAudio, name, Color(0xFF316ACA)) { events = name; count++ }
                             },
                             actions = listOf("Pin", "Mute", "Archive").map { name ->
-                                HomeSwipeAction(Icons.Rounded.PushPin, name,
+                                HomeSwipeAction(when (name) { "Pin" -> com.example.chat.ui.icons.ChatyIconId.pin; "Mute" -> com.example.chat.ui.icons.ChatyIconId.mute; else -> com.example.chat.ui.icons.ChatyIconId.archive }, name,
                                     when (name) { "Pin" -> Color(0xFF008A74); "Mute" -> Color(0xFFF59E0B); else -> Color(0xFF516570) }
                                 ) { events = name; count++ }
                             },

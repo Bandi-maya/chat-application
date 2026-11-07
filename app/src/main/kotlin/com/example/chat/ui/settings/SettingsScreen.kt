@@ -1,5 +1,6 @@
 package com.example.chat.ui.settings
 
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -78,7 +79,7 @@ import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -216,11 +217,11 @@ fun SettingsScreen(
                 .padding(horizontal = 18.dp, vertical = 12.dp),
         ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { onBack?.invoke() }) { Icon(Icons.Rounded.ChevronLeft, "Back", Modifier.size(22.dp), tint = primaryText) }
+                IconButton(onClick = { onBack?.invoke() }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", modifier = Modifier.size(22.dp), color = primaryText) }
                 Row {
-                    IconButton(onClick = { onOpenSearch(buildSettingsSearchIndex()) }) { Icon(Icons.Rounded.Search, "Search settings", Modifier.size(22.dp), tint = primaryText) }
+                    IconButton(onClick = { onOpenSearch(buildSettingsSearchIndex()) }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = "Search settings", modifier = Modifier.size(22.dp), color = primaryText) }
                     IconButton(onClick = { sheet = SettingsSheet.Export }) { Icon(Icons.Rounded.QrCodeScanner, "Export chat", Modifier.size(22.dp), tint = primaryText) }
-                    IconButton(onClick = { sheet = SettingsSheet.EditProfile }) { Icon(Icons.Outlined.Edit, "Edit profile", Modifier.size(22.dp), tint = primaryText) }
+                    IconButton(onClick = { sheet = SettingsSheet.EditProfile }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.edit, semanticLabel = "Edit profile", modifier = Modifier.size(22.dp), color = primaryText) }
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -341,7 +342,7 @@ fun SettingsScreen(
                 Column {
                     Tile(Icons.Outlined.Backup, colors.info, "Backup & Export Data", "Export encrypted chats JSON, backup verification") { sheet = SettingsSheet.Export }
                     ChatySettingsRowDivider()
-                    Tile(Icons.Outlined.RestorePage, colors.error, "Reset & Diagnostics", "Reset privacy settings, themes, or restore factory defaults") { sheet = SettingsSheet.Reset }
+                    Tile(Icons.Rounded.RestartAlt, colors.error, "Reset & Diagnostics", "Reset privacy settings, themes, or restore factory defaults") { sheet = SettingsSheet.Reset }
                     ChatySettingsRowDivider()
                     Tile(Icons.Outlined.Info, colors.foregroundSecondary, "About Chaty", "Version 1.0.0 \u2022 Pure private messaging architecture") { sheet = SettingsSheet.About }
                 }
@@ -354,7 +355,7 @@ fun SettingsScreen(
                 shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(1.2.dp, colors.error),
             ) {
-                Icon(Icons.Rounded.Logout, null, Modifier.size(18.dp), tint = colors.error)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.logout, semanticLabel = null, modifier = Modifier.size(18.dp), color = colors.error)
                 Spacer(Modifier.width(8.dp))
                 Text("Log Out of Chaty", color = colors.error, fontWeight = FontWeight.Bold, fontSize = 14.5.sp)
             }

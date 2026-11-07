@@ -54,7 +54,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -300,7 +300,7 @@ private fun ReactionRailRow(rail: ReactionRail, onDismiss: () -> Unit) {
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
                     .clickable { onDismiss(); add() },
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.Add, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            ) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null, modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }

@@ -32,7 +32,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -268,7 +268,7 @@ fun RegisterOrganizationScreen(
                     onValueChange = { adminEmail = it },
                     keyboardType = KeyboardType.Email,
                     error = emailError,
-                    prefixIcon = { PrefixIcon(theme) { Icon(Icons.Rounded.MailOutline, null, tint = it, modifier = Modifier.size(20.dp)) } },
+                    prefixIcon = { PrefixIcon(theme) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.mail, semanticLabel = null, color = it, modifier = Modifier.size(20.dp)) } },
                 )
                 Spacer(Modifier.height(16.dp))
                 AuthTextField(
@@ -279,7 +279,7 @@ fun RegisterOrganizationScreen(
                     onValueChange = { adminPassword = it },
                     obscureText = obscurePassword,
                     error = passwordError,
-                    prefixIcon = { PrefixIcon(theme) { Icon(Icons.Rounded.Lock, null, tint = it, modifier = Modifier.size(20.dp)) } },
+                    prefixIcon = { PrefixIcon(theme) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock, semanticLabel = null, color = it, modifier = Modifier.size(20.dp)) } },
                     suffixIcon = {
                         IconButton(onClick = { obscurePassword = !obscurePassword }) {
                             Icon(
@@ -310,7 +310,7 @@ fun RegisterOrganizationScreen(
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = Color(theme.dangerColor), modifier = Modifier.size(20.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.errorOutline, semanticLabel = null, color = Color(theme.dangerColor), modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(10.dp))
                         Text(msg, color = Color(theme.dangerColor), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
@@ -341,10 +341,9 @@ fun RegisterOrganizationScreen(
 
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     TextButton(onClick = onBack) {
-                        Icon(
-                            Icons.Rounded.ChevronLeft,
-                            contentDescription = null,
-                            tint = Color(theme.secondaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                            semanticLabel = null,
+                            color = Color(theme.secondaryTextColor),
                             modifier = Modifier.size(16.dp),
                         )
                         Spacer(Modifier.width(4.dp))

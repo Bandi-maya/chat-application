@@ -2,7 +2,7 @@ package com.example.chat.ui.icons
 
 import com.example.chat.R
 
-/** Genuine bundled family glyphs only. A missing mapping never uses a different family. */
+/** Bundled family glyphs plus explicitly original family-style supplements. Missing mappings never use a different family. */
 object ChatyAssetIcons {
     private val glyphs: Map<ChatyIconThemeId, Map<ChatyIconId, Int>> = mapOf(
         ChatyIconThemeId.hugeiconsFree to mapOf(
@@ -83,6 +83,11 @@ object ChatyAssetIcons {
             ChatyIconId.pause to R.drawable.ic_hgf_pause,
             ChatyIconId.playArrow to R.drawable.ic_hgf_play_arrow,
             ChatyIconId.musicNote to R.drawable.ic_hgf_music_note,
+            ChatyIconId.mail to R.drawable.ic_hgf_mail,
+            ChatyIconId.eye to R.drawable.ic_hgf_eye,
+            ChatyIconId.eyeOff to R.drawable.ic_hgf_eye_off,
+            ChatyIconId.workspace to R.drawable.ic_hgf_workspace,
+            ChatyIconId.info to R.drawable.ic_hgf_info,
         ),
         ChatyIconThemeId.majesticonsLine to mapOf(
             ChatyIconId.chats to R.drawable.ic_mjl_chats,
@@ -162,6 +167,11 @@ object ChatyAssetIcons {
             ChatyIconId.pause to R.drawable.ic_mjl_pause,
             ChatyIconId.playArrow to R.drawable.ic_mjl_play_arrow,
             ChatyIconId.musicNote to R.drawable.ic_mjl_music_note,
+            ChatyIconId.mail to R.drawable.ic_mjl_mail,
+            ChatyIconId.eye to R.drawable.ic_mjl_eye,
+            ChatyIconId.eyeOff to R.drawable.ic_mjl_eye_off,
+            ChatyIconId.workspace to R.drawable.ic_mjl_workspace,
+            ChatyIconId.info to R.drawable.ic_mjl_info,
         ),
         ChatyIconThemeId.majesticonsSolid to mapOf(
             ChatyIconId.chats to R.drawable.ic_mjs_chats,
@@ -241,6 +251,11 @@ object ChatyAssetIcons {
             ChatyIconId.pause to R.drawable.ic_mjs_pause,
             ChatyIconId.playArrow to R.drawable.ic_mjs_play_arrow,
             ChatyIconId.musicNote to R.drawable.ic_mjs_music_note,
+            ChatyIconId.mail to R.drawable.ic_mjs_mail,
+            ChatyIconId.eye to R.drawable.ic_mjs_eye,
+            ChatyIconId.eyeOff to R.drawable.ic_mjs_eye_off,
+            ChatyIconId.workspace to R.drawable.ic_mjs_workspace,
+            ChatyIconId.info to R.drawable.ic_mjs_info,
         ),
         ChatyIconThemeId.pikaiconsStroke to mapOf(
             ChatyIconId.chats to R.drawable.ic_pks_chats,
@@ -320,6 +335,11 @@ object ChatyAssetIcons {
             ChatyIconId.pause to R.drawable.ic_pks_pause,
             ChatyIconId.playArrow to R.drawable.ic_pks_play_arrow,
             ChatyIconId.musicNote to R.drawable.ic_pks_music_note,
+            ChatyIconId.mail to R.drawable.ic_pks_mail,
+            ChatyIconId.eye to R.drawable.ic_pks_eye,
+            ChatyIconId.eyeOff to R.drawable.ic_pks_eye_off,
+            ChatyIconId.workspace to R.drawable.ic_pks_workspace,
+            ChatyIconId.info to R.drawable.ic_pks_info,
         ),
         ChatyIconThemeId.pikaiconsSolid to mapOf(
             ChatyIconId.chats to R.drawable.ic_pkf_chats,
@@ -399,6 +419,11 @@ object ChatyAssetIcons {
             ChatyIconId.pause to R.drawable.ic_pkf_pause,
             ChatyIconId.playArrow to R.drawable.ic_pkf_play_arrow,
             ChatyIconId.musicNote to R.drawable.ic_pkf_music_note,
+            ChatyIconId.mail to R.drawable.ic_pkf_mail,
+            ChatyIconId.eye to R.drawable.ic_pkf_eye,
+            ChatyIconId.eyeOff to R.drawable.ic_pkf_eye_off,
+            ChatyIconId.workspace to R.drawable.ic_pkf_workspace,
+            ChatyIconId.info to R.drawable.ic_pkf_info,
         ),
         ChatyIconThemeId.phosphorRegular to mapOf(
             ChatyIconId.chats to R.drawable.ic_phr_chats,
@@ -478,6 +503,11 @@ object ChatyAssetIcons {
             ChatyIconId.pause to R.drawable.ic_phr_pause,
             ChatyIconId.playArrow to R.drawable.ic_phr_play_arrow,
             ChatyIconId.musicNote to R.drawable.ic_phr_music_note,
+            ChatyIconId.mail to R.drawable.ic_phr_mail,
+            ChatyIconId.eye to R.drawable.ic_phr_eye,
+            ChatyIconId.eyeOff to R.drawable.ic_phr_eye_off,
+            ChatyIconId.workspace to R.drawable.ic_phr_workspace,
+            ChatyIconId.info to R.drawable.ic_phr_info,
         ),
     )
     private val selectedPhosphorGlyphs: Map<ChatyIconId, Int> = mapOf(
@@ -492,6 +522,7 @@ object ChatyAssetIcons {
         ChatyIconId.settings to R.drawable.ic_phr_fill_settings,
     )
     fun drawable(theme: ChatyIconThemeId, icon: ChatyIconId, selected: Boolean = false): Int? =
+        ChatySupplementalIcons.drawable(theme, icon) ?:
         if (selected && theme == ChatyIconThemeId.phosphorRegular)
             selectedPhosphorGlyphs[icon] ?: glyphs[theme]?.get(icon)
         else if (selected && theme == ChatyIconThemeId.majesticonsLine)

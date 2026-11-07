@@ -42,7 +42,7 @@ import androidx.compose.material.icons.rounded.ViewCarousel
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Timelapse
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -128,7 +128,7 @@ fun StatusSettingsScreen(preferences: ChatyPreferencesController, onBack: () -> 
                                     Text("TN", fontWeight = FontWeight.Bold, color = Color(config.primaryTextColor))
                                 }
                                 Box(Modifier.align(Alignment.BottomEnd).background(accent, CircleShape).padding(2.dp)) {
-                                    Icon(Icons.Rounded.Add, null, tint = com.example.chat.ui.kit.chatyReadableOn(accent, Color.White, Color.Black), modifier = Modifier.size(14.dp))
+                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null, color = com.example.chat.ui.kit.chatyReadableOn(accent, Color.White, Color.Black), modifier = Modifier.size(14.dp))
                                 }
                             }
                             Spacer(Modifier.width(14.dp))

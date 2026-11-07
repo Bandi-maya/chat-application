@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.chat.BuildConfig
 
 private const val PREFS = "chaty_release_notes"
@@ -60,37 +61,21 @@ fun UpdateChangelogHost(onFinished: () -> Unit = {}, forceShow: Boolean = false)
         show = false
         onFinished()
     }
-    AlertDialog(
-        shape = com.example.chat.ui.kit.ChatyModalShape,
-        onDismissRequest = { close() },
-        title = { Text("Chaty changelog") },
-        text = {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-            ) {
-                if (historyReadOnly) item {
-                    Text("Stored update history could not be read. Existing records have been kept, but this update cannot be saved to history yet.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                items(history, key = { it.identity }) { entry ->
-                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Text("Version ${entry.versionName} (${entry.versionCode})", style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary)
-                        Text(if (entry.identity == current.identity) "Latest changes" else "Earlier update", style = MaterialTheme.typography.labelMedium)
-                        entry.changes.forEach { change ->
-                            Text("\u2022 $change", style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-                item {
-                    Text("Earlier versions appear here as they are recorded on this device. App data removal also removes this local history.",
-                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+    com.example.chat.ui.kit.ChatyReviewModal("Chaty changelog", "Release history", ::close) {
+        val colors = com.example.chat.ui.theme.LocalAppColors.current
+        if (historyReadOnly) Text("Stored update history could not be read. Existing records have been kept, but this update cannot be saved to history yet.", color = colors.foregroundSecondary)
+        history.forEach { entry ->
+            Text("Version ${entry.versionName} (${entry.versionCode})", color = colors.primary,
+                style = MaterialTheme.typography.titleLarge)
+            Text(if (entry.identity == current.identity) "Latest changes" else "Earlier update", color = colors.foregroundSecondary)
+            androidx.compose.material3.HorizontalDivider(modifier = Modifier.fillMaxWidth(), color = colors.borderSubtle)
+            entry.changes.forEach { change ->
+                Text("\u2022 $change", modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge,
+                    color = colors.foreground, lineHeight = 24.sp)
+                androidx.compose.foundation.layout.Spacer(Modifier.heightIn(min = 14.dp))
             }
-        },
-        confirmButton = { ChatyTextButton(onClick = { close() }, label = "Close") },
-    )
+        }
+        Text("Earlier versions appear here as they are recorded on this device. App data removal also removes this local history.",
+            style = MaterialTheme.typography.labelSmall, color = colors.foregroundSecondary)
+    }
 }
-

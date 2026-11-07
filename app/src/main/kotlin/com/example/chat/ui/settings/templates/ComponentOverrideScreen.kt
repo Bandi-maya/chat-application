@@ -46,7 +46,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -368,7 +368,13 @@ private fun NavigationSnippet(tmpl: ChatyTemplateDefinition) {
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Icon(
+                        if (id == "updates") {
+                            com.example.chat.ui.icons.ChatyIcon(
+                                com.example.chat.ui.icons.ChatyIconId.updates, selected = active,
+                                modifier = Modifier.size(19.dp),
+                                color = if (active) colors.primary else colors.foregroundSecondary,
+                            )
+                        } else Icon(
                             destinationIcon(id),
                             contentDescription = null,
                             tint = if (active) colors.primary else colors.foregroundSecondary,
@@ -426,10 +432,9 @@ private fun ComposerSnippet(tmpl: ChatyTemplateDefinition) {
                 .padding(horizontal = 9.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Outlined.EmojiEmotions,
-                contentDescription = null,
-                tint = colors.foregroundSecondary,
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.emoji,
+                semanticLabel = null,
+                color = colors.foregroundSecondary,
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.width(6.dp))
@@ -461,10 +466,9 @@ private fun ComposerSnippet(tmpl: ChatyTemplateDefinition) {
                     if (composer.showCameraShortcut) camera()
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (composer.showVoiceLock) {
-                            Icon(
-                                Icons.Rounded.Lock,
-                                contentDescription = null,
-                                tint = colors.foregroundSecondary,
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock,
+                                semanticLabel = null,
+                                color = colors.foregroundSecondary,
                                 modifier = Modifier.size(12.dp),
                             )
                         }
@@ -525,10 +529,9 @@ private fun ConversationSnippet(tmpl: ChatyTemplateDefinition) {
                         fontWeight = FontWeight.W600,
                     )
                     Spacer(Modifier.width(6.dp))
-                    Icon(
-                        Icons.Rounded.DoneAll,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.82f),
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.messageCheckDouble,
+                        semanticLabel = null,
+                        color = Color.White.copy(alpha = 0.82f),
                         modifier = Modifier.size(13.dp),
                     )
                 }
@@ -550,10 +553,9 @@ private fun HomeSnippet(tmpl: ChatyTemplateDefinition) {
     PreviewSurface {
         Column(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Rounded.ChatBubbleOutline,
-                    contentDescription = null,
-                    tint = colors.primary,
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats,
+                    semanticLabel = null,
+                    color = colors.primary,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(7.dp))
@@ -564,9 +566,9 @@ private fun HomeSnippet(tmpl: ChatyTemplateDefinition) {
                     fontWeight = FontWeight.W700,
                     modifier = Modifier.weight(1f),
                 )
-                Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.foregroundSecondary, modifier = Modifier.size(17.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, color = colors.foregroundSecondary, modifier = Modifier.size(17.dp))
                 Spacer(Modifier.width(10.dp))
-                Icon(Icons.Rounded.MoreVert, contentDescription = null, tint = colors.foregroundSecondary, modifier = Modifier.size(17.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = null, color = colors.foregroundSecondary, modifier = Modifier.size(17.dp))
             }
             Spacer(Modifier.height(10.dp))
             if (tmpl.home.showStoriesStrip) {
@@ -675,7 +677,7 @@ private fun UpdatesSnippet(tmpl: ChatyTemplateDefinition) {
                                 modifier = Modifier.padding(vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                CircleAction(Icons.Outlined.AutoStories, size = 15)
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.updates, modifier = Modifier.size(15.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Box(Modifier.weight(1f).height(4.dp).background(colors.border))
                             }

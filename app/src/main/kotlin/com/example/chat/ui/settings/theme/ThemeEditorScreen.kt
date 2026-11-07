@@ -38,7 +38,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -195,16 +195,16 @@ fun ThemeEditorScreen(
         title = "Theme & Design Studio",
         onBack = onBack,
         trailingHeaderWidget = {
-            IconButton(onClick = { generateFromImage() }) { Icon(Icons.Outlined.Palette, "Extract from photo", tint = colors.foreground) }
+            IconButton(onClick = { generateFromImage() }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.palette, semanticLabel = "Extract from photo", color = colors.foreground) }
             IconButton(onClick = { guideOpen = true }) { Icon(Icons.Outlined.CloudDownload, "Theme Packs & Download Guide", tint = colors.foreground) }
             IconButton(onClick = { importTheme() }) { Icon(Icons.Outlined.FileDownload, "Import Theme JSON", tint = colors.foreground) }
             IconButton(onClick = { exportTheme() }) { Icon(Icons.Outlined.FileUpload, "Export Theme JSON", tint = colors.foreground) }
             Box {
-                IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, "More options", tint = colors.foreground) }
+                IconButton(onClick = { menuOpen = true }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = "More options", color = colors.foreground) }
                 DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Save Theme", color = colors.foreground) },
-                        leadingIcon = { Icon(Icons.Rounded.Check, null, Modifier.size(20.dp), tint = colors.foreground) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, modifier = Modifier.size(20.dp), color = colors.foreground) },
                         onClick = { menuOpen = false; applyAndSave() },
                     )
                     HorizontalDivider()
@@ -413,7 +413,7 @@ fun ThemeEditorScreen(
                     }
                     Spacer(Modifier.width(12.dp))
                     Button(onClick = { guideOpen = false; generateFromImage() }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Outlined.Palette, null); Spacer(Modifier.width(8.dp)); Text("Photo Palette")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.palette, semanticLabel = null); Spacer(Modifier.width(8.dp)); Text("Photo Palette")
                     }
                 }
                 Spacer(Modifier.height(12.dp))

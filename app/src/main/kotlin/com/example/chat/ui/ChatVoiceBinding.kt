@@ -29,7 +29,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -256,7 +256,7 @@ private fun VoiceRecordingCard(
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDelete, enabled = !state.busy, modifier = Modifier.size(52.dp).background(Color(theme.cardColor), CircleShape)) {
-                    Icon(Icons.Default.Delete, "Delete recording", tint = foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.delete, semanticLabel = "Delete recording", color = foreground)
                 }
                 Button(onClick = onPause, enabled = !state.busy, modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(26.dp)) {
                     Icon(if (state.paused) Icons.Default.PlayArrow else Icons.Default.Pause, if (state.paused) "Resume recording" else "Pause recording")
@@ -278,7 +278,7 @@ private fun VoiceRecordingCard(
                     )
                 }
                 IconButton(onClick = onSend, enabled = !state.busy, modifier = Modifier.size(52.dp).background(accent, CircleShape)) {
-                    Icon(Icons.Default.Send, "Send recording", tint = Color(theme.onAccentColor))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.send, semanticLabel = "Send recording", color = Color(theme.onAccentColor))
                 }
             }
         } else {
@@ -287,11 +287,11 @@ private fun VoiceRecordingCard(
                 Text("%d:%02d".format(state.seconds / 60, state.seconds % 60), color = foreground)
                 Text("‹ Slide to cancel", color = foreground, modifier = Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Lock, "Slide up to lock recording", tint = foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock, semanticLabel = "Slide up to lock recording", color = foreground)
                     // The scale follows real microphone samples; reduced motion removes scaling.
                     val scale = if (reduced) 1f else 1.08f + (levels.lastOrNull() ?: 0.0).toFloat() * .14f
                     Box(Modifier.size(58.dp).graphicsLayer { scaleX = scale; scaleY = scale }.background(accent, CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Mic, "Recording audio", tint = foreground)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.microphone, semanticLabel = "Recording audio", color = foreground)
                     }
                 }
             }

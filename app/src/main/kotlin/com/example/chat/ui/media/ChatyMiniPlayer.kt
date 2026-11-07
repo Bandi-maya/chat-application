@@ -16,7 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -134,7 +134,7 @@ fun ChatyMiniPlayer(
                         )
                     }
                     IconButton(onClick = { scope.launch { coordinator.stop() } }) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Stop", modifier = Modifier.size(18.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Stop", modifier = Modifier.size(18.dp))
                     }
                 }
                 LinearProgressIndicator(

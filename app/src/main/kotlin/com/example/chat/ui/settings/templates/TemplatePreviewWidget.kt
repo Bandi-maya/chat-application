@@ -45,7 +45,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -183,12 +183,12 @@ private fun PreviewHeader(template: ChatyTemplateDefinition, colors: AppColors, 
                     .background(colors.surfaceSecondary, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(12.dp), tint = colors.foregroundSecondary)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, modifier = Modifier.size(12.dp), color = colors.foregroundSecondary)
             }
         } else {
-            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(14.dp), tint = colors.foregroundSecondary)
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, modifier = Modifier.size(14.dp), color = colors.foregroundSecondary)
             Spacer(Modifier.width(9.dp))
-            Icon(Icons.Rounded.MoreHoriz, contentDescription = null, modifier = Modifier.size(15.dp), tint = colors.foregroundSecondary)
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.more, semanticLabel = null, modifier = Modifier.size(15.dp), color = colors.foregroundSecondary)
         }
     }
 }
@@ -327,14 +327,13 @@ private fun CameraFirstLayout(colors: AppColors, accent: Color) {
                     RoundedCornerShape(13.dp),
                 ),
         ) {
-            Icon(
-                Icons.Rounded.AutoAwesome,
-                contentDescription = null,
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.autoAwesome,
+                semanticLabel = null,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(start = 8.dp, top = 8.dp)
                     .size(13.dp),
-                tint = accent,
+                color = accent,
             )
             Box(Modifier.align(Alignment.Center), contentAlignment = Alignment.Center) {
                 Box(
@@ -349,7 +348,7 @@ private fun CameraFirstLayout(colors: AppColors, accent: Color) {
                             .background(accent, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Rounded.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = null, modifier = Modifier.size(14.dp), color = Color.White)
                     }
                 }
             }
@@ -389,7 +388,7 @@ private fun MessageFirstLayout(template: ChatyTemplateDefinition, colors: AppCol
             ) {
                 Text("Sounds good!", fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.W700)
                 Spacer(Modifier.width(4.dp))
-                Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(10.dp), tint = Color.White.copy(alpha = 0.7f))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.messageCheckDouble, semanticLabel = null, modifier = Modifier.size(10.dp), color = Color.White.copy(alpha = 0.7f))
             }
         }
     }
@@ -417,9 +416,9 @@ private fun PowerChatLayout(colors: AppColors, accent: Color) {
                 verticalArrangement = Arrangement.SpaceEvenly,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(Icons.Rounded.ChatBubble, contentDescription = null, modifier = Modifier.size(12.dp), tint = accent)
-                Icon(Icons.Rounded.Star, contentDescription = null, modifier = Modifier.size(12.dp), tint = colors.foregroundSecondary)
-                Icon(Icons.Rounded.Archive, contentDescription = null, modifier = Modifier.size(12.dp), tint = colors.foregroundSecondary)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats, semanticLabel = null, modifier = Modifier.size(12.dp), color = accent)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.starFilled, semanticLabel = null, modifier = Modifier.size(12.dp), color = colors.foregroundSecondary)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.archive, semanticLabel = null, modifier = Modifier.size(12.dp), color = colors.foregroundSecondary)
             }
             Spacer(Modifier.width(7.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.SpaceEvenly) {
@@ -445,7 +444,7 @@ private fun PowerChatLayout(colors: AppColors, accent: Color) {
                 fontSize = 7.sp,
                 color = colors.foregroundSecondary,
             )
-            Icon(Icons.Rounded.Send, contentDescription = null, modifier = Modifier.size(10.dp), tint = accent)
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.send, semanticLabel = null, modifier = Modifier.size(10.dp), color = accent)
         }
     }
 }
@@ -468,7 +467,7 @@ private fun CommunityLayout(colors: AppColors, accent: Color) {
             Icon(Icons.Rounded.Hub, contentDescription = null, modifier = Modifier.size(17.dp), tint = accent)
             Spacer(Modifier.width(7.dp))
             Text("Design Community", modifier = Modifier.weight(1f), fontSize = 9.sp, fontWeight = FontWeight.W800)
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null, modifier = Modifier.size(14.dp), tint = accent)
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, modifier = Modifier.size(14.dp), color = accent)
         }
         Spacer(Modifier.height(6.dp))
         Row(Modifier.weight(1f)) {
@@ -511,7 +510,7 @@ private fun PreviewNavigation(template: ChatyTemplateDefinition, colors: AppColo
                 // Dart: template.navigation.centerActionIcon ??
                 // Icons.camera_alt_rounded; the canonical String semantic is
                 // 'camera_alt_rounded' whenever set.
-                Icon(Icons.Rounded.CameraAlt, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color.White)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = null, modifier = Modifier.size(15.dp), color = Color.White)
             }
         }
         if (isUtility) {
@@ -550,7 +549,10 @@ private fun PreviewNavItem(
             .padding(horizontal = if (identity) 8.dp else 5.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp), tint = foreground)
+        if (label == "Updates") com.example.chat.ui.icons.ChatyIcon(
+            com.example.chat.ui.icons.ChatyIconId.updates, selected = active,
+            modifier = Modifier.size(12.dp), color = foreground,
+        ) else Icon(icon, contentDescription = null, modifier = Modifier.size(12.dp), tint = foreground)
         if (identity) {
             Spacer(Modifier.width(3.dp))
             Text(label, fontSize = 7.sp, color = foreground, fontWeight = FontWeight.W700)
@@ -648,7 +650,9 @@ private fun QuickAction(colors: AppColors, accent: Color, icon: ImageVector, lab
                 .background(accent.copy(alpha = 0.12f), RoundedCornerShape(7.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(13.dp), tint = accent)
+            if (label == "Updates") com.example.chat.ui.icons.ChatyIcon(
+                com.example.chat.ui.icons.ChatyIconId.updates, modifier = Modifier.size(13.dp), color = accent,
+            ) else Icon(icon, contentDescription = null, modifier = Modifier.size(13.dp), tint = accent)
         }
         Spacer(Modifier.width(6.dp))
         Text(label, fontSize = 8.sp, color = colors.foreground, fontWeight = FontWeight.W700)
@@ -720,7 +724,7 @@ private fun MiniDenseRow(colors: AppColors, accent: Color, label: String) {
                 .background(accent.copy(alpha = 0.12f), RoundedCornerShape(5.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(10.dp), tint = accent)
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.profile, semanticLabel = null, modifier = Modifier.size(10.dp), color = accent)
         }
         Spacer(Modifier.width(5.dp))
         Column(Modifier.weight(1f)) {
@@ -740,7 +744,7 @@ private fun MiniDenseRow(colors: AppColors, accent: Color, label: String) {
                     .background(colors.foregroundSecondary.copy(alpha = 0.38f), RoundedCornerShape(2.dp)),
             )
         }
-        Icon(Icons.Rounded.PushPin, contentDescription = null, modifier = Modifier.size(9.dp), tint = colors.foregroundSecondary)
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.pin, semanticLabel = null, modifier = Modifier.size(9.dp), color = colors.foregroundSecondary)
     }
 }
 
@@ -759,7 +763,9 @@ private fun SpaceCard(colors: AppColors, accent: Color, icon: ImageVector, title
                 .background(accent.copy(alpha = 0.14f), RoundedCornerShape(6.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(13.dp), tint = accent)
+            if (title == "Updates") com.example.chat.ui.icons.ChatyIcon(
+                com.example.chat.ui.icons.ChatyIconId.updates, modifier = Modifier.size(13.dp), color = accent,
+            ) else Icon(icon, contentDescription = null, modifier = Modifier.size(13.dp), tint = accent)
         }
         Spacer(Modifier.weight(1f))
         Text(

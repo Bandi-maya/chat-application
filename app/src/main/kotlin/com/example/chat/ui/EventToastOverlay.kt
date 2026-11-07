@@ -26,7 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -165,8 +165,8 @@ fun ChatyEventToastOverlay(
                                 Box(Modifier.size(avatarSize).clip(CircleShape)
                                     .background(presetColor.copy(alpha = 0.14f)),
                                     contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Rounded.ChatBubbleOutline, null,
-                                        tint = presetColor, modifier = Modifier.size(21.dp))
+                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats, semanticLabel = null,
+                                        color = presetColor, modifier = Modifier.size(21.dp))
                                 }
                             }
                             Spacer(Modifier.width(11.dp))

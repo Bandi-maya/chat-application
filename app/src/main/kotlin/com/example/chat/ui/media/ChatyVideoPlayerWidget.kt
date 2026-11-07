@@ -29,7 +29,7 @@ import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -252,7 +252,7 @@ fun ChatyVideoPlayerWidget(
                 modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = Color(0xFFFF5252), modifier = Modifier.size(36.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.errorOutline, semanticLabel = null, color = Color(0xFFFF5252), modifier = Modifier.size(36.dp))
                 Spacer(Modifier.height(8.dp))
                 Text("Cannot play this video format", color = Color.White, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))

@@ -38,7 +38,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -217,7 +217,7 @@ fun AccountSettingsScreen(
                         leading = { AccountAvatar(user, colors.primary, 42) },
                         title = user.displayName.ifEmpty { "Display Name" },
                         subtitle = "@${user.username}",
-                        trailing = { Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.edit, semanticLabel = null, modifier = Modifier.size(20.dp)) },
                         onTap = { showEditSheet = true },
                     )
                     ChatySettingsTile(
@@ -451,7 +451,7 @@ private fun EditProfileSheet(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close")
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close")
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -487,10 +487,9 @@ private fun EditProfileSheet(
                             .border(2.dp, colors.surface, CircleShape)
                             .padding(6.dp),
                     ) {
-                        Icon(
-                            Icons.Rounded.CameraAlt,
-                            contentDescription = null,
-                            tint = Color.White,
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera,
+                            semanticLabel = null,
+                            color = Color.White,
                             modifier = Modifier.size(16.dp),
                         )
                     }
@@ -515,7 +514,7 @@ private fun EditProfileSheet(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Display Name") },
-                leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
+                leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.profile, semanticLabel = null) },
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -525,7 +524,7 @@ private fun EditProfileSheet(
                 value = about,
                 onValueChange = { about = it },
                 label = { Text("About / Bio") },
-                leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
+                leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.info, semanticLabel = null) },
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,

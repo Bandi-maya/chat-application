@@ -40,7 +40,7 @@ import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.SmartButton
 import androidx.compose.material.icons.rounded.Style
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -231,11 +231,11 @@ fun ConversationEntryStyleScreen(preferences: ChatyPreferencesController, onBack
 
 @Composable
 private fun EntryStylePreview(style: String, pc: EntryPreviewColors) {
-    @Composable fun emojiI(size: Dp = 22.dp) = Icon(Icons.Outlined.EmojiEmotions, null, tint = pc.emoji, modifier = Modifier.size(size))
-    @Composable fun attachI(size: Dp = 20.dp) = Icon(Icons.Rounded.AttachFile, null, tint = pc.buttons, modifier = Modifier.size(size))
-    @Composable fun cameraI(size: Dp = 20.dp) = Icon(Icons.Outlined.CameraAlt, null, tint = pc.buttons, modifier = Modifier.size(size))
+    @Composable fun emojiI(size: Dp = 22.dp) = com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.emoji, semanticLabel = null, color = pc.emoji, modifier = Modifier.size(size))
+    @Composable fun attachI(size: Dp = 20.dp) = com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.attachment, semanticLabel = null, color = pc.buttons, modifier = Modifier.size(size))
+    @Composable fun cameraI(size: Dp = 20.dp) = com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = null, color = pc.buttons, modifier = Modifier.size(size))
     @Composable fun micCircle() = Box(Modifier.size(44.dp).background(pc.micCircle, CircleShape), contentAlignment = Alignment.Center) {
-        Icon(Icons.Rounded.Mic, null, tint = pc.send, modifier = Modifier.size(22.dp))
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.microphone, semanticLabel = null, color = pc.send, modifier = Modifier.size(22.dp))
     }
     @Composable fun sp(w: Int) = Spacer(Modifier.width(w.dp))
 
@@ -270,7 +270,7 @@ private fun EntryStylePreview(style: String, pc: EntryPreviewColors) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         for (k in 0 until n) {
-            if (k == 0) Icon(Icons.Outlined.EmojiEmotions, null, tint = pc.emoji, modifier = Modifier.size(16.dp))
+            if (k == 0) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.emoji, semanticLabel = null, color = pc.emoji, modifier = Modifier.size(16.dp))
             else Icon(Icons.Rounded.Circle, null, tint = pc.buttons.copy(alpha = 0.7f), modifier = Modifier.size(5.dp))
         }
     }
@@ -301,12 +301,12 @@ private fun EntryStylePreview(style: String, pc: EntryPreviewColors) {
         "Simple" -> row { field(22, trailing = { attachI(18.dp) }); sp(8); micCircle() }
         "Old Stock (2016)" -> row { field(8, leading = { emojiI(18.dp) }, trailing = { attachI(18.dp) }); sp(8); micCircle() }
         "Telegram Modern" -> row {
-            Icon(Icons.Rounded.AttachFile, null, tint = pc.buttons, modifier = Modifier.size(24.dp)); sp(8)
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.attachment, semanticLabel = null, color = pc.buttons, modifier = Modifier.size(24.dp)); sp(8)
             field(14, trailing = { emojiI(20.dp) }); sp(8); micCircle()
         }
         "iOS Clean Rounded" -> row {
             Box(Modifier.size(36.dp).background(pc.buttons, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.Add, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null, color = Color.White, modifier = Modifier.size(22.dp))
             }
             sp(8); field(22); sp(8); micCircle()
         }

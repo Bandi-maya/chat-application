@@ -26,7 +26,7 @@ import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -79,7 +79,7 @@ fun CallsScreen(
                     FloatingActionButton(
                         modifier = Modifier.size(56.dp).semantics { contentDescription = "Add call" },
                         onClick = onOpenAddCall,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = androidx.compose.foundation.shape.CircleShape,
                         containerColor = Color(theme.accentColor),
                         contentColor = Color(theme.onAccentColor),
                     ) { Icon(Icons.Rounded.Dialpad, contentDescription = null) }

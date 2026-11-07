@@ -33,7 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -276,10 +276,9 @@ fun PlanSubscriptionScreen(
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            Icons.Rounded.ErrorOutline,
-                            contentDescription = null,
-                            tint = Color(theme.dangerColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.errorOutline,
+                            semanticLabel = null,
+                            color = Color(theme.dangerColor),
                             modifier = Modifier.size(20.dp),
                         )
                         Spacer(Modifier.width(10.dp))
@@ -585,10 +584,9 @@ private fun PlanCard(
                 contentAlignment = Alignment.Center,
             ) {
                 if (isSelected) {
-                    Icon(
-                        Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = Color(theme.onAccentColor),
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check,
+                        semanticLabel = null,
+                        color = Color(theme.onAccentColor),
                         modifier = Modifier.size(14.dp),
                     )
                 }

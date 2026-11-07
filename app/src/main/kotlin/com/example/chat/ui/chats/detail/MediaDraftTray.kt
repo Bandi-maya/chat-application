@@ -26,7 +26,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -113,7 +113,7 @@ fun ChatyMediaDraftTray(
                             contentDescription = "Add more attachments"
                         },
                     ) {
-                        Icon(Icons.Rounded.Add, contentDescription = null, tint = onSurface)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null, color = onSurface)
                     }
                 }
             }
@@ -161,10 +161,9 @@ fun ChatyMediaDraftTray(
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (showEncryptionBadge) {
-                    Icon(
-                        Icons.Rounded.Lock,
-                        contentDescription = null,
-                        tint = primary,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock,
+                        semanticLabel = null,
+                        color = primary,
                         modifier = Modifier.size(15.dp),
                     )
                     Spacer(Modifier.width(6.dp))
@@ -192,9 +191,8 @@ fun ChatyMediaDraftTray(
                             modifier = Modifier.size(16.dp),
                         )
                     } else {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.Send,
-                            contentDescription = null,
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.send,
+                            semanticLabel = null,
                             modifier = Modifier.size(18.dp),
                         )
                     }
@@ -252,10 +250,9 @@ private fun DraftTile(
                 .clickable(enabled = enabled, onClick = onRemove),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                Icons.Rounded.Close,
-                contentDescription = null,
-                tint = Color.White,
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close,
+                semanticLabel = null,
+                color = Color.White,
                 modifier = Modifier.size(17.dp),
             )
         }

@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -18,11 +18,7 @@ data class MessageMoreOption(val label: String, val enabled: Boolean, val onClic
 
 @Composable
 fun MessageMoreOptionsDialog(options: List<MessageMoreOption>, onDismiss: () -> Unit) {
-    ChatyConfirmationDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("More options") },
-        text = {
-            Column {
+    com.example.chat.ui.kit.ChatyReviewModal("More options", "Message actions", onDismiss) {
                 options.forEach { option ->
                     ChatyDropdownMenuItem(
                         text = { Text(option.label) },
@@ -32,11 +28,7 @@ fun MessageMoreOptionsDialog(options: List<MessageMoreOption>, onDismiss: () -> 
                         onClick = { onDismiss(); option.onClick() },
                     )
                 }
-                Text("Unavailable actions need their supporting service or settings.")
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-    )
+    }
 }
 
 private fun messageOptionIcon(label: String): ImageVector = when (label) {

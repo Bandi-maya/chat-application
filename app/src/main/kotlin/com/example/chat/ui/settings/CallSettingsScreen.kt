@@ -21,7 +21,7 @@ import androidx.compose.material.icons.rounded.RingVolume
 import androidx.compose.material.icons.rounded.SpeakerGroup
 import androidx.compose.material.icons.rounded.SpeakerPhone
 import androidx.compose.material.icons.rounded.Style
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -82,10 +82,10 @@ fun CallSettingsScreen(
 
     ChatySettingsPage("Calls", "Incoming call privacy, background audio & visual island", onBack = onBack) {
         ChatySettingsSection("Incoming Call Privacy", "Control who is permitted to initiate voice and video calls with you.") {
-            ChatySettingsTile(title = "Who Can Call Me", icon = Icons.Rounded.RingVolume, iconColor = colors.primary, subtitle = privacy.whoCanCallMe, trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = { dialog = 1 })
+            ChatySettingsTile(title = "Who Can Call Me", icon = Icons.Rounded.RingVolume, iconColor = colors.primary, subtitle = privacy.whoCanCallMe, trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) }, onTap = { dialog = 1 })
             if (privacy.whoCanCallMe == exceptAudience) {
                 ChatySettingsRowDivider()
-                ChatySettingsTile(title = "Excluded Contacts", icon = Icons.Outlined.PersonOff, iconColor = colors.error, subtitle = " contacts excluded", trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = { dialog = 4 })
+                ChatySettingsTile(title = "Excluded Contacts", icon = Icons.Outlined.PersonOff, iconColor = colors.error, subtitle = " contacts excluded", trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) }, onTap = { dialog = 4 })
             }
         }
         ChatySettingsSection(
@@ -98,7 +98,7 @@ fun CallSettingsScreen(
                 icon = Icons.Rounded.Style,
                 iconColor = colors.primary,
                 subtitle = bundle.displayName,
-                trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) },
+                trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) },
                 onTap = onOpenCallBundles,
             )
         }
@@ -108,7 +108,7 @@ fun CallSettingsScreen(
             ChatySwitchTile(title = "Picture-in-Picture Video", icon = Icons.Rounded.PictureInPicture, iconColor = colors.primary, subtitle = "Automatically minimize video stream into PiP window when switching apps.", value = call.pictureInPictureEnabled, onChanged = onPictureInPicture)
         }
         ChatySettingsSection("Audio & Connectivity") {
-            ChatySettingsTile(title = "Dual-Speaker & Output Routing", icon = Icons.Rounded.SpeakerGroup, iconColor = colors.accent, subtitle = "Configure receiver, bottom speaker, and capability routing", trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) }, onTap = onOpenAudioSettings)
+            ChatySettingsTile(title = "Dual-Speaker & Output Routing", icon = Icons.Rounded.SpeakerGroup, iconColor = colors.accent, subtitle = "Configure receiver, bottom speaker, and capability routing", trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) }, onTap = onOpenAudioSettings)
             ChatySettingsRowDivider()
             ChatySwitchTile(title = "Low Data Usage for Calls", icon = Icons.Rounded.SpeakerPhone, iconColor = colors.success, subtitle = "Optimize WebRTC bandwidth consumption on cellular connections.", value = call.lowDataUsageEnabled, onChanged = onLowData)
         }

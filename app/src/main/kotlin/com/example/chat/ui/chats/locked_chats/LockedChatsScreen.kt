@@ -32,7 +32,7 @@ import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -114,7 +114,7 @@ fun LockedChatsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -152,10 +152,9 @@ fun LockedChatsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
             ) {
-                Icon(
-                    Icons.Rounded.Lock,
-                    contentDescription = null,
-                    tint = colors.foregroundSecondary,
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock,
+                    semanticLabel = null,
+                    color = colors.foregroundSecondary,
                     modifier = Modifier.size(44.dp),
                 )
                 Spacer(Modifier.height(10.dp))
@@ -186,10 +185,9 @@ fun LockedChatsScreen(
                         Box(
                             Modifier.background(colors.primary.copy(alpha = 0.12f), CircleShape).padding(10.dp),
                         ) {
-                            Icon(
-                                Icons.Rounded.VisibilityOff,
-                                contentDescription = null,
-                                tint = colors.primary,
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eyeOff,
+                                semanticLabel = null,
+                                color = colors.primary,
                                 modifier = Modifier.size(22.dp),
                             )
                         }
@@ -274,10 +272,9 @@ fun LockedChatsScreen(
                             )
                         }
                         IconButton(onClick = { settingsTarget = conversation }) {
-                            Icon(
-                                Icons.Rounded.MoreVert,
-                                contentDescription = "Chat lock settings",
-                                tint = colors.foregroundSecondary,
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions,
+                                semanticLabel = "Chat lock settings",
+                                color = colors.foregroundSecondary,
                             )
                         }
                     }
@@ -458,7 +455,7 @@ fun LockedChatsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.background(colors.error.copy(alpha = 0.15f), CircleShape).padding(10.dp)) {
-                        Icon(Icons.Rounded.LockOpen, contentDescription = null, tint = colors.error)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.unlock, semanticLabel = null, color = colors.error)
                     }
                     Spacer(Modifier.width(12.dp))
                     Column {

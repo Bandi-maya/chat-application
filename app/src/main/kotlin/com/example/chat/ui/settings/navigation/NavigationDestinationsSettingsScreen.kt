@@ -29,7 +29,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -131,7 +131,7 @@ fun NavigationDestinationsSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
                 }
                 Text(
                     "Navigation destinations",
@@ -148,7 +148,7 @@ fun NavigationDestinationsSettingsScreen(
                     if (saving) {
                         CircularProgressIndicator(strokeWidth = 2.dp, color = colors.primary, modifier = Modifier.size(18.dp))
                     } else {
-                        Icon(Icons.Rounded.Check, contentDescription = "Save navigation destinations", tint = colors.foreground)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = "Save navigation destinations", color = colors.foreground)
                     }
                 }
             }
