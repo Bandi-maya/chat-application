@@ -1,0 +1,227 @@
+name: Plain current kotlin debug fallback
+'on':
+  push:
+    branches:
+    - test/news-emoji-sections-nov7
+  workflow_dispatch: null
+permissions:
+  contents: read
+jobs:
+  plain-kotlin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: 3bc0215836470bfe2023a0af8147067b001bd50a
+    - name: Validate custom WebRTC backend route syntax
+      run: node --check backend/routes/chaty-webrtc-ice.js
+    - name: Restore pinned cumulative candidate source
+      run: "python3 - <<'PYOVERLAY'\nimport base64,hashlib,json,pathlib,zipfile,io\nd=pathlib.Path('ci/candidate-overlay')\n\
+        m=json.loads((d/'manifest.json').read_text())\nraw=base64.b64decode(''.join(p.read_text().strip() for p in sorted(d.glob('part-*.b64'))),validate=True)\n\
+        assert hashlib.sha256(raw).hexdigest()==m['archive_sha256']\nz=zipfile.ZipFile(io.BytesIO(raw))\nassert set(z.namelist())==set(m['files'])\n\
+        for p in z.infolist():\n    n=p.filename; q=pathlib.PurePosixPath(n)\n    assert not q.is_absolute() and '..' not\
+        \ in q.parts and not n.startswith('.') and not n.endswith('/')\n    assert (n == 'build.gradle.kts' or n.startswith(('app/','ci/','tools/location-map/')))\
+        \ and '/build/' not in n and '/.env' not in n\n    assert (p.external_attr >> 16) & 0o170000 != 0o120000\n    data=z.read(p);\
+        \ assert hashlib.sha256(data).hexdigest()==m['files'][n]\n    target=pathlib.Path(n); assert not target.is_symlink()\n\
+        \    assert all(not parent.is_symlink() for parent in target.parents)\n    target.parent.mkdir(parents=True,exist_ok=True);\
+        \ target.write_bytes(data)\nprint('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))\nPYOVERLAY\n"
+    - name: Patch pinned candidate sources for com.logybyte.chaty
+      run: "python3 - <<'PYLOGYPATCH'\nimport pathlib\nsubs = {\n    'ci/run-instrumentation-shard.py': [('com.example.chat.test/',\
+        \ 'com.logybyte.chaty.test/')],\n    'ci/collect-runtime-resources.py': [(\"meminfo','com.example.chat'\", \"meminfo','com.logybyte.chaty'\"\
+        )],\n    'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chaty')],\n    'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt':\
+        \ [\n        ('By.pkg(\"com.example.chat\")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),\n\
+        \        ('        device.findObject(By.desc(\"Clear number\")).click()\\n        assertTrue(\"Clear number removes\
+        \ query\", device.wait(Until.gone(By.desc(\"Clear number\")), 5000))',\n         '        // Clear-number (X) affordance\
+        \ removed per product direction: number centered, no trailing X.\\n        assertTrue(\"Clear number affordance removed\"\
+        , device.wait(Until.gone(By.desc(\"Clear number\")), 5000))'),\n    ],\n    'app/src/main/res/xml/shortcuts.xml':\
+        \ [('android:targetPackage=\"com.example.chat\"', 'android:targetPackage=\"com.logybyte.chaty\"')],\n    'build.gradle.kts':\
+        \ [('    id(\"com.google.gms.google-services\") version \"4.4.2\" apply false\\\\n', '')],\n}\nfor rel, pairs in subs.items():\n\
+        \    p = pathlib.Path(rel)\n    if not p.exists():\n        continue\n    s = p.read_text()\n    for old, new in pairs:\n\
+        \        if old in s:\n            s = s.replace(old, new)\n    p.write_text(s)\nPYLOGYPATCH\n"
+    - name: Apply Chaty Kotlin GB feature overrides
+      run: "python3 - <<'PYOVERRIDES'\nfrom pathlib import Path\nimport shutil\n\nroot = Path(\"ci/gb-parity-overrides\")\n\
+        applied = 0\nfor source in sorted(root.rglob(\"*\")):\n    if not source.is_file():\n        continue\n    relative\
+        \ = source.relative_to(root)\n    allowed_ci = {\"ci/test-shards.py\", \"ci/run-smoke.sh\"}\n    if not relative.parts\
+        \ or (relative.parts[0] != \"app\" and str(relative) not in allowed_ci):\n        raise SystemExit(f\"Unexpected override\
+        \ path: {relative}\")\n    target = Path(*relative.parts)\n    target.parent.mkdir(parents=True, exist_ok=True)\n\
+        \    shutil.copy2(source, target)\n    print(f\"Applied {target}\")\n    applied += 1\nif applied != 137:\n    raise\
+        \ SystemExit(f\"Expected 137 override files, applied {applied}\")\nPYOVERRIDES\n"
+    - name: Patch debug-only proof fixtures to current Kotlin ports
+      run: "python3 - <<'PY'\nimport pathlib, re\np = pathlib.Path('app/src/debug/java/com/example/chat/LockBadgeProofActivity.kt')\n\
+        if p.exists():\n    source = p.read_text()\n    # The old fixture used unsupported animated-icon parameters. Keep\
+        \ a visible\n    # lock glyph so the pixel proof still exercises the actual row badge state.\n    start = source.find('ChatyIcon(')\n\
+        \    if start >= 0:\n        depth = 0\n        quote = None\n        escaped = False\n        end = None\n      \
+        \  for i in range(start + len('ChatyIcon'), len(source)):\n            ch = source[i]\n            if quote:\n   \
+        \             if escaped:\n                    escaped = False\n                elif ord(ch) == 92:\n            \
+        \        escaped = True\n                elif ch == quote:\n                    quote = None\n                continue\n\
+        \            if ch in ('\"', \"'\"):\n                quote = ch\n            elif ch == '(':\n                depth\
+        \ += 1\n            elif ch == ')':\n                depth -= 1\n                if depth == 0:\n                \
+        \    end = i + 1\n                    break\n        if end is not None:\n            source = source[:start] + 'Text(\"\
+        \U0001F512\", fontSize = 14.sp)' + source[end:]\n    source_lines = source.splitlines()\n    package_index = next(\n\
+        \        (i for i, line in enumerate(source_lines) if line.strip().startswith('package ')),\n        None,\n    )\n\
+        \    if package_index is None:\n        raise SystemExit('LockBadgeProofActivity has no package declaration')\n  \
+        \  for import_line in (\n        'import androidx.compose.material3.Text',\n        'import androidx.compose.ui.unit.sp',\n\
+        \    ):\n        if import_line not in source_lines:\n            source_lines.insert(package_index + 1, import_line)\n\
+        \            package_index += 1\n    source = chr(10).join(source_lines) + (chr(10) if source.endswith(chr(10)) else\
+        \ '')\n    if 'import androidx.compose.material3.Text' not in source or 'import androidx.compose.ui.unit.sp' not in\
+        \ source:\n        raise SystemExit('Compose imports were not injected into LockBadgeProofActivity')\n    p.write_text(source)\n\
+        voice = pathlib.Path('app/src/debug/java/com/example/chat/VoiceGestureFixtureActivity.kt')\nif voice.exists():\n \
+        \   source = voice.read_text()\n    for name in ('pause', 'resume'):\n        source = re.sub(\n            rf'(?ms)^\\\
+        s*override\\s+(?:suspend\\s+)?fun\\s+{name}\\s*\\([^)]*\\)\\s*(?:\\{{[^{{}}]*\\}}|=\\s*[^\\n]+)\\s*\\n?',\n      \
+        \      '',\n            source,\n        )\n    voice.write_text(source)\nPY\n"
+    - name: Restore branch-owned adaptive network sources after candidate overlay
+      run: "git checkout HEAD -- \\\n  app/src/main/kotlin/com/example/chat/ui/vault/HiddenVaultScreen.kt \\\n  app/src/main/kotlin/com/example/chat/ui/media/ChatyVideoPlayerWidget.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/updates/UpdatesScreenParts.kt \\\n  app/src/main/java/com/example/chat/data/services/AndroidVoiceNoteAdapters.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/network/NetworkStatusMonitor.kt \\\n  app/src/main/java/com/example/chat/data/network/TransferMonitor.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/network/AppTrafficMonitor.kt \\\n  app/src/main/java/com/example/chat/data/api/ApiMediaUploadClient.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/remote/SupabaseStorageClient.kt \\\n  app/src/main/java/com/example/chat/data/media/BoundedMediaDownloader.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/services/ChatMediaService.kt \\\n  app/src/main/java/com/example/chat/data/services/CallSignalingService.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/services/SessionLifecycleService.kt \\\n  app/src/main/kotlin/com/example/chat/ui/chats/home/ConversationRow.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt \\\n  app/src/main/java/com/example/chat/data/transfer/NativeP2pTransferProtocol.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/transfer/ChunkReceiptLedger.kt \\\n  app/src/main/java/com/example/chat/data/transfer/P2pFileTransferService.kt\
+        \ \\\n  app/src/test/java/com/example/chat/data/transfer/NativeP2pTransferProtocolTest.kt \\\n  app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionDetailSheet.kt\
+        \ \\\n  app/src/main/res/xml/file_paths.xml \\\n  app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/api/ApiRealtimeClient.kt \\\n  app/src/main/java/com/example/chat/data/messaging/ConversationsRepository.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/ChatVoiceBinding.kt \\\n  app/src/main/kotlin/com/example/chat/ui/chats/detail/VoiceNoteController.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ServiceLocator.kt \\\n  app/src/main/kotlin/com/example/chat/ui/AppRoot.kt\
+        \ \\\n  app/src/debug/AndroidManifest.xml \\\n  app/src/main/kotlin/com/example/chat/ui/GlobalLayersHost.kt \\\n \
+        \ app/src/main/kotlin/com/example/chat/ui/kit/ReferenceLayoutPresentation.kt \\\n  app/src/main/kotlin/com/example/chat/ui/theme/ChatyTheme.kt\
+        \ \\\n  app/src/main/java/com/example/chat/domain/models/ChatMessage.kt \\\n  app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt \\\n  app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/updates/ReleaseNotesPolicy.kt \\\n  app/src/main/kotlin/com/example/chat/ui/navigation/NavigationShells3.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/navigation/MainNavigationShell.kt \\\n  app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/calls/InAppCallPip.kt \\\n  app/src/main/kotlin/com/example/chat/ui/kit/SpringInteractiveScale.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/auth/RegisterOrganizationScreen.kt \\\n  app/src/main/kotlin/com/example/chat/ui/auth/RegisterScreen.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/auth/CreateNewPasswordScreen.kt \\\n  app/src/main/kotlin/com/example/chat/ui/auth/AuthComponents.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/auth/ForgotPasswordScreen.kt \\\n  app/src/main/kotlin/com/example/chat/ui/auth/LoginScreen.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/chats/detail/AnimatedEmojiAsset.kt \\\n  app/src/main/kotlin/com/example/chat/ui/chats/home/HomeAppBars.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/chats/detail/AlbumSelectionPolicy.kt \\\n  app/src/test/java/com/example/chat/AlbumSelectionPolicyTest.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/settings/SettingsRootScreen.kt \\\n  app/src/main/kotlin/com/example/chat/ui/settings/NetworkDataUsageScreen.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/services/ProtectedResourceGate.kt \\\n  app/src/main/java/com/example/chat/data/services/LocalLockService.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/services/CallForegroundService.kt \\\n  app/src/main/AndroidManifest.xml\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/ChatsHomeHost.kt \\\n  app/src/main/kotlin/com/example/chat/ui/settings/notifications/NotificationSettingsPage.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/kit/GbDesignSystem.kt \\\n  app/src/debug/java/com/example/chat/LockBadgeProofActivity.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/data/api/EncryptedApiSessionStore.kt \\\n  app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/data/auth/SessionStore.kt \\\n  app/src/main/kotlin/com/example/chat/data/auth/AuthRepository.kt\
+        \ \\\n  app/src/main/java/com/example/chat/data/api/ApiSessionStore.kt \\\n  app/src/main/java/com/example/chat/data/services/AacPcmVoiceRecorder.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/chats/detail/VoiceSessionController.kt \\\n  app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/media/MediaLibraryService.kt \\\n  app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceScreen.kt\
+        \ \\\n  app/src/main/kotlin/com/example/chat/ui/media/PdfWorkspaceScreen.kt \\\n  app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceHost.kt\
+        \ \\\n  app/src/test/java/com/example/chat/LocalLockServiceFullTest.kt \\\n  app/src/test/java/com/example/chat/ProtectedResourceGateParityTest.kt\
+        \ \\\n  app/src/test/java/com/example/chat/ui/media/MediaLibraryServiceHardeningTest.kt\n"
+    - name: Restore hash-reviewed run5 UI sources after all overlays
+      run: "python3 - <<'PYRUN5'\nimport hashlib,json,pathlib,subprocess\nm=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())\n\
+        paths=list(m['files'])\nassert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts\
+        \ for n in paths)\nsubprocess.run(['git','checkout','HEAD','--',*paths],check=True)\nsubprocess.run(['git','checkout','3bc0215836470bfe2023a0af8147067b001bd50a','--','app/src/main/kotlin/com/example/chat/ui/chats/detail/ChatyEmojiPicker.kt'],check=True)\n\
+        for n,expected in m['files'].items():\n    assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n\n\
+        print('RUN5-UI-RESTORED',len(paths),m['source_commit'])\nPYRUN5\n"
+    - name: Disable unused Firebase messaging entrypoint
+      run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 8.11.1
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: 'mls-native -> target
+
+          '
+        cache-on-failure: true
+    - name: Install cargo-ndk
+      run: command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
+    - name: Set Android NDK for cargo-ndk
+      run: 'NDK=$(ls -d "$ANDROID_HOME"/ndk/* | sort -V | tail -1)
+
+        echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
+
+        echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
+
+        '
+    - name: Generate UniFFI bindings (diagnostic)
+      run: 'gradle :app:generateUniffiBindings --no-daemon
+
+        echo ''--- generated tree ---''
+
+        find app/build/generated/uniffi -type f | head -20
+
+        '
+    - name: Prepare local debug signing only, no repository secrets
+      run: 'mkdir -p ci/keystore
+
+        keytool -genkeypair -keystore ci/keystore/chaty-release.jks -alias chaty -keyalg RSA -keysize 2048 -validity 10000
+        -storepass android -keypass android -dname ''CN=Chaty Debug''
+
+        echo ''CHATY_KEYSTORE_PASSWORD=android'' >> "$GITHUB_ENV"
+
+        '
+    - name: Build debug APK (compile verification)
+      run: gradle :app:assembleDebug --no-daemon
+    - name: APK info
+      if: always()
+      run: "ls -l app/build/outputs/apk/debug/ 2>/dev/null || true\nif [ -f app/build/outputs/apk/debug/app-debug.apk ]; then\
+        \ sha256sum app/build/outputs/apk/debug/app-debug.apk; fi\nAPK=app/build/outputs/apk/debug/app-debug.apk\nif [ -f\
+        \ \"$APK\" ]; then\n  echo \"--- APK content check (model/native libs) ---\"\n  echo \"--- model assets ---\"\n  unzip\
+        \ -l \"$APK\" | grep -i \"face_landmarker\\|\\.task$\\|\\.tflite$\" || echo \"NO MODEL ASSET FOUND\"\n  if unzip -l\
+        \ \"$APK\" | grep -q \"assets/face_landmarker.task\"; then\n    GOT=$(unzip -p \"$APK\" assets/face_landmarker.task\
+        \ | sha256sum | cut -d' ' -f1)\n    echo \"MODEL sha256 in APK: $GOT\"\n    echo \"MODEL sha256 pinned: 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff\"\
+        \n    [ \"$GOT\" = \"64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff\" ] && echo \"MODEL CHECKSUM\
+        \ MATCH\" || echo \"MODEL CHECKSUM MISMATCH\"\n  fi\n  unzip -l \"$APK\" | grep -i \"libchaty\\|libmediapipe\" ||\
+        \ true\n  BT=$(ls -d \"$ANDROID_HOME\"/build-tools/* | sort -V | tail -1)\n  echo \"--- badging ---\"\n  \"$BT/aapt2\"\
+        \ dump badging \"$APK\" 2>/dev/null | grep -E \"^package:|sdkVersion|targetSdk\" || true\n  echo \"--- signing ---\"\
+        \n  \"$BT/apksigner\" verify --print-certs \"$APK\" 2>&1 | head -6 || true\nfi\n"
+    - name: Compile instrumentation tests before emulator setup
+      run: gradle :app:compileDebugAndroidTestKotlin --no-daemon
+    - name: Unit tests (behavior parity)
+      run: gradle :app:testDebugUnitTest --no-daemon
+    - name: Report unit test totals
+      if: always()
+      run: 'python3 - <<''PYTEST''
+
+        import glob, xml.etree.ElementTree as ET
+
+        roots = [ET.parse(p).getroot() for p in glob.glob(''app/build/test-results/testDebugUnitTest/TEST-*.xml'')]
+
+        totals = {k: sum(int(r.get(k, 0)) for r in roots) for k in (''tests'', ''failures'', ''errors'', ''skipped'')}
+
+        print(''UNIT-TEST-TOTALS'', totals, ''suites'', len(roots))
+
+        PYTEST
+
+        '
+    - name: Record tested APK identity
+      run: 'mkdir -p evidence apk
+
+        cp app/build/outputs/apk/debug/app-debug.apk apk/app-debug.apk
+
+        sha256sum apk/app-debug.apk > evidence/apk-sha256.txt
+
+        AAPT=$(ls "$ANDROID_HOME/build-tools/"*/aapt | sort -V | tail -1)
+
+        "$AAPT" dump badging apk/app-debug.apk > /tmp/apk-badging.txt
+
+        python3 - <<''P''
+
+        import re,os,pathlib
+
+        s=pathlib.Path(''/tmp/apk-badging.txt'').read_text();p=re.search(r"package: name=''([^'']+)''",s).group(1)
+
+        with open(os.environ[''GITHUB_ENV''],''a'') as f:f.write(''TEST_PACKAGE=''+p+''\n'')
+
+        P
+
+        '
+    - name: Upload plain kotlin tested APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Chaty-plain-kotlin-3bc02158-debug-APK
+        path: apk/app-debug.apk
+        retention-days: 7
+        if-no-files-found: error
