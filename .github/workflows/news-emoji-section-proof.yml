@@ -111,9 +111,9 @@ jobs:
     - name: Restore hash-reviewed run5 UI sources after all overlays
       run: "python3 - <<'PYRUN5'\nimport hashlib,json,pathlib,subprocess\nm=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())\n\
         paths=list(m['files'])\nassert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts\
-        \ for n in paths)\nsubprocess.run(['git','checkout','HEAD','--',*paths],check=True)\nfor n,expected in m['files'].items():\n\
-        \    assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n\nprint('RUN5-UI-RESTORED',len(paths),m['source_commit'])\n\
-        PYRUN5\n"
+        \ for n in paths)\nsubprocess.run(['git','checkout','HEAD','--',*paths],check=True)\nsubprocess.run(['git','checkout','3bc0215836470bfe2023a0af8147067b001bd50a','--','app/src/main/kotlin/com/example/chat/ui/chats/detail/ChatyEmojiPicker.kt'],check=True)\n\
+        for n,expected in m['files'].items():\n    assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n\n\
+        print('RUN5-UI-RESTORED',len(paths),m['source_commit'])\nPYRUN5\n"
     - name: Disable unused Firebase messaging entrypoint
       run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
     - uses: actions/setup-java@v4
