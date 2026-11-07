@@ -68,7 +68,18 @@ internal fun ClusteredStickerPicker(
 @Composable
 private fun StickerArtwork(sticker: StickerAsset, size: Float) {
     var failed by remember(sticker.assetPath) { mutableStateOf(false) }
+    val reduced = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var foreground by remember(owner) { mutableStateOf(owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) }
+    DisposableEffect(owner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, _ ->
+            foreground = owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+    val poster = if (sticker.packId == "chaty-news-clean-v1") sticker.assetPath.replace("/animated/", "/posters/").replace(".webp", ".png") else sticker.assetPath
     if (failed) Text("Sticker preview unavailable")
-    else if (sticker.animated && android.os.Build.VERSION.SDK_INT >= 28) IosAnimatedEmoji(sticker.assetPath, size, onUnavailable = { failed = true })
-    else StaticAssetEmoji(sticker.assetPath, size, onUnavailable = { failed = true })
+    else if (sticker.animated && android.os.Build.VERSION.SDK_INT >= 28) IosAnimatedEmoji(sticker.assetPath, size, animate = foreground && !reduced, onUnavailable = { failed = true })
+    else StaticAssetEmoji(poster, size, onUnavailable = { failed = true })
 }
