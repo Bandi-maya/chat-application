@@ -96,6 +96,14 @@ android {
         }
     }
 
+    packaging {
+        resources {
+            // bcprov-jdk18on (Ed25519 device keys) and jspecify both ship this
+            // multi-release-jar metadata; keep first, drop duplicates.
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
+    }
+
     sourceSets {
         getByName("main") {
             java.srcDir(layout.buildDirectory.dir("generated/uniffi"))

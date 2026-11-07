@@ -1,8 +1,8 @@
 {
- "archive_sha256": "ecf57be57161ec11306e365009af809c7ece5afbfce97f78bac5ab4c2243f241",
+ "archive_sha256": "75a7c48aa549c8c816fc383bdfe48a2b254faf247e52918bb7193bed57d704d2",
  "base": "e465747abe825fb30a76226cfcebda10bb56d7d8",
  "files": {
-  "app/build.gradle.kts": "db87ab2f7c965b47c45b0c76b61c7a9f9aa7627bb405daece6c028aa08c96f9e",
+  "app/build.gradle.kts": "3019d4203b256214153a687b5bc1b2fa0f5b0f97d0f6ab655c329bdeefe50f48",
   "app/src/androidTest/java/com/example/chat/AccountDraftIsolationProofTest.kt": "1a6753da78a2bc872216b885bbba08c0fdce642eec4765a311172ce695a1c4cc",
   "app/src/androidTest/java/com/example/chat/AppRootConfiguredProofTest.kt": "42c3a6e5f2596d166daef7df719a695db1a27e6b290319ddb495a805cffd22be",
   "app/src/androidTest/java/com/example/chat/AttachmentInitialOpenProofTest.kt": "dd64279951135f25586007c20b2b909824e0624cdd8f3f3449ed618e416925ea",
