@@ -245,6 +245,22 @@ jobs:
 
         P
 
+        python3 - <<''P''
+
+        from pathlib import Path
+
+        p=Path(''ci/capture-news-emoji-section.py'');s=p.read_text()
+
+        s=s.replace("adb(''shell'',''uiautomator'',''dump'',''/sdcard/news-panel.xml'');return list(ET.fromstring(adb(''shell'',''cat'',''/sdcard/news-panel.xml'')).iter(''node''))",
+        "adb(''shell'',''uiautomator'',''dump'',''/sdcard/news-panel.xml'');ns=list(ET.fromstring(adb(''shell'',''cat'',''/sdcard/news-panel.xml'')).iter(''node''))\n   if
+        any(n.get(''text'')==\"Pixel Launcher isn''t responding\" for n in ns):\n    close=next((n for n in ns if n.get(''text'')==''Close
+        app''),None)\n    if close is None:raise RuntimeError(''Verified launcher ANR lacks close control'')\n    z=list(map(int,re.findall(r''\\d+'',close.get(''bounds'',''''))));adb(''shell'',''input'',''tap'',str((z[0]+z[2])//2),str((z[1]+z[3])//2));time.sleep(3);continue\n   return
+        ns")
+
+        p.write_text(s)
+
+        P
+
         '
     - name: Capture real emoji component in offline fixture
       uses: reactivecircus/android-emulator-runner@v2
