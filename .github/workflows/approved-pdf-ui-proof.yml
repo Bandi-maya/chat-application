@@ -106,7 +106,8 @@ jobs:
         \ PDF UI source files' ,len(z.namelist()))\nPYUI\n"
     - name: Apply approved266 icon and responsive UI overlay last
       run: "python3 - <<'PYICON'\nimport base64,hashlib,io,json,pathlib,zipfile\nroot=pathlib.Path('ci/icon-responsive-nov7');m=json.loads((root/'manifest.json').read_text())\nraw=base64.b64decode(''.join(p.read_text().strip() for p in sorted(root.glob('part-*.b64'))),validate=True)\nassert hashlib.sha256(raw).hexdigest()==m['archive_sha256']\nz=zipfile.ZipFile(io.BytesIO(raw));assert set(z.namelist())==set(m['files'])\nfor n in z.namelist():\n p=pathlib.Path(n);assert n.startswith('app/') and '..' not in p.parts and not p.is_absolute()\n data=z.read(n);assert hashlib.sha256(data).hexdigest()==m['files'][n]\n p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)\nprint('ICON-RESPONSIVE-OVERLAY',m['archive_sha256'],'files',len(m['files']))\nPYICON\npython3 - <<'PYTINT'\nimport base64,hashlib,pathlib\nraw=base64.b64decode(pathlib.Path('ci/icon-responsive-nov7/named-tint.kt.b64').read_text().strip(),validate=True)\nassert hashlib.sha256(raw).hexdigest()=='b51e99fde49fdb742b3575550060ea84488886fd25b060246fadeda88f778863'\n\
-        pathlib.Path('app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt').write_bytes(raw)\nprint('Named token tint; unchanged Python contract verified locally')\nPYTINT\npython3 - <<'PYCOMPILE'\nimport base64,json,pathlib\nallowed={'app/src/debug/java/com/example/chat/SwipeRowFixtureActivity.kt','app/src/main/kotlin/com/example/chat/ui/settings/SettingsScreen.kt','app/src/main/kotlin/com/example/chat/ui/settings/templates/TemplatePreviewWidget.kt'}\npatch=json.loads(pathlib.Path('ci/icon-responsive-nov7/compiler-corrections.json').read_text());assert set(patch)==allowed\nfor n,data in patch.items():pathlib.Path(n).write_bytes(base64.b64decode(data,validate=True))\nprint('Four approved compiler source corrections applied; no test edits')\nPYCOMPILE\n"
+        pathlib.Path('app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt').write_bytes(raw)\nprint('Named token tint; unchanged Python contract verified locally')\nPYTINT\npython3 - <<'PYCOMPILE'\nimport base64,json,pathlib\nallowed={'app/src/debug/java/com/example/chat/SwipeRowFixtureActivity.kt','app/src/main/kotlin/com/example/chat/ui/settings/SettingsScreen.kt','app/src/main/kotlin/com/example/chat/ui/settings/templates/TemplatePreviewWidget.kt'}\npatch=json.loads(pathlib.Path('ci/icon-responsive-nov7/compiler-corrections.json').read_text());assert set(patch)==allowed\nfor n,data in patch.items():pathlib.Path(n).write_bytes(base64.b64decode(data,validate=True))\nprint('Four approved compiler source corrections applied; no test edits')\nPYCOMPILE\npython3 - <<'PYNS'\nimport base64,hashlib,io,pathlib,zipfile\nraw=base64.b64decode(pathlib.Path('ci/icon-responsive-nov7/canonical-namespace.b64').read_text().strip(),validate=True)\nassert hashlib.sha256(raw).hexdigest()=='71ddf0990e7f38e5abed416fa0cb3c423d13a62c7a9f2818e664590d9c86132b'\n\
+        z=zipfile.ZipFile(io.BytesIO(raw));assert len(z.namelist())==115\nfor n in z.namelist():\n assert n.startswith('app/src/main/res/drawable/') and '..' not in pathlib.Path(n).parts\n pathlib.Path(n).write_bytes(z.read(n))\nprint('115 canonical Android namespaces; geometry/style hashes unchanged')\nPYNS\n"
     - name: Call bundle source contracts
       run: python3 ci/tests/test_call_bundle_settings_contract.py -v
     - name: PDF identity and native parser contracts
@@ -158,8 +159,6 @@ jobs:
       run: "mkdir -p ci/keystore\nif [ -n \"${CHATY_KEYSTORE_B64:-}\" ] && [ -n \"${CHATY_KEYSTORE_PASSWORD:-}\" ]; then\n  printf '%s' \"$CHATY_KEYSTORE_B64\" | base64 -d > ci/keystore/chaty-release.jks\n  chmod 600 ci/keystore/chaty-release.jks\n  echo \"CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD\" >> \"$GITHUB_ENV\"\n  echo \"Materialized Chaty release keystore from secrets.\"\nelse\n  keytool -genkeypair -v -keystore ci/keystore/chaty-release.jks \\\n    -alias chaty -keyalg RSA -keysize 2048 -validity 10000 \\\n    -storepass android -keypass android \\\n    -dname \"CN=Chaty, OU=Dev, O=Chaty, L=Unknown, S=Unknown, C=US\"\n  echo \"CHATY_KEYSTORE_PASSWORD=android\" >> \"$GITHUB_ENV\"\n  echo \"Generated fallback debug keystore for Chaty build.\"\nfi\n"
     - name: Build debug APK (compile verification)
       run: gradle :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon
-    - name: Unit tests including four approved icon contract changes
-      run: gradle :app:testDebugUnitTest --no-daemon
     - name: Record screenshot APK identity
       run: 'mkdir -p evidence apk
 
@@ -180,6 +179,8 @@ jobs:
         name: Chaty-approved-PDF-debug-APK
         path: apk/app-debug.apk
         retention-days: 7
+    - name: Unit tests including four approved icon contract changes
+      run: gradle :app:testDebugUnitTest --no-daemon
     - name: Enable KVM
       run: 'echo ''KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"'' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
 
@@ -228,4 +229,3 @@ jobs:
         path: evidence/
         retention-days: 1
         if-no-files-found: error
-# Attempt4: exact SpaceCard title discriminator correction only.
