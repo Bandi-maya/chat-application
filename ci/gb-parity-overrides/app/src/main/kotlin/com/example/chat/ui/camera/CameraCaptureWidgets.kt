@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -53,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -79,6 +81,7 @@ import coil.compose.AsyncImage
 import java.io.File
 import androidx.compose.ui.text.font.FontWeight
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /** UI halves of camera_capture_screen.dart (viewfinder, top bar, bottom
  *  controls, mode selector, shutter, confirm pane, no-camera pane). All
@@ -100,6 +103,7 @@ fun CameraCaptureViewfinder(
     facePoses: List<FacePose>,
     faceHealth: TrackingHealth,
     flashOn: Boolean,
+    flashAuto: Boolean = false,
     flashSupported: Boolean = true,
     previewAspect: Float? = null,
     effectsOpen: Boolean,
@@ -112,6 +116,8 @@ fun CameraCaptureViewfinder(
     onToggleEffects: () -> Unit,
     onOpenSettings: () -> Unit,
     onPickFromGallery: () -> Unit,
+    focusTap: Offset? = null,
+    captureFlashAlpha: Float = 0f,
 ) {
     Box(
         Modifier
@@ -152,6 +158,26 @@ fun CameraCaptureViewfinder(
                 modifier = Modifier.align(Alignment.Center)
                     .then(if (previewAspect != null) Modifier.fillMaxWidth().aspectRatio(previewAspect) else Modifier.fillMaxSize()),
             )
+        }
+        // Tap-to-focus feedback ring (reference camera UIs, incl. the GB
+        // AutofocusOverlay, show a ring where focus locked; a focus tap with no
+        // visible response reads as dead). Drawn in the PreviewView's own
+        // coordinate space: same centered box, same aspect constraint.
+        val focusRing = focusTap
+        if (focusRing != null) {
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .then(if (previewAspect != null) Modifier.fillMaxWidth().aspectRatio(previewAspect) else Modifier.fillMaxSize()),
+            ) {
+                Box(
+                    Modifier
+                        .offset { IntOffset((focusRing.x - 34.dp.toPx()).roundToInt(), (focusRing.y - 34.dp.toPx()).roundToInt()) }
+                        .size(68.dp)
+                        .border(2.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                        .semantics { contentDescription = "Focusing here" },
+                )
+            }
         }
         when (phase) {
             CameraPhase.initializing -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -230,8 +256,12 @@ fun CameraCaptureViewfinder(
             if (phase == CameraPhase.ready) {
                 if (flashSupported) {
                     CameraCaptureRoundAction(
-                        label = if (flashOn) "Turn flash off" else "Turn flash on",
-                        kind = "flash",
+                        label = when {
+                            flashAuto -> "Turn flash off"
+                            flashOn -> "Switch flash to auto"
+                            else -> "Turn flash on"
+                        },
+                        kind = if (flashAuto) "flash_auto" else "flash",
                         onClick = onToggleFlash,
                     )
                     Spacer(Modifier.width(10.dp))
@@ -258,6 +288,10 @@ fun CameraCaptureViewfinder(
             }
             CameraCaptureRoundAction(label = "Camera settings", kind = "settings", onClick = onToggleOptions)
             }
+        }
+        // ShutterOverlay parity: brief white flash on photo capture.
+        if (captureFlashAlpha > 0f) {
+            Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = captureFlashAlpha)))
         }
     }
 }
@@ -370,6 +404,11 @@ fun CameraCaptureBottomControls(
     onFlip: () -> Unit,
     onPickFromGallery: () -> Unit,
     onBrowseLenses: () -> Unit = {},
+    recentStripVisible: Boolean = false,
+    recentStripOpen: Boolean = false,
+    recentPhotos: List<android.net.Uri> = emptyList(),
+    onToggleRecentStrip: (Boolean) -> Unit = {},
+    onPickRecent: (android.net.Uri) -> Unit = {},
 ) {
     val ready = phase == CameraPhase.ready
     val configuration = LocalConfiguration.current
@@ -626,6 +665,15 @@ fun CameraCaptureBottomControls(
                 }
                 Spacer(Modifier.height((if (tight) 1 else 4).dp))
             }
+            if (recentStripVisible) {
+                CameraRecentStrip(
+                    open = recentStripOpen,
+                    photos = recentPhotos,
+                    onToggle = onToggleRecentStrip,
+                    onPick = onPickRecent,
+                )
+                Spacer(Modifier.height((if (tight) 2 else 6).dp))
+            }
             // Snap-style inline row (verified reference): gallery, shutter, then the
             // lens carousel scrolling on the SAME row, flip at the far edge. Gallery
             // and flip keep their existing capabilities and safe-area padding.
@@ -660,19 +708,11 @@ fun CameraCaptureBottomControls(
                             .semantics { contentDescription = if (videoPaused) "Resume recording" else "Pause recording" },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (videoPaused) {
-                            androidx.compose.foundation.Canvas(Modifier.size(18.dp)) {
-                                val w = size.width; val h = size.height
-                                drawPath(androidx.compose.ui.graphics.Path().apply {
-                                    moveTo(w * .25f, h * .12f); lineTo(w * .25f, h * .88f); lineTo(w * .88f, h * .5f); close()
-                                }, color = Color.White)
-                            }
-                        } else {
-                            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Box(Modifier.width(5.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White))
-                                Box(Modifier.width(5.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White))
-                            }
-                        }
+                        com.example.chat.ui.icons.ChatyIcon(
+                            if (videoPaused) com.example.chat.ui.icons.ChatyIconId.playArrow
+                            else com.example.chat.ui.icons.ChatyIconId.pause,
+                            color = Color.White, size = 18.dp,
+                        )
                     }
                 }
             } else {

@@ -168,6 +168,7 @@ fun SettingsSubHost(
             } else if (showBundles) {
                 com.example.chat.ui.calls.bundles.CallExperienceBundlePickerScreen(
                     currentBundleId = store.value.callExperienceBundleId,
+                    onApplyScopedBundle = { bundleId, target -> store.applyExperienceBundle(bundleId, target) },
                     onApplyBundle = { bundleId ->
                         scope.launch {
                             try {

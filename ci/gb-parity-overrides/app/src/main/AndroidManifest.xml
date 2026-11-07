@@ -21,8 +21,8 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <!-- Required when the active call service also hosts user-consented screen capture. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -61,7 +61,9 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="chaty" android:host="reset-password" />
             </intent-filter>
-            <!-- Static launcher shortcuts (res/xml/shortcuts.xml), API 25+; no-op below. -->
+            <!-- Static launcher shortcuts (res/xml/shortcuts.xml). MainActivity forwards
+                 EXTRA_SHORTCUT_ACTION to LauncherShortcutRouter; AppRoot consumes it only
+                 after the auth/app-lock gate. Ignored harmlessly on API 24 (minSdk). -->
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -80,11 +82,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Shortcut publication follows whichever launcher entry is enabled (icon
-                 variants are activity-aliases; exactly one entry is enabled at a time). -->
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <activity-alias
@@ -99,11 +96,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Shortcut publication follows whichever launcher entry is enabled (icon
-                 variants are activity-aliases; exactly one entry is enabled at a time). -->
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <activity-alias
@@ -118,11 +110,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Shortcut publication follows whichever launcher entry is enabled (icon
-                 variants are activity-aliases; exactly one entry is enabled at a time). -->
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <activity-alias
@@ -137,11 +124,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Shortcut publication follows whichever launcher entry is enabled (icon
-                 variants are activity-aliases; exactly one entry is enabled at a time). -->
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <activity-alias
@@ -156,11 +138,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Shortcut publication follows whichever launcher entry is enabled (icon
-                 variants are activity-aliases; exactly one entry is enabled at a time). -->
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <activity-alias
@@ -175,11 +152,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Shortcut publication follows whichever launcher entry is enabled (icon
-                 variants are activity-aliases; exactly one entry is enabled at a time). -->
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <service
@@ -192,13 +164,9 @@
             </intent-filter>
         </service>
 
-        <receiver
-            android:name="com.example.chat.notifications.ChatyNotificationActionReceiver"
-            android:exported="false" />
-
         <service
             android:name="com.example.chat.data.services.CallForegroundService"
-            android:foregroundServiceType="microphone|camera"
+            android:foregroundServiceType="microphone|camera|mediaProjection"
             android:stopWithTask="true" />
 
         <provider
@@ -223,5 +191,12 @@
             android:exported="false"
             android:foregroundServiceType="remoteMessaging"
             android:stopWithTask="false" />
+        <service
+            android:name=".notifications.ChatyFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

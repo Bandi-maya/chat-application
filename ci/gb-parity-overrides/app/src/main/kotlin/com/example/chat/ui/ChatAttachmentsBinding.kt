@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.example.chat.ServiceLocator
+import com.example.chat.data.local.BoundedFileReader
 import com.example.chat.domain.models.MessageAttachment
 import com.example.chat.domain.models.MessageType
 import com.example.chat.ui.chats.detail.AttachmentBackendPort
@@ -45,17 +46,11 @@ class ChatAttachmentsBindings(
     val onContact: () -> Unit,
     val onLocation: () -> Unit,
     val controller: com.example.chat.ui.chats.detail.ChatAttachmentActionController,
-    /** Gallery lease: issue on the ORIGINAL paperclip open (null if signed out). The sheet keeps it, and passes the same
-     *  object to onPickedImages and closeGallery. Opaque: nothing in the UI can mint or alter a scope. */
-    val openGallery: () -> GalleryLease? = { null },
-    val closeGallery: (GalleryLease) -> Unit = {},
+    val onReviewImages: (List<Uri>) -> Unit,
+    val onDirectSendImages: (List<Uri>) -> Unit,
     /** Capture sessions for voice/camera video: open at the ORIGINAL record/entry start (null if signed out). */
-    val openCaptureSession: ((onCancel: () -> Unit) -> AttachFlow?) = { null },
-    val closeCaptureSession: (AttachFlow) -> Unit = {},
-    val onPickedImages: (GalleryLease, List<Uri>) -> Unit = { _, _ -> },
-    val onDirectSendImages: (GalleryLease, List<Uri>) -> Unit = { _, _ -> },
-    /** Bumped on the main dispatcher (never under the transition lock) after every transition; sheet closes and drops selection. */
-    val scopeEpoch: Int = 0,
+    val openCaptureSession: ((onCancel: () -> Unit) -> com.example.chat.ui.AttachFlow?) = { null },
+    val closeCaptureSession: (com.example.chat.ui.AttachFlow) -> Unit = {},
 )
 
 @Composable
@@ -63,22 +58,26 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val api = ServiceLocator.apiBackend
+    // Capture-session scope guard (voice/camera video): sessions open under the current account
+    // scope and are atomically cancelled on any account transition.
+    val captureRegistry = remember { val h = android.os.Handler(android.os.Looper.getMainLooper()); com.example.chat.ui.GalleryLeaseRegistry { r -> h.post { r() } } }
+    androidx.compose.runtime.DisposableEffect(api) {
+        val l: (com.example.chat.data.api.ApiAccountScope) -> Unit = { next ->
+            captureRegistry.onTransition(next, publishEpoch = { }, cancelWaiters = { })
+        }
+        api.addAuthScopeListener(l)
+        onDispose { api.removeAuthScopeListener(l) }
+    }
     var pending by remember { mutableStateOf<CompletableDeferred<List<Uri>>?>(null) }
     var mediaReview by remember { mutableStateOf<Pair<List<com.example.chat.ui.chats.detail.MediaReviewItem>, CompletableDeferred<com.example.chat.ui.chats.detail.ReviewedMedia?>>?>(null) }
     var viewOnceAsk by remember { mutableStateOf<Pair<String, CompletableDeferred<Boolean>>?>(null) }
-    val multiGate = remember { ResultGate() }; val singleGate = remember { ResultGate() }
-    val pendingGate = remember { java.util.concurrent.atomic.AtomicReference<ResultGate?>(null) }   // launcher that owns the current `pending`
-    val contactGate = remember { ResultGate() }; val permGate = remember { ResultGate() }
     val multi = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-        if (!multiGate.accept()) return@rememberLauncherForActivityResult   // late result of a cancelled flow's picker
         pending?.complete(uris); pending = null
     }
     val single = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (!singleGate.accept()) return@rememberLauncherForActivityResult
         pending?.complete(listOfNotNull(uri)); pending = null
     }
     var contactPending by remember { mutableStateOf<CompletableDeferred<Uri?>?>(null) }
-    var contactReadPending by remember { mutableStateOf<CompletableDeferred<Boolean>?>(null) }
     var docPickerPending by remember { mutableStateOf<CompletableDeferred<List<MediaFileDescriptor>?>?>(null) }
     // Dart custom_file_picker_screen.dart:33 `final _libraryService = MediaLibraryService();`
     // with path_provider sources (media_library_service.dart:48-51): app documents dir + temp dir.
@@ -92,7 +91,6 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
     }
     var readerDoc by remember { mutableStateOf<MediaFileDescriptor?>(null) }
     val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { uri ->
-        if (!contactGate.accept()) return@rememberLauncherForActivityResult
         contactPending?.complete(uri); contactPending = null
     }
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
@@ -109,41 +107,39 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                 if (s >= 0 && !c.isNull(s)) size = c.getLong(s)
             }
         }
-        val max = ServiceLocator.chatMedia.maxBytes(type)
+        val max = if (type == "image") 50L * 1024 * 1024 else ServiceLocator.chatMedia.maxBytes(type)
         // Guard before reading the stream: images are compressed after, so allow headroom for them.
-        if (size > 0 && type != "image" && size > max) {
+        if (size > 0 && size > max) {
             throw IllegalStateException("This $type exceeds the ${max / (1024 * 1024)} MB storage limit.")
         }
-        val bytes = withContext(Dispatchers.IO) {
-            cr.openInputStream(uri)?.use { it.readBytes() }
-                ?: throw IllegalStateException("The selected file is not accessible on this device.")
+        // Copy the provider URI to an app-private temporary file using a bounded buffer.
+        // This preserves access after the picker closes without materializing large media in RAM.
+        val staged = withContext(Dispatchers.IO) {
+            val target = java.io.File.createTempFile("chaty-outgoing-", ".part", context.cacheDir)
+            try {
+                cr.openInputStream(uri)?.use { input ->
+                    target.outputStream().buffered(64 * 1024).use { output ->
+                        input.copyTo(output, 64 * 1024)
+                    }
+                } ?: throw IllegalStateException("The selected file is not accessible on this device.")
+                val finalName = name.replace(Regex("[^A-Za-z0-9._-]"), "_").takeLast(100).ifBlank { "attachment" }
+                val finalFile = java.io.File(context.cacheDir, "chaty-outgoing-${java.util.UUID.randomUUID()}-$finalName")
+                check(target.renameTo(finalFile)) { "Unable to stage the selected attachment." }
+                finalFile
+            } catch (error: Throwable) {
+                target.delete()
+                throw error
+            }
         }
-        return PickedFile(name = name, bytes = bytes, mimeType = cr.getType(uri))
-    }
-
-    // Account scope of the running attach flow (pick -> review -> upload -> send). Captured once at the entry tap;
-    // every upload/send in the flow uses exactly this immutable scope. A scope transition cancels the flow.
-    var scopeEpoch by remember { mutableStateOf(0) }
-    val registry = remember { val h = android.os.Handler(android.os.Looper.getMainLooper()); GalleryLeaseRegistry { r -> h.post { r() } } }
-    androidx.compose.runtime.DisposableEffect(api) {
-        // Listener runs synchronously under the transition lock: cancel-only (flag + completing waiters), no IO/UI.
-        // Under the transition lock: registry does atomics + one Handler.post (always queued, never inline).
-        val l: (com.example.chat.data.api.ApiAccountScope) -> Unit = { next ->
-            registry.onTransition(next, publishEpoch = { n -> scopeEpoch = n }, cancelWaiters = {
-                // a waiter that is set has a launched picker: abandon it so its late callback cannot fulfil a later flow
-                pending?.let { it.complete(emptyList()); pending = null; pendingGate.getAndSet(null)?.orphan() }
-                contactPending?.let { it.complete(null); contactPending = null; contactGate.orphan() }
-                contactReadPending?.let { it.complete(false); contactReadPending = null; permGate.orphan() }
-                mediaReview?.second?.complete(null); viewOnceAsk?.second?.complete(false); docPickerPending?.complete(null)
-            })
+        if (staged.length() <= 0L) {
+            staged.delete()
+            throw IllegalStateException("The selected file is empty.")
         }
-        api.addAuthScopeListener(l)
-        onDispose { api.removeAuthScopeListener(l) }
-    }
-    suspend fun scopeForFlow(): com.example.chat.data.api.ApiAccountScope? {
-        val f = kotlin.coroutines.coroutineContext[AttachFlowElement]?.flow   // ownership: only the flow's own coroutine context
-        if (f != null && f.isCancelled) throw IllegalStateException("Account changed; attachment cancelled.")
-        return f?.scope   // null only outside an attach flow (then the service captures once at call time)
+        if (staged.length() > max) {
+            staged.delete()
+            throw IllegalStateException("This $type exceeds the ${max / (1024 * 1024)} MB storage limit.")
+        }
+        return PickedFile(name = name, path = staged.absolutePath, mimeType = cr.getType(uri))
     }
 
     val controller = remember(conversationId) {
@@ -153,18 +149,74 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                 override suspend fun upload(type: String, file: PickedFile, durationSeconds: Int): MessageAttachment {
                     // Camera captures arrive as a file path (no picker bytes): read them here,
                     // matching Dart ChatMediaService.uploadFile(sourcePath:).
-                    val payload = file.bytes ?: file.path?.let { p ->
-                        withContext(Dispatchers.IO) { java.io.File(p).readBytes() }
-                    } ?: throw IllegalStateException("The selected file is empty.")
-                    val s = scopeForFlow() ?: api.authSnapshot()
-                    return withContext(com.example.chat.data.api.ApiScopeElement(s)) {
-                        ServiceLocator.chatMedia.uploadBytes(
+                    val stagedFile = file.path?.let { java.io.File(it) }
+                    if (api.isAuthenticated && stagedFile != null) {
+                        var uploadTarget = stagedFile
+                        var compressedTemp: java.io.File? = null
+                        if (type == "image") {
+                            val compressed = com.example.chat.ui.media.ImageSendCompressor.compressFile(stagedFile)
+                            if (compressed !== stagedFile) {
+                                compressedTemp = compressed
+                                uploadTarget = compressed
+                            }
+                        }
+                        try {
+                            val uploaded = api.uploadMedia(uploadTarget) { _, _ -> }
+                            val effectiveName = if (type == "image" && compressedTemp != null) {
+                                if (file.name.contains('.')) "${file.name.substringBeforeLast('.')}.jpg" else "${file.name}.jpg"
+                            } else {
+                                file.name
+                            }
+                            return MessageAttachment(
+                                id = java.util.UUID.randomUUID().toString(),
+                                type = type,
+                                name = effectiveName,
+                                size = com.example.chat.data.services.ChatMediaService.formatBytes(uploadTarget.length()),
+                                url = uploaded["url"]?.toString() ?: throw IllegalStateException("Upload response did not contain a media URL."),
+                                durationSeconds = durationSeconds,
+                            )
+                        } finally {
+                            compressedTemp?.delete()
+                            if (stagedFile.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")) {
+                                stagedFile.delete()
+                            }
+                        }
+                    }
+                    // The legacy Supabase storage adapter accepts ByteArray only.
+                    // Never let a 100–700 MB configured media limit turn into an
+                    // equally large heap allocation: keep this compatibility route
+                    // to a strict 16 MB buffer. The API route above is file-streamed.
+                    val payload = try {
+                        file.bytes ?: stagedFile?.let { source ->
+                            val bufferLimit = minOf(
+                                ServiceLocator.chatMedia.maxBytes(type),
+                                BoundedFileReader.MAX_IN_MEMORY_UPLOAD_BYTES,
+                            )
+                            if (source.length() > bufferLimit) {
+                                throw IllegalStateException(
+                                    "This upload route buffers at most 16 MB in memory. Use Send Large File where available, or choose a smaller file.",
+                                )
+                            }
+                            withContext(Dispatchers.IO) { BoundedFileReader.read(source, bufferLimit) }
+                        } ?: throw IllegalStateException("The selected file is empty.")
+                    } catch (error: Throwable) {
+                        if (stagedFile?.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")) {
+                            stagedFile.delete()
+                        }
+                        throw error
+                    }
+                    try {
+                        return ServiceLocator.chatMedia.uploadBytes(
                             conversationId, type, payload, file.name, file.mimeType, durationSeconds,
                         )
+                    } finally {
+                        if (stagedFile?.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")) {
+                            stagedFile.delete()
+                        }
                     }
                 }
                 override suspend fun sendMessage(text: String, type: MessageType, attachment: MessageAttachment?, extraMetadata: Map<String, Any?>?) {
-                    api.sendMessage(conversationId, text, type, attachment, extraMetadata, expectedScope = scopeForFlow())
+                    api.sendMessage(conversationId, text, type, attachment, extraMetadata)
                 }
                 override suspend fun sendStructuredMessage(type: String, body: String, metadata: Map<String, Any?>) {
                     // Location / contact go to backend_python as a normal text message: the body already
@@ -191,16 +243,9 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
     // (manifest entry added with this patch) decides the canRead path; the system picker stands in
     // for FlutterContacts.native.showPicker. Android has no "limited" contacts access, so the
     // permission result maps to granted/denied only.
+    var contactReadPending by remember { mutableStateOf<CompletableDeferred<Boolean>?>(null) }
     val contactReadPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!permGate.accept()) return@rememberLauncherForActivityResult
         contactReadPending?.complete(granted); contactReadPending = null
-    }
-    // Launch a picker only when that launcher has no abandoned launch still owed a callback (else a late old result is indistinguishable).
-    fun launchPick(d: CompletableDeferred<List<Uri>>, multiple: Boolean, mime: String) {
-        val g = if (multiple) multiGate else singleGate
-        if (g.hasOrphans()) { toast("Previous picker is still closing. Try again."); d.complete(emptyList()); return }
-        pending = d; pendingGate.set(g)
-        if (multiple) multi.launch(mime) else single.launch(mime)
     }
     val contactsPort = object : com.example.chat.ui.chats.detail.ContactsPort {
         override suspend fun requestReadAccess(): com.example.chat.ui.chats.detail.ContactReadAccess {
@@ -208,7 +253,6 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                 return com.example.chat.ui.chats.detail.ContactReadAccess.granted
             }
             val d = CompletableDeferred<Boolean>()
-            if (permGate.hasOrphans()) return com.example.chat.ui.chats.detail.ContactReadAccess.denied
             contactReadPending = d
             contactReadPermission.launch(android.Manifest.permission.READ_CONTACTS)
             return if (d.await()) {
@@ -219,7 +263,6 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
         }
         override suspend fun showPicker(canRead: Boolean): com.example.chat.ui.chats.detail.PickedContactRef? {
             val d = CompletableDeferred<Uri?>()
-            if (contactGate.hasOrphans()) return null
             contactPending = d
             contactPicker.launch(null)
             val uri = d.await() ?: return null
@@ -246,43 +289,27 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             },
         )
     }
-    val onContact: () -> Unit = { scope.launch {
-        val st = api.authSnapshot()
-        if (st.userId.isNullOrBlank() || st.token.isNullOrBlank()) { toast("Sign in to send attachments."); return@launch }
-        val flow = registry.begin(st, null) { api.authSnapshot() } ?: run { toast("Another attachment is in progress."); return@launch }
-        try {
-            if (flow.isCancelled) { toast("Account changed. Try again."); return@launch }
-            withContext(AttachFlowElement(flow)) { controller.shareContact(contactsPort) }; afterSend()
-        } finally { registry.end(flow) }
-    } }
+    val onContact: () -> Unit = { scope.launch { controller.shareContact(contactsPort); afterSend() } }
     val onMedia: (String) -> Unit = { type ->
         scope.launch {
-            val started = api.authSnapshot()
-            if (started.userId.isNullOrBlank() || started.token.isNullOrBlank()) { toast("Sign in to send attachments."); return@launch }
-            val flow = registry.begin(started, null) { api.authSnapshot() } ?: run { toast("Another attachment is in progress."); return@launch }
-            try {
-            if (flow.isCancelled) { toast("Account changed. Try again."); return@launch }
             if (type == "image" || type == "video") {
                 try {
                     val d = CompletableDeferred<List<Uri>>()
+                    pending = d
                     val limit = if (type == "image") ServiceLocator.preferencesController.gbDouble("Img_share_limit", 30.0).toInt().coerceIn(1, 100) else 1
-                    launchPick(d, limit > 1, if (limit > 1) "image/*" else if (type == "image") "image/*" else "video/*")
+                    if (limit > 1) multi.launch("image/*") else single.launch(if (type == "image") "image/*" else "video/*")
                     val uris = d.await()
                     if (uris.isEmpty()) return@launch
                     check(uris.size <= limit) { "Your configured send limit is $limit." }
                     val items = uris.map { uri -> com.example.chat.ui.chats.detail.MediaReviewItem(uri.toString(), read(uri, type), type) }
                     val review = CompletableDeferred<com.example.chat.ui.chats.detail.ReviewedMedia?>()
                     mediaReview = items to review
-                    val result = review.await()
-                    mediaReview = null
-                    if (result == null || flow.isCancelled) return@launch
-                    withContext(AttachFlowElement(flow)) { controller.sendReviewedMedia(result.items.map { it.file }, type, result.caption, result.viewOnce) }
+                    val result = review.await() ?: return@launch
+                    controller.sendReviewedMedia(result.items.map { it.file }, type, result.caption, result.viewOnce)
                     afterSend()
                 } catch (e: Exception) { toast(e.message ?: "Unable to prepare attachment") }
                 return@launch
             }
-            if (flow.isCancelled) { toast("Account changed. Try again."); return@launch }
-            withContext(AttachFlowElement(flow)) {
             controller.shareMedia(
                 type = type,
                 pickFiles = { multiple, maxFiles ->
@@ -296,8 +323,9 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                         }
                     }
                     val d = CompletableDeferred<List<Uri>>()
+                    pending = d
                     val mime = when (type) { "image" -> "image/*"; "video" -> "video/*"; "audio" -> "audio/*"; else -> "*/*" }
-                    launchPick(d, multiple, mime)
+                    if (multiple) multi.launch(mime) else single.launch(mime)
                     val uris = d.await()
                     if (uris.isEmpty()) null else {
                         if (uris.size > maxFiles && maxFiles != Int.MAX_VALUE) {
@@ -312,79 +340,13 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                     d.await()
                 },
             )
-            }
             afterSend()
-            } finally { registry.end(flow) }
-        }
-    }
-    val openGallery: () -> GalleryLease? = {
-        val st = api.authSnapshot()
-        if (st.userId.isNullOrBlank() || st.token.isNullOrBlank()) { toast("Sign in to send attachments."); null }
-        else registry.issue(st) { api.authSnapshot() }
-    }
-    val closeGallery: (GalleryLease) -> Unit = { registry.release(it) }
-    val openCaptureSession: (() -> Unit) -> AttachFlow? = { onCancel ->
-        val st = api.authSnapshot()
-        if (st.userId.isNullOrBlank() || st.token.isNullOrBlank()) { toast("Sign in to send attachments."); null }
-        else registry.openSession(st, { api.authSnapshot() }, onCancel)
-    }
-    val closeCaptureSession: (AttachFlow) -> Unit = { registry.closeSession(it) }
-    val onPickedImages: (GalleryLease, List<Uri>) -> Unit = { lease, uris ->
-        scope.launch {
-            // begin() consumes the lease (single use, closes queued-callback reuse); refuses if a flow runs or the lease is dead.
-            val flow = registry.begin(lease.scope, lease) { api.authSnapshot() }
-            if (flow == null) { toast(if (lease.isValid) "Another attachment is in progress." else "Account changed. Open the gallery again."); return@launch }
-            try {
-                if (api.authSnapshot() !== lease.scope) { flow.cancelled.set(true); toast("Account changed. Open the gallery again."); return@launch }
-                val limit = ServiceLocator.preferencesController.gbDouble("Img_share_limit", 30.0).toInt().coerceIn(1, 100)
-                if (uris.isEmpty()) return@launch
-                check(uris.size <= limit) { "Your configured send limit is $limit." }
-                val items = uris.map { uri -> com.example.chat.ui.chats.detail.MediaReviewItem(uri.toString(), read(uri, "image"), "image") }
-                if (flow.isCancelled) return@launch
-                val review = CompletableDeferred<com.example.chat.ui.chats.detail.ReviewedMedia?>()
-                mediaReview = items to review
-                val result = review.await()
-                mediaReview = null
-                if (result == null || flow.isCancelled) return@launch
-                withContext(AttachFlowElement(flow)) { controller.sendReviewedMedia(result.items.map { it.file }, "image", result.caption, result.viewOnce) }
-                afterSend()
-            } catch (e: Exception) { toast(e.message ?: "Unable to prepare attachment") }
-            finally { registry.end(flow) }
-        }
-    }
-    val onDirectSendImages: (GalleryLease, List<Uri>) -> Unit = { lease, uris ->
-        scope.launch {
-            val flow = registry.begin(lease.scope, lease) { api.authSnapshot() }
-            if (flow == null) {
-                toast(if (lease.isValid) "Another attachment is in progress." else "Account changed. Open the gallery again.")
-                return@launch
-            }
-            try {
-                if (api.authSnapshot() !== lease.scope) {
-                    flow.cancelled.set(true)
-                    toast("Account changed. Open the gallery again.")
-                    return@launch
-                }
-                val limit = ServiceLocator.preferencesController.gbDouble("Img_share_limit", 30.0).toInt().coerceIn(1, 100)
-                if (uris.isEmpty()) return@launch
-                check(uris.size <= limit) { "Your configured send limit is $limit." }
-                val files = uris.map { uri -> read(uri, "image") }
-                if (flow.isCancelled) return@launch
-                withContext(AttachFlowElement(flow)) {
-                    controller.sendReviewedMedia(files, "image", "", false)
-                }
-                afterSend()
-            } catch (e: Exception) {
-                toast(e.message ?: "Unable to send selected images")
-            } finally {
-                registry.end(flow)
-            }
         }
     }
     mediaReview?.let { (items, deferred) ->
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { mediaReview = null; deferred.complete(null) },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = true),
         ) {
             com.example.chat.ui.chats.detail.MediaReviewScreen(
                 items,
@@ -422,5 +384,39 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             onClose = { readerDoc = null },
         )
     }
-    return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller, openGallery, closeGallery, openCaptureSession, closeCaptureSession, onPickedImages, onDirectSendImages, scopeEpoch)
+    // Gallery-sheet review flow: same staging, review and send path as onMedia("image"),
+    // fed by the sheet's own MediaStore grid instead of the system picker.
+    val onReviewImages: (List<Uri>) -> Unit = { uris ->
+        scope.launch {
+            try {
+                if (uris.isEmpty()) return@launch
+                val limit = ServiceLocator.preferencesController.gbDouble("Img_share_limit", 30.0).toInt().coerceIn(1, 100)
+                check(uris.size <= limit) { "Your configured send limit is $limit." }
+                val items = uris.map { uri -> com.example.chat.ui.chats.detail.MediaReviewItem(uri.toString(), read(uri, "image"), "image") }
+                val review = CompletableDeferred<com.example.chat.ui.chats.detail.ReviewedMedia?>()
+                mediaReview = items to review
+                val result = review.await() ?: return@launch
+                controller.sendReviewedMedia(result.items.map { it.file }, "image", result.caption, result.viewOnce)
+                afterSend()
+            } catch (e: Exception) { toast(e.message ?: "Unable to prepare attachment") }
+        }
+    }
+    // Gallery-sheet direct send: stage and send immediately, no review step.
+    val onDirectSendImages: (List<Uri>) -> Unit = { uris ->
+        scope.launch {
+            try {
+                if (uris.isEmpty()) return@launch
+                val files = uris.map { uri -> read(uri, "image") }
+                controller.sendReviewedMedia(files, "image", "", false)
+                afterSend()
+            } catch (e: Exception) { toast(e.message ?: "Unable to send") }
+        }
+    }
+    val openCaptureSession: (() -> Unit) -> com.example.chat.ui.AttachFlow? = { onCancel ->
+        val st = api.authSnapshot()
+        if (st.userId.isNullOrBlank() || st.token.isNullOrBlank()) { toast("Sign in to send attachments."); null }
+        else captureRegistry.openSession(st, { api.authSnapshot() }, onCancel)
+    }
+    val closeCaptureSession: (com.example.chat.ui.AttachFlow) -> Unit = { captureRegistry.closeSession(it) }
+    return ChatAttachmentsBindings(onMedia, onContact, onLocation, controller, onReviewImages, onDirectSendImages, openCaptureSession, closeCaptureSession)
 }

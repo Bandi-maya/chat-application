@@ -36,7 +36,7 @@ import androidx.compose.material.icons.rounded.RotateRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -396,7 +396,7 @@ private fun ProfileImageCropperOwnedDialog(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = { if (!isProcessing) onDone(null) }) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close", tint = Color.White)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close", color = Color.White)
                 }
                 Text(
                     title,
@@ -410,10 +410,10 @@ private fun ProfileImageCropperOwnedDialog(
                     userOffset = Offset.Zero
                     quarterRotations = 0
                 }) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = "Reset", tint = Color.White.copy(alpha = 0.7f))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.reset, semanticLabel = "Reset", color = Color.White.copy(alpha = 0.7f))
                 }
                 IconButton(onClick = { quarterRotations = (quarterRotations + 1) % 4 }) {
-                    Icon(Icons.Rounded.RotateRight, contentDescription = "Rotate 90°", tint = Color.White)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.rotateRight, semanticLabel = "Rotate 90°", color = Color.White)
                 }
             }
 
@@ -571,7 +571,7 @@ private fun ProfileImageCropperOwnedDialog(
                             color = Color.White,
                         )
                     } else {
-                        Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(20.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, modifier = Modifier.size(20.dp))
                     }
                     Spacer(Modifier.width(6.dp))
                     Text(

@@ -38,7 +38,7 @@ import androidx.compose.material.icons.rounded.Wallpaper
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -275,10 +275,9 @@ private fun ProfileHeader(
                             )
                             .border(1.dp, LocalAppColors.current.borderSubtle, CircleShape),
                     ) {
-                        Icon(
-                            Icons.Rounded.Wallpaper,
-                            contentDescription = "Change profile banner",
-                            tint = Color(theme.primaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.wallpaper,
+                            semanticLabel = "Change profile banner",
+                            color = Color(theme.primaryTextColor),
                             modifier = Modifier.size(17.dp),
                         )
                     }
@@ -375,10 +374,9 @@ private fun CompactHeader(
                 )
                 if (onEditBanner != null) {
                     IconButton(onClick = onEditBanner, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            Icons.Outlined.Wallpaper,
-                            contentDescription = "Change profile banner",
-                            tint = Color(theme.secondaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.wallpaper,
+                            semanticLabel = "Change profile banner",
+                            color = Color(theme.secondaryTextColor),
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -440,10 +438,9 @@ private fun CenteredIdentityHeader(
                         .padding(8.dp)
                         .background(Color(theme.surfaceColor).copy(alpha = 0.88f), CircleShape),
                 ) {
-                    Icon(
-                        Icons.Outlined.Wallpaper,
-                        contentDescription = "Change profile banner",
-                        tint = Color(theme.primaryTextColor),
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.wallpaper,
+                        semanticLabel = "Change profile banner",
+                        color = Color(theme.primaryTextColor),
                     )
                 }
             }
@@ -492,7 +489,7 @@ private fun CenteredIdentityHeader(
             if (onEditBanner != null) {
                 Spacer(Modifier.width(8.dp))
                 androidx.compose.material3.OutlinedButton(onClick = onEditBanner) {
-                    Icon(Icons.Outlined.Wallpaper, contentDescription = null, modifier = Modifier.size(17.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.wallpaper, semanticLabel = null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Banner")
                 }
@@ -539,10 +536,9 @@ private fun BannerFallback() {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            Icons.Rounded.Wallpaper,
-            contentDescription = null,
-            tint = Color(theme.secondaryTextColor).copy(alpha = 0.65f),
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.wallpaper,
+            semanticLabel = null,
+            color = Color(theme.secondaryTextColor).copy(alpha = 0.65f),
             modifier = Modifier.size(30.dp),
         )
     }
@@ -657,7 +653,7 @@ internal fun EditPill(onClick: () -> Unit) {
             .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Outlined.Edit, contentDescription = null, tint = Color(theme.accentColor), modifier = Modifier.size(15.dp))
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.edit, semanticLabel = null, color = Color(theme.accentColor), modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(7.dp))
         Text(
             "Edit profile",
@@ -741,10 +737,9 @@ internal fun SettingsTile(
             )
         }
         if (showChevron) {
-            Icon(
-                Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                tint = Color(theme.secondaryTextColor).copy(alpha = 0.65f),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+                semanticLabel = null,
+                color = Color(theme.secondaryTextColor).copy(alpha = 0.65f),
                 modifier = Modifier.size(20.dp),
             )
         }

@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.LooksOne
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +41,9 @@ internal fun MediaReviewScreen(items: List<MediaReviewItem>, onCancel: () -> Uni
     var submitted by remember(items) { mutableStateOf(false) }
     DisposableEffect(items) { onDispose { if (!submitted) ownedEdits.forEach { it.delete() } } }
     val context = LocalContext.current
+    // GB/stock parity: the sender sees the view-once explainer exactly once.
+    val viewOnceNuxStore = remember(context) { com.example.chat.data.media.ViewOnceNuxStore(context) }
+    var viewOnceSenderNux by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(onBack = onCancel)
     val item = current[index.coerceIn(current.indices)]
     if (editing) {
@@ -84,7 +88,20 @@ internal fun MediaReviewScreen(items: List<MediaReviewItem>, onCancel: () -> Uni
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(caption, { caption = it }, modifier = Modifier.weight(1f), placeholder = { Text("Add a caption") }, maxLines = 3,
                 trailingIcon = {
-                    IconToggleButton(viewOnce, { viewOnce = it }) { Icon(Icons.Rounded.LooksOne, if (viewOnce) "View once on" else "View once off", tint = if (viewOnce) Color(0xFF00D9A0) else Color.Gray) }
+                    IconToggleButton(viewOnce, { enabled ->
+                        if (enabled && viewOnceNuxStore.needsSenderNux()) viewOnceSenderNux = true
+                        viewOnce = enabled
+                    }) { Icon(Icons.Rounded.LooksOne, if (viewOnce) "View once on" else "View once off", tint = if (viewOnce) Color(0xFF00D9A0) else Color.Gray) }
+                    if (viewOnceSenderNux) {
+                        AlertDialog(
+                            onDismissRequest = { viewOnceSenderNux = false; viewOnceNuxStore.markSenderSeen() },
+                            confirmButton = {
+                                TextButton(onClick = { viewOnceSenderNux = false; viewOnceNuxStore.markSenderSeen() }) { Text("Got it") }
+                            },
+                            title = { Text("View once") },
+                            text = { Text("Recipients are asked to open this photo or video only once. It expires on their device after the first open unless their own settings keep opened items. People can still take screenshots or photos of the screen.") },
+                        )
+                    }
                 },
                 colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White),
             )
@@ -94,7 +111,7 @@ internal fun MediaReviewScreen(items: List<MediaReviewItem>, onCancel: () -> Uni
                 ownedEdits.filter { it.path !in finalPaths }.forEach { it.delete() }
                 onSend(ReviewedMedia(current, caption.trim(), viewOnce)); submitted = true
             }, modifier = Modifier.padding(start = 8.dp).size(48.dp)) {
-                Icon(Icons.AutoMirrored.Rounded.Send, "Send attachment")
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.send, semanticLabel = "Send attachment")
             }
         }
     }

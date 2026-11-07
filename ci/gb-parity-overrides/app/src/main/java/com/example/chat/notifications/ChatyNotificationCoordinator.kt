@@ -240,7 +240,7 @@ class ChatyNotificationCoordinator(
             }
             ChatyNotificationPolicy.ACTION_DECLINE -> {
                 val id = e.callId ?: return
-                calls.declineCall()
+                calls.declineCall(expectedCallId = id)
                 if (lastIncomingCallId == id) lastIncomingCallId = null
                 lane.cancelCallFor(account, id)
             }

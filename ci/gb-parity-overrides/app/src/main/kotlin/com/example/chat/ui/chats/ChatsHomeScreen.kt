@@ -34,11 +34,11 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.PushPin as OutlinedPushPin
 import androidx.compose.material.icons.rounded.Videocam
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
-import androidx.compose.material3.Icon
+import com.example.chat.ui.kit.ChatyTextButton
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -51,12 +51,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.preferences.HomePresetNormalizer
@@ -167,7 +167,8 @@ fun ChatsHomeScreen(
     connectionBanner: (@Composable () -> Unit)? = null,
     headerBottom: (@Composable () -> Unit)? = null,
 ) {
-    val theme = LocalThemeConfig.current
+    val bundleTemplates = com.example.chat.ui.chats.bundles.messageBundleHome(templates)
+    val theme = com.example.chat.ui.chats.bundles.messageBundleTheme(LocalThemeConfig.current)
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val searchFocus = remember { FocusRequester() }
@@ -202,7 +203,7 @@ fun ChatsHomeScreen(
             @Composable {
                 com.example.chat.ui.chats.detail.ConnectionHealthIndicator(
                     health = state.health,
-                    size = 15.dp,
+                    size = 24.dp,
                     onTap = onOpenConnectionDetail,
                 )
             }
@@ -222,7 +223,7 @@ fun ChatsHomeScreen(
     val homePrefs = homePreferences
     val rawHomeUiStyle = homePrefs.homeStyle.trim().lowercase()
     val homeStyle = com.example.chat.core.preferences.HomePresentationPolicy.listStyle(homePrefs.homeStyle)
-    val referenceRows = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle) && templates.chatList.referenceDefault
+    val referenceRows = com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle) && bundleTemplates.chatList.referenceDefault
     val spec = HomeStyleSpec.resolve(homeStyle, rawHomeUiStyle).let {
         if (referenceRows) it.copy(showSections = false) else it
     }
@@ -251,7 +252,7 @@ fun ChatsHomeScreen(
     )
     val filters = homeFilters(forcedType)
 
-    val headerStyle = effectiveHomeHeaderStyle(rawHomeUiStyle, homeStyle, templates.headerStyle)
+    val headerStyle = effectiveHomeHeaderStyle(rawHomeUiStyle, homeStyle, bundleTemplates.headerStyle)
 
     // P4 large-title collapse: 0 expanded -> 1 collapsed, driven by the
     // primary list's vertical scroll only.
@@ -392,7 +393,7 @@ fun ChatsHomeScreen(
                     onValueChange = { messageNumberText = it },
                     label = { Text("Phone number") },
                     placeholder = { Text("Include country code (+1...)") },
-                    leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null) },
+                    leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, semanticLabel = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
                 )
@@ -508,7 +509,7 @@ fun ChatsHomeScreen(
                             onSnack = onSnack,
                             headerExtras = effectiveHeaderExtras,
                         )
-                        Box(Modifier.align(Alignment.TopEnd)) {
+                        Box(Modifier.align(Alignment.BottomEnd)) {
                             HomeOverflowMenu(
                                 expanded = overflowOpen,
                                 onDismiss = { overflowOpen = false },
@@ -519,6 +520,7 @@ fun ChatsHomeScreen(
                                     onSnack("Marked all chats as read")
                                 },
                                 onMessageANumber = { showMessageNumber = true },
+                                onOpenArchived = { showArchived = true },
                             )
                         }
                     }
@@ -550,6 +552,8 @@ fun ChatsHomeScreen(
                 rawHomeUiStyle !in setOf("ios style", "whatsapp old ui")) {
                 Box(
                     modifier = Modifier
+                        // Collapse drives height to exactly 0; the expanded height scales
+                        // with font scale (sp->dp) so large text is never pinned to 44dp.
                         .height(with(LocalDensity.current) { (44f * theme.fontScale.toFloat()).sp.toDp() } * (1 - effectiveTitleCollapse))
                         .alpha(1 - effectiveTitleCollapse),
                 ) {
@@ -666,7 +670,7 @@ fun ChatsHomeScreen(
                                 theme = theme,
                                 homePrefs = homePrefs,
                                 spec = spec,
-                                templates = templates,
+                                bundleTemplates = bundleTemplates,
                                 currentUserId = currentUserId,
                                 contacts = contacts,
                                 selectedIds = selectedIds,
@@ -734,7 +738,7 @@ private fun HomeConversationList(
     theme: com.example.chat.core.theme.ThemeConfig,
     homePrefs: HomePreferences,
     spec: HomeStyleSpec,
-    templates: HomeTemplates,
+    bundleTemplates: HomeTemplates,
     currentUserId: String,
     contacts: List<UserProfile>,
     selectedIds: Set<String>,
@@ -757,9 +761,9 @@ private fun HomeConversationList(
         modifier = Modifier.fillMaxSize(),
         state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = if (templates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
+            start = if (bundleTemplates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
             top = 0.dp,
-            end = if (templates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
+            end = if (bundleTemplates.chatList.referenceDefault && com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle)) 0.dp else 8.dp,
             bottom = 96.dp,
         ),
     ) {
@@ -789,10 +793,9 @@ private fun HomeConversationList(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            Icons.Outlined.Archive,
-                            contentDescription = null,
-                            tint = Color(theme.secondaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.archive,
+                            semanticLabel = null,
+                            color = Color(theme.secondaryTextColor),
                             modifier = Modifier.width(22.dp).height(22.dp),
                         )
                         Spacer(Modifier.width(24.dp))
@@ -835,13 +838,13 @@ private fun HomeConversationList(
                         leadingActions = if (conversation.type == ConversationType.direct) {
                             listOf(
                                 HomeSwipeAction(
-                                    icon = Icons.Rounded.Call,
+                                    icon = com.example.chat.ui.icons.ChatyIconId.callAudio,
                                     label = "Call",
                                     color = Color(theme.successColor),
                                     onTriggered = { onStartCall(conversation, false) },
                                 ),
                                 HomeSwipeAction(
-                                    icon = Icons.Rounded.Videocam,
+                                    icon = com.example.chat.ui.icons.ChatyIconId.callVideo,
                                     label = "Video",
                                     color = Color(theme.accentColor),
                                     onTriggered = { onStartCall(conversation, true) },
@@ -852,19 +855,19 @@ private fun HomeConversationList(
                         },
                         actions = listOf(
                             HomeSwipeAction(
-                                icon = if (conversation.isPinned) Icons.Rounded.PushPin else Icons.Outlined.OutlinedPushPin,
+                                icon = if (conversation.isPinned) com.example.chat.ui.icons.ChatyIconId.unpin else com.example.chat.ui.icons.ChatyIconId.pin,
                                 label = if (conversation.isPinned) "Unpin" else "Pin",
                                 color = Color(theme.accentColor),
                                 onTriggered = { onTogglePin(conversation.id) },
                             ),
                             HomeSwipeAction(
-                                icon = if (conversation.isMuted) Icons.Rounded.NotificationsActive else Icons.Rounded.NotificationsOff,
+                                icon = if (conversation.isMuted) com.example.chat.ui.icons.ChatyIconId.unmute else com.example.chat.ui.icons.ChatyIconId.mute,
                                 label = if (conversation.isMuted) "Unmute" else "Mute",
-                                color = Color(0xFFF59E0B),
+                                color = com.example.chat.ui.core.theme.ChatyColors(theme).warning,
                                 onTriggered = { onToggleMute(conversation.id) },
                             ),
                             HomeSwipeAction(
-                                icon = Icons.Outlined.Archive,
+                                icon = com.example.chat.ui.icons.ChatyIconId.archive,
                                 label = "Archive",
                                 color = Color(theme.secondaryTextColor),
                                 onTriggered = { onToggleArchive(conversation.id) },
@@ -875,7 +878,7 @@ private fun HomeConversationList(
                             conversation = conversation,
                             theme = theme,
                             homePrefs = homePrefs,
-                            chatList = templates.chatList,
+                            chatList = bundleTemplates.chatList,
                             density = spec.tileDensity,
                             isDark = theme.isDark,
                             cardRows = spec.cardRows && !com.example.chat.core.preferences.HomePresentationPolicy.isDefault(homePrefs.homeStyle),

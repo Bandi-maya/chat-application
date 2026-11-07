@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.ImageNotSupported
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.rounded.Check
@@ -58,7 +59,7 @@ import androidx.compose.material.icons.rounded.Shortcut
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.VideocamOff
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -73,10 +74,15 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -85,6 +91,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.ThemeConfig
 import com.example.chat.core.theme.argbWithAlpha
+import com.example.chat.data.transfer.P2pFileTransferService
+import com.example.chat.core.links.MessageLinkPolicy
+import com.example.chat.data.links.LinkPreviewService
+import com.example.chat.data.links.sharedLinkPreviewService
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.TaskPriority
@@ -154,6 +164,8 @@ fun ChatMessageBubble(
     modifier: Modifier = Modifier,
     senderName: String? = null,
     showGroupAvatar: Boolean = true,
+    // Chaty #29: group sender avatar quick view; null keeps the avatar inert.
+    onAvatarTap: (() -> Unit)? = null,
     senderCluster: SenderClusterPosition = SenderClusterPosition.SINGLE,
     isSenderAdmin: Boolean = false,
     makeTextSelectable: Boolean = true,
@@ -170,6 +182,7 @@ fun ChatMessageBubble(
     showEditedLabel: Boolean = true,
     viewOnceOpened: Boolean = false,
     retainViewOnce: Boolean = false,
+    viewOncePlaybackCompleted: Boolean = false,
     colorOverrides: BubbleColorOverrides? = null,
     remoteImage: RemoteImageSlot? = chatyRemoteImage,
     onLongPress: () -> Unit = {},
@@ -182,11 +195,15 @@ fun ChatMessageBubble(
     onReactionTap: ((String) -> Unit)? = null,
     onReactionBadgeTap: ((MessageReaction) -> Unit)? = null,
     mediaContent: (@Composable () -> Unit)? = null,
+    // Chaty #34: in-bubble link previews for text messages (client-side OpenGraph).
+    linkPreviewService: LinkPreviewService = sharedLinkPreviewService,
     onMediaTap: (() -> Unit)? = null,
     onMediaTapWithBounds: ((Rect) -> Unit)? = null,
     attachmentBinding: AttachmentConsumerBinding? = null,
+    p2pTransferState: P2pFileTransferService.TransferState? = null,
     onVoicePlay: ((MessageAttachment) -> Unit)? = null,
     onViewOnceOpen: (() -> Unit)? = null,
+    onViewOncePlaybackCompleted: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
     task: ChatTask? = null,
     onTaskTap: (() -> Unit)? = null,
@@ -216,6 +233,14 @@ fun ChatMessageBubble(
     }
     val rawTextSize = colorOverrides?.messageTextSize ?: 15.0
     val messageTextSize = rawTextSize.coerceIn(10.0, 30.0)
+    // Chaty #36: per-participant group label color, theme-derived; an explicit
+    // groupParticipantNameColor override still wins.
+    val participantNameColor = colorOverrides?.groupParticipantNameColor
+        ?: if (!isMe && senderName != null) {
+            ParticipantColorPolicy.colorFor(message.senderId, theme.accentColor, theme.surfaceColor)
+        } else {
+            theme.accentColor
+        }
 
     // --- System message pill ---
     if (message.type == MessageType.system) {
@@ -225,6 +250,7 @@ fun ChatMessageBubble(
             contentAlignment = Alignment.Center) {
             Box(
                 Modifier
+                    .testTag("message_system_bubble")
                     .background(Color(infoBg), RoundedCornerShape(12.dp))
                     .border(1.dp, Color(theme.cardColor), RoundedCornerShape(12.dp))
                     .padding(vertical = 5.dp, horizontal = 12.dp),
@@ -262,10 +288,9 @@ fun ChatMessageBubble(
                     },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.Outlined.Cancel,
-                    contentDescription = null,
-                    tint = Color(colorOverrides?.deletedMessageIconColor ?: theme.secondaryTextColor),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close,
+                    semanticLabel = null,
+                    color = Color(colorOverrides?.deletedMessageIconColor ?: theme.secondaryTextColor),
                     modifier = Modifier.size(17.dp),
                 )
                 Box(Modifier.width(7.dp))
@@ -309,6 +334,7 @@ fun ChatMessageBubble(
             } else {
                 Text(
                     message.text,
+                    modifier = Modifier.testTag("message_emoji_only_text"),
                     fontSize = emojiInfo.fontSize(messageTextSize * theme.fontScale).sp,
                     lineHeight = (emojiInfo.fontSize(messageTextSize * theme.fontScale) * 1.25).sp,
                 )
@@ -325,6 +351,7 @@ fun ChatMessageBubble(
             ) {
                 Text(
                     bubbleMetaTimeFormatter.format(message.createdAt.atZone(ZoneId.systemDefault())),
+                    modifier = Modifier.testTag("message_timestamp"),
                     color = Color(timestampColor),
                     fontSize = (10 * theme.fontScale).sp,
                 )
@@ -348,7 +375,8 @@ fun ChatMessageBubble(
         surfaceColor = Color(theme.surfaceColor),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(vertical = (3 * theme.density).dp, horizontal = 12.dp),
+            Modifier.testTag("message_bubble").fillMaxWidth().padding(horizontal = 12.dp)
+                .padding(bottom = if (senderCluster == SenderClusterPosition.FIRST || senderCluster == SenderClusterPosition.MIDDLE) 2.dp else 12.dp),
             horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
             verticalAlignment = Alignment.Bottom,
         ) {
@@ -357,7 +385,19 @@ fun ChatMessageBubble(
                     Modifier
                         .padding(end = 8.dp, bottom = 2.dp)
                         .size(28.dp)
-                        .background(Color(theme.accentColor), CircleShape),
+                        .clip(CircleShape)
+                        .background(Color(theme.accentColor), CircleShape)
+                        .then(
+                            if (onAvatarTap != null) {
+                                Modifier.clickable(
+                                    role = androidx.compose.ui.semantics.Role.Button,
+                                    onClickLabel = "View $senderName",
+                                    onClick = onAvatarTap,
+                                )
+                            } else {
+                                Modifier
+                            },
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -451,7 +491,7 @@ fun ChatMessageBubble(
                             Text(
                                 senderName,
                                 color = Color(
-                                    colorOverrides?.groupParticipantNameColor ?: theme.accentColor,
+                                    participantNameColor,
                                 ),
                                 fontSize = (11.5 * theme.fontScale).sp,
                                 fontWeight = FontWeight.W700,
@@ -470,7 +510,7 @@ fun ChatMessageBubble(
                                     contentDescription = null,
                                     modifier = Modifier.size(13.dp),
                                     tint = Color(
-                                        colorOverrides?.groupParticipantNameColor ?: theme.accentColor,
+                                        participantNameColor,
                                     ),
                                 )
                             }
@@ -488,10 +528,9 @@ fun ChatMessageBubble(
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                Icons.Outlined.Cancel,
-                                contentDescription = null,
-                                tint = Color(
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close,
+                                semanticLabel = null,
+                                color = Color(
                                     colorOverrides?.deletedMessageIconColor
                                         ?: argbWithAlpha(textColor, 0.8),
                                 ),
@@ -556,10 +595,9 @@ fun ChatMessageBubble(
                             Modifier.padding(bottom = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                Icons.Rounded.Shortcut,
-                                contentDescription = null,
-                                tint = Color(argbWithAlpha(textColor, 0.6)),
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.forward,
+                                semanticLabel = null,
+                                color = Color(argbWithAlpha(textColor, 0.6)),
                                 modifier = Modifier.size(11.dp),
                             )
                             Box(Modifier.width(3.dp))
@@ -571,38 +609,101 @@ fun ChatMessageBubble(
                             )
                         }
                     }
+                    // GB/stock parity: view-once covers photo, video AND voice notes.
+                    // Voice expires after the first completed playback; image/video
+                    // expire after the viewer closes. Enforcement is local to this
+                    // device: consumption is persisted per account
+                    // (ViewOnceConsumedStore), there is no server-side consume or
+                    // revocation, and the pre-existing host retainViewOnce flag
+                    // (anti-view-once preference, on by default) keeps an opened
+                    // in-session image/video view visible. Rules live in
+                    // ViewOnceStatePolicy (JVM-tested).
+                    val isViewOnceVoice = message.metadata["view_once"] == true &&
+                        (message.attachment?.type == "audio" || message.type == MessageType.audio)
                     val isViewOnceMedia = message.metadata["view_once"] == true &&
                         (message.attachment?.type == "image" || message.attachment?.type == "video")
-                    if (isViewOnceMedia && !isMe && !viewOnceOpened) {
+                    val viewOnceSurface = when {
+                        isViewOnceMedia -> com.example.chat.core.messages.ViewOnceStatePolicy.surface(
+                            com.example.chat.core.messages.ViewOnceStatePolicy.Kind.MEDIA,
+                            opened = viewOnceOpened,
+                            retainOpenedMedia = retainViewOnce,
+                            playbackCompleted = false,
+                        )
+                        isViewOnceVoice -> com.example.chat.core.messages.ViewOnceStatePolicy.surface(
+                            com.example.chat.core.messages.ViewOnceStatePolicy.Kind.VOICE,
+                            opened = viewOnceOpened,
+                            retainOpenedMedia = retainViewOnce,
+                            playbackCompleted = viewOncePlaybackCompleted,
+                        )
+                        else -> null
+                    }
+                    if (viewOnceSurface != null && !isMe &&
+                        viewOnceSurface == com.example.chat.core.messages.ViewOnceStatePolicy.Surface.LOCKED
+                    ) {
                         ViewOnceLockedCard(
                             isVideo = message.attachment?.type == "video",
+                            isVoice = isViewOnceVoice,
                             textColor = Color(textColor),
                             accentColor = Color(theme.accentColor),
                             surfaceColor = Color(theme.surfaceColor),
                             onTap = onViewOnceOpen,
+                            retainAfterOpen = retainViewOnce,
                         )
-                    } else if (isViewOnceMedia && !isMe && viewOnceOpened && !retainViewOnce) {
-                        ViewOnceExpiredCard(textColor = Color(textColor))
+                    } else if (viewOnceSurface != null && !isMe &&
+                        viewOnceSurface == com.example.chat.core.messages.ViewOnceStatePolicy.Surface.EXPIRED
+                    ) {
+                        var expiredDialogOpen by remember(message.id) { mutableStateOf(false) }
+                        ViewOnceExpiredCard(
+                            textColor = Color(textColor),
+                            onTap = { expiredDialogOpen = true },
+                        )
+                        if (expiredDialogOpen) {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = { expiredDialogOpen = false },
+                                confirmButton = {
+                                    androidx.compose.material3.TextButton(onClick = { expiredDialogOpen = false }) {
+                                        Text("OK")
+                                    }
+                                },
+                                title = {
+                                    Text(
+                                        when {
+                                            isViewOnceVoice -> "Voice message expired"
+                                            message.attachment?.type == "video" -> "Video expired"
+                                            else -> "Photo expired"
+                                        },
+                                    )
+                                },
+                                text = { Text("This view-once message has expired. Ask the sender to send it again.") },
+                            )
+                        }
                     } else {
                         when (message.attachment?.type) {
-                            "image" -> if (mediaContent != null) mediaContent() else ImageAttachmentPreview(
-                                attachment = message.attachment!!,
-                                remoteImage = remoteImage,
-                                message = message, binding = attachmentBinding,
-                                resolveUrl = voiceUrlResolver,
-                                onTap = onMediaTap,
-                                onTapWithBounds = onMediaTapWithBounds,
-                            )
-                            "video" -> VideoAttachmentPreview(
-                                attachment = message.attachment!!,
-                                textColor = Color(textColor),
-                                accentColor = Color(theme.accentColor),
-                                remoteImage = remoteImage,
-                                message = message, binding = attachmentBinding,
-                                resolveUrl = voiceUrlResolver,
-                                onTap = onMediaTap,
-                                onTapWithBounds = onMediaTapWithBounds,
-                            )
+                            "image" -> if (mediaContent != null) Box(Modifier.testTag("message_bubble_media")) { mediaContent() } else {
+                                val attachment = message.attachment!!
+                                val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
+                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
+                                else ImageAttachmentPreview(attachment = attachment, remoteImage = remoteImage, message = message, binding = attachmentBinding, resolveUrl = voiceUrlResolver, onTap = tap)
+                            }
+                            "video" -> {
+                                val attachment = message.attachment!!
+                                val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
+                                if (attachment.url?.startsWith("chaty://transfer/") == true &&
+                                    message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true
+                                ) {
+                                    P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
+                                } else {
+                                    VideoAttachmentPreview(
+                                        attachment = attachment,
+                                        textColor = Color(textColor),
+                                        accentColor = Color(theme.accentColor),
+                                        remoteImage = remoteImage,
+                                        message = message, binding = attachmentBinding,
+                                        resolveUrl = voiceUrlResolver,
+                                        onTap = tap,
+                                    )
+                                }
+                            }
                             "audio" -> VoiceNoteCard(
                                 attachment = message.attachment!!,
                                 textColor = Color(textColor),
@@ -613,13 +714,14 @@ fun ChatMessageBubble(
                                 urlResolver = voiceUrlResolver,
                                 message = message, binding = attachmentBinding,
                                 onPlay = onVoicePlay,
+                                onPlaybackCompleted = if (isViewOnceVoice) onViewOncePlaybackCompleted else null,
                             )
-                            "document" -> DocumentPreview(
-                                attachment = message.attachment!!,
-                                textColor = Color(textColor),
-                                accentColor = Color(theme.accentColor),
-                                onTap = onMediaTap,
-                            )
+                            "document" -> {
+                                val attachment = message.attachment!!
+                                val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
+                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
+                                else DocumentPreview(attachment = attachment, textColor = Color(textColor), accentColor = Color(theme.accentColor), onTap = tap)
+                            }
                         }
                         if (message.type == MessageType.location) {
                             LocationCard(
@@ -652,7 +754,7 @@ fun ChatMessageBubble(
                         message.type != MessageType.contact &&
                         message.text.isNotEmpty()
                     ) {
-                        Column(Modifier.padding(horizontal = if (isVisualMedia) 8.dp else 0.dp, vertical = if (isVisualMedia) 4.dp else 0.dp)) {
+                        Column(Modifier.testTag("message_bubble_text").padding(horizontal = if (isVisualMedia) 8.dp else 0.dp, vertical = if (isVisualMedia) 4.dp else 0.dp)) {
                             // Dart: convPrefs.makeTextSelectable (default true) wraps
                             // the body text in a selectable region.
                             // Dart message_bubble.dart:1103-1120: the body text
@@ -670,15 +772,51 @@ fun ChatMessageBubble(
                                         emojiStyle = emojiStyle,
                                     )
                                 } else {
-                                    BasicText(
-                                        text = message.text,
-                                        style = TextStyle(
-                                            color = Color(textColor),
-                                            fontSize = (messageTextSize * theme.fontScale).sp,
-                                            lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
-                                        ),
-                                        modifier = mod,
+                                    // Chaty #34: in-text links render underlined in the theme
+                                    // accent and open on tap (Compose LinkAnnotation); long-press
+                                    // text selection still works. Plain text keeps the original
+                                    // render; the animated-emoji path is unchanged.
+                                    val linkSpans = remember(message.text) {
+                                        MessageLinkPolicy.linkSpans(message.text)
+                                    }
+                                    val bodyStyle = TextStyle(
+                                        color = Color(textColor),
+                                        fontSize = (messageTextSize * theme.fontScale).sp,
+                                        lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
                                     )
+                                    if (linkSpans.isEmpty()) {
+                                        BasicText(
+                                            text = message.text,
+                                            style = bodyStyle,
+                                            modifier = mod,
+                                        )
+                                    } else {
+                                        val linkedText = remember(message.text, theme.accentColor) {
+                                            buildAnnotatedString {
+                                                append(message.text)
+                                                linkSpans.forEach { span ->
+                                                    addLink(
+                                                        LinkAnnotation.Url(
+                                                            url = span.url,
+                                                            styles = TextLinkStyles(
+                                                                style = SpanStyle(
+                                                                    color = Color(theme.accentColor),
+                                                                    textDecoration = TextDecoration.Underline,
+                                                                ),
+                                                            ),
+                                                        ),
+                                                        span.start,
+                                                        span.end,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        BasicText(
+                                            text = linkedText,
+                                            style = bodyStyle,
+                                            modifier = mod,
+                                        )
+                                    }
                                 }
                             }
                             if (makeTextSelectable) {
@@ -688,6 +826,16 @@ fun ChatMessageBubble(
                             } else {
                                 bodyText(Modifier)
                             }
+                        }
+                    }
+                    if (!isVisualMedia && message.attachment == null && message.type == MessageType.text) {
+                        MessageLinkPolicy.extractUrls(message.text).forEach { link ->
+                            LinkPreviewCard(
+                                url = link,
+                                theme = theme,
+                                textColor = Color(textColor),
+                                service = linkPreviewService,
+                            )
                         }
                     }
                     Row(
@@ -810,8 +958,8 @@ private fun TaskCardChip(
                         .border(2.dp, toggleBorder, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (isCompleted) Icon(Icons.Rounded.Check, contentDescription = null,
-                        tint = Color.White, modifier = Modifier.size(14.dp))
+                    if (isCompleted) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null,
+                        color = Color.White, modifier = Modifier.size(14.dp))
                 }
             }
             Spacer(Modifier.width(10.dp))
@@ -836,10 +984,9 @@ private fun TaskCardChip(
                     ),
             )
             if (onTaskMenu != null) {
-                Icon(
-                    Icons.Rounded.MoreVert,
-                    contentDescription = null,
-                    tint = textColor.copy(alpha = 0.6f),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions,
+                    semanticLabel = null,
+                    color = textColor.copy(alpha = 0.6f),
                     modifier = Modifier
                         .padding(start = 4.dp)
                         .size(18.dp)
@@ -867,10 +1014,9 @@ private fun TaskCardChip(
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 )
                 Spacer(Modifier.width(6.dp))
-                Icon(
-                    Icons.Rounded.Schedule,
-                    contentDescription = null,
-                    tint = if (isOverdue) Color(theme.dangerColor) else textColor.copy(alpha = 0.65f),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.schedule,
+                    semanticLabel = null,
+                    color = if (isOverdue) Color(theme.dangerColor) else textColor.copy(alpha = 0.65f),
                     modifier = Modifier.size(12.dp),
                 )
                 Spacer(Modifier.width(3.dp))
@@ -939,19 +1085,17 @@ private fun MessageMetaRow(
             Box(Modifier.width(4.dp))
         }
         if (message.isPinned) {
-            Icon(
-                Icons.Rounded.PushPin,
-                contentDescription = null,
-                tint = Color(argbWithAlpha(textColor, 0.7)),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.pin,
+                semanticLabel = null,
+                color = Color(argbWithAlpha(textColor, 0.7)),
                 modifier = Modifier.size(11.dp),
             )
             Box(Modifier.width(3.dp))
         }
         if (message.isStarred) {
-            Icon(
-                Icons.Rounded.Star,
-                contentDescription = null,
-                tint = Color(0xFFFFC107),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.starFilled,
+                semanticLabel = null,
+                color = Color(0xFFFFC107),
                 modifier = Modifier.size(11.dp),
             )
             Box(Modifier.width(3.dp))
@@ -966,7 +1110,7 @@ private fun MessageMetaRow(
         if (isMe) {
             Box(Modifier.width(4.dp))
             Box(
-                Modifier.pointerInput(message.id, message.deliveryState) {
+                Modifier.testTag("message_delivery_status").pointerInput(message.id, message.deliveryState) {
                     if (message.deliveryState == DeliveryState.failed &&
                         onRetry != null
                     ) {
@@ -1010,9 +1154,7 @@ private fun ReactionBadge(
             .padding(horizontal = 7.dp, vertical = 3.5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // api parity (animated_emoji_reaction.dart): reaction emoji uses the same animated pack,
-        // looping while composed; static glyph on registry miss / load failure / reduced motion.
-        AnimatedEmojiView(unicode = emoji, size = 19f, mode = EmojiDisplayMode.reaction)
+        Text(emoji, fontSize = 19.sp)
         if (count > 0) {
             Box(Modifier.width(4.dp))
             Text("$count", color = textColor, fontSize = 11.sp, fontWeight = FontWeight.W700)
@@ -1027,8 +1169,7 @@ private fun ImageAttachmentPreview(
     message: ChatMessage, binding: AttachmentConsumerBinding?,
     resolveUrl: (suspend (String) -> String)?,
     onTap: (() -> Unit)?,
-    onTapWithBounds: ((Rect) -> Unit)? = null,
-) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, false, message, binding, onTapWithBounds = onTapWithBounds)
+) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, false, message, binding)
 
 @Composable
 private fun VideoAttachmentPreview(
@@ -1039,8 +1180,7 @@ private fun VideoAttachmentPreview(
     message: ChatMessage, binding: AttachmentConsumerBinding?,
     resolveUrl: (suspend (String) -> String)?,
     onTap: (() -> Unit)?,
-    onTapWithBounds: ((Rect) -> Unit)? = null,
-) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, true, message, binding, onTapWithBounds = onTapWithBounds)
+) = MediaAttachmentPreview(attachment, remoteImage, resolveUrl, onTap, true, message, binding)
 
 /** Port of _VoiceNotePlayer (message_bubble.dart:1578-1730): signed-url load on first play,
  *  pause/resume, restart after completion, live speed apply while playing, progress bar
@@ -1058,10 +1198,13 @@ private fun VoiceNoteCard(
     onPlay: ((MessageAttachment) -> Unit)?,
     message: ChatMessage,
     binding: AttachmentConsumerBinding?,
+    onPlaybackCompleted: (() -> Unit)? = null,
 ) {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val audioContext = androidx.compose.ui.platform.LocalContext.current
     val player = remember(attachment.id, binding?.session) { android.media.MediaPlayer() }
+    var waveform by remember(attachment.id, binding?.session) { mutableStateOf<List<Float>?>(null) }
+    var waveformJob by remember(attachment.id, binding?.session) { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var loading by remember(attachment.id) { mutableStateOf(false) }
     var playing by remember(attachment.id) { mutableStateOf(false) }
     var prepared by remember(attachment.id) { mutableStateOf(false) }
@@ -1070,10 +1213,15 @@ private fun VoiceNoteCard(
     var positionMs by remember(attachment.id) { mutableStateOf(0) }
     var playbackSource by remember(attachment.id, binding?.session) { mutableStateOf<com.example.chat.data.media.ResolvedSource?>(null) }
     var playbackError by remember(attachment.id, binding?.session) { mutableStateOf<String?>(null) }
+    fun releasePlaybackLeaseAfterReader() {
+        val source = playbackSource; playbackSource = null
+        val reader = waveformJob; waveformJob = null
+        com.example.chat.core.audio.releaseAfterReader(reader) { releaseConsumerSource(source) }
+    }
     androidx.compose.runtime.DisposableEffect(attachment.id, binding?.session) {
         onDispose {
-            // The row owns this MediaPlayer, not the app-wide coordinator. Stop reader BEFORE deleting lease.
-            try { player.release() } finally { releaseConsumerSource(playbackSource); playbackSource = null }
+            // Stop player immediately; asynchronous reader completion releases its own lease afterwards.
+            try { player.release() } finally { releasePlaybackLeaseAfterReader() }
         }
     }
     val voiceLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -1137,10 +1285,20 @@ private fun VoiceNoteCard(
                     }
                     totalMs = player.duration
                     prepared = true
+                    val localSource = playbackSource
+                    if (waveform == null && localSource is com.example.chat.data.media.ResolvedSource.Leased) {
+                        waveformJob?.cancel()
+                        waveformJob = scope.launch {
+                            val peaks = decodeVoiceWaveform(localSource.lease.file)
+                            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                            binding?.deliverIfCurrent { waveform = peaks }
+                        }
+                    }
                     player.setOnCompletionListener {
                         playing = false; completed = false; positionMs = totalMs ?: 0
                         runCatching { player.reset() }; prepared = false
-                        releaseConsumerSource(playbackSource); playbackSource = null
+                        releasePlaybackLeaseAfterReader()
+                        onPlaybackCompleted?.invoke()
                     }
                 }
                 if (completed) { player.seekTo(0); completed = false; positionMs = 0 }
@@ -1156,14 +1314,14 @@ private fun VoiceNoteCard(
             catch (e: Exception) {
                 playing = false; playbackError = e.message ?: "Audio unavailable"
                 runCatching { player.reset() }; prepared = false
-                releaseConsumerSource(playbackSource); playbackSource = null
+                releasePlaybackLeaseAfterReader()
             } finally {
                 loading = false
             }
         }
     }
-    val fallbackMs = attachment.durationSeconds * 1000
-    val total = totalMs ?: fallbackMs
+    val fallbackMs = (attachment.durationSeconds.toLong() * 1000).coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
+    val total = totalMs?.takeIf { it > 0 } ?: fallbackMs
     val progress = if (total <= 0) 0f else (positionMs.toFloat() / total).coerceIn(0f, 1f)
     Row(
         Modifier
@@ -1196,28 +1354,25 @@ private fun VoiceNoteCard(
         }
         Box(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            androidx.compose.material3.LinearProgressIndicator(
+            val peaks = waveform
+            if (peaks != null) androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(25.dp)) {
+                val step = size.width / peaks.size
+                peaks.forEachIndexed { index, amplitude ->
+                    val height = (amplitude * size.height).coerceAtLeast(1f)
+                    val x = step * index + step / 2
+                    drawLine((playingBarColor ?: accentColor).copy(alpha = if (index.toFloat() / peaks.size <= progress) 1f else 0.35f),
+                        androidx.compose.ui.geometry.Offset(x, (size.height - height) / 2),
+                        androidx.compose.ui.geometry.Offset(x, (size.height + height) / 2), strokeWidth = (step * 0.55f).coerceAtLeast(1f))
+                }
+            } else androidx.compose.material3.LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(12.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .pointerInput(total, prepared) {
-                        detectTapGestures { tap ->
-                            if (prepared && total > 0) {
-                                val fraction = (tap.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f)
-                                val target = (total * fraction).toInt()
-                                runCatching { player.seekTo(target); positionMs = target }
-                            }
-                        }
-                    },
+                modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(3.dp)),
                 color = playingBarColor ?: MaterialTheme.colorScheme.primary,
                 trackColor = (playingBarColor ?: MaterialTheme.colorScheme.primary).copy(alpha = 0.24f),
             )
             Box(Modifier.height(5.dp))
             playbackError?.let { Text(it, color = textColor, fontSize = 10.sp) }
-            Text(
-                if (total > 0) "${fmt(positionMs)} / ${fmt(total)}" else "Tap play to load duration",
-                color = textColor.copy(alpha = 0.75f), fontSize = 10.5.sp,
-            )
+            Text("${fmt(positionMs)} / ${if (total > 0) fmt(total) else "--:--"}", color = textColor.copy(alpha = 0.75f), fontSize = 10.5.sp)
         }
     }
 }
@@ -1280,10 +1435,9 @@ private fun DocumentPreview(
                 fontSize = 10.5.sp,
             )
         }
-        Icon(
-            Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint = textColor.copy(alpha = 0.7f),
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+            semanticLabel = null,
+            color = textColor.copy(alpha = 0.7f),
         )
     }
 }
@@ -1331,10 +1485,9 @@ private fun LocationCard(message: ChatMessage, textColor: Color, accentColor: Co
                     fontSize = 10.5.sp,
                 )
             }
-            Icon(
-                Icons.Rounded.OpenInNew,
-                contentDescription = null,
-                tint = textColor.copy(alpha = 0.7f),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.openInNew,
+                semanticLabel = null,
+                color = textColor.copy(alpha = 0.7f),
                 modifier = Modifier.size(17.dp),
             )
         }
@@ -1400,12 +1553,130 @@ private fun ContactCard(message: ChatMessage, textColor: Color, accentColor: Col
 }
 
 @Composable
+private fun P2pFileInviteCard(
+    attachment: MessageAttachment,
+    isMe: Boolean,
+    textColor: Color,
+    accentColor: Color,
+    onTap: () -> Unit,
+    transferState: P2pFileTransferService.TransferState? = null,
+) {
+    val transferLabel = when (transferState?.status) {
+        "Sending" -> "Sending · ${(transferState.progress * 100).toInt().coerceAtMost(99)}%"
+        "Receiving" -> "Receiving · ${(transferState.progress * 100).toInt().coerceAtMost(99)}%"
+        "Waiting for recipient" -> "Waiting for recipient"
+        "Secure channel connected", "Secure channel ready" -> "Secure connection · ready"
+        "Connecting", "Waiting for secure data channel" -> "Connecting securely"
+        "Paused by network backpressure", "Network backpressure — waiting" -> "Weak signal · safely queued"
+        "Connection interrupted — retrying", "Requesting secure reconnect", "Reconnecting directly…" -> "Reconnecting securely"
+        "Waiting for sender / network" -> "Waiting for sender"
+        "Peer paused" -> "Recipient paused"
+        "Connection could not recover" -> "Connection lost · retry available"
+        "Received and verified" -> "Received · ready to play"
+        "Sent" -> "Sent securely · verified"
+        "Channel closed" -> "Direct connection closed · tap to retry"
+        "Waiting for recipient — resuming", "Paused — source ready to resume" -> "Waiting · tap to resume"
+        "Failed" -> "Transfer failed · tap to retry/cancel"
+        "Cancelled" -> "Transfer cancelled"
+        else -> if (isMe) "Waiting for recipient" else "Tap to receive original"
+    }
+    if (attachment.type == "video") {
+        // Keep the invitation looking like a native video message, not a pasted URL.
+        // The real media bytes stay peer-to-peer and are never embedded in chat metadata.
+        Column(
+            Modifier
+                .widthIn(min = 220.dp, max = 290.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF111820))
+                .border(1.dp, accentColor.copy(alpha = 0.30f), RoundedCornerShape(14.dp))
+                .clickable(onClick = onTap),
+        ) {
+            Box(
+                Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                    .background(Color(0xFF18232E)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callVideoOff,
+                        semanticLabel = "Video transfer",
+                        color = Color.White.copy(alpha = 0.72f),
+                        modifier = Modifier.size(38.dp),
+                    )
+                    Text("SECURE VIDEO", color = Color.White.copy(alpha = 0.70f), fontSize = 9.sp, fontWeight = FontWeight.W800)
+                }
+                Box(
+                    Modifier.align(Alignment.Center).size(48.dp)
+                        .clip(CircleShape).background(accentColor.copy(alpha = 0.92f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.playArrow, semanticLabel = "Receive video", color = Color.White, modifier = Modifier.size(30.dp))
+                }
+                Text(
+                    "END-TO-END ENCRYPTED",
+                    modifier = Modifier.align(Alignment.BottomStart).padding(9.dp),
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.W800,
+                )
+            }
+            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Text(attachment.name, color = Color.White, fontWeight = FontWeight.W700, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(attachment.size, color = Color.White.copy(alpha = 0.68f), fontSize = 11.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        transferLabel,
+                        color = accentColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.W700,
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    Row(
+        Modifier
+            .widthIn(min = 220.dp, max = 290.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(accentColor.copy(alpha = 0.10f))
+            .border(1.dp, accentColor.copy(alpha = 0.28f), RoundedCornerShape(14.dp))
+            .clickable(onClick = onTap)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(accentColor.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            val fileIcon = if (attachment.type == "image") Icons.Outlined.ImageNotSupported else Icons.Rounded.Description
+            Icon(fileIcon, contentDescription = null, tint = accentColor, modifier = Modifier.size(23.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(attachment.name, color = textColor, fontWeight = FontWeight.W700, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(attachment.size, color = textColor.copy(alpha = 0.68f), fontSize = 11.sp)
+            Text(
+                transferLabel,
+                color = accentColor,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.W700,
+                maxLines = 2,
+            )
+        }
+    }
+}
+
+@Composable
 private fun ViewOnceLockedCard(
     isVideo: Boolean,
     textColor: Color,
     accentColor: Color,
     surfaceColor: Color,
     onTap: (() -> Unit)?,
+    isVoice: Boolean = false,
+    retainAfterOpen: Boolean = false,
 ) {
     Column(
         Modifier
@@ -1414,26 +1685,33 @@ private fun ViewOnceLockedCard(
             .clip(RoundedCornerShape(14.dp))
             .background(surfaceColor.copy(alpha = 0.55f))
             .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-            .pointerInput("viewOnce") { detectTapGestures(onTap = { onTap?.invoke() }) },
+            .clickable(
+                role = androidx.compose.ui.semantics.Role.Button,
+                onClickLabel = if (isVoice) "Play view-once voice message" else "Open view-once message",
+            ) { onTap?.invoke() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            if (isVideo) Icons.Rounded.VideocamOff else Icons.Outlined.ImageNotSupported,
+            if (isVoice) Icons.Rounded.MicOff else if (isVideo) Icons.Rounded.VideocamOff else Icons.Outlined.ImageNotSupported,
             contentDescription = null,
             tint = accentColor,
             modifier = Modifier.size(30.dp),
         )
         Box(Modifier.height(8.dp))
         Text(
-            "View once",
+            if (isVoice) "View once voice message" else "View once",
             color = textColor.copy(alpha = 0.85f),
             fontSize = 12.sp,
             fontWeight = FontWeight.W700,
         )
         Box(Modifier.height(2.dp))
         Text(
-            "Tap to open • opens only once",
+            // Voice still plays once while retention is on; only image/video
+            // stay visible after opening (ViewOnceStatePolicy).
+            if (isVoice) "Tap to listen • plays only once"
+            else if (retainAfterOpen) "Tap to open"
+            else "Tap to open • opens only once",
             color = textColor.copy(alpha = 0.5f),
             fontSize = 9.5.sp,
         )
@@ -1441,19 +1719,22 @@ private fun ViewOnceLockedCard(
 }
 
 @Composable
-private fun ViewOnceExpiredCard(textColor: Color) {
+private fun ViewOnceExpiredCard(textColor: Color, onTap: (() -> Unit)? = null) {
     Row(
         Modifier
             .width(210.dp)
             .height(64.dp)
-            .background(textColor.copy(alpha = 0.06f), RoundedCornerShape(14.dp)),
+            .background(textColor.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
+            .clickable(
+                role = androidx.compose.ui.semantics.Role.Button,
+                onClickLabel = "View-once message expired. Details",
+            ) { onTap?.invoke() },
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            Icons.Rounded.VisibilityOff,
-            contentDescription = null,
-            tint = textColor.copy(alpha = 0.55f),
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eyeOff,
+            semanticLabel = null,
+            color = textColor.copy(alpha = 0.55f),
             modifier = Modifier.size(16.dp),
         )
         Box(Modifier.width(7.dp))
@@ -1528,10 +1809,9 @@ private fun SwipeToReplyContainer(
                     .background(surfaceColor.copy(alpha = progress), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Icons.Rounded.Reply,
-                    contentDescription = "Reply",
-                    tint = accentColor.copy(alpha = progress),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.reply,
+                    semanticLabel = "Reply",
+                    color = accentColor.copy(alpha = progress),
                     modifier = Modifier.size(18.dp),
                 )
             }

@@ -53,9 +53,15 @@ class ConversationsRepository(
     private val snapshotCache: SnapshotCacheStore? = null,
     /** Scope for the Dart-unawaited snapshot writes. */
     private val snapshotScope: kotlinx.coroutines.CoroutineScope? = null,
+    /** Account-scope capture/guard: stale responses from a previous login cannot mutate this repository. */
+    private val scopeSnapshot: () -> Any? = { null },
+    private val withScope: (Any?, () -> Unit) -> Boolean = { _, action -> action(); true },
     /** Called with the attachments of messages that were deleted/removed so local media copies can be invalidated.
      *  Default no-op; must not throw (guarded) and must not block for long. */
     private val onAttachmentsGone: (List<com.example.chat.data.local.AttachmentRef>) -> Unit = {},
+    /** D1: the encrypted send/edit/delete plane rides the Chaty backend via
+     *  ApiMlsRpcClient; defaults to [rpc] (Supabase) until wired. */
+    private val secureRpc: SupabaseRpc? = null,
 ) {
     private fun notifyGone(refs: List<com.example.chat.data.local.AttachmentRef>) {
         if (refs.isNotEmpty()) runCatching { onAttachmentsGone(refs) }
@@ -66,13 +72,14 @@ class ConversationsRepository(
     val usersById = HashMap<String, UserProfile>()
 
     private val transport = SecureMessageTransport(
-        rpc = rpc,
+        rpc = secureRpc ?: rpc,
         currentUserId = currentUserId,
         encryptor = { mls()?.let { m -> MlsServiceEncryptorAdapter(m) } },
     )
 
     @Suppress("UNCHECKED_CAST")
     suspend fun loadConversations(loadMembers: Boolean = true) {
+        val expectedScope = scopeSnapshot()
         val raw = rpc.rpc("get_my_conversations", emptyMap())
         val rows = raw as? List<*> ?: emptyList<Any?>()
         val next = LinkedHashMap<String, Conversation>()
@@ -105,12 +112,15 @@ class ConversationsRepository(
             next[id] = conversation
         }
 
-        conversationsById.clear()
-        conversationsById.putAll(next)
-        messagesByChatId.keys.retainAll(next.keys)
-        // Dart: unawaited(_persistConversationSnapshot()) - failures logged,
-        // never fatal.
-        snapshotScope?.launch { persistConversationSnapshot() }
+        val applied = withScope(expectedScope) {
+            conversationsById.clear()
+            conversationsById.putAll(next)
+            messagesByChatId.keys.retainAll(next.keys)
+            // Dart: unawaited(_persistConversationSnapshot()) - failures logged,
+            // never fatal.
+            snapshotScope?.launch { persistConversationSnapshot() }
+        }
+        if (!applied) return
 
         if (loadMembers) {
             coroutineScope {
@@ -144,6 +154,7 @@ class ConversationsRepository(
 
     @Suppress("UNCHECKED_CAST")
     suspend fun loadMessages(conversationId: String) {
+        val expectedScope = scopeSnapshot()
         val raw = rpc.rpc(
             "get_conversation_messages",
             mapOf(
@@ -156,6 +167,7 @@ class ConversationsRepository(
         for (item in rows) {
             val row = item as? Map<String, Any?> ?: continue
             if (row["is_hidden"] == true) continue
+            noteSeq(conversationId, row)
             hydratedRows.add(hydrateEncryptedMessageRow(conversationId, row))
         }
         val messages = hydratedRows.map { transport.messageFromRow(it, currentUserId()) }
@@ -175,21 +187,193 @@ class ConversationsRepository(
             }
         }
         messages.sortBy { it.createdAt }
-        val heldBefore = messagesByChatId[conversationId]?.toList()
-        messagesByChatId[conversationId] = messages
-        notifyGone(com.example.chat.data.media.AttachmentRefs.refsGone(conversationId, heldBefore, messages))
+        var heldBefore: List<ChatMessage>? = null
+        val applied = withScope(expectedScope) {
+            heldBefore = messagesByChatId[conversationId]?.toList()
+            messagesByChatId[conversationId] = messages
+            notifyGone(com.example.chat.data.media.AttachmentRefs.refsGone(conversationId, heldBefore, messages))
 
-        val conversation = conversationsById[conversationId]
-        if (conversation != null && messages.isNotEmpty()) {
-            val latest = messages.last()
-            conversationsById[conversationId] = conversation.copy(
-                lastMessageText = latest.text,
-                lastMessageTime = latest.createdAt,
-                lastMessageSenderId = latest.senderId,
-            )
+            val conversation = conversationsById[conversationId]
+            if (conversation != null && messages.isNotEmpty()) {
+                val latest = messages.last()
+                conversationsById[conversationId] = conversation.copy(
+                    lastMessageText = latest.text,
+                    lastMessageTime = latest.createdAt,
+                    lastMessageSenderId = latest.senderId,
+                )
+            }
+            // Dart: unawaited(_persistMessageSnapshot(conversationId, ..)).
+            snapshotScope?.launch { persistMessageSnapshot(conversationId, messagesByChatId[conversationId]) }
         }
-        // Dart: unawaited(_persistMessageSnapshot(conversationId, ..)).
-        snapshotScope?.launch { persistMessageSnapshot(conversationId, messagesByChatId[conversationId]) }
+        if (!applied) return
+    }
+
+    // ── Gap-ordered sync (Phase 6 / offline_sync matrix) ────────────────
+    // The server assigns a per-room monotonic seq; the client tracks the
+    // highest seq applied per conversation and heals gaps with after_seq
+    // instead of trusting arrival order (Telegram pts/getDifference, room-scoped).
+
+    private val lastSeqByChatId = HashMap<String, Long>()
+
+    private fun noteSeq(conversationId: String, row: Map<String, Any?>) {
+        val seq = (row["seq"] as? Number)?.toLong() ?: return
+        val current = lastSeqByChatId[conversationId]
+        if (current == null || seq > current) {
+            lastSeqByChatId[conversationId] = seq
+            snapshotScope?.launch { persistSyncCursors() }
+        }
+    }
+
+    private suspend fun persistSyncCursors() {
+        val userId = currentUserId() ?: return
+        val cache = snapshotCache ?: return
+        runCatching { cache.writeJson(userId, "sync_cursors", lastSeqByChatId.toMap()) }
+    }
+
+    /** Restores persisted cursors at session start (called from the locator
+     *  after the repository is wired). */
+    suspend fun restoreSyncCursors() {
+        val userId = currentUserId() ?: return
+        val cache = snapshotCache ?: return
+        val raw = runCatching { cache.readJson(userId, "sync_cursors") }.getOrNull() ?: return
+        @Suppress("UNCHECKED_CAST")
+        val map = raw as? Map<String, Any?> ?: return
+        for ((key, value) in map) {
+            (value as? Number)?.toLong()?.let { lastSeqByChatId[key] = it }
+        }
+    }
+
+    /** Fetches every message newer than the local cursor, oldest first, and
+     *  merges them (dedupe by id). Used for reconnect catch-up and when a
+     *  realtime envelope reveals a seq gap. */
+    @Volatile private var cursorsRestored = false
+
+    suspend fun catchUpConversation(conversationId: String) {
+        if (!cursorsRestored) {
+            cursorsRestored = true
+            restoreSyncCursors()
+        }
+        val expectedScope = scopeSnapshot()
+        val params = mutableMapOf<String, Any?>(
+            "p_conversation_id" to conversationId,
+            "p_limit" to 200,
+        )
+        lastSeqByChatId[conversationId]?.let { params["p_after_seq"] = it }
+        val raw = rpc.rpc("get_conversation_messages", params)
+        val rows = raw as? List<*> ?: return
+        val applied = mutableListOf<ChatMessage>()
+        for (item in rows) {
+            val row = item as? Map<String, Any?> ?: continue
+            if (row["is_hidden"] == true) continue
+            noteSeq(conversationId, row)
+            val hydrated = hydrateEncryptedMessageRow(conversationId, row)
+            applied.add(transport.messageFromRow(hydrated, currentUserId()))
+        }
+        if (applied.isEmpty()) return
+        withScope(expectedScope) {
+            val list = messagesByChatId.getOrPut(conversationId) { mutableListOf() }
+            for (message in applied) {
+                if (list.none { it.id == message.id }) list.add(message)
+            }
+            list.sortBy { it.createdAt }
+            snapshotScope?.launch { persistMessageSnapshot(conversationId, list) }
+        }
+        notifyChanged()
+    }
+
+    /** Realtime secure envelope from the websocket (backend new_message with
+     *  the opaque MLS payload). A seq gap triggers catch-up instead of
+     *  decrypting out of order; otherwise the envelope is hydrated and
+     *  appended immediately. */
+    suspend fun ingestSecureEnvelope(data: Map<String, Any?>) {
+        val conversationId = data["room_id"]?.toString() ?: return
+        val seq = (data["seq"] as? Number)?.toLong()
+        val last = lastSeqByChatId[conversationId]
+        if (seq != null && last != null && seq > last + 1) {
+            catchUpConversation(conversationId)
+            return
+        }
+        val row = mutableMapOf<String, Any?>(
+            "id" to data["id"],
+            "conversation_id" to conversationId,
+            "sender_id" to data["sender_id"],
+            "client_id" to data["client_id"],
+            "seq" to seq,
+            "created_at" to data["created_at"],
+            "msg_type" to (data["msg_type"] ?: "text"),
+            "encryption_version" to 2,
+            "encryption_protocol" to MlsE2eeService.protocolSuite,
+            "sender_device_id" to data["sender_device_id"],
+            "encrypted_payload" to data["encrypted_payload"],
+        )
+        val expectedScope = scopeSnapshot()
+        val hydrated = hydrateEncryptedMessageRow(conversationId, row)
+        val message = transport.messageFromRow(hydrated, currentUserId())
+        withScope(expectedScope) {
+            val list = messagesByChatId.getOrPut(conversationId) { mutableListOf() }
+            if (list.none { it.id == message.id }) {
+                list.add(message)
+                list.sortBy { it.createdAt }
+                snapshotScope?.launch { persistMessageSnapshot(conversationId, list) }
+            }
+        }
+        seq?.let { noteSeq(conversationId, mapOf("seq" to it)) }
+        notifyChanged()
+    }
+
+    /** MLS edit fan-out (chat UI matrix, 15-min server window): re-decrypt the
+     *  replacement ciphertext and update the local copy in place. */
+    suspend fun applySecureEdit(data: Map<String, Any?>) {
+        val conversationId = data["room_id"]?.toString() ?: return
+        val id = data["id"]?.toString() ?: return
+        val row = mutableMapOf<String, Any?>(
+            "id" to id,
+            "conversation_id" to conversationId,
+            "sender_id" to data["sender_id"],
+            "created_at" to data["created_at"],
+            "edited_at" to data["edited_at"],
+            "msg_type" to (data["msg_type"] ?: "text"),
+            "encryption_version" to 2,
+            "encryption_protocol" to MlsE2eeService.protocolSuite,
+            "sender_device_id" to data["sender_device_id"],
+            "encrypted_payload" to data["encrypted_payload"],
+        )
+        val expectedScope = scopeSnapshot()
+        val hydrated = hydrateEncryptedMessageRow(conversationId, row)
+        val message = transport.messageFromRow(hydrated, currentUserId())
+        withScope(expectedScope) {
+            val list = messagesByChatId[conversationId] ?: return@withScope
+            val index = list.indexOfFirst { it.id == id }
+            if (index >= 0) {
+                list[index] = message.copy(
+                    createdAt = list[index].createdAt,
+                    editedAt = message.editedAt ?: java.time.Instant.now(),
+                )
+                snapshotScope?.launch { persistMessageSnapshot(conversationId, list) }
+            }
+        }
+        notifyChanged()
+    }
+
+    /** Delete-for-everyone fan-out (48 h server window): tombstone the local
+     *  copy; the next server fetch confirms (list rows arrive payload-less). */
+    suspend fun applyRemoteDeleteForEveryone(data: Map<String, Any?>) {
+        val conversationId = data["room_id"]?.toString() ?: return
+        val id = data["id"]?.toString() ?: return
+        if (data["for_everyone"] != true) return
+        withScope(scopeSnapshot()) {
+            val list = messagesByChatId[conversationId] ?: return@withScope
+            val index = list.indexOfFirst { it.id == id }
+            if (index >= 0) {
+                list[index] = list[index].copy(
+                    text = "",
+                    isDeletedForEveryone = true,
+                    editedAt = null,
+                )
+                snapshotScope?.launch { persistMessageSnapshot(conversationId, list) }
+            }
+        }
+        notifyChanged()
     }
 
     /** Exact port of _persistConversationSnapshot. */
@@ -204,6 +388,11 @@ class ConversationsRepository(
             )
         }
     }
+
+    /** Matrix 11/18: mirrors decrypted, user-visible messages into the
+     *  SQLCipher local DB for offline global search. Installed by
+     *  ServiceLocator; null in JVM tests. */
+    var localMessageMirror: (suspend (conversationId: String, messages: List<ChatMessage>) -> Unit)? = null
 
     /** Exact port of _persistMessageSnapshot. Content is encrypted at rest by
      *  LocalSnapshotCacheService; nothing plaintext is ever written to disk. */
@@ -220,6 +409,9 @@ class ConversationsRepository(
                 scope = "messages_$conversationId",
                 value = messages.map { SnapshotCodec.chatMessageToJson(it) },
             )
+        }
+        localMessageMirror?.let { mirror ->
+            runCatching { mirror(conversationId, messages) }
         }
     }
 

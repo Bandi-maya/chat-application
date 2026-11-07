@@ -49,6 +49,7 @@ import com.example.chat.ui.onboarding.rememberPermissionRequester
 import java.io.File
 import java.util.concurrent.Executors
 import kotlin.math.max
+import androidx.compose.ui.geometry.Offset
 import androidx.core.content.ContextCompat
 import androidx.camera.core.CameraState
 import kotlinx.coroutines.CancellationException
@@ -141,6 +142,16 @@ private class CameraSession(
     val analysisExecutor = Executors.newSingleThreadExecutor()
     val captureExecutor = Executors.newSingleThreadExecutor()
     var torchOn: Boolean = false
+    // Flash mode for the ImageCapture use case (off/on/auto). The torch flag
+    // above lights the LED while composing; this decides whether the shot
+    // itself fires the flash (GB three-state flash parity).
+    var captureFlashMode: Int = ImageCapture.FLASH_MODE_OFF
+        private set
+
+    fun applyCaptureFlashMode(mode: Int) {
+        captureFlashMode = mode
+        imageCapture?.flashMode = mode
+    }
     var stabilization: Boolean = false
     var flashSupported = false
     var stabilizationSupported = false
@@ -230,6 +241,7 @@ private class CameraSession(
         }
         val capture = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+            .setFlashMode(captureFlashMode)
             .build()
         val analyzer = ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -358,6 +370,42 @@ fun ChatyCameraCaptureScreen(
     var phase by remember { mutableStateOf(CameraPhase.initializing) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var flashOn by remember { mutableStateOf(false) }
+    // GB three-state flash: off -> on -> auto -> off.
+    var flashAuto by remember { mutableStateOf(false) }
+    // ShutterOverlay parity: one white flash pulse per photo capture.
+    var captureFlashSeq by remember { mutableStateOf(0) }
+    val captureFlashAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(captureFlashSeq) {
+        if (captureFlashSeq > 0) {
+            captureFlashAlpha.snapTo(0.55f)
+            captureFlashAlpha.animateTo(0f, androidx.compose.animation.core.tween(280))
+        }
+    }
+    // GB DragGalleryStrip: recent gallery photos above the shutter, revealed by
+    // dragging up (or tapping the handle). Hidden without photos permission.
+    val recentStripAvailable = ChatyPermissions.isGranted(context, ChatyPermissions.photos)
+    var recentStripOpen by remember { mutableStateOf(false) }
+    var recentPhotos by remember { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+    LaunchedEffect(recentStripOpen) {
+        if (recentStripOpen && recentPhotos.isEmpty()) {
+            val loaded = withContext(Dispatchers.IO) { queryRecentImageUris(context) }
+            if (loaded.isEmpty()) recentStripOpen = false else recentPhotos = loaded
+        }
+    }
+    // Photos permission can be revoked in system settings while Chaty is in
+    // the background: on resume, drop the cached strip contents and hide it.
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME &&
+                !ChatyPermissions.isGranted(context, ChatyPermissions.photos)
+            ) {
+                recentPhotos = emptyList()
+                recentStripOpen = false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     var effectsOpen by remember { mutableStateOf(false) }
     var lensBrowserOpen by remember { mutableStateOf(false) }
     var capturing by remember { mutableStateOf(false) }
@@ -437,6 +485,24 @@ fun ChatyCameraCaptureScreen(
     val liveSegmentPreview = remember { LiveSegmentPreview(segmentationBridge) }
     DisposableEffect(segmentationBridge) { onDispose { segmentationBridge.dispose() } }
     var segmentPreviewFrame by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    // Ownership for live segment preview bitmaps (see SegmentFrameSlot). A
+    // published frame is NEVER recycled - only dereferenced for the GC - while
+    // frames rejected before publish (stale effect, disposed slot) are
+    // recycled immediately. Before this, replaced frames were dropped with no
+    // ownership rule at all.
+    val segmentFrames = remember { SegmentFrameSlot<android.graphics.Bitmap> { frame -> frame.recycle() } }
+    // Tap-to-focus feedback ring: PreviewView-space point of the last focus
+    // tap, auto-cleared shortly after. Reference camera UIs (incl. GB's
+    // AutofocusOverlay) show a ring where focus locked; a focus tap with no
+    // visible response reads as dead.
+    var focusTapPoint by remember { mutableStateOf<Offset?>(null) }
+    var focusTapSeq by remember { mutableStateOf(0) }
+    LaunchedEffect(focusTapSeq) {
+        if (focusTapSeq > 0) {
+            kotlinx.coroutines.delay(900)
+            focusTapPoint = null
+        }
+    }
     var segmentPublishedKey by remember { mutableStateOf<String?>(null) }
     var processingSegmentFrame by remember { mutableStateOf(false) }
     var lastSegmentFrameMs by remember { mutableStateOf(0L) }
@@ -455,14 +521,34 @@ fun ChatyCameraCaptureScreen(
         val intensity = engine.intensity
         val mirrored = session.lensFacing == CameraSelector.LENS_FACING_FRONT
         scope.launch(Dispatchers.Default) {
+            var produced: android.graphics.Bitmap? = null
             try {
-                val bmp = liveSegmentPreview.render(frame, rotationDegrees, mirrored, key, intensity)
-                if (bmp != null && segmentEffectKey == key) {
-                    segmentPreviewFrame = bmp
-                    segmentPublishedKey = key
-                } else bmp?.recycle()
+                produced = liveSegmentPreview.render(frame, rotationDegrees, mirrored, key, intensity)
+                val bmp = produced
+                if (bmp != null) {
+                    // Single-owner transfer: the frame is handed to the slot
+                    // exactly once, inside a NonCancellable main-thread hop.
+                    // NonCancellable guarantees the handoff runs to completion
+                    // even if this render coroutine was cancelled while parked,
+                    // so no catch path can recycle a frame the slot now owns.
+                    // The slot either shows the frame or - rejected BEFORE
+                    // publish (stale effect key, disposed slot) - recycles it.
+                    // Never both, never the caller, never a published frame.
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable + Dispatchers.Main) {
+                        val shown = segmentFrames.publish(bmp, accept = segmentEffectKey == key)
+                        if (shown) {
+                            segmentPreviewFrame = segmentFrames.visible
+                            segmentPublishedKey = key
+                        }
+                        produced = null // the slot owns the frame in every outcome
+                    }
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                produced?.recycle()
+                throw cancelled
             } catch (_: Exception) {
                 // Best-effort preview: never interrupt capture.
+                produced?.recycle()
             } finally {
                 processingSegmentFrame = false
             }
@@ -516,7 +602,10 @@ fun ChatyCameraCaptureScreen(
         session.analyzeSegment = segmentEffectKey != null && !nightActive && !portraitActive
         // A key change (blur -> office/gradient, or deselect) must never keep the
         // previous effect's composite on screen while its replacement is in flight.
-        if (segmentEffectKey != segmentPublishedKey) segmentPreviewFrame = null
+        if (segmentEffectKey != segmentPublishedKey) {
+            segmentFrames.clear()
+            segmentPreviewFrame = segmentFrames.visible
+        }
     }
 
     fun bindCamera() {
@@ -700,16 +789,29 @@ fun ChatyCameraCaptureScreen(
     fun toggleFlash() {
         if (!flashSupported) return
         val camera = session.camera ?: return
-        val next = !flashOn
-        val future = camera.cameraControl.enableTorch(next)
+        // GB three-state cycle: off -> on -> auto -> off. "on" also lights the
+        // torch while composing; "auto" leaves the LED to the capture itself.
+        val next = if (flashOn) "auto" else if (flashAuto) "off" else "on"
+        val torchNext = next == "on"
+        val future = camera.cameraControl.enableTorch(torchNext)
         future.addListener({
             try {
                 future.get()
-                flashOn = next
-                session.torchOn = next
+                flashOn = torchNext
+                flashAuto = next == "auto"
+                session.torchOn = torchNext
+                session.applyCaptureFlashMode(
+                    when (next) {
+                        "on" -> ImageCapture.FLASH_MODE_ON
+                        "auto" -> ImageCapture.FLASH_MODE_AUTO
+                        else -> ImageCapture.FLASH_MODE_OFF
+                    }
+                )
             } catch (_: Exception) {
                 flashOn = false
+                flashAuto = false
                 session.torchOn = false
+                session.applyCaptureFlashMode(ImageCapture.FLASH_MODE_OFF)
                 scannerError = "Flash could not change on this camera."
             }
         }, ContextCompat.getMainExecutor(context))
@@ -725,7 +827,9 @@ fun ChatyCameraCaptureScreen(
         }
         if (session.lensFacing == CameraSelector.LENS_FACING_FRONT) {
             flashOn = false
+            flashAuto = false
             session.torchOn = false
+            session.applyCaptureFlashMode(ImageCapture.FLASH_MODE_OFF)
         }
         faceSolver.reset()
         facePoses = emptyList()
@@ -738,6 +842,28 @@ fun ChatyCameraCaptureScreen(
         effectsOpen = false
     }
 
+    // Shared by the photo picker and the GB recent-photos strip: copy the
+    // picked image into app-owned cache, then stage it like any capture.
+    fun stageRecentPhoto(uri: android.net.Uri) {
+        scope.launch {
+            try {
+                val dest = File.createTempFile("chaty_picked_", ".jpg", context.cacheDir)
+                if(!ownedFiles.own(dest)) return@launch
+                try { withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        dest.outputStream().use { input.copyTo(it) }
+                    } ?: error("Image source is unavailable")
+                } } finally { if(!ownedFiles.isOpen() || !kotlinx.coroutines.currentCoroutineContext().isActive) dest.delete() }
+                val selectedPath = dest.absolutePath
+                if (captureViewMode == CaptureViewMode.document) documentReviewPath = selectedPath
+                else stagePickedOrCaptured(selectedPath)
+            } catch(cancelled:CancellationException) { throw cancelled
+            } catch (_: Exception) {
+                // Picker/copy failure leaves state untouched (Dart returns early).
+            }
+        }
+    }
+
     // Dart FilePicker(type: image) -> Android Photo Picker (the Dart repo's
     // MainActivity used PickVisualMedia). Picked content is copied into the
     // cache so downstream code always has a file path, then document mode
@@ -745,26 +871,7 @@ fun ChatyCameraCaptureScreen(
     val galleryLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
     ) { uri: android.net.Uri? ->
-        if (uri != null) {
-            scope.launch {
-                try {
-                    val stamp = System.currentTimeMillis()
-                    val dest = File.createTempFile("chaty_picked_", ".jpg", context.cacheDir)
-                    if(!ownedFiles.own(dest)) return@launch
-                    try { withContext(Dispatchers.IO) {
-                        context.contentResolver.openInputStream(uri)?.use { input ->
-                            dest.outputStream().use { input.copyTo(it) }
-                        } ?: error("Image source is unavailable")
-                    } } finally { if(!ownedFiles.isOpen() || !kotlinx.coroutines.currentCoroutineContext().isActive) dest.delete() }
-                    var selectedPath = dest.absolutePath
-                    if (captureViewMode == CaptureViewMode.document) documentReviewPath = selectedPath
-                    else stagePickedOrCaptured(selectedPath)
-                } catch(cancelled:CancellationException) { throw cancelled
-                } catch (_: Exception) {
-                    // Picker/copy failure leaves state untouched (Dart returns early).
-                }
-            }
-        }
+        if (uri != null) stageRecentPhoto(uri)
     }
 
 
@@ -788,6 +895,7 @@ fun ChatyCameraCaptureScreen(
         val capture = session.imageCapture ?: return
         if (phase != CameraPhase.ready || capturing) return
         capturing = true
+        captureFlashSeq += 1
         val documentCapture = captureViewMode == CaptureViewMode.document
         ChatyHapticsPort.light(view)
         val stamp = System.currentTimeMillis()
@@ -964,7 +1072,17 @@ fun ChatyCameraCaptureScreen(
     }
 
     DisposableEffect(session) {
-        onDispose { videoHoldRequest?.close(); videoStopPlayback?.invoke(); videoSession?.close(); videoAuth?.close(); videoInvalidationSignal.close(); ownedFiles.close(); timerJob?.cancel(); bindJob?.cancel(); session.dispose(); faceDetection.dispose(); lensManager.dispose() }
+        onDispose {
+            // Stop the segment producer BEFORE dropping frames. A render still
+            // in flight hands its frame to the disposed slot afterwards, which
+            // recycles it because it can never be shown. The last visible
+            // frame is dereferenced without recycle - teardown does not prove
+            // the RenderThread released it.
+            session.analyzeSegment = false
+            segmentFrames.dispose()
+            segmentPreviewFrame = null
+            videoHoldRequest?.close(); videoStopPlayback?.invoke(); videoSession?.close(); videoAuth?.close(); videoInvalidationSignal.close(); ownedFiles.close(); timerJob?.cancel(); bindJob?.cancel(); session.dispose(); faceDetection.dispose(); lensManager.dispose()
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -987,13 +1105,38 @@ fun ChatyCameraCaptureScreen(
                     previewView = pv
                     var touchDownX = 0f
                     var touchDownY = 0f
+                    // GB live pinch-to-zoom: two-finger scale on the preview
+                    // drives the same clamped zoom path as the presets/slider.
+                    var pinchZoomed = false
+                    val pinchDetector = android.view.ScaleGestureDetector(context,
+                        object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                            private var startSpan = 0f
+                            private var startRatio = 1f
+                            override fun onScaleBegin(detector: android.view.ScaleGestureDetector): Boolean {
+                                startSpan = detector.currentSpan
+                                startRatio = zoomRatio
+                                return phase == CameraPhase.ready && startSpan > 0f
+                            }
+                            override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
+                                val control = if (videoOpen) videoSession?.boundCamera()?.cameraControl
+                                    else session.camera?.cameraControl
+                                if (control == null || startSpan <= 0f) return false
+                                val target = clampCameraZoom(startRatio * detector.currentSpan / startSpan, minZoom, maxZoom)
+                                control.setZoomRatio(target)
+                                zoomRatio = target
+                                pinchZoomed = true
+                                return true
+                            }
+                        })
                     pv.setOnTouchListener { _, event ->
+                        pinchDetector.onTouchEvent(event)
                         when (event.action) {
                             android.view.MotionEvent.ACTION_DOWN -> {
                                 touchDownX = event.x
                                 touchDownY = event.y
+                                pinchZoomed = false
                             }
-                            android.view.MotionEvent.ACTION_UP -> if (phase == CameraPhase.ready) {
+                            android.view.MotionEvent.ACTION_UP -> if (phase == CameraPhase.ready && !pinchZoomed) {
                                 val dx = event.x - touchDownX
                                 val dy = event.y - touchDownY
                                 val swipeThreshold = 56 * pv.resources.displayMetrics.density
@@ -1016,6 +1159,8 @@ fun ChatyCameraCaptureScreen(
                                     val action = androidx.camera.core.FocusMeteringAction.Builder(point)
                                         .setAutoCancelDuration(5, java.util.concurrent.TimeUnit.SECONDS).build()
                                     session.camera?.cameraControl?.startFocusAndMetering(action)
+                                    focusTapPoint = Offset(event.x, event.y)
+                                    focusTapSeq += 1
                                 }
                                 pv.performClick()
                             }
@@ -1028,6 +1173,7 @@ fun ChatyCameraCaptureScreen(
                 facePoses = facePoses,
                 faceHealth = faceHealth,
                 flashOn = flashOn,
+                flashAuto = flashAuto,
                 flashSupported = flashSupported,
                 previewAspect = options.aspect.portraitRatio,
                 effectsOpen = effectsOpen,
@@ -1044,6 +1190,8 @@ fun ChatyCameraCaptureScreen(
                 },
                 onOpenSettings = { ChatyPermissions.openAppSettings(context) },
                 onPickFromGallery = ::pickFromGallery,
+                focusTap = focusTapPoint,
+                captureFlashAlpha = captureFlashAlpha.value,
             )
             if (options.grid || options.level) CameraGridAndLevel(options.grid, options.level,
                 Modifier.align(Alignment.Center).then(options.aspect.portraitRatio?.let { Modifier.fillMaxWidth().aspectRatio(it) } ?: Modifier.fillMaxSize()))
@@ -1173,6 +1321,19 @@ fun ChatyCameraCaptureScreen(
                 },
                 onFlip = ::flipCamera,
                 onPickFromGallery = ::pickFromGallery,
+                recentStripVisible = recentStripAvailable && !videoTimerActive && !effectsOpen,
+                recentStripOpen = recentStripOpen,
+                recentPhotos = recentPhotos,
+                onToggleRecentStrip = { recentStripOpen = it },
+                onPickRecent = { uri ->
+                    if (ChatyPermissions.isGranted(context, ChatyPermissions.photos)) {
+                        recentStripOpen = false
+                        stageRecentPhoto(uri)
+                    } else {
+                        recentPhotos = emptyList()
+                        recentStripOpen = false
+                    }
+                },
             )
                 }
             }

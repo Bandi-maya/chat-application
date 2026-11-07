@@ -2,72 +2,36 @@
 # Runs inside the emulator-runner (which executes each script line separately,
 # so a multi-line inline script cannot propagate the gradle exit code).
 mkdir -p screenshots
-# Passive host-side evidence (retry-job pattern): qemu RSS + MemAvailable sampler, so a
-# qemu disappearance has host telemetry instead of inference from guest logs alone.
-while :; do p=$(pgrep -f qemu-system | head -1); if [ -n "$p" ]; then echo "{\"t\":$(date +%s),\"pid\":$p,\"rss_kb\":\"$(awk '/VmRSS/{print $2}' /proc/$p/status 2>/dev/null)\",\"memavail_kb\":\"$(awk '/MemAvailable/{print $2}' /proc/meminfo)\"}"; fi; sleep 5; done > screenshots/host-watch.jsonl &
-hostwatch_pid=$!
-# Early qemu identity (run-134 lesson): qemu was already dead at restart-check
-# entry when the exit happened, so a host-dmesg 'RenderThread[<tid>] segfault'
-# line can only be bound to the emulator if tid->process identity was captured
-# while qemu was alive, BEFORE the test window.
-QPID=$(pgrep -f qemu-system | head -1)
-{
-  echo "capture_wall=$(date -u +%FT%TZ) uptime=$(cat /proc/uptime)"
-  echo "qemu_pid=${QPID:-none}"
-  if [ -n "$QPID" ]; then
-    echo "qemu_starttime_ticks=$(awk '{print $22}' /proc/$QPID/stat 2>/dev/null)"
-    echo "qemu_cgroup=$(head -1 /proc/$QPID/cgroup 2>/dev/null)"
-    for t in /proc/$QPID/task/*; do echo "tid=$(basename "$t") comm=$(cat "$t/comm" 2>/dev/null)"; done
-  fi
-} > screenshots/qemu-identity.txt 2>&1
-# Evidence only: no camera opening or real account/hardware use. Bounds preserve failure artifacts.
-timeout 20 adb shell dumpsys media.camera > screenshots/camera-inventory-before.txt 2>&1 || true
-timeout 10 adb shell getprop ro.kernel.qemu > screenshots/emulator-identity.txt 2>&1 || true
-python3 ci/collect-runtime-resources.py &
-resource_pid=$!
-finish_resources() { kill "$resource_pid" 2>/dev/null || true; wait "$resource_pid" 2>/dev/null || true; }
-trap finish_resources EXIT
 adb logcat -c || true
-(adb logcat -v threadtime > screenshots/logcat-full.txt 2>&1 &) 
-# Each isolated runner restores the same immutable candidate and gets a disjoint class partition.
-classes=$(python3 ci/test-shards.py "${CHATY_TEST_SHARD:-all}")
-filter_rc=$?
-if [ "$filter_rc" -ne 0 ] || [ -z "$classes" ]; then
-  echo "Invalid or empty instrumentation shard: ${CHATY_TEST_SHARD:-all}" >&2
-  exit 2
-fi
-printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt
-printf '%s\n' "TEST-SHARD ${CHATY_TEST_SHARD:-all} classes=$classes"
-(cd runtime-apks && sha256sum -c SHA256SUMS) || exit 2
-adb install -r -t runtime-apks/app-debug.apk || exit 2
-adb install -r -t runtime-apks/app-debug-androidTest.apk || exit 2
-python3 ci/run-instrumentation-shard.py "$classes"
+# Job-lifetime process watch: timestamp qemu presence/RSS every 5s so a guest
+# death is placed on the test timeline (run-127 emoji-real: logcat ended
+# 06:39:25, qemu RSS froze, then qemu vanished) - discriminates crash vs kill.
+( while true; do
+    line=$(ps -eo pid,rss,command 2>/dev/null | grep -i "[q]emu" | head -3 | tr '\n' '|')
+    if [ -z "$line" ]; then echo "$(date +%H:%M:%S) QEMU-GONE" >> screenshots/qemu-watch.txt; else echo "$(date +%H:%M:%S) $line" >> screenshots/qemu-watch.txt; fi
+    sleep 5
+  done ) &
+QWATCH=$!
+# Logcat reconnect: if the stream dies while the emulator is still up (run-127
+# emoji-real logcat ended mid-run), restart it and mark the gap.
+( while true; do
+    adb logcat -v threadtime >> screenshots/logcat-full.txt 2>&1
+    echo "$(date +%H:%M:%S) LOGCAT-STREAM-ENDED rc=$?" >> screenshots/qemu-watch.txt
+    pgrep -f qemu >/dev/null 2>&1 || break
+    sleep 2
+  done ) &
+LOGCATW=$!
+gradle :app:connectedDebugAndroidTest --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
 rc=$?
-kill "$hostwatch_pid" 2>/dev/null || true
-# Host kill-path evidence: kernel OOM/kill records, cgroup events, memory pressure.
-( sudo dmesg 2>/dev/null | tail -60 || echo "dmesg unavailable" ) > screenshots/host-dmesg-tail.txt 2>&1 || true
-( cat /sys/fs/cgroup/memory.events 2>/dev/null ; cat /proc/pressure/memory 2>/dev/null ; free -m ) > screenshots/host-memory-evidence.txt 2>&1 || true
-# Emulator process stdout/stderr traces where the runner wrote them.
-mkdir -p screenshots/emulator-crash
-for f in /tmp/android-runner/*.log /tmp/android-runner/stdout* /tmp/android-runner/stderr* /tmp/android-runner/emulator*; do
-  [ -f "$f" ] && cp "$f" screenshots/emulator-crash/ 2>/dev/null || true
-done
-timeout 20 adb shell dumpsys media.camera > screenshots/camera-inventory-after.txt 2>&1 || true
-# A disconnected emulator must not block artifact preservation for the job's full timeout.
-# Bounds each post-run adb operation and is inherited by restart-check.sh.
-CHATY_ADB_BINARY=$(command -v adb)
-export CHATY_ADB_BINARY
-adb() { timeout 60 "$CHATY_ADB_BINARY" "$@"; }
-export -f adb
+kill $QWATCH $LOGCATW 2>/dev/null || true
+echo "--- qemu/logcat watch (job-lifetime) ---"
+tail -30 screenshots/qemu-watch.txt 2>/dev/null || true
 # Permission restore belongs outside instrumentation: pm revoke kills the app process.
 if adb shell test -f /sdcard/Android/data/com.logybyte.chaty/files/camera-permission-cleanup; then
   adb shell rm /sdcard/Android/data/com.logybyte.chaty/files/camera-permission-cleanup
   adb shell pm revoke com.logybyte.chaty android.permission.CAMERA || true
 fi
 adb pull /sdcard/Android/data/com.logybyte.chaty/files/screenshots/. screenshots/ || true
-# Bounded audit: missing producer diagnostics must remain visible, not be inferred from source.
-find screenshots -maxdepth 1 -type f -name 'hdr-*' -printf '%f %s bytes\n' | sort > screenshots/header-artifact-inventory.txt
-
 sleep 2
 adb logcat -b crash -d > screenshots/logcat-crash.txt 2>&1 || true
 adb logcat -d -t 4000 > screenshots/logcat.txt 2>&1 || true

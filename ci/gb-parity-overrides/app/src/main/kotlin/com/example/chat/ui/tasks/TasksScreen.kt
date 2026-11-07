@@ -28,7 +28,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.ListAlt
 import androidx.compose.material.icons.rounded.MoreVert
@@ -36,9 +36,10 @@ import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.material.icons.rounded.ViewKanban
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
+import com.example.chat.ui.kit.ChatyTextButton
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -151,7 +152,7 @@ fun TasksScreen(
                         .clip(CircleShape)
                         .background(colors.surfaceSecondary),
                 ) {
-                    Icon(Icons.Rounded.Add, contentDescription = "Create task", tint = colors.primary)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = "Create task", color = colors.primary)
                 }
             }
             // Tabs
@@ -281,7 +282,7 @@ private fun TaskListView(
             verticalArrangement = Arrangement.Center,
         ) {
             if (priorityFilter != "All") {
-                Icon(Icons.Rounded.TaskAlt, contentDescription = null, tint = colors.primary, modifier = Modifier.size(40.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.tasks, semanticLabel = null, color = colors.primary, modifier = Modifier.size(40.dp))
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "No results for $priorityFilter Priority",
@@ -303,7 +304,7 @@ private fun TaskListView(
                     modifier = Modifier.clickable(onClick = onClearFilter),
                 )
             } else {
-                Icon(Icons.Rounded.TaskAlt, contentDescription = null, tint = colors.primary, modifier = Modifier.size(40.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.tasks, semanticLabel = null, color = colors.primary, modifier = Modifier.size(40.dp))
                 Spacer(Modifier.height(12.dp))
                 Text("No action items yet", color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Spacer(Modifier.height(6.dp))
@@ -386,22 +387,22 @@ private fun TaskListCard(
             }
             Box {
                 IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Rounded.MoreVert, contentDescription = "Task options", tint = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = "Task options", color = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
                 }
                 DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Edit Task") },
-                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.history, semanticLabel = null, modifier = Modifier.size(18.dp)) },
                         onClick = { menuOpen = false; onEditTask() },
                     )
                     DropdownMenuItem(
                         text = { Text("View Details") },
-                        leadingIcon = { Icon(Icons.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.openInNew, semanticLabel = null, modifier = Modifier.size(18.dp)) },
                         onClick = { menuOpen = false; onOpenDetail() },
                     )
                     DropdownMenuItem(
-                        text = { Text("Delete Task", color = Color(0xFFF44336)) },
-                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = Color(0xFFF44336), modifier = Modifier.size(18.dp)) },
+                        text = { Text("Delete Task", color = colors.error) },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.deleteOutline, semanticLabel = null, color = colors.error, modifier = Modifier.size(18.dp)) },
                         onClick = { menuOpen = false; onDeleteTask() },
                     )
                 }
@@ -677,24 +678,23 @@ private fun KanbanCardBody(
             Spacer(Modifier.weight(1f))
             if (showActions) {
                 IconButton(onClick = onEditTask, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Rounded.Edit, contentDescription = "Edit task", tint = colors.primary, modifier = Modifier.size(18.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.history, semanticLabel = "Edit task", color = colors.primary, modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onShowHistory, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Rounded.History, contentDescription = "History", tint = colors.primary, modifier = Modifier.size(18.dp))
                 }
                 if (previous != null) {
                     IconButton(onClick = { onMove(task, previous) }, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            Icons.Rounded.ChevronRight,
-                            contentDescription = "Move back",
-                            tint = colors.primary,
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+                            semanticLabel = "Move back",
+                            color = colors.primary,
                             modifier = Modifier.size(18.dp).mirrored(),
                         )
                     }
                 }
                 if (next != null) {
                     IconButton(onClick = { onMove(task, next) }, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Move forward", tint = colors.primary, modifier = Modifier.size(18.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = "Move forward", color = colors.primary, modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -739,7 +739,7 @@ private fun TaskHistoryDialog(
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(onClick = onClose, shape = com.example.chat.ui.kit.ChatyActionShape) { Text("Close") }
+            ChatyTextButton(onClick = onClose, label = "Close")
         },
         containerColor = colors.surface,
     )

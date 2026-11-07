@@ -30,7 +30,7 @@ import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.TagFaces
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -121,6 +121,7 @@ fun ChatyEmojiPickerSheet(
         )
     }
     var stickerTab by remember { mutableStateOf(false) }
+    var newsSection by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchOpen by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf(0) } // 0 = recents
@@ -216,7 +217,7 @@ fun ChatyEmojiPickerSheet(
                     onEmojiPicked("")
                 }
             }) {
-                Icon(Icons.Rounded.Close, contentDescription = "Close", tint = headerForeground)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close", color = headerForeground)
             }
         }
 
@@ -233,6 +234,9 @@ fun ChatyEmojiPickerSheet(
                 modifier = Modifier.weight(1f),
                 unavailableReason = if (onStickerSend == null) "Sticker sending is not connected yet. Preview only." else null)
             }
+        } else {
+        if (composerMode && !reactionMode && newsSection) {
+            NewsCustomEmojiSection(theme = theme, modifier = Modifier.weight(1f))
         } else {
         // Search field (Dart SearchViewConfig, hint 'Search emoji…')
         if (searchOpen) {
@@ -392,8 +396,12 @@ fun ChatyEmojiPickerSheet(
             horizontalArrangement = Arrangement.End,
         ) {
             IconButton(onClick = { searchOpen = !searchOpen; if (!searchOpen) searchQuery = "" }) {
-                Icon(Icons.Rounded.Search, contentDescription = "Search emoji", tint = accent)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = "Search emoji", color = accent)
             }
+        }
+        }
+        if (composerMode && !reactionMode) {
+            CustomEmojiPackStrip(theme, newsSection, onSelect = { newsSection = it })
         }
         }
     }

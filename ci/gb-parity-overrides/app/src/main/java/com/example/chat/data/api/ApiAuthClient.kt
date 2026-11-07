@@ -44,21 +44,21 @@ class ApiAuthClient(
     private val token: () -> String? = { null },
 ) {
     /** ApiBackendService.login — identifier is sent verbatim as `username`. */
-    fun login(identifier: String, password: String): ApiAuthResult {
+    fun login(identifier: String, password: String, extraHeaders: Map<String, String> = emptyMap()): ApiAuthResult {
         val body = JSONObject().put("username", identifier).put("password", password).toString()
-        val response = postWithFallback("auth/token", body)
+        val response = postWithFallback("auth/token", body, extraHeaders = extraHeaders)
         return parseAuthResponse(response.first, response.second)
     }
 
     /** ApiBackendService.register — no displayName is sent; the display name
      *  comes back from the server response (see parseAuthResponse). */
-    fun register(email: String, username: String, password: String): ApiAuthResult {
+    fun register(email: String, username: String, password: String, extraHeaders: Map<String, String> = emptyMap()): ApiAuthResult {
         val body = JSONObject()
             .put("email", email)
             .put("username", username)
             .put("password", password)
             .toString()
-        val response = postWithFallback("auth/register", body)
+        val response = postWithFallback("auth/register", body, extraHeaders = extraHeaders)
         return parseAuthResponse(response.first, response.second)
     }
 
@@ -195,15 +195,19 @@ class ApiAuthClient(
 
     /** Outcome of POST /auth/refresh. [Rejected] means the refresh token is
      *  expired/revoked (the user must sign in again); [Unavailable] is a
-     *  network/server problem worth retrying later. */
+     *  network/server problem worth retrying later. [Ok.refreshToken] is the
+     *  rotated refresh token when the server rotates (single-use tokens);
+     *  the caller MUST persist it - replaying a consumed token revokes the
+     *  whole session server-side. Null means the server did not rotate. */
     sealed interface RefreshResult {
-        data class Ok(val accessToken: String) : RefreshResult
+        data class Ok(val accessToken: String, val refreshToken: String? = null) : RefreshResult
         data object Rejected : RefreshResult
         data object Unavailable : RefreshResult
     }
 
-    /** POST /auth/refresh {refreshToken} -> new access token (data.token). */
-    fun refresh(refreshToken: String): RefreshResult {
+    /** POST /auth/refresh {refreshToken} -> new access token (data.token) plus
+     *  the rotated refresh token (data.refreshToken / data.refresh_token). */
+    fun refresh(refreshToken: String, extraHeaders: Map<String, String> = emptyMap()): RefreshResult {
         val body = JSONObject().put("refreshToken", refreshToken).toString()
         val response = try {
             postWithFallback("auth/refresh", body)
@@ -215,7 +219,9 @@ class ApiAuthClient(
                 val parsed = JSONObject(response.second)
                 val data = parsed.optJSONObject("data") ?: parsed
                 val token = data.optString("token", "").ifEmpty { data.optString("access_token", "") }
-                if (token.isEmpty()) RefreshResult.Unavailable else RefreshResult.Ok(token)
+                if (token.isEmpty()) return RefreshResult.Unavailable
+                val rotated = data.optString("refreshToken", "").ifEmpty { data.optString("refresh_token", "") }
+                RefreshResult.Ok(token, rotated.ifBlank { null })
             } catch (_: Exception) {
                 RefreshResult.Unavailable
             }
@@ -336,8 +342,9 @@ class ApiAuthClient(
         path: String,
         body: String,
         tenant: String = tenantId(),
+        extraHeaders: Map<String, String> = emptyMap(),
     ): Pair<Int, String> {
-        val headers = mapOf("Content-Type" to "application/json", "x-tenant-id" to tenant)
+        val headers = mapOf("Content-Type" to "application/json", "x-tenant-id" to tenant) + extraHeaders
         val response = try {
             transport.execute("POST", "${baseUrl()}/$path", headers, body)
         } catch (e: Exception) {

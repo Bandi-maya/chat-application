@@ -34,6 +34,7 @@ class ApiAccountClient(
         allowUserRegistration: Boolean,
     ): Boolean {
         val clean = organizationIdOrTenantId.trim()
+        val safeId = safeOrganizationSegment(clean) ?: return false
         val headers = mutableMapOf(
             "Content-Type" to "application/json",
             "x-tenant-id" to tenantId(),
@@ -41,61 +42,58 @@ class ApiAccountClient(
         token()?.let { headers["Authorization"] = "Bearer $it" }
         val body = JSONObject().put("allow_user_registration", allowUserRegistration).toString()
         val response = transport.execute(
-            "PATCH", "${baseUrl()}/organization/$clean/registration", headers, body,
+            "PATCH", "${baseUrl()}/organization/$safeId/registration", headers, body,
         )
         return response.first == 200
     }
+
+    private fun safeOrganizationSegment(value: String): String? =
+        value.takeIf { candidate ->
+            candidate.length in 1..64 && candidate != "." && candidate != ".." &&
+                candidate.first().let { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' } &&
+                candidate.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' || it == '.' }
+        }
+
+    private fun safeMultipartFilename(value: String): String =
+        value.map { ch ->
+            if (ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9' || ch == '.' || ch == '_' || ch == '-') ch else '_'
+        }.joinToString("").trim('.', '_').take(120).ifBlank { "upload.bin" }
 
     /** Dart uploadProfilePhoto: multipart POST of field `file`; 404 retries
      *  against /api/v1; 200 returns (data.avatarUrl ?: data.url ?: ''); the
      *  current-user persistence stays with the ApiBackendService facade. */
     fun uploadProfilePhoto(filename: String, bytes: ByteArray): String {
-        // Capture base/tenant/token ONCE: primary and the /api/v1 retry use only these. A blank token is not a session.
-        val tok = token()?.takeIf { it.isNotBlank() } ?: throw Exception("Not authenticated")
-        val base = baseUrl(); val tenant = tenantId()
-        val unchanged = { baseUrl() == base && tenantId() == tenant && token() == tok }
-        return upload(base, tenant, tok, filename, bytes) { if (!unchanged()) throw ApiScopeChangedException() }
-    }
-
-    /** Account-bound form: routing, tenant and token come ONLY from [expected]; [isCurrent] (authSnapshot() === expected)
-     *  is checked before each request and again before the URL is returned. HTTP runs outside any lock. The caller
-     *  publishes the result to the local profile inside a short withScope(expected) callback. */
-    fun uploadProfilePhoto(expected: ApiAccountScope, isCurrent: () -> Boolean, filename: String, bytes: ByteArray): String {
-        val tok = expected.token?.takeIf { it.isNotBlank() && !expected.userId.isNullOrBlank() } ?: throw Exception("Not authenticated")
-        return upload(expected.baseUrl, expected.tenantId, tok, filename, bytes) { if (!isCurrent()) throw ApiScopeChangedException() }
-    }
-
-    private fun upload(base: String, tenant: String, tok: String, filename: String, bytes: ByteArray, check: () -> Unit): String {
+        val tok = token() ?: throw Exception("Not authenticated")
         val headers = mapOf(
             "Authorization" to "Bearer $tok",
-            "x-tenant-id" to tenant,
+            "x-tenant-id" to tenantId(),
             "Content-Type" to "multipart/form-data; boundary=$BOUNDARY",
         )
         val body = buildMultipartBody(safeMultipartFilename(filename), bytes)
 
         val response: Pair<Int, String> = try {
-            check()
-            val primary = binaryTransport.execute("POST", "$base/app-users/upload-photo", headers, body)
-            check()   // switch while in flight: no retry under a stale account
+            val primary = binaryTransport.execute(
+                "POST", "${baseUrl()}/app-users/upload-photo", headers, body,
+            )
             if (primary.first == 404) {
-                binaryTransport.execute("POST", "$base/api/v1/app-users/upload-photo", headers, body)
+                binaryTransport.execute(
+                    "POST", "${baseUrl()}/api/v1/app-users/upload-photo", headers, body,
+                )
             } else {
                 primary
             }
-        } catch (e: ApiScopeChangedException) {
-            throw e
         } catch (e: Exception) {
             throw Exception("Unable to reach server to upload photo: $e")
         }
-        check()   // never release a result into a replaced account
 
         if (response.first == 200) {
             val parsed = JSONObject(response.second)
             val data = if (parsed.has("data")) parsed.get("data") else parsed
             if (data is JSONObject) {
-                return (if (data.has("avatarUrl") && !data.isNull("avatarUrl")) data.get("avatarUrl")
+                val avatarUrl = (if (data.has("avatarUrl") && !data.isNull("avatarUrl")) data.get("avatarUrl")
                     else if (data.has("url") && !data.isNull("url")) data.get("url")
                     else "").toString()
+                return avatarUrl
             }
             return ""
         }
@@ -103,15 +101,15 @@ class ApiAccountClient(
         var detail = "Failed to upload profile photo (${response.first})"
         try {
             val parsed = JSONObject(response.second)
-            detail = parsed.optString("detail").ifEmpty { parsed.optString("message").ifEmpty { detail } }
+            detail = parsed.optString("detail").ifEmpty {
+                parsed.optString("message").ifEmpty {
+                    parsed.optJSONObject("error")?.optString("message")?.ifEmpty { null } ?: detail
+                }
+            }
         } catch (_: Exception) {
         }
         throw Exception(detail)
     }
-
-    private fun safeMultipartFilename(value: String): String = value.map { ch ->
-        if (ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9' || ch == '.' || ch == '_' || ch == '-') ch else '_'
-    }.joinToString("").trim('.', '_').take(120).ifBlank { "upload.bin" }
 
     private fun buildMultipartBody(filename: String, bytes: ByteArray): ByteArray {
         // Dart http.MultipartFile('file', ...) without an explicit content

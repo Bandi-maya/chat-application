@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
@@ -237,7 +238,7 @@ fun FriendMapScreen(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp).semantics { contentDescription = FriendMapCopy.MAP_STATUS_CHIP },
             ) {
                 Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.VisibilityOff, contentDescription = null, modifier = Modifier.size(14.dp), tint = mapColors.onSurfaceVariant)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eyeOff, semanticLabel = null, modifier = Modifier.size(14.dp), color = mapColors.onSurfaceVariant)
                     Spacer(Modifier.size(6.dp))
                     Text(FriendMapCopy.MAP_STATUS_CHIP, fontSize = 12.sp, fontWeight = FontWeight.W600, color = mapColors.onSurfaceVariant)
                 }
@@ -252,7 +253,7 @@ fun FriendMapScreen(
                     listOf("liberty" to "Streets", "positron" to "Light", "dark" to "Dark", "bright" to "Bright", "fiord" to "Fiord").forEach { (style, label) ->
                         ChatyDropdownMenuItem(
                             text = { Text(label, color = mapColors.onSurface, fontSize = 15.5.sp, fontWeight = FontWeight.W600) },
-                            trailingIcon = { if (selectedStyle == style) Icon(Icons.Rounded.Check, contentDescription = "Selected") },
+                            trailingIcon = { if (selectedStyle == style) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = "Selected") },
                             onClick = { layersOpen = false; mapView?.selectStyle(style) },
                         )
                     }
@@ -293,7 +294,7 @@ fun FriendMapScreen(
                     when (connection) {
                         FriendMapConnection.NotConnected -> {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                                Icon(Icons.Rounded.Groups, contentDescription = null, modifier = Modifier.size(36.dp), tint = mapColors.onSurfaceVariant)
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.groups, semanticLabel = null, modifier = Modifier.size(36.dp), color = mapColors.onSurfaceVariant)
                                 Spacer(Modifier.size(12.dp))
                                 Column {
                                     Text(FriendMapCopy.NOT_CONNECTED_TITLE, fontWeight = FontWeight.W600, fontSize = 14.5.sp)
@@ -307,7 +308,7 @@ fun FriendMapScreen(
                     HorizontalDivider(color = mapColors.outlineVariant)
                     Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.VisibilityOff, contentDescription = null, modifier = Modifier.size(20.dp), tint = mapColors.onSurfaceVariant)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eyeOff, semanticLabel = null, modifier = Modifier.size(20.dp), color = mapColors.onSurfaceVariant)
                         Spacer(Modifier.size(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Your location: not shared", fontWeight = FontWeight.W600, fontSize = 14.sp)

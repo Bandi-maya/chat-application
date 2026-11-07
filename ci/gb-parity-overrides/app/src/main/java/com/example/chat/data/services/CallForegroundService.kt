@@ -8,8 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
-import android.util.Log
 import android.os.IBinder
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 
 /**
  * Android foreground-execution wrapper for an already-authorized WebRTC call.
@@ -23,7 +26,7 @@ import android.os.IBinder
  *
  * Manifest (integration owner):
  *   <service android:name=".data.services.CallForegroundService"
- *       android:foregroundServiceType="microphone|camera" android:stopWithTask="true"/>
+ *       android:foregroundServiceType="microphone|camera|mediaProjection" android:stopWithTask="true"/>
  */
 class CallForegroundService : Service() {
 
@@ -31,14 +34,7 @@ class CallForegroundService : Service() {
     // (i.e. an active call per CallForegroundPolicy) runs, released in onDestroy.
     private var wakeLock: android.os.PowerManager.WakeLock? = null
     private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
-
-    // Owner of the session this service instance is currently serving: the
-    // started session's callId, or a synthetic id for direct (sessionless)
-    // starts. A couriered stop may only tear down the owner it names (see
-    // stop()): a stale teardown must never kill a newer call that started
-    // after it (118 evidence: a previous test's courier executed after a new
-    // start and destroyed its service 5ms into the call).
-    private var servingOwner: String? = null
+    @Volatile private var foregroundStarted = false
 
     private fun acquireLocks() {
         try {
@@ -56,7 +52,7 @@ class CallForegroundService : Service() {
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.w("CallForegroundService", "call lock acquire failed: ${e.javaClass.simpleName}")
+            android.util.Log.w("CallForegroundService", "call lock acquire failed: $e")
         }
     }
 
@@ -68,93 +64,50 @@ class CallForegroundService : Service() {
     }
 
     override fun onDestroy() {
-        if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG onDestroy")
         releaseLocks()
         super.onDestroy()
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-        if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG onCreate")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG onStartCommand entered startId=$startId")
-        if (intent?.action == ACTION_STOP) {
-            // Couriered stop (see stop()): satisfy any pending foreground
-            // requirement on this record, then remove the notification and
-            // stop. The platform kills the process when a record comes down
-            // while still waiting for start foreground (system_server:
-            // "Bringing down service while still waiting for start
-            // foreground"), so a stop must never race context.stopService
-            // against an in-flight startForegroundService.
-            if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG ACTION_STOP courier startId=$startId")
-            try {
-                ensureChannel()
-                val stopNotification = buildNotification("Chaty call", "", "")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(SERVICE_ID, stopNotification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-                } else {
-                    startForeground(SERVICE_ID, stopNotification)
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("CallForegroundService", "stop courier foreground failed: ${e.javaClass.simpleName}")
-            }
-            val stopOwner = intent.getStringExtra(EXTRA_STOP_OWNER)
-            val serving = servingOwner
-            when (stopDisposition(serving, stopOwner)) {
-                // No live session on this record: pure pending-requirement
-                // cleanup (the ForegroundServiceDidNotStartInTimeException case).
-                StopDisposition.CLEANUP -> {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf(startId)
-                }
-                // The courier names the session actually being served: tear down.
-                StopDisposition.ACCEPT -> {
-                    if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG stop accepted owner=${diagId(stopOwner)}")
-                    servingOwner = null
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf(startId)
-                }
-                // Anything else is a stale teardown racing a newer call: leave
-                // the live session (and its notification) alone.
-                StopDisposition.IGNORE -> if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG stale stop ignored serving=${diagId(serving)} owner=${diagId(stopOwner)}")
-            }
-            return START_NOT_STICKY
+        // Direct proof/test starts and lifecycle-owned starts both carry an
+        // owner-qualified token. Keep the owner prefix so a stale test or
+        // coordinator stop cannot stop a service owned by another caller.
+        intent?.getStringExtra(EXTRA_OWNER)?.substringBefore(':')?.takeIf { it.isNotBlank() }?.let { owner ->
+            synchronized(ownerLock) { activeOwnerToken = owner }
         }
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Chaty call"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: ""
         val isVideo = intent?.getBooleanExtra(EXTRA_IS_VIDEO, false) == true
-        val sessionId = intent?.getStringExtra(EXTRA_SESSION_ID).orEmpty()
-        // Foreground FIRST: on API 31+ the system kills the service with
-        // ForegroundServiceDidNotStartInTimeException if startForeground is not
-        // reached within a few seconds of startForegroundService(). Lock
-        // acquisition (wifi/wake) can block, so it must happen after the service
-        // is foreground, never before it.
-        ensureChannel()
-        val notification = buildNotification(title, text, sessionId)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val types = if (isVideo) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-            } else {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            }
-            startForeground(SERVICE_ID, notification, types)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val types = if (isVideo) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-            } else {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            }
-            startForeground(SERVICE_ID, notification, types)
-        } else {
-            startForeground(SERVICE_ID, notification)
-        }
-        servingOwner = intent?.getStringExtra(EXTRA_OWNER) ?: "anon-" + (++anonStartCounter)
-        if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG startForeground posted startId=$startId owner=${diagId(servingOwner)}")
+        val isScreenProjection = intent?.getBooleanExtra(EXTRA_SCREEN_PROJECTION, false) == true
+        val callId = intent?.getStringExtra(EXTRA_CALL_ID).orEmpty()
         acquireLocks()
+        ensureChannel()
+        val notification = buildNotification(title, text, callId)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                var types = if (isVideo) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                } else {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                }
+                if (isScreenProjection) {
+                    types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                }
+                startForeground(SERVICE_ID, notification, types)
+            } else {
+                startForeground(SERVICE_ID, notification)
+            }
+            foregroundStarted = true
+            if (isScreenProjection) projectionForegroundReady?.complete(true)
+        } catch (error: Exception) {
+            if (isScreenProjection) projectionForegroundReady?.complete(false)
+            android.util.Log.e("CallForegroundService", "Unable to enter requested foreground-service mode", error)
+            // Preserve an already-running voice/video call if only the optional
+            // screen-projection upgrade was rejected by Android.
+            if (!foregroundStarted) stopSelf(startId)
+        }
         // Dart allowAutoRestart=false: never recreated by the system without a live call.
         return START_NOT_STICKY
     }
@@ -181,128 +134,127 @@ class CallForegroundService : Service() {
         }
     }
 
-    private fun buildNotification(title: String, text: String, sessionId: String): Notification {
-        // Tapping returns to the in-app call UI only while a real session is active.
-        val showCall = android.app.PendingIntent.getActivity(
-            this, SERVICE_ID,
-            Intent(this, com.example.chat.MainActivity::class.java).apply {
-                action = com.example.chat.notifications.ChatyNotifications.ACTION_SHOW_CALL
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            },
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
-        )
-        val caller = androidx.core.app.Person.Builder().setName(title).build()
-        val builder = androidx.core.app.NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.sym_call_incoming)
+    private fun buildNotification(title: String, text: String, callId: String): Notification {
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+        // Dart notificationInitialRoute '/': tapping the notification brings the app to its launch screen.
+        val launch = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        if (launch != null) {
+            builder.setContentIntent(
+                android.app.PendingIntent.getActivity(
+                    this, SERVICE_ID, launch,
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+                ),
+            )
+        }
+        builder
             .setContentTitle(title)
             .setContentText(text)
+            .setSmallIcon(android.R.drawable.sym_call_incoming)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setContentIntent(showCall)
-        if (sessionId.isNotBlank()) {
-            val hangUp = android.app.PendingIntent.getBroadcast(
-                this, sessionId.hashCode(),
-                Intent(this, com.example.chat.notifications.CallActionReceiver::class.java).apply {
-                    action = com.example.chat.notifications.ChatyNotifications.ACTION_END_CALL
-                    data = android.net.Uri.Builder().scheme("chaty-call").authority("hangup").appendPath(sessionId).build()
-                    putExtra(com.example.chat.notifications.ChatyNotifications.EXTRA_CALL_ID, sessionId)
-                },
+        if (callId.isNotBlank()) {
+            val hangUp = Intent(this, com.example.chat.notifications.CallActionReceiver::class.java).apply {
+                action = com.example.chat.notifications.ChatyNotifications.ACTION_END_CALL
+                data = android.net.Uri.Builder().scheme("chaty-call").authority("hangup").appendPath(callId).build()
+                putExtra(EXTRA_CALL_ID, callId)
+            }
+            val hangUpPendingIntent = android.app.PendingIntent.getBroadcast(
+                this,
+                callId.hashCode(),
+                hangUp,
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
             )
-            // CallStyle provides the standard system-rendered hang-up action.
-            builder
-                .setCategory(androidx.core.app.NotificationCompat.CATEGORY_CALL)
-                .setStyle(androidx.core.app.NotificationCompat.CallStyle.forOngoingCall(caller, hangUp))
-        } else {
-            builder.setCategory(androidx.core.app.NotificationCompat.CATEGORY_SERVICE)
+            builder.addAction(
+                android.app.Notification.Action.Builder(
+                    android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
+                    "Hang up",
+                    hangUpPendingIntent,
+                ).build(),
+            )
         }
         return builder.build()
     }
 
-    // Nested at class level, not inside the companion object: Kotlin does
-    // not resolve companion-nested classifiers through the outer class
-    // name (run 120 unit-test compile failure), so tests can reference
-    // CallForegroundService.StopDisposition.
-    enum class StopDisposition { CLEANUP, ACCEPT, IGNORE }
-
     companion object {
         const val CHANNEL_ID = "chaty_active_call"
         const val SERVICE_ID = 7401
-        private const val TAG = "CallForegroundService"
         const val EXTRA_TITLE = "chaty.call.title"
         const val EXTRA_TEXT = "chaty.call.text"
         const val EXTRA_IS_VIDEO = "chaty.call.is_video"
-        private const val ACTION_STOP = "chaty.call.STOP"
-        const val EXTRA_SESSION_ID = "chaty.call.session_id"
-        const val EXTRA_CALL_ID = EXTRA_SESSION_ID
+        const val EXTRA_SCREEN_PROJECTION = "chaty.call.screen_projection"
+        const val EXTRA_CALL_ID = "chaty.call.call_id"
         const val EXTRA_OWNER = "chaty.call.owner"
-        private const val EXTRA_STOP_OWNER = "chaty.call.stop_owner"
 
-        private var anonStartCounter = 0
-        // Per wiring-owner record of what that owner last started: a stop may
-        // only name a session its own caller started, never a process-global
-        // "current" value (a delayed teardown would otherwise be stamped with
-        // a NEWER call's identity and still kill it).
-        private val lastStartedCallIdByToken = mutableMapOf<String, String>()
-        private var pendingSyncOwner: String? = null
-        // Diagnostics never print raw callIds or owner composites (they are
-        // identifiers and debug APKs ship with DEBUG logging on): owners get
-        // opaque process-local correlation labels instead.
-        private val diagIds = java.util.concurrent.ConcurrentHashMap<String, String>()
-        private fun diagId(owner: String?): String =
-            owner?.let { diagIds.getOrPut(it) { "own-" + diagIds.size } } ?: "none"
-        private fun forgetOwnerToken(token: String) {
-            synchronized(syncLock) { lastStartedCallIdByToken.remove(token) }
-            diagIds.keys.removeIf { it == token || it.startsWith(token + ":") }
+        private fun activeCallId(context: Context): String? =
+            runCatching { com.example.chat.ServiceLocator.callSignaling.currentSession?.callId }.getOrNull()
+
+        private val projectionReadyLock = Any()
+        private val ownerLock = Any()
+        @Volatile private var activeOwnerToken: String? = null
+        @Volatile private var projectionForegroundReady: CompletableDeferred<Boolean>? = null
+
+        /**
+         * Wait until Android confirms the running call service has entered the
+         * mediaProjection foreground-service type. The Activity obtains
+         * consent first; this handshake prevents ScreenCapturerAndroid from
+         * creating a MediaProjection too early.
+         */
+        suspend fun ensureScreenProjectionForeground(context: Context): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
+            val ready = synchronized(projectionReadyLock) {
+                projectionForegroundReady?.takeIf { !it.isCompleted }
+                    ?: CompletableDeferred<Boolean>().also { projectionForegroundReady = it }
+            }
+            val intent = Intent(context, CallForegroundService::class.java).apply {
+                putExtra(EXTRA_TITLE, "Chaty screen sharing")
+                putExtra(EXTRA_TEXT, "Sharing your screen in an active video call")
+                putExtra(EXTRA_IS_VIDEO, true)
+                putExtra(EXTRA_SCREEN_PROJECTION, true)
+                putExtra(EXTRA_CALL_ID, activeCallId(context).orEmpty())
+            }
+            return try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                withTimeout(5_000L) { ready.await() }
+            } catch (timeout: TimeoutCancellationException) {
+                android.util.Log.e("CallForegroundService", "Timed out waiting for mediaProjection foreground mode", timeout)
+                false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                android.util.Log.e("CallForegroundService", "Screen-share foreground setup failed", error)
+                false
+            } finally {
+                synchronized(projectionReadyLock) {
+                    if (projectionForegroundReady === ready) projectionForegroundReady = null
+                }
+            }
         }
-
-        private val syncLock = Any()
-        private var syncHandler: android.os.Handler? = null
-        private var pendingSync: Runnable? = null
 
         /** Sync entry point consumed by CallLifecycleCoordinator's
-         *  foregroundSync seam.
-         *
-         *  Start/stop decisions are serialized on the main thread and rapid
-         *  session flaps collapse to the latest state: every
-         *  startForegroundService() opens a "did not start in time" window,
-         *  and a start racing a later stop (the hang-up path) crashes the
-         *  process with ForegroundServiceDidNotStartInTimeException when the
-         *  window expires unserviced. Coalescing guarantees at most one
-         *  pending decision and that a terminal stop discards any queued
-         *  start. The pending slot always clears when its runnable runs, so
-         *  later sessions can start the service again. */
-        fun sync(context: Context, session: ChatyCallSession?, ownerToken: String) {
-            val appContext = context.applicationContext
-            val handler = syncHandler
-                ?: android.os.Handler(android.os.Looper.getMainLooper()).also { syncHandler = it }
-            synchronized(syncLock) {
-                pendingSync?.let { handler.removeCallbacks(it) }
-                val task = Runnable {
-                    synchronized(syncLock) { pendingSync = null }
-                    applySync(appContext, session, ownerToken)
-                }
-                pendingSync = task
-                pendingSyncOwner = session?.let { ownerToken + ":" + it.callId }
-                handler.post(task)
-            }
-        }
-
-        private fun applySync(context: Context, session: ChatyCallSession?, ownerToken: String) {
+         *  foregroundSync seam. */
+        fun sync(context: Context, session: ChatyCallSession?) {
             if (!CallForegroundPolicy.shouldRunFor(session)) {
-                if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG applySync -> stop (session=${session?.state})")
-                stop(context, ownerToken, session?.callId)
+                stop(context)
                 return
             }
-            if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG applySync -> startForegroundService (session=${session?.state})")
             val active = session!!
-            synchronized(syncLock) { lastStartedCallIdByToken[ownerToken] = active.callId }
             val intent = Intent(context, CallForegroundService::class.java).apply {
                 putExtra(EXTRA_TITLE, CallForegroundPolicy.notificationTitle(active))
                 putExtra(EXTRA_TEXT, CallForegroundPolicy.notificationText(active))
                 putExtra(EXTRA_IS_VIDEO, active.isVideo)
-                putExtra(EXTRA_SESSION_ID, active.callId)
-                putExtra(EXTRA_OWNER, ownerToken + ":" + active.callId)
+                putExtra(EXTRA_SCREEN_PROJECTION, active.isSharingScreen)
+                putExtra(EXTRA_CALL_ID, active.callId)
             }
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -310,83 +262,41 @@ class CallForegroundService : Service() {
                 } else {
                     context.startService(intent)
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // WebRTC remains the media source of truth; a foreground-service
                 // failure must never present as a successful background-call
                 // guarantee.
-                android.util.Log.w("CallForegroundService", "foreground start failed: ${e.javaClass.simpleName}")
             }
         }
 
-        // Stop authorization decisions, factored pure so the lifecycle
-        // regression matrix (old-token stop after new-token foreground, same
-        // callId under different owner tokens, stale owner vs another owner's
-        // queued start) is JVM-testable without instrumentation timing.
-        fun stopDisposition(serving: String?, stopOwner: String?): StopDisposition = when {
-            serving == null -> StopDisposition.CLEANUP
-            stopOwner != null && stopOwner == serving -> StopDisposition.ACCEPT
-            else -> StopDisposition.IGNORE
+        /** Owner-aware entry point used by CallLifecycleCoordinator. */
+        fun sync(context: Context, session: ChatyCallSession?, ownerToken: String) {
+            synchronized(ownerLock) { activeOwnerToken = ownerToken }
+            sync(context, session)
         }
 
-        fun shouldDiscardPendingStart(stopOwner: String?, pendingOwner: String?): Boolean =
-            stopOwner != null && stopOwner == pendingOwner
-
-        private fun stopOwnerFor(ownerToken: String?, callId: String?): String? = when {
-            ownerToken != null && callId != null -> ownerToken + ":" + callId
-            ownerToken != null -> synchronized(syncLock) { lastStartedCallIdByToken[ownerToken] }?.let { ownerToken + ":" + it }
-            else -> null
-        }
-
-        fun stop(context: Context, ownerToken: String? = null, callId: String? = null) {
-            // A terminal stop also discards any queued start decision - but
-            // only one queued by the SAME owner: a stale teardown must not
-            // discard a newer call's pending start either.
-            val handler = syncHandler
-            val stopOwner = stopOwnerFor(ownerToken, callId)
-            // Whole-owner teardown (app detach/dispose/account transition):
-            // do not retain that owner's tokens or session ids afterwards.
-            if (ownerToken != null && callId == null) forgetOwnerToken(ownerToken)
-            if (handler != null) {
-                synchronized(syncLock) {
-                    if (shouldDiscardPendingStart(stopOwner, pendingSyncOwner)) {
-                        pendingSync?.let { handler.removeCallbacks(it) }
-                        pendingSync = null
-                        pendingSyncOwner = null
-                    }
-                }
+        /** A stale coordinator may stop only the service instance it owns. */
+        fun stop(context: Context, ownerToken: String, nextOwnerToken: String?) {
+            synchronized(ownerLock) {
+                if (!ownerStopMayProceed(activeOwnerToken, ownerToken)) return
+                activeOwnerToken = nextOwnerToken
             }
-            // Stop authority originates from the caller: the session being
-            // disposed (ownerToken:callId), or that caller's own last-started
-            // session for whole-owner teardown (app detach/dispose). Never a
-            // process-global "current" value: a delayed old-owner teardown
-            // would otherwise be stamped with a newer call's identity and
-            // still kill it. A courier naming an older owner is ignored by
-            // the service if a newer call has since started.
-            if (com.example.chat.BuildConfig.DEBUG) Log.i(TAG, "FGS-DIAG stop requested (courier owner=${diagId(stopOwner)})")
-            // Never race context.stopService against an in-flight
-            // startForegroundService: if the platform processes the stop
-            // first it brings the record down with the foreground
-            // requirement still pending and kills the process with
-            // ForegroundServiceDidNotStartInTimeException. Couriering the
-            // stop as a start command on the same record keeps platform
-            // ordering: the service satisfies the requirement first, then
-            // removes its notification and stops itself.
+            stop(context)
+        }
+
+        /** Pure owner-stop decision consulted by [stop]: a stop proceeds only
+         *  when the caller's token matches the serving owner token (an
+         *  untokened caller proceeds only when nothing is serving).
+         *  JVM-testable seam; no behavior change. */
+        fun ownerStopMayProceed(activeOwnerToken: String?, stopOwnerToken: String?): Boolean =
+            activeOwnerToken == stopOwnerToken
+
+        fun stop(context: Context) {
+            synchronized(ownerLock) { activeOwnerToken = null }
             try {
-                context.startService(
-                    Intent(context, CallForegroundService::class.java).setAction(ACTION_STOP)
-                        .putExtra(EXTRA_STOP_OWNER, stopOwner),
-                )
-            } catch (e: Exception) {
-                // Background-start rejection means no foreground service is
-                // running or pending, so nothing needs the courier; the
-                // legacy direct stop is then a harmless no-op.
-                android.util.Log.w("CallForegroundService", "stop courier start failed: ${e.javaClass.simpleName}")
-                try {
-                    context.stopService(Intent(context, CallForegroundService::class.java))
-                } catch (_: Exception) {
-                }
+                context.stopService(Intent(context, CallForegroundService::class.java))
+            } catch (_: Exception) {
             }
         }
     }
 }
-

@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.chat.core.crypto.uniffi.UniffiMlsEngine
 import com.example.chat.data.auth.AuthRepository
 import com.example.chat.data.auth.AuthSessionManager
+import com.example.chat.data.auth.EncryptedGoTrueSessionStorage
 import com.example.chat.data.auth.SessionStore
 import com.example.chat.data.auth.SupabaseAuthClient
 import com.example.chat.data.e2ee.MlsE2eeService
@@ -85,13 +86,14 @@ object ServiceLocator {
 
     val authClient: SupabaseAuthClient by lazy { SupabaseAuthClient() }
 
-    private val sessionStorage: SessionStore by lazy { SessionStore(requireContext()) }
+    private val sessionStorage: com.example.chat.data.auth.SessionStorage by lazy { EncryptedGoTrueSessionStorage(requireContext()) }
 
     val sessionManager: AuthSessionManager by lazy {
         AuthSessionManager(auth = authClient, storage = sessionStorage)
     }
 
     private val accessToken: suspend () -> String? = { sessionManager.accessToken() }
+
     private val currentUserId: () -> String? = { sessionManager.currentUserId() }
 
     val authRepository: AuthRepository by lazy {
@@ -118,6 +120,11 @@ object ServiceLocator {
 
     /** REST backend (ApiBackendService on the api branch): the service the
      *  auth screens actually call; its session takes facade precedence. */
+    /** The ApiBackendService under construction. initialize() runs the FCM sync hook synchronously when a session is
+     *  stored; fcmRegistrar must reach the service through this field, not through the apiBackend lazy (re-entering
+     *  it recursed until StackOverflowError at launch, CI run 40267033954 job 121395203962). */
+    @Volatile private var apiBackendUnderConstruction: com.example.chat.data.api.ApiBackendService? = null
+
     /** One monitor for the process (created lazily with the single apiBackend). */
     val networkMonitor: com.example.chat.data.network.NetworkStatusMonitor by lazy {
         com.example.chat.data.network.NetworkStatusMonitor(requireContext())
@@ -143,6 +150,8 @@ object ServiceLocator {
             networkMonitor.state.collect { status ->
                 if (status.online && !wasOnline) service.onNetworkRegained()
                 wasOnline = status.online
+                // Re-tune active video calls whenever Android reports a network handover
+                // or a changed link-bandwidth estimate. Voice remains the priority.
                 if (status.online && callSignaling.hasActiveSession) {
                     runCatching {
                         callSignaling.onNetworkStatusChanged(
@@ -157,13 +166,92 @@ object ServiceLocator {
 
     val apiBackend: com.example.chat.data.api.ApiBackendService by lazy {
         com.example.chat.data.api.ApiBackendService(requireContext()).also { service ->
+            apiBackendUnderConstruction = service
+            service.deviceIdentity = com.example.chat.data.api.DeviceIdentityManager(secureStore)
             service.transferMonitor = transferMonitor
+            // Dart locator wiring for _syncFcmToken / unregisterOnLogout:
+            // deferred lambdas so the registrar's lazy init cannot cycle
+            // back into this lazy block during construction.
             service.onAttachmentsGone = { refs -> invalidateMediaFor(refs) }
+            service.secureMessageIngest = { data ->
+                appScope.launch {
+                    runCatching { conversationsRepository.ingestSecureEnvelope(data) }
+                }
+            }
+            service.secureMessageEditIngest = { data ->
+                appScope.launch {
+                    runCatching { conversationsRepository.applySecureEdit(data) }
+                }
+            }
+            service.secureMessageDeleteIngest = { data ->
+                appScope.launch {
+                    runCatching { conversationsRepository.applyRemoteDeleteForEveryone(data) }
+                }
+            }
+            service.syncFcmTokenHook = { fcmRegistrar.syncTokenOnLogin() }
+            service.unregisterFcmHook = { fcmRegistrar.unregisterOnLogout() }
             // Offline demo: fail-closed entry probe; a real GoTrue identity blocks demo mode.
             service.demoGoTruePresentHook = { sessionManager.hasAnySession() }
             service.initialize()
             startNetworkRecovery(service)
         }
+    }
+
+    /** FCM token lifecycle (firebase_notification_service.dart port),
+     *  installed into FcmRegistrarHolder so the framework-created
+     *  ChatyFirebaseMessagingService reaches it. Runtime delivery stays
+     *  inert until a real google-services.json lands. */
+    val fcmRegistrar: com.example.chat.data.api.FcmTokenRegistrar by lazy {
+        com.example.chat.data.api.FcmTokenRegistrar(
+            apiDevices = (apiBackendUnderConstruction ?: apiBackend).deviceTokenClient,
+            log = { android.util.Log.d("FcmTokenRegistrar", it) },
+            runAsync = { block -> Thread(block, "fcm-register").start() },
+            // Dart FirebaseMessaging.getToken(); throws IllegalStateException while FirebaseApp is
+            // not initialised (no google-services.json), which the registrar logs.
+            tokenFetcher = { onToken, onError ->
+                try {
+                    com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                        .addOnSuccessListener { token -> onToken(token) }
+                        .addOnFailureListener { error -> onError(error) }
+                } catch (error: Throwable) {
+                    // No google-services.json / FirebaseApp not initialised.
+                    onError(error)
+                }
+            },
+        ).also {
+            com.example.chat.notifications.FcmRegistrarHolder.registrar = it
+            installPushWakeHandler()
+        }
+    }
+
+    /** Push-agnostic wake wiring: a content-free nudge (any transport) runs a
+     *  bounded sync over the authenticated channel. */
+    private fun installPushWakeHandler() {
+        com.example.chat.notifications.PushWakeHolder.handler =
+            object : com.example.chat.notifications.PushWakeHandler {
+                override fun onSyncNudge() {
+                    apiBackend.onPushNudge()
+                }
+
+                override fun onIncomingCallNudge(callId: String) {
+                    // Fetch the queued offer over the authenticated channel;
+                    // the delivered signal surfaces the existing ring UI.
+                    apiBackend.pollCallSignalsNow()
+                }
+            }
+    }
+
+    /** Matrices 11/18: Room + SQLCipher encrypted local message DB. */
+    val secureMessageStore: com.example.chat.data.local.SecureMessageStore by lazy {
+        com.example.chat.data.local.SecureMessageStore(requireContext(), secureStore)
+    }
+
+    /** Media matrix: per-network auto-download rules + per-chat overrides. */
+    val mediaAutoDownloadGate: com.example.chat.data.media.MediaAutoDownloadGate by lazy {
+        com.example.chat.data.media.MediaAutoDownloadGate(
+            networkMonitor,
+            requireContext().getSharedPreferences("chaty_media_rules", android.content.Context.MODE_PRIVATE),
+        )
     }
 
     val themeController: com.example.chat.core.theme.ThemeController by lazy {
@@ -286,7 +374,7 @@ object ServiceLocator {
             store = AndroidPreferencesBlobStore(preferencesStorage),
             remote = SupabaseRemoteSettingsStore(queryClient),
             lockStore = localLockService,
-            auth = SessionAuthSource(sessionManager),
+            auth = SessionAndApiAuthSource(GoTrueAuthPlane(sessionManager), ApiBackendAuthPlane(apiBackend)),
             scope = appScope,
         )
     }
@@ -303,9 +391,33 @@ object ServiceLocator {
         )
     }
 
+    /** D1 (Supabase retirement): the MLS plane talks to the Chaty backend's
+     *  /e2ee routes; the shared Supabase rpcClient is no longer on the
+     *  encrypted path. Account-scoped: base URL, tenant and token always come
+     *  from the current api session snapshot. */
+    private val mlsRpcClient: com.example.chat.data.api.ApiMlsRpcClient by lazy {
+        com.example.chat.data.api.ApiMlsRpcClient(
+            baseUrl = { apiBackend.config.restApiBaseUrl },
+            tenantId = { apiBackend.config.tenantId },
+            token = { apiBackend.authSnapshot().token },
+            transport = com.example.chat.data.api.OkHttpApiTransport(),
+        )
+    }
+
+    /** D2=C encrypted attachment queue (upload/download/confirm of opaque
+     *  ciphertext blobs; keys travel only inside MLS messages). The
+     *  file-transfer flow wires in with the media section. */
+    val encryptedAttachments: com.example.chat.data.api.ApiEncryptedAttachmentClient by lazy {
+        com.example.chat.data.api.ApiEncryptedAttachmentClient(
+            baseUrl = { apiBackend.config.restApiBaseUrl },
+            tenantId = { apiBackend.config.tenantId },
+            token = { apiBackend.authSnapshot().token },
+        )
+    }
+
     val mls: MlsE2eeService by lazy {
         MlsE2eeService(
-            rpc = rpcClient,
+            rpc = mlsRpcClient,
             secureStorage = secureStore,
             currentAuthUserId = currentUserId,
             dbPathForUser = { safeUser -> requireContext().filesDir.absolutePath + "/mls" },
@@ -415,7 +527,11 @@ object ServiceLocator {
 
     val conversationsRepository: ConversationsRepository by lazy {
         ConversationsRepository(
-            rpc = rpcClient,
+            secureRpc = mlsRpcClient,
+            // D1: the repository's reads (conversations list, message list,
+            // profile search) ride the Chaty backend too - the Supabase
+            // PostgREST client is retired from the messaging path.
+            rpc = mlsRpcClient,
             queryClient = queryClient,
             mls = { mls },
             currentUserId = currentUserId,
@@ -424,6 +540,11 @@ object ServiceLocator {
             onPendingEnqueued = { appScope.launch { outgoingQueue.processQueue() } },
             snapshotCache = snapshotCache,
             snapshotScope = appScope,
+            scopeSnapshot = { apiBackend.authSnapshot() },
+            withScope = { expected, action ->
+                (expected as? com.example.chat.data.api.ApiAccountScope)
+                    ?.let { apiBackend.withAuthScope(it, action) } ?: false
+            },
             onAttachmentsGone = { refs -> invalidateMediaFor(refs) },
             // Dart backend_service _shouldSendReadReceipts: ghost mode, readReceipts and blue-ticks-after-reply.
             shouldSendReadReceipts = { conversationId ->
@@ -435,7 +556,26 @@ object ServiceLocator {
                     senderIds = conversationsRepository.messagesByChatId[conversationId]?.map { it.senderId },
                 )
             },
-        )
+        ).also { repo ->
+            // Matrices 11/18: mirror decrypted, user-visible messages into the
+            // SQLCipher DB so global search works offline.
+            repo.localMessageMirror = { conversationId, messages ->
+                val dao = secureMessageStore.database().messages()
+                dao.upsertAll(messages.map { m ->
+                    com.example.chat.data.local.LocalMessageEntity(
+                        id = m.id,
+                        conversationId = conversationId,
+                        senderId = m.senderId,
+                        type = m.type.name,
+                        text = m.text,
+                        caption = m.metadata["caption"]?.toString(),
+                        createdAtMillis = m.createdAt.toEpochMilli(),
+                        editedAtMillis = m.editedAt?.toEpochMilli(),
+                        isDeletedForEveryone = m.isDeletedForEveryone,
+                    )
+                })
+            }
+        }
     }
 
     val tasksRepository: TasksRepository by lazy {
@@ -551,6 +691,7 @@ object ServiceLocator {
             // verified, and CallHistoryService here is Postgrest-backed. Sink is a
             // no-op until the record plane is confirmed.
             callRecordSink = { },
+            iceServersProvider = { apiBackend.loadIceServers() },
             lowDataUsageEnabled = { callPresentationPrefs.value.lowDataUsageEnabled },
             captureAccountScope = { apiBackend.authSnapshot() },
             accountScopeValid = { expected -> apiBackend.authSnapshot() === expected },
@@ -573,6 +714,13 @@ object ServiceLocator {
                         guardScope = { action -> apiBackend.withAuthScope(expected, action) })
                 }
             }
+            // Calls matrix "survive network switch mid-call": feed transport
+            // changes (Wi-Fi <-> cellular) into ICE restart.
+            appScope.launch {
+                networkMonitor.state.collect { status ->
+                    svc.onNetworkTransportChanged(status.transport)
+                }
+            }
         }
     }
     /** Native direct file transfer over a dedicated WebRTC DataChannel. */
@@ -581,9 +729,10 @@ object ServiceLocator {
             context = requireContext(),
             scope = appScope,
             currentUserId = { apiBackend.currentUser?.id },
-            sendSignal = { targetUserId, data -> apiBackend.sendCallSignal(targetUserId, data); true },
+            sendSignal = { targetUserId, data -> apiBackend.sendCallSignal(targetUserId, data) },
             transferMonitor = transferMonitor,
             iceServers = { com.example.chat.data.transfer.P2pFileTransferService.parseIceServers(callSignaling.iceServersForTransfer()) },
+            networkStatus = { networkMonitor.state.value },
         ).also { service ->
             apiBackend.addScopedCallSignalListener { expected, data ->
                 if (data["signal_type"]?.toString()?.startsWith("file_transfer_") == true) {

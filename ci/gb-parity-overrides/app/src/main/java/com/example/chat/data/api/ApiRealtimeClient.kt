@@ -1,7 +1,5 @@
 package com.example.chat.data.api
 
-import com.example.chat.data.demo.DemoMode
-
 import com.example.chat.core.util.parseIsoOrNow
 import com.example.chat.domain.models.ChatMessage
 import java.time.Instant
@@ -85,6 +83,19 @@ class ApiRealtimeClient(
         fun onMessagesCleared(roomId: String) {}
         /** call_signal: payload['data'] ?? payload, only when it is a Map. */
         fun onCallSignal(data: Map<String, Any?>) {}
+        /** security.new_device: server-side security notification (new device
+         *  signed in awaiting confirmation). Payload forwarded verbatim. */
+        fun onSecurityNewDevice(payload: org.json.JSONObject) {}
+        /** new_message carrying an encrypted envelope (MLS secure plane):
+         *  routed to the secure ingest instead of the plaintext parser. */
+        fun onSecureMessage(data: Map<String, Any?>) {}
+
+        /** MLS edit fan-out (chat UI matrix): same opaque envelope shape as
+         *  onSecureMessage plus edited_at; the repository re-decrypts and
+         *  updates the local copy. */
+        fun onSecureMessageEdited(data: Map<String, Any?>) {}
+        /** config_changed: server configuration was republished; revalidate. */
+        fun onConfigChanged() {}
         fun onScopedCallSignal(data: Map<String, Any?>, capturedScope: Any?) { onCallSignal(data) }
         /** messages_read: another participant read [messageIds] in [roomId]. */
         fun onMessagesRead(roomId: String, messageIds: List<String>, readerId: String) {}
@@ -114,6 +125,9 @@ class ApiRealtimeClient(
     private var socketUrl: String? = null
     private var connecting = false
     private var pingCancel: Scheduler.Cancelable? = null
+    /** Last time a pong (or any inbound frame) proved the connection alive. */
+    private var lastInboundAt: Long = 0L
+    private val nowMs: () -> Long = { System.currentTimeMillis() }
     private var reconnectCancel: Scheduler.Cancelable? = null
     private var reconnectAttempt = 0
 
@@ -136,18 +150,20 @@ class ApiRealtimeClient(
      *  connecting/connected; cancels any pending reconnect; on immediate
      *  failure cleans up and schedules the 4s reconnect. */
     fun connect() = post {
-        // Offline demo: no socket is ever created for a demo session, from any
-        // caller (auth-transition listener, reconnect, send fallback).
-        if (DemoMode.active) return@post
         if (socket != null && (socketToken != token() || socketUrl != webSocketUrl() || socketScope !== connectionScopeIdentity())) cleanupLocked()
         if (connecting || socket != null) return@post
-        val connectToken = token()
-        if (connectToken == null || connectToken == DemoMode.TOKEN) return@post
-        val url = webSocketUrl()?.takeIf { it.isNotBlank() } ?: return@post
+        val currentToken = token()
+        if (currentToken.isNullOrBlank() || currentToken == com.example.chat.data.demo.DemoMode.TOKEN ||
+            com.example.chat.data.demo.DemoMode.active) {
+            cleanupLocked()
+            return@post
+        }
+        val configuredUrl = webSocketUrl()?.takeIf { it.isNotBlank() } ?: return@post
+        val url = runCatching { validateWebSocketUrl(configuredUrl) }.getOrNull() ?: return@post
         reconnectCancel?.cancel()
         reconnectCancel = null
         connecting = true
-        socketToken = token(); socketUrl = url; socketScope = connectionScopeIdentity()
+        socketToken = token(); socketUrl = configuredUrl; socketScope = connectionScopeIdentity()
         val expectedScope = socketScope
         var registered: Socket? = null
         val created = try {
@@ -183,68 +199,93 @@ class ApiRealtimeClient(
      *  fallback used only when the HTTP POST did not confirm. Fire-and-forget;
      *  Dart swallows errors. Returns whether a frame was queued (informational
      *  for logging/tests). */
-    fun sendMessageFallback(roomId: String, content: String): Boolean {
-        val s = socket ?: return false
-        return try {
-            s.send(
-                JSONObject()
-                    .put("type", "send_message")
-                    .put("room_id", roomId)
-                    .put("content", content)
-                    .toString(),
-            )
-        } catch (_: Exception) {
-            false
+    /** A frame is sent only on the socket still owned by the initiating account. */
+    private fun sendScopedFrame(
+        expectedSocket: Socket,
+        expectedScope: Any?,
+        frame: JSONObject,
+    ): Boolean {
+        var queued = false
+        val accepted = connectionScopeGuard(expectedScope) {
+            if (expectedSocket === socket &&
+                socketToken == token() &&
+                socketUrl == webSocketUrl() &&
+                expectedScope === connectionScopeIdentity()
+            ) {
+                queued = try { expectedSocket.send(frame.toString()) } catch (_: Exception) { false }
+            }
         }
+        return accepted && queued
     }
 
-    /** Scoped WS fallback: queues the frame only if the CURRENT socket was opened under exactly [expected] and the
-     *  guard (the service's withAuthScope) still accepts it. A socket from another account/route is never used
-     *  and never retargeted; false means "not sent". Short synchronous work only under the guard. */
-    fun sendMessageFallback(expected: Any, roomId: String, content: String): Boolean {
+    /** Message fallback sends only on the socket still owned by this account. */
+    fun sendMessageFallback(roomId: String, content: String): Boolean {
+        val safeRoomId = ApiPathSegments.safe(roomId) ?: return false
+        val currentSocket = socket ?: return false
+        return sendScopedFrame(
+            currentSocket,
+            socketScope,
+            JSONObject().put("type", "send_message").put("room_id", safeRoomId).put("content", content),
+        )
+    }
+
+    /** Typing indicator is account-scoped and only sent to a validated room. */
+    fun sendTyping(roomId: String, isTyping: Boolean): Boolean {
+        val safeRoomId = ApiPathSegments.safe(roomId) ?: return false
+        val currentSocket = socket ?: return false
+        return sendScopedFrame(
+            currentSocket,
+            socketScope,
+            JSONObject().put("type", "typing").put("room_id", safeRoomId).put("is_typing", isTyping),
+        )
+    }
+
+    /** Delivery ack is scoped to the account/socket that observed the message. */
+    fun sendDelivered(roomId: String): Boolean {
+        val safeRoomId = ApiPathSegments.safe(roomId) ?: return false
+        val currentSocket = socket ?: return false
+        return sendScopedFrame(
+            currentSocket,
+            socketScope,
+            JSONObject().put("type", "delivered").put("room_id", safeRoomId),
+        )
+    }
+
+
+    /** Recording indicator on the custom backend WebSocket; no Supabase RPC. */
+    fun sendRecording(roomId: String, isRecording: Boolean): Boolean {
         val s = socket ?: return false
-        if (socketScope !== expected) return false
+        val expectedScope = socketScope
         var queued = false
-        val accepted = connectionScopeGuard(expected) {
-            if (s === socket && socketScope === expected && socketToken == token() && socketUrl == webSocketUrl() && expected === connectionScopeIdentity()) {
+        val accepted = connectionScopeGuard(expectedScope) {
+            if (s === socket && socketToken == token() && socketUrl == webSocketUrl() &&
+                expectedScope === connectionScopeIdentity()
+            ) {
                 queued = try {
-                    s.send(JSONObject().put("type", "send_message").put("room_id", roomId).put("content", content).toString())
+                    s.send(
+                        JSONObject()
+                            .put("type", "recording")
+                            .put("room_id", roomId)
+                            .put("is_recording", isRecording)
+                            .toString(),
+                    )
                 } catch (_: Exception) { false }
             }
         }
         return accepted && queued
     }
-    /** Typing indicator for [roomId]; the server only relays it to that room's
-     *  participants (and only while the sender's typing indicators are enabled). */
-    fun sendTyping(roomId: String, isTyping: Boolean): Boolean {
-        val s = socket ?: return false
-        return try {
-            s.send(JSONObject().put("type", "typing").put("room_id", roomId).put("is_typing", isTyping).toString())
-        } catch (_: Exception) {
-            false
-        }
-    }
 
-    /** Delivery ack: tells the server a new message for [roomId] reached this device
-     *  (the sender's second grey tick). No-op when disconnected. */
-    fun sendDelivered(roomId: String): Boolean {
-        val s = socket ?: return false
-        return try {
-            s.send(JSONObject().put("type", "delivered").put("room_id", roomId).toString())
-        } catch (_: Exception) {
-            false
-        }
-    }
     /** Dart sendCallSignal (api_backend_service.dart:807): sends
      *  {type: call_signal, target_user_id, data}; no-op when disconnected. */
     fun sendCallSignal(targetUserId: String, data: Map<String, Any?>): Boolean {
+        val safeTargetUserId = ApiPathSegments.safe(targetUserId) ?: return false
         val s = socket ?: return false
         val expectedScope = socketScope
         var queued = false
         val accepted = connectionScopeGuard(expectedScope) {
             if (s === socket && socketToken == token() && socketUrl == webSocketUrl() && expectedScope === connectionScopeIdentity()) {
                 queued = try {
-                    s.send(JSONObject().put("type", "call_signal").put("target_user_id", targetUserId).put("data", toJson(data)).toString())
+                    s.send(JSONObject().put("type", "call_signal").put("target_user_id", safeTargetUserId).put("data", toJson(data)).toString())
                 } catch (_: Exception) { false }
             }
         }
@@ -259,6 +300,7 @@ class ApiRealtimeClient(
             if (socket !== this@ApiRealtimeClient.socket) return@post
             if (socketToken != token() || socketUrl != webSocketUrl() || socketScope !== connectionScopeIdentity()) return@post
             reconnectAttempt = 0
+            lastInboundAt = nowMs()
             handleMessage(text)
         }
 
@@ -279,6 +321,7 @@ class ApiRealtimeClient(
     private fun cleanupLocked() {
         pingCancel?.cancel()
         pingCancel = null
+        lastInboundAt = 0L
         try {
             socket?.close()
         } catch (_: Exception) {
@@ -305,6 +348,7 @@ class ApiRealtimeClient(
      *  schedules the reconnect, exactly like Dart. */
     private fun schedulePingLocked() {
         pingCancel?.cancel()
+        if (lastInboundAt == 0L) lastInboundAt = nowMs()  // fresh connection starts alive
         pingCancel = scheduler.schedule(PING_INTERVAL_MS) { pingTick() }
     }
 
@@ -312,6 +356,14 @@ class ApiRealtimeClient(
         val s = socket
         if (s == null || token() == null) {
             pingCancel = null
+            return
+        }
+        // Dead-connection detection: a proxy may have killed the socket without
+        // a close frame. No inbound traffic for PONG_TIMEOUT_MS => reconnect.
+        if (lastInboundAt > 0 && nowMs() - lastInboundAt > PONG_TIMEOUT_MS) {
+            pingCancel = null
+            cleanupLocked()
+            scheduleReconnectLocked()
             return
         }
         val ok = try {
@@ -334,7 +386,7 @@ class ApiRealtimeClient(
         try {
             val payload = JSONObject(text)
             when (payload.optString("type", "")) {
-                "pong" -> Unit
+                "pong" -> { lastInboundAt = nowMs() }
                 "call_signal" -> {
                     val raw = if (payload.has("data") && !payload.isNull("data")) {
                         payload.get("data")
@@ -350,17 +402,33 @@ class ApiRealtimeClient(
                         listener?.onScopedCallSignal(signal, socketScope)
                     }
                 }
+                "security.new_device" -> {
+                    listener?.onSecurityNewDevice(payload)
+                }
                 "new_message" -> {
                     val raw = dataOrMessage(payload) ?: return
-                    listener?.onNewMessage(ChatMessage.fromApi(ApiChatClient.deepMap(raw)))
+                    val mapped = ApiChatClient.deepMap(raw)
+                    if (mapped["encrypted"] == true) {
+                        listener?.onSecureMessage(mapped)
+                    } else {
+                        listener?.onNewMessage(ChatMessage.fromApi(mapped))
+                    }
+                }
+                "config_changed" -> {
+                    listener?.onConfigChanged()
                 }
                 "message_edited" -> {
                     val raw = dataOrMessage(payload) ?: return
-                    val msgId = str(raw, "uid") ?: str(raw, "id") ?: ""
-                    val roomId = str(raw, "room_id") ?: ""
-                    val newContent = str(raw, "content") ?: ""
-                    val editedAt = parseIsoOrNow(str(raw, "updated_at"))
-                    listener?.onMessageEdited(roomId, msgId, newContent, editedAt)
+                    val mapped = ApiChatClient.deepMap(raw)
+                    if (mapped["encrypted_payload"] != null || mapped["encrypted"] == true) {
+                        listener?.onSecureMessageEdited(mapped)
+                    } else {
+                        val msgId = str(raw, "uid") ?: str(raw, "id") ?: ""
+                        val roomId = str(raw, "room_id") ?: ""
+                        val newContent = str(raw, "content") ?: ""
+                        val editedAt = parseIsoOrNow(str(raw, "edited_at") ?: str(raw, "updated_at"))
+                        listener?.onMessageEdited(roomId, msgId, newContent, editedAt)
+                    }
                 }
                 "message_deleted" -> {
                     val raw = dataOrMessage(payload) ?: return
@@ -431,7 +499,9 @@ class ApiRealtimeClient(
             return url + (if (url.contains('?')) "&" else "?") + "token=" + encoded
         }
 
-        const val PING_INTERVAL_MS = 25_000L
+        const val PING_INTERVAL_MS = 45_000L  // proxies kill idle sockets at 60-120s
+        /** No pong for this many ms => the connection is silently dead. */
+        const val PONG_TIMEOUT_MS = 2 * PING_INTERVAL_MS
         const val RECONNECT_DELAY_MS = 4_000L
 
         /** Dart map access: missing key or JSON null both read as null. */
@@ -464,6 +534,32 @@ class ApiRealtimeClient(
          *  A value containing '/ws/school' is ignored at each level.
          *  '{userId}' / '$userId' placeholders are substituted; otherwise the
          *  standard '/chat/ws/<userId>' path is appended. */
+        private fun validateWebSocketUrl(value: String): String {
+            val uri = runCatching { java.net.URI(value.trim()) }.getOrElse {
+                throw IllegalArgumentException("WebSocket URL is invalid.", it)
+            }
+            val scheme = uri.scheme?.lowercase()
+            val host = uri.host?.lowercase().orEmpty().removePrefix("[").removeSuffix("]")
+            val loopback = host == "localhost" || host == "127.0.0.1" ||
+                host.startsWith("127.") || host == "10.0.2.2" || host == "::1"
+            val tokenSuppliedByConfig = uri.rawQuery
+                ?.split('&')
+                ?.any { it.substringBefore('=').equals("token", ignoreCase = true) } == true
+            require(uri.host.isNullOrBlank().not() && uri.rawUserInfo == null && uri.rawFragment == null) {
+                "WebSocket URL must have a host and cannot contain credentials or a fragment."
+            }
+            require(scheme == "wss" || (scheme == "ws" && loopback)) {
+                "WebSocket connections must use WSS except for loopback development hosts."
+            }
+            require(!tokenSuppliedByConfig) {
+                "WebSocket URL must not contain a configured token parameter."
+            }
+            return uri.toASCIIString()
+        }
+
+        /** Exact port of ApiBackendConfig.getWebSocketUrl. User IDs are always
+         *  validated as a single path segment. Remote connections must use
+         *  WSS because the bearer token is attached to the upgrade request. */
         fun resolveWebSocketUrl(
             userId: String,
             customWebSocketUrl: String?,
@@ -471,29 +567,31 @@ class ApiRealtimeClient(
             restApiBaseUrl: String,
         ): String {
             val cleanUserId = userId.trim()
-            if (!customWebSocketUrl.isNullOrEmpty() && !customWebSocketUrl.contains("/ws/school")) {
-                val ws = customWebSocketUrl.trim()
-                if (ws.contains("{userId}") || ws.contains("\$userId")) {
-                    return ws
-                        .replace("{userId}", cleanUserId)
-                        .replace("\$userId", cleanUserId)
-                }
-                return "${ws.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
+            require(ApiPathSegments.safe(cleanUserId) != null) {
+                "WebSocket user ID contains invalid path characters."
             }
-            if (envWebSocketUrl.isNotEmpty() && !envWebSocketUrl.contains("/ws/school")) {
-                if (envWebSocketUrl.contains("{userId}") || envWebSocketUrl.contains("\$userId")) {
-                    return envWebSocketUrl
-                        .replace("{userId}", cleanUserId)
-                        .replace("\$userId", cleanUserId)
+            val candidate = when {
+                !customWebSocketUrl.isNullOrEmpty() && !customWebSocketUrl.contains("/ws/school") -> {
+                    val ws = customWebSocketUrl.trim()
+                    if (ws.contains("{userId}") || ws.contains("\$userId")) {
+                        ws.replace("{userId}", cleanUserId).replace("\$userId", cleanUserId)
+                    } else "${ws.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
                 }
-                return "${envWebSocketUrl.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
+                envWebSocketUrl.isNotEmpty() && !envWebSocketUrl.contains("/ws/school") -> {
+                    if (envWebSocketUrl.contains("{userId}") || envWebSocketUrl.contains("\$userId")) {
+                        envWebSocketUrl.replace("{userId}", cleanUserId).replace("\$userId", cleanUserId)
+                    } else "${envWebSocketUrl.replace(Regex("/+$"), "")}/chat/ws/$cleanUserId"
+                }
+                else -> {
+                    val base = restApiBaseUrl
+                        .replaceFirst("https://", "wss://")
+                        .replaceFirst("http://", "ws://")
+                        .replace(Regex("/api/v[0-9]+/?$"), "")
+                        .replace(Regex("/+$"), "")
+                    "$base/chat/ws/$cleanUserId"
+                }
             }
-            val base = restApiBaseUrl
-                .replaceFirst("https://", "wss://")
-                .replaceFirst("http://", "ws://")
-                .replace(Regex("/api/v[0-9]+/?$"), "")
-                .replace(Regex("/+$"), "")
-            return "$base/chat/ws/$cleanUserId"
+            return validateWebSocketUrl(candidate)
         }
     }
 

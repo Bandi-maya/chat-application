@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.MyLocation
@@ -31,10 +32,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.takeOrElse
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.sp
 import com.example.chat.ui.kit.ChatyDropdownMenu
 import com.example.chat.ui.kit.ChatyDropdownMenuItem
@@ -62,7 +59,9 @@ import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
 
 /** Dedicated GeoLibre viewer. Explicitly opening this screen starts map tile requests, not GPS.
- * Provider attribution and the online-service notice remain in the map. No Send path exists. */
+ * The visible provider-attribution control is hidden in the bundled page (user direction,
+ * recorded in todo-01M5XXQ89E04GQZKM6X9M8HFMS); licence/provenance notices stay in
+ * assets/location-map/THIRD_PARTY_NOTICES.txt and no licence waiver is claimed. No Send path exists. */
 @Composable
 fun MapViewerScreen(
     context: Context,
@@ -202,9 +201,9 @@ fun MapViewerScreen(
     Surface(modifier = Modifier.fillMaxSize(), color = mapColors.background, contentColor = mapColors.onBackground) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                IconButton(onClick = { stopLocate(); gate.cancel(); onDismiss() }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Back" }) { Icon(Icons.Rounded.ChevronLeft, contentDescription = null) }
+                IconButton(onClick = { stopLocate(); gate.cancel(); onDismiss() }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Back" }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = null) }
                 Text("Map", modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.titleMedium)
-                IconButton(onClick = { friendsMapOpen = true }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Friends map" }) { Icon(Icons.Rounded.Groups, contentDescription = null) }
+                IconButton(onClick = { friendsMapOpen = true }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Friends map" }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.groups, semanticLabel = null) }
             }
             Box(Modifier.fillMaxWidth().weight(1f)) {
             if (mapActive) {
@@ -220,10 +219,10 @@ fun MapViewerScreen(
                 )
             }
             Column(Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                FilledIconButton(onClick = { mapView?.control("zoomIn") }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Zoom in" }, shape = androidx.compose.foundation.shape.CircleShape) { Icon(Icons.Rounded.Add, contentDescription = null) }
+                FilledIconButton(onClick = { mapView?.control("zoomIn") }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Zoom in" }, shape = androidx.compose.foundation.shape.CircleShape) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null) }
                 FilledIconButton(onClick = { mapView?.control("zoomOut") }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Zoom out" }, shape = androidx.compose.foundation.shape.CircleShape) { Icon(Icons.Rounded.Remove, contentDescription = null) }
                 FilledIconButton(onClick = { mapView?.control("toggleBuildings") }, enabled = rendererReady, colors = controlColors,
-                    modifier = Modifier.size(48.dp).semantics { contentDescription = "Toggle 3D buildings"; stateDescription = buildingsStateDescription }, shape = androidx.compose.foundation.shape.CircleShape) { BuildingsToggleLabel(if (buildingsEnabled) "2D" else "3D") }
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = "Toggle 3D buildings"; stateDescription = buildingsStateDescription }, shape = androidx.compose.foundation.shape.CircleShape) { Text(if (buildingsEnabled) "2D" else "3D", modifier = Modifier.clearAndSetSemantics { }) }
                 Box {
                 FilledIconButton(onClick = { layersOpen = true }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Map layers" }, shape = androidx.compose.foundation.shape.CircleShape) {
                     Icon(Icons.Rounded.Layers, contentDescription = null)
@@ -232,7 +231,7 @@ fun MapViewerScreen(
                     listOf("liberty" to "Streets", "positron" to "Light", "dark" to "Dark", "bright" to "Bright", "fiord" to "Fiord").forEach { (style, label) ->
                         ChatyDropdownMenuItem(
                             text = { Text(label, color = mapColors.onSurface, fontSize = 15.5.sp, fontWeight = FontWeight.W600) },
-                            trailingIcon = { if (selectedStyle == style) Icon(Icons.Rounded.Check, contentDescription = "Selected") },
+                            trailingIcon = { if (selectedStyle == style) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = "Selected") },
                             onClick = { layersOpen = false; mapView?.selectStyle(style) },
                         )
                     }
@@ -286,48 +285,3 @@ private suspend fun mapCurrentLocationFix(context: Context, manager: LocationMan
         }
     }
 
-/**
- * Draws the 2D/3D label without creating a semantics node, so the clickable button stays a childless node
- * and exposes its own contentDescription.
- *
- * Intended to use the same inputs as material3 Text (ambient LocalTextStyle, color precedence of style color
- * then LocalContentColor, Clip overflow, softWrap, unlimited lines, the incoming constraints and density).
- * Pixel equivalence with Text is NOT guaranteed and needs runtime validation (font scale 1.0 and 2.0, both
- * orientations). Known risks: TextMeasurer and Text use separate paragraph layout paths; drawText cannot
- * relayout when async font loading resolves; the layout result holder is a plain array written during
- * layout and read during draw, not snapshot state (draw invalidation relies on the draw lambda capturing text and
- * color, assumed, not runtime-verified).
- */
-@Composable
-private fun BuildingsToggleLabel(text: String) {
-    val style = LocalTextStyle.current
-    val textColor = style.color.takeOrElse { LocalContentColor.current }
-    val mergedStyle = style.merge(color = textColor)
-    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
-    val holder = remember { arrayOfNulls<androidx.compose.ui.text.TextLayoutResult>(1) }
-    Spacer(
-        Modifier
-            // Draw is the OUTER modifier: it wraps the node sized by the layout modifier below. A draw modifier placed
-            // inside a layout modifier that never measures its child is never measured, placed or drawn.
-            .drawBehind {
-                val result = holder[0]
-                // text and textColor are read here so this lambda changes with them and draw is re-invoked on 2D/3D
-                // and on enabled/disabled color changes even when the measured size is unchanged.
-                if (result != null && result.layoutInput.text.text == text) drawText(result, color = textColor)
-            }
-            .layout { _, constraints ->
-                val result = measurer.measure(
-                    text = text,
-                    style = mergedStyle,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Clip,
-                    softWrap = true,
-                    maxLines = Int.MAX_VALUE,
-                    constraints = constraints,
-                    layoutDirection = layoutDirection,
-                    density = this
-                )
-                holder[0] = result
-                layout(result.size.width, result.size.height) {}
-            }
-    )
-}

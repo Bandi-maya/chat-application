@@ -2,7 +2,6 @@ package com.example.chat.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import com.example.chat.data.demo.DemoMode
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -34,7 +33,9 @@ fun ChatsHomeHost(
     onOpenSecurity: () -> Unit,
     onOpenLockedChats: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenNotifications: () -> Unit = {},
     onOpenNewChat: (groupMode: Boolean, broadcastMode: Boolean) -> Unit = { _, _ -> },
+    onNewCall: () -> Unit = {},
     onOpenGlobalSearch: () -> Unit = {},
     onOpenMessageManagement: () -> Unit = {},
     onOpenStarredMessages: () -> Unit = {},
@@ -42,8 +43,9 @@ fun ChatsHomeHost(
     onOpenProfile: () -> Unit = {},
     onOpenQr: () -> Unit = {},
     onOpenLinkedDevices: () -> Unit = {},
-    /** Offline demo (NOT in Flutter): exit action for the demo banner. */
-    onExitDemo: () -> Unit = {},
+    /** Opens a root destination (tasks/updates) as a pushed screen; used when the
+     *  user hides them from the rail into the home header overflow menu. */
+    onOpenDestination: (String) -> Unit = {},
 ) {
     val api = ServiceLocator.apiBackend
     val prefs = ServiceLocator.preferencesController
@@ -53,10 +55,12 @@ fun ChatsHomeHost(
     var rev by remember { mutableIntStateOf(0) }
     var connectionSheetOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
     var connectionTesting by remember { androidx.compose.runtime.mutableStateOf(false) }
-    DisposableEffect(prefs) {
+    val templateController = ServiceLocator.templateController
+    DisposableEffect(prefs, templateController) {
         val l: () -> Unit = { rev++ }
         prefs.addListener(l)
-        onDispose { prefs.removeListener(l) }
+        templateController.addListener(l)
+        onDispose { prefs.removeListener(l); templateController.removeListener(l) }
     }
     @Suppress("UNUSED_EXPRESSION") rev
     val me = api.currentUser
@@ -64,8 +68,6 @@ fun ChatsHomeHost(
     fun find(id: String) = conversations.firstOrNull { it.id == id }
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
     fun setState(id: String, field: String, value: Boolean) {
-        // Offline demo: conversation state is server-side; refuse visibly.
-        if (api.isDemoSession) { toast(DemoMode.UNAVAILABLE_MESSAGE); return }
         // Stored on this device: the custom backend has no per-user chat state API yet.
         api.setConversationLocalState(id, field, value)
     }
@@ -83,17 +85,9 @@ fun ChatsHomeHost(
             )
         }
     } else null
-    // Offline demo (NOT in Flutter): visible marker + exit under the home header.
-    val demoBanner: (@Composable () -> Unit)? = if (api.isDemoSession) {
-        { DemoModeBanner(theme = headerTabsTheme, onExit = onExitDemo) }
-    } else null
-    val effectiveHeaderBottom: (@Composable () -> Unit)? = when {
-        demoBanner != null && headerBottom != null -> { { demoBanner(); headerBottom() } }
-        demoBanner != null -> demoBanner
-        else -> headerBottom
-    }
     ChatsHomeScreen(
-        headerBottom = effectiveHeaderBottom,
+        headerBottom = headerBottom,
+        templates = com.example.chat.ui.chats.home.resolveHomeTemplates(templateController.config, com.example.chat.core.preferences.HomePresentationPolicy.isDefault(prefs.home.homeStyle), templateController.chatList),
         conversations = conversations,
         requiresSubscription = api.requiresSubscription,
         subscriptionMessage = api.subscriptionErrorMessage,
@@ -129,10 +123,18 @@ fun ChatsHomeHost(
         onToggleGhostMode = { on -> prefs.updateHome(prefs.home.copy(ghostMode = on)) },
         verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },
         nav = ChatsHomeNav(
+            // User directive: rail-hidden Tasks/Updates live in the home header
+            // overflow menu and open the real destination screens (no preview).
+            showTasksEntry = prefs.gbBool("nav_hide_tasks", false),
+            showUpdatesEntry = prefs.gbBool("nav_hide_updates", false) && com.example.chat.ReleaseFeatures.STATUS_UPDATES,
+            onOpenTasks = { onOpenDestination(com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks) },
+            onOpenUpdates = { onOpenDestination(com.example.chat.core.templates.ChatyNavigationDestinationIds.updates) },
             onOpenSettings = onOpenSettings,
+            onOpenNotifications = onOpenNotifications,
             onOpenSecuritySettings = onOpenSecurity,
             onOpenLockedVault = onOpenLockedChats,
             onOpenNewChat = onOpenNewChat,
+            onNewCall = onNewCall,
             onOpenGlobalSearch = onOpenGlobalSearch,
             onOpenMessageManagement = onOpenMessageManagement,
             onOpenStarredMessages = onOpenStarredMessages,

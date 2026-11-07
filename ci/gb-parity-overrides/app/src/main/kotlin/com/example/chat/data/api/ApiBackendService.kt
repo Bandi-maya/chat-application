@@ -30,31 +30,14 @@ class ApiBackendService(
     context: Context,
     chatTransport: ApiHttpTransport = OkHttpApiTransport(),
 ) {
+    private val appContext = context.applicationContext
 
     private val authScopeLock = Any()
     val config = ApiBackendConfig(context, authScopeLock, ::notifyAuthScopeTransition)
 
-    private val prefs = context.applicationContext
-        .getSharedPreferences("chaty_api_backend", Context.MODE_PRIVATE)
-
-    private val sessionStore = object : ApiSessionStore {
-        override fun loadToken(): String? =
-            try { prefs.getString("api_hub_token", null) } catch (_: Exception) { null }
-        override fun loadUserJson(): String? =
-            try { prefs.getString("api_hub_user", null) } catch (_: Exception) { null }
-        override fun save(token: String, userJson: String) {
-            try {
-                prefs.edit()
-                    .putString("api_hub_token", token)
-                    .putString("api_hub_user", userJson)
-                    .apply()
-            } catch (_: Exception) {
-            }
-        }
-        override fun clear() {
-            try { prefs.edit().remove("api_hub_token").remove("api_hub_user").apply() } catch (_: Exception) {}
-        }
-    }
+    private val sessionStore: ApiSessionStore = EncryptedApiSessionStore(context.applicationContext)
+    // Non-secret account-local preferences and outbox only; credentials live in sessionStore.
+    private val prefs = context.applicationContext.getSharedPreferences("chaty_api_backend", Context.MODE_PRIVATE)
 
     private val auth = ApiAuthClient(
         baseUrl = { config.restApiBaseUrl },
@@ -64,6 +47,16 @@ class ApiBackendService(
     )
 
     private val session = ApiAuthSession(sessionStore, authScopeLock, ::notifyAuthScopeTransition)
+
+    /** Phase 5: server-controlled configuration, revalidated with ETag on
+     *  login and app start (never polled). Failures keep the last cache. */
+    val serverConfig = ApiConfigClient(
+        baseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        token = { session.token },
+        transport = OkHttpApiTransport(),
+        cache = ApiConfigStore(context.applicationContext),
+    )
     private val authScopeOwner = ApiAccountScopeOwner(authScopeLock, session::snapshot, config::snapshot)
     fun authSnapshot(): ApiAccountScope = authScopeOwner.snapshot()
     fun withAuthScope(expected: ApiAccountScope, block: () -> Unit): Boolean = authScopeOwner.withScope(expected, block)
@@ -170,6 +163,67 @@ class ApiBackendService(
     private val callSignalListeners =
         java.util.concurrent.CopyOnWriteArrayList<(Map<String, Any?>) -> Unit>()
 
+    /**
+     * Loads short-lived ICE credentials from the Chaty custom API.
+     * The authenticated user identity is taken from the current account scope;
+     * credentials are never requested from Supabase and are never cached.
+     */
+    suspend fun loadIceServers(): List<Map<String, Any?>> = withContext(Dispatchers.IO) {
+        val expected = authSnapshot()
+        val bearer = expected.token?.takeIf { it.isNotBlank() }
+            ?: throw SecurityException("Sign in to load WebRTC ICE credentials.")
+        val base = expected.baseUrl.trimEnd('/')
+        val uri = runCatching { java.net.URI(base) }.getOrElse {
+            throw IllegalStateException("Custom API URL is invalid.")
+        }
+        val loopback = uri.host in setOf("localhost", "127.0.0.1", "10.0.2.2", "::1")
+        if (uri.host.isNullOrBlank() || (uri.scheme != "https" && !(loopback && uri.scheme == "http")) ||
+            uri.userInfo != null || uri.query != null || uri.fragment != null
+        ) throw SecurityException("ICE credentials require a secure custom API URL.")
+
+        val headers = mapOf(
+            "Authorization" to "Bearer $bearer",
+            "x-tenant-id" to expected.tenantId,
+            "Accept" to "application/json",
+        )
+        val transport = OkHttpApiTransport()
+        val primary = transport.execute("GET", "$base/chat/call/ice-servers", headers, null)
+        val response = if (primary.first == 404) {
+            transport.execute("GET", "$base/api/v1/chat/call/ice-servers", headers, null)
+        } else primary
+        if (authSnapshot() !== expected) throw kotlinx.coroutines.CancellationException("Account changed while loading ICE credentials.")
+        if (response.first == 401 || response.first == 403) throw SecurityException("Custom API rejected ICE credential authorization.")
+        if (response.first !in 200..299) throw IllegalStateException("Custom ICE endpoint failed (${response.first}).")
+
+        val json = org.json.JSONObject(response.second)
+        val raw = json.optJSONArray("ice_servers")
+            ?: throw IllegalStateException("Custom ICE endpoint returned no ice_servers array.")
+        if (raw.length() > 16) throw SecurityException("Custom ICE endpoint returned too many ICE servers.")
+        val servers = ArrayList<Map<String, Any?>>(raw.length())
+        for (index in 0 until raw.length()) {
+            val item = raw.optJSONObject(index) ?: continue
+            val rawUrls = item.opt("urls")
+            val urls = when (rawUrls) {
+                is String -> listOf(rawUrls)
+                is org.json.JSONArray -> (0 until rawUrls.length()).mapNotNull { i ->
+                    rawUrls.optString(i).takeIf { it.isNotBlank() }
+                }
+                else -> emptyList()
+            }.onEach { url ->
+                if (!url.startsWith("stun:", true) && !url.startsWith("stuns:", true) &&
+                    !url.startsWith("turn:", true) && !url.startsWith("turns:", true)
+                ) throw SecurityException("Custom ICE endpoint returned an unsupported ICE URL.")
+            }
+            if (urls.isEmpty()) continue
+            val entry = linkedMapOf<String, Any?>("urls" to if (rawUrls is String) urls.first() else urls)
+            item.optString("username").takeIf { it.isNotBlank() }?.let { entry["username"] = it }
+            item.optString("credential").takeIf { it.isNotBlank() }?.let { entry["credential"] = it }
+            servers += entry
+        }
+        if (servers.isEmpty()) throw IllegalStateException("Custom ICE endpoint returned no usable ICE servers.")
+        servers
+    }
+
     fun addCallSignalListener(listener: (Map<String, Any?>) -> Unit) = callSignalListeners.add(listener)
     /** Dart ApiBackendService.sendCallSignal: fire-and-forget call signaling
      *  over the custom-backend WebSocket (payload type call_signal). */
@@ -183,6 +237,9 @@ class ApiBackendService(
     fun removeCallSignalListener(listener: (Map<String, Any?>) -> Unit) { callSignalListeners.remove(listener) }
 
     private val scopedCallListeners = java.util.concurrent.CopyOnWriteArrayList<(ApiAccountScope, Map<String, Any?>) -> Unit>()
+    /** Push ring nudge: one-shot REST poll of queued call signals while the
+     *  socket is down (app may be backgrounded). */
+    fun pollCallSignalsNow() = callCoordinator.pollNow()
     fun addScopedCallSignalListener(listener: (ApiAccountScope, Map<String, Any?>) -> Unit) = scopedCallListeners.add(listener)
     private val callRequests = CallRequestRegistry()
     private val sendRequests = CallRequestRegistry()
@@ -232,7 +289,29 @@ class ApiBackendService(
         )
     }
 
-    private val realtimeListener = object : ApiRealtimeClient.Listener {
+    private val realtimeListener: ApiRealtimeClient.Listener = object : ApiRealtimeClient.Listener {
+        override fun onSecurityNewDevice(payload: org.json.JSONObject) {
+            securityEvents.tryEmit(payload)
+        }
+
+        override fun onSecureMessage(data: Map<String, Any?>) {
+            secureMessageIngest?.invoke(data)
+        }
+
+        override fun onSecureMessageEdited(data: Map<String, Any?>) {
+            secureMessageEditIngest?.invoke(data)
+        }
+
+        override fun onMessageDeleted(roomId: String, messageId: String) {
+            secureMessageDeleteIngest?.invoke(mapOf("room_id" to roomId, "id" to messageId, "for_everyone" to true))
+        }
+
+        override fun onConfigChanged() {
+            // Telegram-style push invalidation: revalidate (ETag) on the hint;
+            // the fresh document activates on the next app start.
+            chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
+        }
+
         override fun onNewMessage(message: ChatMessage) {
             var unknownRoom = false
             var isNewToList = false
@@ -438,6 +517,15 @@ class ApiBackendService(
         realtime.sendTyping(roomId, isTyping)
     }
 
+    /** Publishes voice-note recording state through the custom backend socket. */
+    fun sendRecording(roomId: String, isRecording: Boolean): Boolean {
+        val expected = authSnapshot()
+        if (expected.token.isNullOrBlank() || roomId.isBlank()) return false
+        var queued = false
+        withAuthScope(expected) { queued = realtime.sendRecording(roomId, isRecording) }
+        return queued
+    }
+
     /** Marks the room read on the server and clears the local unread badge. */
     fun markConversationRead(chatId: String) {
         if (session.token == null || chatId.isEmpty()) return
@@ -508,10 +596,36 @@ class ApiBackendService(
     private val realtime: ApiRealtimeClient = ApiRealtimeClient(
         webSocketUrl = { resolveWebSocketUrl() },
         token = { session.token },
-        backoff = com.example.chat.data.network.BackoffPolicy(),
+        // Reconnect-storm-safe full jitter (500ms base, 30s cap): every retry is
+        // uniformly spread, so a server restart never sees a thundering herd.
+        backoff = com.example.chat.data.network.BackoffPolicy(
+            baseMs = 500L, maxMs = 30_000L, fullJitter = true,
+        ),
         connectionScopeIdentity = { authSnapshot() },
-        connectionScopeGuard = { expected: Any?, action: () -> Unit -> (expected as? ApiAccountScope)?.let { withAuthScope(it, action) } ?: false },
+        connectionScopeGuard = { expected, action -> (expected as? ApiAccountScope)?.let { withAuthScope(it, action) } ?: false },
     ).apply { listener = realtimeListener }
+
+    /** Content-free push nudge (FCM or any wake transport): the message
+     *  itself told us nothing, so do a bounded sync over the authenticated
+     *  channel. Single-flight; safe to call repeatedly. */
+    @Volatile private var pushSyncRunning = false
+    fun onPushNudge() {
+        if (session.token == null || DemoMode.active) return
+        synchronized(this) {
+            if (pushSyncRunning) return
+            pushSyncRunning = true
+        }
+        chatScope.launch(Dispatchers.IO) {
+            try {
+                ensureFreshToken()
+                ensureOutboxLoaded()
+                flushOutbox()
+                loadConversations()
+            } finally {
+                pushSyncRunning = false
+            }
+        }
+    }
 
     /** Network regained after loss: reconnect the socket now instead of waiting out the backoff.
      *  No-op while connected, connecting or signed out. */
@@ -522,6 +636,29 @@ class ApiBackendService(
 
     /** Invalidates local media copies for deleted/removed messages. Set by the locator BEFORE initialize(). */
     @Volatile var onAttachmentsGone: (List<com.example.chat.data.local.AttachmentRef>) -> Unit = {}
+
+    /** Wired by ServiceLocator: secure-plane realtime envelopes (MLS) go to
+     *  the conversations repository for decrypt+merge with gap healing. */
+    @Volatile var secureMessageIngest: ((Map<String, Any?>) -> Unit)? = null
+
+    /** MLS edit fan-out (chat UI matrix): re-decrypt + update in place. */
+    @Volatile var secureMessageEditIngest: ((Map<String, Any?>) -> Unit)? = null
+
+    /** Delete-for-everyone fan-out: tombstone the local copy. */
+    @Volatile var secureMessageDeleteIngest: ((Map<String, Any?>) -> Unit)? = null
+
+    /** Wired by ServiceLocator. Binds sessions to this device's Ed25519 key:
+     *  login/register send x-device-id + x-device-public-key; every refresh
+     *  signs the presented refresh token as x-device-proof. Null = legacy
+     *  unbound sessions (still accepted by the server). */
+    @Volatile var deviceIdentity: DeviceIdentityManager? = null
+
+    /** Server security notifications (currently: new device signed in and
+     *  awaiting confirmation). Collected by the UI layer to prompt the user
+     *  to confirm or kill the session (48h auto-confirm server-side). */
+    val securityEvents = kotlinx.coroutines.flow.MutableSharedFlow<org.json.JSONObject>(
+        replay = 1, extraBufferCapacity = 8,
+    )
     private fun notifyGone(refs: List<com.example.chat.data.local.AttachmentRef>) {
         if (refs.isNotEmpty()) runCatching { onAttachmentsGone(refs) }
     }
@@ -649,8 +786,8 @@ class ApiBackendService(
         // block demo entry (never overwritten). A STRICTLY-demo persisted
         // pair is the one exception: re-entering the demo replaces it.
         run {
-            val storedToken = try { prefs.getString("api_hub_token", null) } catch (_: Exception) { null }
-            val storedUser = try { prefs.getString("api_hub_user", null) } catch (_: Exception) { null }
+            val storedToken = runCatching { sessionStore.loadToken() }.getOrNull()
+            val storedUser = runCatching { sessionStore.loadUserJson() }.getOrNull()
             val anyRaw = storedToken != null || storedUser != null ||
                 session.token != null || session.currentUser != null
             val strictDemo = DemoMode.isDemoRestSession(storedToken, storedUser) &&
@@ -706,32 +843,47 @@ class ApiBackendService(
     /** ApiBackendService.loadTasks: GET /tasks into _tasks, keeping prior
      *  state on failure or when unauthenticated (Dart early return/catch). */
     suspend fun loadTasks() {
-        val result = withContext(Dispatchers.IO) { tasksClient.listTasks() } ?: return
-        synchronized(chatLock) {
-            _tasks.clear()
-            _tasks.addAll(result)
-        }
-        notifyChatListeners()
+        val expected = authSnapshot()
+        var changed = false
+        val applied = com.example.chat.data.api.publishScopedApiResult(expected, ::withAuthScope,
+            fetch = { withContext(Dispatchers.IO) { tasksClient.listTasks() } },
+            publish = { result ->
+                if (result != null) {
+                    synchronized(chatLock) {
+                        _tasks.clear()
+                        _tasks.addAll(result)
+                    }
+                    changed = true
+                }
+            })
+        if (applied && changed) notifyChatListeners()
     }
 
     suspend fun loadConversations() {
-        when (val result = withContext(Dispatchers.IO) { chat.listRooms() }) {
-            is ApiChatClient.RoomsResult.Ok -> {
-                synchronized(chatLock) {
-                    _conversations.clear()
-                    _conversations.addAll(result.conversations.filter { !it.isTask })
+        val expected = authSnapshot()
+        var changed = false
+        val applied = com.example.chat.data.api.publishScopedApiResult(expected, ::withAuthScope,
+            fetch = { withContext(Dispatchers.IO) { chat.listRooms() } },
+            publish = { result ->
+                when (result) {
+                    is ApiChatClient.RoomsResult.Ok -> {
+                        synchronized(chatLock) {
+                            _conversations.clear()
+                            _conversations.addAll(result.conversations.filter { !it.isTask })
+                        }
+                        requiresSubscription = false
+                        subscriptionErrorMessage = null
+                        changed = true
+                    }
+                    ApiChatClient.RoomsResult.SubscriptionRequired -> {
+                        requiresSubscription = true
+                        subscriptionErrorMessage = "Workspace subscription required. Please select a plan."
+                        changed = true
+                    }
+                    ApiChatClient.RoomsResult.Failed -> Unit
                 }
-                requiresSubscription = false
-                subscriptionErrorMessage = null
-                notifyChatListeners()
-            }
-            ApiChatClient.RoomsResult.SubscriptionRequired -> {
-                requiresSubscription = true
-                subscriptionErrorMessage = "Workspace subscription required. Please select a plan."
-                notifyChatListeners()
-            }
-            ApiChatClient.RoomsResult.Failed -> Unit
-        }
+            })
+        if (applied && changed) notifyChatListeners()
     }
 
     /** loadMessages with Dart merge semantics: pending (sending/temp) messages
@@ -1070,6 +1222,7 @@ class ApiBackendService(
         val effectiveContent = if (attachment != null) {
             val o = org.json.JSONObject()
             o.put("type", type.name)
+            o.put("id", attachment.id)
             o.put("url", attachment.url ?: org.json.JSONObject.NULL)
             o.put("name", attachment.name)
             o.put("size", attachment.size)
@@ -1154,6 +1307,12 @@ class ApiBackendService(
                     type = runCatching { MessageType.valueOf(o.optString("type", "text")) }.getOrDefault(MessageType.text),
                     text = o.optString("text"),
                     attachment = att,
+                    metadata = runCatching {
+                        val content = org.json.JSONObject(o.getString("content"))
+                        com.example.chat.core.stickers.StickerMessagePolicy.parse(content.optString("type"),
+                            listOf("chaty_sticker_version", "chaty_sticker_pack", "chaty_sticker_id")
+                                .associateWith { key -> if (content.has(key)) content.opt(key) else null })
+                    }.getOrDefault(emptyMap()),
                     createdAt = runCatching { Instant.parse(o.optString("created_at")) }.getOrDefault(Instant.now()),
                     deliveryState = DeliveryState.sending,
                 )
@@ -1218,8 +1377,35 @@ class ApiBackendService(
 
     /** One HTTP attempt for a queued message; updates the chat and the outbox from the result. */
     private suspend fun sendOutboxEntry(entry: OutboxEntry): ApiChatClient.SendResult {
-        val result = withContext(Dispatchers.IO) {
-            chat.sendMessageResult(entry.conversationId, entry.content, clientId = entry.tempId)
+        val payloadBytes = entry.content.toByteArray(Charsets.UTF_8).size.toLong()
+        val ledger = transferMonitor
+        val transferId = ledger?.begin(
+            com.example.chat.data.network.TransferDirection.upload,
+            com.example.chat.data.network.TransferKind.message,
+            payloadBytes,
+            "Message",
+        )
+        val result = try {
+            withContext(Dispatchers.IO) {
+                chat.sendMessageResult(entry.conversationId, entry.content, clientId = entry.tempId)
+            }
+        } catch (error: Throwable) {
+            if (transferId != null) ledger?.finish(transferId, com.example.chat.data.network.TransferStatus.failed)
+            throw error
+        }
+        if (transferId != null) {
+            when (result) {
+                is ApiChatClient.SendResult.Ok -> {
+                    ledger?.update(transferId, payloadBytes, payloadBytes)
+                    ledger?.finish(transferId)
+                }
+                is ApiChatClient.SendResult.Rejected ->
+                    ledger?.finish(transferId, com.example.chat.data.network.TransferStatus.failed)
+                ApiChatClient.SendResult.Offline -> {
+                    ledger?.setStatus(transferId, com.example.chat.data.network.TransferStatus.paused)
+                    ledger?.finish(transferId, com.example.chat.data.network.TransferStatus.paused)
+                }
+            }
         }
         when (result) {
             is ApiChatClient.SendResult.Ok -> {
@@ -1343,6 +1529,9 @@ class ApiBackendService(
      *  ServiceLocator wires these hooks instead (same effect, no cycle). */
     var syncFcmTokenHook: (() -> Unit)? = null
     var unregisterFcmHook: (() -> Unit)? = null
+    /** Optional process-wide ledger for visible message-transfer progress and payload usage. */
+    @Volatile var transferMonitor: com.example.chat.data.network.TransferMonitor? = null
+
     /** Offline demo: returns true when any real GoTrue identity is live or
      *  persisted (wired by ServiceLocator). Demo entry FAILS CLOSED in that
      *  case; a real stored session is never cleared as demo prep. */
@@ -1351,15 +1540,31 @@ class ApiBackendService(
     /** Dart ApiBackendService.uploadMedia (api_backend_service.dart:1569):
      *  multipart POST /chat/upload with the /api/v1 404 fallback. */
     suspend fun uploadMedia(file: java.io.File): Map<String, Any> =
-        withContext(Dispatchers.IO) { mediaUpload.uploadMedia(file) }
+        uploadMedia(file) { _, _ -> }
+
+    /** Stream a file through the custom backend without reading it into a ByteArray. */
+    suspend fun uploadMedia(
+        file: java.io.File,
+        onProgress: (transferred: Long, total: Long) -> Unit,
+    ): Map<String, Any> {
+        val expected = authSnapshot()
+        return withContext(Dispatchers.IO) {
+            mediaUpload.uploadMedia(expected, { authSnapshot() === expected }, file, onProgress)
+        }
+    }
 
     /** Byte-array form used by ChatMediaService's post-compression payload;
      *  Dart uploads the (possibly compressed) File, whose filename is the
      *  attachment name - here the name travels alongside the bytes. */
-    suspend fun uploadMedia(filename: String, bytes: ByteArray, expectedScope: ApiAccountScope? = null): Map<String, Any> {
+    suspend fun uploadMedia(
+        filename: String,
+        bytes: ByteArray,
+        expectedScope: ApiAccountScope? = null,
+        onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
+    ): Map<String, Any> {
         val expected = expectedScope ?: authSnapshot()      // captured ONCE: primary, 404 retry and result check share it
         return withContext(Dispatchers.IO) {
-            mediaUpload.uploadMedia(expected, { authSnapshot() === expected }, filename, bytes)
+            mediaUpload.uploadMedia(expected, { authSnapshot() === expected }, filename, bytes, onProgress)
         }
     }
 
@@ -1384,8 +1589,8 @@ class ApiBackendService(
         // guard BEFORE restore() fires its transition listeners.
         try {
             if (DemoMode.isDemoRestSession(
-                    prefs.getString("api_hub_token", null),
-                    prefs.getString("api_hub_user", null),
+                    sessionStore.loadToken(),
+                    sessionStore.loadUserJson(),
                 )
             ) {
                 DemoMode.active = true
@@ -1407,6 +1612,8 @@ class ApiBackendService(
                 seedDemoState()
                 DemoMode.active = true
             } else {
+                SessionRefreshWorker.schedule(appContext) // keep the session alive between app opens
+                chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
                 chatScope.launch { ensureFreshToken() }
                 realtime.connect()
                 startBackgroundSync()
@@ -1438,8 +1645,8 @@ class ApiBackendService(
         // is demo only when BOTH sides match. A mixed/corrupt store keeps its
         // raw bytes - the in-memory demo session is dropped without touching
         // the store, and demo disk residue is erased only when provably demo.
-        val storedToken = try { prefs.getString("api_hub_token", null) } catch (_: Exception) { null }
-        val storedUser = try { prefs.getString("api_hub_user", null) } catch (_: Exception) { null }
+        val storedToken = runCatching { sessionStore.loadToken() }.getOrNull()
+        val storedUser = runCatching { sessionStore.loadUserJson() }.getOrNull()
         val storedStrictDemo = DemoMode.isDemoRestSession(storedToken, storedUser)
         val memoryIsDemo = DemoMode.isDemoUser(session.currentUser?.id) || session.token == DemoMode.TOKEN
         when {
@@ -1466,7 +1673,7 @@ class ApiBackendService(
             } else if (!tenant.isNullOrBlank()) {
                 config.setTenantId(tenant.trim(), useDefault = false)
             }
-            val result = auth.login(value, password)
+            val result = auth.login(value, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
             afterAuthAdopted()
@@ -1476,6 +1683,8 @@ class ApiBackendService(
     /** Dart _parseAuthResponse tail (api_backend_service.dart:565-572), shared by login, register,
      *  registerOrganization and oauth: connect the socket, load conversations/users/tasks, sync FCM. */
     private fun afterAuthAdopted() {
+        chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
+        SessionRefreshWorker.schedule(appContext) // 30-day background renewal; survives app not being opened
         purgeDemoResidueForRealAdopt()
         realtime.connect()
         startBackgroundSync()
@@ -1488,7 +1697,7 @@ class ApiBackendService(
 
     suspend fun register(email: String, username: String, password: String): ApiUserProfile =
         withContext(Dispatchers.IO) {
-            val result = auth.register(email, username, password)
+            val result = auth.register(email, username, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
             afterAuthAdopted()
@@ -1633,8 +1842,8 @@ class ApiBackendService(
         val signingOutDemo = isDemoSession
         val storedStrictDemo = try {
             DemoMode.isDemoRestSession(
-                prefs.getString("api_hub_token", null),
-                prefs.getString("api_hub_user", null),
+                sessionStore.loadToken(),
+                sessionStore.loadUserJson(),
             )
         } catch (_: Exception) { false }
         if (signingOutDemo && !storedStrictDemo) {
@@ -1643,6 +1852,7 @@ class ApiBackendService(
             session.signOut()
         }
         saveRefreshToken(null)
+        SessionRefreshWorker.cancel(appContext)
         onlineIds.clear(); lastSeenById.clear(); typingUntil.clear()
         // Queued messages stay saved for this account and are sent after its next login.
         synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
@@ -1658,21 +1868,23 @@ class ApiBackendService(
     }
 
     // ---- Access-token refresh (/auth/refresh) ----
-    // Access tokens live JWT_EXPIRE_MINUTES (60 by default). Without a refresh every
-    // request starts failing with 401 an hour after login.
+    // Access tokens live ACCESS_TOKEN_EXPIRE_MINUTES (15 by default on the secure
+    // backend). Without a refresh every request starts failing with 401 shortly
+    // after login. Refresh tokens are single-use and rotated on every refresh:
+    // the rotated token returned by the server is persisted immediately, because
+    // replaying a consumed token revokes the whole session (reuse detection).
 
     private val refreshMutex = kotlinx.coroutines.sync.Mutex()
 
     private fun saveRefreshToken(token: String?) {
         try {
-            if (token.isNullOrBlank()) prefs.edit().remove("api_hub_refresh_token").apply()
-            else prefs.edit().putString("api_hub_refresh_token", token).apply()
+            sessionStore.saveRefreshToken(token)
         } catch (_: Exception) {
         }
     }
 
     private fun loadRefreshToken(): String? =
-        try { prefs.getString("api_hub_refresh_token", null) } catch (_: Exception) { null }
+        try { sessionStore.loadRefreshToken() } catch (_: Exception) { null }
 
     /** Renews the access token when it expires within [REFRESH_MARGIN_SECONDS]. Waits while a
      *  call is active (a new token is a new account scope, which would end the call). Signs the
@@ -1682,22 +1894,48 @@ class ApiBackendService(
         val remaining = auth.secondsUntilExpiry(current) ?: return
         if (remaining > REFRESH_MARGIN_SECONDS) return
         if (remaining > 0 && isCallActive()) return
+        performRefresh(force = false)
+    }
+
+    /** Outcome of a refresh attempt, for the background worker's retry policy. */
+    enum class SessionRefreshOutcome { REFRESHED, NOT_NEEDED, NO_SESSION, UNAVAILABLE }
+
+    /** Bandi (2026-11-07): a user who never opens the app must still stay
+     *  signed in. SessionRefreshWorker calls this on a 30-day cadence; every
+     *  successful call slides the server's 180-day idle window forward, so
+     *  the session outlives any realistic gap between app opens. Network
+     *  failures return UNAVAILABLE (the worker retries with backoff) and
+     *  NEVER sign the user out; only a definitive server rejection does. */
+    suspend fun refreshSessionInBackground(): SessionRefreshOutcome {
+        if (session.token == null) session.restore()
+        if (session.token == null) return SessionRefreshOutcome.NO_SESSION
+        return performRefresh(force = true)
+    }
+
+    private suspend fun performRefresh(force: Boolean): SessionRefreshOutcome {
+        val current = session.token ?: return SessionRefreshOutcome.NO_SESSION
         refreshMutex.lock()
         try {
-            if (session.token != current) return // someone else refreshed meanwhile
-            val user = session.currentUser ?: return
-            val refreshToken = loadRefreshToken()
-            if (refreshToken == null) {
-                if (remaining <= 0) withContext(Dispatchers.Main) { signOut() }
-                return
-            }
-            when (val result = withContext(Dispatchers.IO) { auth.refresh(refreshToken) }) {
+            if (session.token != current) return SessionRefreshOutcome.REFRESHED // someone else refreshed meanwhile
+            val user = session.currentUser ?: return SessionRefreshOutcome.NO_SESSION
+            val refreshToken = loadRefreshToken() ?: return SessionRefreshOutcome.NO_SESSION
+            val proofHeaders = deviceIdentity?.proofHeaders(refreshToken) ?: emptyMap()
+            val result = withContext(Dispatchers.IO) { auth.refresh(refreshToken, extraHeaders = proofHeaders) }
+            return when (result) {
                 is ApiAuthClient.RefreshResult.Ok -> {
-                    session.adopt(ApiAuthResult(token = result.accessToken, user = user, refreshToken = refreshToken))
+                    val rotated = result.refreshToken ?: refreshToken
+                    saveRefreshToken(rotated) // rotation: the old token is dead from here on
+                    session.adopt(ApiAuthResult(token = result.accessToken, user = user, refreshToken = rotated))
                     realtime.connect()
+                    SessionRefreshOutcome.REFRESHED
                 }
-                ApiAuthClient.RefreshResult.Rejected -> withContext(Dispatchers.Main) { signOut() }
-                ApiAuthClient.RefreshResult.Unavailable -> Unit // retry on the next tick
+                ApiAuthClient.RefreshResult.Rejected -> {
+                    // The server states the session is dead (revoked, or a
+                    // replayed token tripped reuse detection). Only now sign out.
+                    withContext(Dispatchers.Main) { signOut() }
+                    SessionRefreshOutcome.NO_SESSION
+                }
+                ApiAuthClient.RefreshResult.Unavailable -> SessionRefreshOutcome.UNAVAILABLE // retry later
             }
         } finally {
             refreshMutex.unlock()
@@ -1715,7 +1953,9 @@ class ApiBackendService(
     }
 
     private companion object {
-        const val REFRESH_MARGIN_SECONDS = 10 * 60L
+        // 5-minute margin against the 15-minute access-token lifetime; the
+        // refresh is skipped while a call is active (unless already expired).
+        const val REFRESH_MARGIN_SECONDS = 5 * 60L
         const val TYPING_TTL_MS = 6_000L
     }
 }

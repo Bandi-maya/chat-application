@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +64,8 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
     // Deterministic fixture injection. Production never provides items here.
     fixtureItems: List<AttachmentGalleryItem>? = null,
 ) {
+    val bundleDesign = com.example.chat.ui.chats.bundles.rememberMessageBundleDesign()
+    val attachmentRadius = (bundleDesign?.radius ?: 28.0).dp
     val context = LocalContext.current
     val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
     fun allowed() = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED ||
@@ -98,6 +101,7 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
                 if (onDirectSendImages != null) Button(onClick = { onDirectSendImages(selected.toList()) }) { Text("Send (${selected.size})") }
             }
         }
+
         if (!canRead && fixtureItems == null) {
             Text("Choose photos with Browse, or allow gallery access to see recent photos here.", color = foreground,
                 modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
@@ -117,7 +121,7 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
                 for ((label, icon, action) in capsules) Column(Modifier.widthIn(min = 72.dp).clickable {
                     when (label) { "Camera" -> onCamera(); "Voice note" -> onVoiceNote(); "Gallery" -> reload++; else -> action?.let(onAction) }
                 }.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(shape = RoundedCornerShape(28.dp), color = Color(theme.cardColor),
+                    Surface(shape = RoundedCornerShape(attachmentRadius), color = Color(theme.cardColor),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(theme.dividerColor))) {
                         Box(Modifier.size(60.dp, 48.dp), contentAlignment = Alignment.Center) { Icon(icon, label, tint = accent) }
                     }
@@ -125,12 +129,13 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
                 }
             }
         }
-        LazyVerticalGrid(columns = GridCells.Adaptive(100.dp), modifier = Modifier.weight(1f).fillMaxWidth().semantics { contentDescription = "Recent attachment photos" },
+        // Supplied reference: fixed three-column media grid (was adaptive 100.dp).
+        LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.weight(1f).fillMaxWidth().semantics { contentDescription = "Recent attachment photos" },
             horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             item(key = "camera") {
                 Box(Modifier.fillMaxWidth().aspectRatio(1f).background(Color(theme.cardColor)).clickable(onClick = onCamera)
                     .semantics { contentDescription = "Open camera" }, contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.PhotoCamera, null, tint = accent, modifier = Modifier.size(36.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = null, color = accent, modifier = Modifier.size(36.dp))
                 }
             }
             items(images, key = { it.uri.toString() }) { item ->
@@ -156,15 +161,21 @@ internal fun AttachmentGallerySheet(theme: ThemeConfig, onAction: (AttachmentAct
         }
         if (selected.size >= maxSelection.coerceIn(1, 100)) Text("Selection limit reached. Review or remove a photo.", color = foreground,
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
-        if (!secondReference) TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = onVoiceNote) { Icon(Icons.Rounded.Mic, null); Text("Record voice note") }
-        if (!secondReference) Row(Modifier.padding(8.dp).fillMaxWidth().semantics { contentDescription = "Attachment type options" }.clip(RoundedCornerShape(28.dp)).background(Color(theme.cardColor))
+        if (!secondReference) TextButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = onVoiceNote) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.microphone, semanticLabel = null); Text("Record voice note") }
+        if (!secondReference) Row(Modifier.padding(8.dp).fillMaxWidth().semantics { contentDescription = "Attachment type options" }.clip(RoundedCornerShape(attachmentRadius)).background(Color(theme.cardColor))
             .horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp)) {
             val actions = listOf(Triple("Gallery", Icons.Rounded.PhotoLibrary, AttachmentAction.image),
                 Triple("File", Icons.Rounded.InsertDriveFile, AttachmentAction.document), Triple("Location", Icons.Rounded.LocationOn, AttachmentAction.location),
                 Triple("Poll", Icons.Rounded.Poll, AttachmentAction.poll), Triple("Contact", Icons.Rounded.Person, AttachmentAction.contact),
+                Triple("Chaty Direct", Icons.Rounded.Send, AttachmentAction.chatyDirect),
                 Triple("Audio", Icons.Rounded.GraphicEq, AttachmentAction.audio), Triple("Video", Icons.Rounded.Videocam, AttachmentAction.video),
                 Triple("Task", Icons.Rounded.TaskAlt, AttachmentAction.task))
-            for ((label, icon, action) in actions) Column(Modifier.widthIn(min = 76.dp).clickable { if (action == AttachmentAction.image) reload++ else onAction(action) }
+            // Keep original dock styling/spacing. Direct gets enough width for its
+            // longer label at large fonts; the existing horizontal scroll reveals it.
+            val directWidth = (104f * androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)).dp
+            for ((label, icon, action) in actions) Column(Modifier.widthIn(min = if (action == AttachmentAction.chatyDirect) directWidth else 76.dp)
+                .semantics { contentDescription = "Attachment option $label" }
+                .clickable { if (action == AttachmentAction.image) reload++ else onAction(action) }
                 .padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(icon, label, tint = if (action == AttachmentAction.image) accent else foreground)
                 Text(label, color = if (action == AttachmentAction.image) accent else foreground, style = MaterialTheme.typography.labelMedium)

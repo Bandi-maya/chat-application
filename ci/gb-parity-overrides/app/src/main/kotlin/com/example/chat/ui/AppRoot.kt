@@ -1,6 +1,7 @@
 package com.example.chat.ui
 
 import com.example.chat.ReleaseFeatures
+
 import com.example.chat.ui.core.system.ChatySystemBarScrims
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -55,7 +56,7 @@ import androidx.compose.material.icons.rounded.Animation
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch, Notifications }
 
 private class AuthNavigationState {
     private var current by mutableStateOf(AuthRoute.Splash)
@@ -104,6 +105,16 @@ fun AppRoot() {
     )
     ChatyTheme(config = resolvedTheme) {
     com.example.chat.ui.icons.ProvideChatyIconTheme(ServiceLocator.preferencesController) {
+    val rootMode = com.example.chat.ui.navigation.HomePresetNormalizer.presentationNavigationMode(
+        ServiceLocator.preferencesController.home.homeStyle,
+    ) ?: themeController.navigationMode
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.example.chat.ui.kit.LocalReferenceLayoutPresentation provides
+            com.example.chat.ui.kit.ReferenceLayoutPresentation(
+                com.example.chat.ui.kit.referenceLayoutStyleFor(rootMode),
+                com.example.chat.ui.kit.rememberChatyReduceMotion(),
+            ),
+    ) {
     GlobalTypographyScale {
         com.example.chat.ui.core.system.ChatySystemBarsEffect(ServiceLocator.preferencesController, resolvedTheme.surfaceColor)
         com.example.chat.ui.core.system.ChatyPresenceEffect(
@@ -128,17 +139,22 @@ fun AppRoot() {
         var registerOrigin by remember { mutableStateOf(AuthRoute.Welcome) }
         var orgOrigin by remember { mutableStateOf(AuthRoute.Login) }
         var selectedConversation by remember { mutableStateOf<com.example.chat.domain.models.Conversation?>(null) }
-        if (com.example.chat.BuildConfig.DEBUG) {
-            androidx.compose.runtime.LaunchedEffect(route) { android.util.Log.d("RouteLayersDiag", "route=" + route + " t=" + android.os.SystemClock.uptimeMillis()) }
-            androidx.compose.runtime.LaunchedEffect(selectedConversation?.id) { android.util.Log.d("RouteLayersDiag", "selectedConvHash=" + (selectedConversation?.id?.hashCode() ?: 0) + " t=" + android.os.SystemClock.uptimeMillis()) }
-        }
         var planOrgId by remember { mutableStateOf("") }
         var planOrgName by remember { mutableStateOf("") }
         var planIsNew by remember { mutableStateOf(false) }
         var selectedInitialMessageId by remember { mutableStateOf<String?>(null) }
+        var pendingSettingsDestination by androidx.compose.runtime.saveable.rememberSaveable {
+            mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null)
+        }
         val lockRequired by ServiceLocator.appLock.lockRequired.collectAsState()
-        androidx.compose.runtime.LaunchedEffect(route) {
-            // Dart _scheduleInitialAppLockIfNeeded on reaching the authenticated shell.
+        androidx.compose.runtime.LaunchedEffect(
+            route,
+            ServiceLocator.apiBackend.isAuthenticated,
+            ServiceLocator.preferencesController.security.isAppLockEnabled,
+            ServiceLocator.preferencesController.security.lockMethod,
+        ) {
+            // Re-run when restored authentication or persisted lock preferences become available.
+            // A route-only effect could run before either value was restored and never show the lock.
             if (route == AuthRoute.Home) ServiceLocator.appLock.scheduleInitialIfNeeded()
         }
         // Call media permissions (Dart: flutter_webrtc getUserMedia prompts RECORD_AUDIO/CAMERA itself).
@@ -167,10 +183,6 @@ fun AppRoot() {
             }
         }
         androidx.compose.runtime.LaunchedEffect(Unit) { try { ServiceLocator.startBadgeSync() } catch (_: Exception) {} }
-        androidx.compose.runtime.LaunchedEffect(Unit) {
-            // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
-            ServiceLocator.messageAutomation
-        }
         // Message notification tapped: open that chat once signed in and unlocked.
         val notificationRoomId by com.example.chat.notifications.ChatyNotifications.pendingRoomId.collectAsState()
         androidx.compose.runtime.LaunchedEffect(notificationRoomId, ServiceLocator.apiBackend.isAuthenticated, lockRequired) {
@@ -190,7 +202,41 @@ fun AppRoot() {
                 route = AuthRoute.ChatDetail
             }
         }
-
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            // Dart _AppState.initState: locator<MessageAutomationService>() (30s account sync, gated on a session).
+            ServiceLocator.messageAutomation
+        }
+        // Launcher shortcut tap (static res/xml/shortcuts.xml via MainActivity). Consumed
+        // only once the authenticated shell is visible and the app lock is satisfied; the
+        // session/TTL/lock matrix lives in LauncherShortcutPolicy (JVM-tested).
+        val pendingShortcut by com.example.chat.LauncherShortcutRouter.pending.collectAsState()
+        androidx.compose.runtime.LaunchedEffect(pendingShortcut, ServiceLocator.apiBackend.isAuthenticated, lockRequired, route) {
+            val p = pendingShortcut ?: return@LaunchedEffect
+            val api = ServiceLocator.apiBackend
+            val scope = api.authSnapshot()
+            val shellVisible = api.isAuthenticated && when (route) {
+                AuthRoute.Home, AuthRoute.ChatDetail, AuthRoute.NewChat,
+                AuthRoute.GlobalSearch, AuthRoute.Notifications, AuthRoute.Security,
+                AuthRoute.LockedChats, AuthRoute.HiddenVault, AuthRoute.MessageManagement,
+                AuthRoute.LinkedDevices, AuthRoute.Starred -> true
+                else -> false
+            }
+            when (com.example.chat.LauncherShortcutPolicy.decide(
+                pendingAction = p.action,
+                fresh = com.example.chat.LauncherShortcutRouter.isFresh(),
+                scopeAllowed = com.example.chat.LauncherShortcutRouter.scopeAllows(scope.userId, scope.generation),
+                authenticatedShellVisible = shellVisible,
+                lockRequired = lockRequired,
+            )) {
+                com.example.chat.LauncherShortcutPolicy.Decision.OpenNewChat -> {
+                    com.example.chat.LauncherShortcutRouter.consume()
+                    route = AuthRoute.NewChat
+                }
+                com.example.chat.LauncherShortcutPolicy.Decision.Drop ->
+                    com.example.chat.LauncherShortcutRouter.consume()
+                com.example.chat.LauncherShortcutPolicy.Decision.Wait -> Unit
+            }
+        }
         var previousLockRequired by remember { mutableStateOf(lockRequired) }
         androidx.compose.runtime.LaunchedEffect(lockRequired) {
             // local_auth stopAuthentication(): a pending prompt never resumes once the lock requirement drops (unlocked
@@ -208,39 +254,35 @@ fun AppRoot() {
         var linkedDevicesOnly by remember { mutableStateOf(false) }
         var newChatBroadcast by remember { mutableStateOf(false) }
         val scope = androidx.compose.runtime.rememberCoroutineScope()
+        val appContext = androidx.compose.ui.platform.LocalContext.current.applicationContext
         // Dart AuthChangeEvent.signedOut: reset lock/prompt state and replace the stack
         // with WelcomeScreen (pushAndRemoveUntil).
         androidx.compose.runtime.DisposableEffect(Unit) {
+            var wasAuthenticated = ServiceLocator.apiBackend.isAuthenticated
             val signOutListener: () -> Unit = {
-                if (!ServiceLocator.apiBackend.isAuthenticated &&
+                val authenticated = ServiceLocator.apiBackend.isAuthenticated
+                if (wasAuthenticated && !authenticated) {
+                    pendingSettingsDestination = null
+                    ServiceLocator.notifications.clearAll()
+                    com.example.chat.notifications.ChatyNotifications.clearForSignOut(appContext)
+                }
+                wasAuthenticated = authenticated
+                if (!authenticated &&
                     (route == AuthRoute.Home || route == AuthRoute.ChatDetail || route == AuthRoute.Security ||
                         route == AuthRoute.LockedChats ||
                         route == AuthRoute.HiddenVault || route == AuthRoute.MessageManagement || route == AuthRoute.LinkedDevices ||
-                        route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch)
+                        route == AuthRoute.NewChat || route == AuthRoute.GlobalSearch || route == AuthRoute.Notifications)
                 ) {
                     ServiceLocator.appLock.onSignedOut()
                     ServiceLocator.lockBiometrics.stopAuthentication()
-                    // Defer the prompt/route/conversation reset across a frame boundary:
-                    // signOut() flips isAuthenticated before notifyChatListeners(), and
-                    // GlobalRouteLayers reads isAuthenticated in composition. Resetting
-                    // route/conversation in the same recomposition pass lets GlobalRouteLayers
-                    // release the route-content group while a route/conversation invalidation
-                    // is pending on it (Composer.endReplaceGroup NPE on demo exit, builds 79+81).
-                    // The auth-flip recompose registers its frame callback before this listener
-                    // runs, so two frame awaits place these writes in a strictly later pass.
-                    scope.launch {
-                        androidx.compose.runtime.withFrameNanos { }
-                        androidx.compose.runtime.withFrameNanos { }
-                        promptPending = false
-                        selectedConversation = null
-                        route = AuthRoute.Welcome
-                    }
+                    promptPending = false
+                    selectedConversation = null
+                    route = AuthRoute.Welcome
                 }
             }
             ServiceLocator.apiBackend.addListener(signOutListener)
             onDispose { ServiceLocator.apiBackend.removeListener(signOutListener) }
         }
-        var showLockPrompt by remember { mutableStateOf(false) }
         // Dart _handleSecurityPreferenceChanged: disabling app lock clears pending lock state.
         androidx.compose.runtime.DisposableEffect(Unit) {
             val prefListener: () -> Unit = {
@@ -251,40 +293,9 @@ fun AppRoot() {
             ServiceLocator.preferencesController.addListener(prefListener)
             onDispose { ServiceLocator.preferencesController.removeListener(prefListener) }
         }
-        // Dart _schedulePostLoginAppLockPrompt: 650ms after the shell appears post-login,
-        // offer app-lock setup unless a usable lock method is already configured.
+        // Setup remains available in Settings; never solicit App Lock on signed-in startup.
         androidx.compose.runtime.LaunchedEffect(route, promptPending) {
-            if (promptPending && route == AuthRoute.Home) {
-                kotlinx.coroutines.delay(650)
-                promptPending = false
-                val sec = ServiceLocator.preferencesController.security
-                val ready = sec.isAppLockEnabled &&
-                    com.example.chat.data.services.ProtectedResourceGate.isMethodConfigured(
-                        ServiceLocator.localLockService, sec.lockMethod,
-                    )
-                if (!ready && ServiceLocator.apiBackend.isAuthenticated) showLockPrompt = true
-            }
-        }
-        if (showLockPrompt) {
-            com.example.chat.ui.kit.ChatyConfirmationDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
-                onDismissRequest = { showLockPrompt = false },
-                title = { androidx.compose.material3.Text("Enable App Lock?") },
-                text = {
-                    androidx.compose.material3.Text(
-                        "You can protect Chaty with biometrics, device lock, PIN, pattern, or password. Setup is optional and can be changed anytime in Settings.",
-                    )
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(onClick = { showLockPrompt = false }) {
-                        androidx.compose.material3.Text("Not now")
-                    }
-                },
-                confirmButton = {
-                    androidx.compose.material3.Button(onClick = { showLockPrompt = false; route = AuthRoute.Security }) {
-                        androidx.compose.material3.Text("Open settings")
-                    }
-                },
-            )
+            if (promptPending && route == AuthRoute.Home) promptPending = false
         }
         Box(Modifier.fillMaxSize()) {
         // Own top/cutout safety once for every route. windowInsetsPadding consumes
@@ -570,10 +581,18 @@ fun AppRoot() {
                 var pushedUniversalAppearance by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedComponentStyles by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedThemeStudio by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedTasks by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedUpdates by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedAppIcon by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedSettingsSearch by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedNetworkUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var pushedDataUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
-                    if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
+                    if (dest == com.example.chat.ui.settings.SettingsDestination.NetworkUsage) {
+                        pushedNetworkUsage = true
+                    } else if (dest == com.example.chat.ui.settings.SettingsDestination.DataUsage) {
+                        pushedDataUsage = true
+                    } else if (dest == com.example.chat.ui.settings.SettingsDestination.Security) {
                         route = AuthRoute.Security
                     } else if (dest == com.example.chat.ui.settings.SettingsDestination.SearchSettings) {
                         // Dart: showSearch(SettingsSearchDelegate(allSettings: _searchIndex())).
@@ -594,10 +613,172 @@ fun AppRoot() {
                         settingsNotice = dest.name
                     }
                 }
+                androidx.compose.runtime.LaunchedEffect(pendingSettingsDestination) {
+                    val pending = pendingSettingsDestination ?: return@LaunchedEffect
+                    settingsSub = pending
+                    pushedSettings = true
+                    pendingSettingsDestination = null
+                }
                 val shellHome = ServiceLocator.preferencesController.home
                 val shellPrefsCtl = ServiceLocator.preferencesController
                 val shellPrivacy = shellPrefsCtl.privacy
+                // User directive: Tasks/Updates hidden from the rail remain reachable
+                // from the home header overflow menu as pushed full screens (no live
+                // preview - the real destination content). The destination bodies are
+                // shared between the pager branch and the pushed overlay.
+                val tasksDestinationContent: @Composable () -> Unit = {
+                val controller = ServiceLocator.tasksController
+                var tasksRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                val tasksAccountKey = ServiceLocator.apiBackend.currentUser?.id ?: ""
+                fun editorDraftKey(taskId: String?) = tasksAccountKey + "|" + (taskId ?: "new")
+                fun storeEditorDraft(taskId: String?, d: com.example.chat.ui.tasks.TaskDraftValues) {
+                    editorDrafts = editorDrafts + (editorDraftKey(taskId) to com.example.chat.ui.tasks.TaskDraftCodec.encode(d))
+                }
+                fun loadEditorDraft(taskId: String?): com.example.chat.ui.tasks.TaskDraftValues? =
+                    editorDrafts[editorDraftKey(taskId)]?.let { e -> com.example.chat.ui.tasks.TaskDraftCodec.decode(e) }
+                fun clearEditorDraft(taskId: String?) {
+                    editorDrafts = editorDrafts - editorDraftKey(taskId)
+                }
+                val detailTaskId = detailTaskIds[tasksAccountKey]
+                val editorOpen = editorOpenByAccount[tasksAccountKey] == true
+                val editorTaskId = editorTaskIds[tasksAccountKey]
+                fun setDetailTaskId(id: String?) {
+                    detailTaskIds = if (id == null) detailTaskIds - tasksAccountKey else detailTaskIds + (tasksAccountKey to id)
+                }
+                fun setEditorState(open: Boolean, taskId: String?) {
+                    editorOpenByAccount = if (open) editorOpenByAccount + (tasksAccountKey to true) else editorOpenByAccount - tasksAccountKey
+                    editorTaskIds = if (taskId == null) editorTaskIds - tasksAccountKey else editorTaskIds + (tasksAccountKey to taskId)
+                }
+                // Snapshot counts only loads validated for the CURRENT account:
+                // prior-account cache can neither resolve nor close restored state.
+                val tasksLoaded = tasksRevision.let { controller.hasLoadedOnce }
+                val tasksSnapshot = if (tasksLoaded) controller.tasks else emptyList()
+                val detailTask = detailTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
+                val editorResolved = editorTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
+                if (editorResolved != null) lastResolvedEditorByAccount = lastResolvedEditorByAccount + (tasksAccountKey to editorResolved)
+                val editorTask = editorResolved ?: lastResolvedEditorByAccount[tasksAccountKey]
+                // Non-destructive settle: a restore target confirmed gone AFTER a
+                // current-account load (and never resolved here, so no draft exists)
+                // closes with a notice instead of vanishing; never flashes create flow.
+                androidx.compose.runtime.LaunchedEffect(tasksLoaded, editorTaskId, editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
+                    if (tasksLoaded && editorTaskId != null && editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
+                        setEditorState(false, null)
+                        settingsNotice = "This task is no longer available."
+                    }
+                }
+                androidx.compose.runtime.LaunchedEffect(tasksLoaded, detailTaskId, detailTask == null) {
+                    if (tasksLoaded && detailTaskId != null && detailTask == null) setDetailTaskId(null)
+                }
+                // Contextual FAB 'Create task' (hoisted tick from the shell FAB).
+                androidx.compose.runtime.LaunchedEffect(createTaskTick) {
+                    if (createTaskTick > handledCreateTaskTick) {
+                        handledCreateTaskTick = createTaskTick
+                        setEditorState(true, null)
+                    }
+                }
+                androidx.compose.runtime.DisposableEffect(controller) {
+                    val l: () -> Unit = { tasksRevision++ }
+                    controller.addListener(l)
+                    onDispose { controller.removeListener(l) }
+                }
+                androidx.compose.runtime.LaunchedEffect(Unit) { controller.loadTasks() }
+                val taskUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                val lookup: (String) -> com.example.chat.domain.models.UserProfile? =
+                    { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } }
+                val detail = detailTask
+                // System Back from a task detail returns to the task list, not out of the Tasks tab.
+                androidx.activity.compose.BackHandler(enabled = detail != null && !editorOpen) { setDetailTaskId(null) }
+                if (taskUser != null && detail != null) {
+                    com.example.chat.ui.tasks.TaskDetailScreen(
+                        task = detail,
+                        controller = controller,
+                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
+                        currentUser = taskUser,
+                        getUser = lookup,
+                        onBack = { setDetailTaskId(null) },
+                        onEditTask = { setEditorState(true, it.id) },
+                    )
+                } else {
+                    com.example.chat.ui.tasks.TasksScreen(
+                        controller = controller,
+                        tasksRevision = tasksRevision,
+                        conversations = ServiceLocator.apiBackend.conversations,
+                        getUser = lookup,
+                        onOpenDetail = { setDetailTaskId(it.id) },
+                        onEditTask = { setEditorState(true, it.id) },
+                        onCreateTask = { setEditorState(true, null) },
+                    )
+                }
+                if (editorOpen && taskUser != null && (editorTaskId == null || editorTask != null)) {
+                    com.example.chat.ui.tasks.TaskCreateEditModal(
+                        controller = controller,
+                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
+                        conversations = ServiceLocator.apiBackend.conversations,
+                        currentUser = taskUser,
+                        getUser = lookup,
+                        sourceConversationId = "",
+                        existingTask = editorTask,
+                        initialDraft = loadEditorDraft(editorTaskId),
+                        onDraftChange = { d -> storeEditorDraft(editorTaskId, d) },
+                        onDismiss = { clearEditorDraft(editorTaskId); setEditorState(false, null) },
+                        onSaved = { msg -> clearEditorDraft(editorTaskId); setEditorState(false, null); settingsNotice = msg },
+                        onError = { msg -> settingsNotice = msg },
+                    )
+                }
+                }
+                val updatesDestinationContent: @Composable () -> Unit = {
+                val updUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
+                if (updUser != null) {
+                    val statusService = ServiceLocator.statusService
+                    val statusFlow = remember(statusService) {
+                        statusService.watchActiveStatuses(
+                            keepDeleted = { ServiceLocator.preferencesController.privacy.antiDeleteStatus },
+                        )
+                    }
+                    val toastContext = androidx.compose.ui.platform.LocalContext.current
+                    com.example.chat.ui.updates.UpdatesScreen(
+                        // Dart launchUrl(signedUrl, LaunchMode.externalApplication).
+                        openUrl = { url ->
+                            try {
+                                toastContext.startActivity(
+                                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            } catch (e: Exception) {
+                                android.util.Log.w("AppRoot", "open status url failed: $e")
+                            }
+                        },
+                        statusService = statusService,
+                        colors = shellColors,
+                        currentUser = updUser,
+                        getUser = { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } },
+                        statuses = statusFlow,
+                        captureStory = captureStory,
+                        pickStatusMedia = com.example.chat.ui.updates.rememberStatusMediaPicker(),
+                        onNotify = { msg ->
+                            android.widget.Toast.makeText(toastContext, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                    )
+                }
+                }
                 com.example.chat.ui.navigation.MainNavigationShell(
+                    unreadCounts = ServiceLocator.apiBackend.conversations.filter { !it.isArchived }.let { conversations ->
+                        mapOf("chats" to conversations.filter { !shellHome.separateChatsAndGroups || !it.isGroup }.sumOf { it.unreadCount },
+                            "groups" to conversations.filter { it.isGroup }.sumOf { it.unreadCount })
+                    },
+                    rootHeaderActions = {
+                        com.example.chat.ui.navigation.ReferenceRootActions(
+                            colors = shellColors, user = ServiceLocator.apiBackend.currentUser?.let { u ->
+                                com.example.chat.domain.models.UserProfile(
+                                    id = u.id, displayName = u.displayName, username = u.username,
+                                    avatarInitials = u.avatarInitials, avatarColorHex = u.avatarColorHex, avatarUrl = u.avatarUrl,
+                                    about = u.about, lastSeenAt = java.time.Instant.now(),
+                                )
+                            },
+                            onSearch = { route = AuthRoute.GlobalSearch },
+                            onSettings = { pushedSettings = true },
+                        )
+                    },
                     colors = shellColors,
                     template = ServiceLocator.templateController.navigation,
                     navigationMode = themeController.navigationMode,
@@ -612,6 +793,7 @@ fun AppRoot() {
                         bottomBarStyle = ServiceLocator.appearanceVariantController.bottomBarStyle,
                         navigationStyleName = ServiceLocator.appearanceVariantController.navigationStyle,
                         homeStyle = shellHome.homeStyle,
+                        oneUiRaisedCenterDock = com.example.chat.ui.navigation.HomePresetNormalizer.oneUiRaisedCenterDockEnabled(shellHome.homeStyle),
                         animationsDisabled = com.example.chat.ui.kit.rememberChatyReduceMotion(),
                     ),
                     myNameOverride = { shellHome.myNameOverride },
@@ -739,6 +921,13 @@ fun AppRoot() {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.chats -> {
                 com.example.chat.ui.ChatsHomeHost(
                     forcedType = null, pageTitle = null, gate = gate,
+                    onNewCall = { showCallPicker = true },
+                    onOpenDestination = { id ->
+                        when (id) {
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> pushedTasks = true
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.updates -> pushedUpdates = true
+                        }
+                    },
                     onOpenConversation = { conversation ->
                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
                         selectedConversation = conversation
@@ -747,6 +936,7 @@ fun AppRoot() {
                     onOpenSecurity = { route = AuthRoute.Security },
                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
                     onOpenSettings = { pushedSettings = true },
+                    onOpenNotifications = { route = AuthRoute.Notifications },
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
@@ -767,6 +957,7 @@ fun AppRoot() {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.groups ->
                                 com.example.chat.ui.ChatsHomeHost(
                                     forcedType = com.example.chat.domain.models.ConversationType.group,
+                                    onNewCall = { showCallPicker = true },
                                     pageTitle = "Groups", gate = gate,
                                     onOpenConversation = { conversation ->
                                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
@@ -776,6 +967,7 @@ fun AppRoot() {
                                     onOpenSecurity = { route = AuthRoute.Security },
                                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
                                     onOpenSettings = { pushedSettings = true },
+                                    onOpenNotifications = { route = AuthRoute.Notifications },
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
                     onOpenMessageManagement = { route = AuthRoute.MessageManagement },
@@ -802,7 +994,7 @@ fun AppRoot() {
                                         onDismissRequest = { showCallPicker = false },
                                         properties = androidx.compose.ui.window.DialogProperties(
                                             usePlatformDefaultWidth = false,
-                                            decorFitsSystemWindows = false,
+                                            decorFitsSystemWindows = true,
                                         ),
                                     ) {
                                         val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -857,141 +1049,8 @@ fun AppRoot() {
                                     },
                                 )
                             }
-                            com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> {
-                                val controller = ServiceLocator.tasksController
-                                var tasksRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                                val tasksAccountKey = ServiceLocator.apiBackend.currentUser?.id ?: ""
-                                fun editorDraftKey(taskId: String?) = tasksAccountKey + "|" + (taskId ?: "new")
-                                fun storeEditorDraft(taskId: String?, d: com.example.chat.ui.tasks.TaskDraftValues) {
-                                    editorDrafts = editorDrafts + (editorDraftKey(taskId) to com.example.chat.ui.tasks.TaskDraftCodec.encode(d))
-                                }
-                                fun loadEditorDraft(taskId: String?): com.example.chat.ui.tasks.TaskDraftValues? =
-                                    editorDrafts[editorDraftKey(taskId)]?.let { e -> com.example.chat.ui.tasks.TaskDraftCodec.decode(e) }
-                                fun clearEditorDraft(taskId: String?) {
-                                    editorDrafts = editorDrafts - editorDraftKey(taskId)
-                                }
-                                val detailTaskId = detailTaskIds[tasksAccountKey]
-                                val editorOpen = editorOpenByAccount[tasksAccountKey] == true
-                                val editorTaskId = editorTaskIds[tasksAccountKey]
-                                fun setDetailTaskId(id: String?) {
-                                    detailTaskIds = if (id == null) detailTaskIds - tasksAccountKey else detailTaskIds + (tasksAccountKey to id)
-                                }
-                                fun setEditorState(open: Boolean, taskId: String?) {
-                                    editorOpenByAccount = if (open) editorOpenByAccount + (tasksAccountKey to true) else editorOpenByAccount - tasksAccountKey
-                                    editorTaskIds = if (taskId == null) editorTaskIds - tasksAccountKey else editorTaskIds + (tasksAccountKey to taskId)
-                                }
-                                // Snapshot counts only loads validated for the CURRENT account:
-                                // prior-account cache can neither resolve nor close restored state.
-                                val tasksLoaded = tasksRevision.let { controller.hasLoadedOnce }
-                                val tasksSnapshot = if (tasksLoaded) controller.tasks else emptyList()
-                                val detailTask = detailTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
-                                val editorResolved = editorTaskId?.let { id -> tasksSnapshot.firstOrNull { it.id == id } }
-                                if (editorResolved != null) lastResolvedEditorByAccount = lastResolvedEditorByAccount + (tasksAccountKey to editorResolved)
-                                val editorTask = editorResolved ?: lastResolvedEditorByAccount[tasksAccountKey]
-                                // Non-destructive settle: a restore target confirmed gone AFTER a
-                                // current-account load (and never resolved here, so no draft exists)
-                                // closes with a notice instead of vanishing; never flashes create flow.
-                                androidx.compose.runtime.LaunchedEffect(tasksLoaded, editorTaskId, editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
-                                    if (tasksLoaded && editorTaskId != null && editorResolved == null && lastResolvedEditorByAccount[tasksAccountKey] == null) {
-                                        setEditorState(false, null)
-                                        settingsNotice = "This task is no longer available."
-                                    }
-                                }
-                                androidx.compose.runtime.LaunchedEffect(tasksLoaded, detailTaskId, detailTask == null) {
-                                    if (tasksLoaded && detailTaskId != null && detailTask == null) setDetailTaskId(null)
-                                }
-                                // Contextual FAB 'Create task' (hoisted tick from the shell FAB).
-                                androidx.compose.runtime.LaunchedEffect(createTaskTick) {
-                                    if (createTaskTick > handledCreateTaskTick) {
-                                        handledCreateTaskTick = createTaskTick
-                                        setEditorState(true, null)
-                                    }
-                                }
-                                androidx.compose.runtime.DisposableEffect(controller) {
-                                    val l: () -> Unit = { tasksRevision++ }
-                                    controller.addListener(l)
-                                    onDispose { controller.removeListener(l) }
-                                }
-                                androidx.compose.runtime.LaunchedEffect(Unit) { controller.loadTasks() }
-                                val taskUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
-                                val lookup: (String) -> com.example.chat.domain.models.UserProfile? =
-                                    { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } }
-                                val detail = detailTask
-                                // System Back from a task detail returns to the task list, not out of the Tasks tab.
-                                androidx.activity.compose.BackHandler(enabled = detail != null && !editorOpen) { setDetailTaskId(null) }
-                                if (taskUser != null && detail != null) {
-                                    com.example.chat.ui.tasks.TaskDetailScreen(
-                                        task = detail,
-                                        controller = controller,
-                                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
-                                        currentUser = taskUser,
-                                        getUser = lookup,
-                                        onBack = { setDetailTaskId(null) },
-                                        onEditTask = { setEditorState(true, it.id) },
-                                    )
-                                } else {
-                                    com.example.chat.ui.tasks.TasksScreen(
-                                        controller = controller,
-                                        tasksRevision = tasksRevision,
-                                        conversations = ServiceLocator.apiBackend.conversations,
-                                        getUser = lookup,
-                                        onOpenDetail = { setDetailTaskId(it.id) },
-                                        onEditTask = { setEditorState(true, it.id) },
-                                        onCreateTask = { setEditorState(true, null) },
-                                    )
-                                }
-                                if (editorOpen && taskUser != null && (editorTaskId == null || editorTask != null)) {
-                                    com.example.chat.ui.tasks.TaskCreateEditModal(
-                                        controller = controller,
-                                        colors = com.example.chat.ui.tasks.TaskColors(resolvedTheme),
-                                        conversations = ServiceLocator.apiBackend.conversations,
-                                        currentUser = taskUser,
-                                        getUser = lookup,
-                                        sourceConversationId = "",
-                                        existingTask = editorTask,
-                                        initialDraft = loadEditorDraft(editorTaskId),
-                                        onDraftChange = { d -> storeEditorDraft(editorTaskId, d) },
-                                        onDismiss = { clearEditorDraft(editorTaskId); setEditorState(false, null) },
-                                        onSaved = { msg -> clearEditorDraft(editorTaskId); setEditorState(false, null); settingsNotice = msg },
-                                        onError = { msg -> settingsNotice = msg },
-                                    )
-                                }
-                            }
-                            com.example.chat.core.templates.ChatyNavigationDestinationIds.updates -> {
-                                val updUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) }
-                                if (updUser != null) {
-                                    val statusService = ServiceLocator.statusService
-                                    val statusFlow = remember(statusService) {
-                                        statusService.watchActiveStatuses(
-                                            keepDeleted = { ServiceLocator.preferencesController.privacy.antiDeleteStatus },
-                                        )
-                                    }
-                                    val toastContext = androidx.compose.ui.platform.LocalContext.current
-                                    com.example.chat.ui.updates.UpdatesScreen(
-                                        // Dart launchUrl(signedUrl, LaunchMode.externalApplication).
-                                        openUrl = { url ->
-                                            try {
-                                                toastContext.startActivity(
-                                                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                                )
-                                            } catch (e: Exception) {
-                                                android.util.Log.w("AppRoot", "open status url failed: $e")
-                                            }
-                                        },
-                                        statusService = statusService,
-                                        colors = shellColors,
-                                        currentUser = updUser,
-                                        getUser = { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } },
-                                        statuses = statusFlow,
-                                        captureStory = captureStory,
-                                        pickStatusMedia = com.example.chat.ui.updates.rememberStatusMediaPicker(),
-                                        onNotify = { msg ->
-                                            android.widget.Toast.makeText(toastContext, msg, android.widget.Toast.LENGTH_SHORT).show()
-                                        },
-                                    )
-                                }
-                            }
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks -> tasksDestinationContent()
+                            com.example.chat.core.templates.ChatyNavigationDestinationIds.updates -> updatesDestinationContent()
                             else -> androidx.compose.material3.Text(
                                 "Destination \"$destinationId\" is not hosted in this build yet.",
                                 modifier = Modifier.padding(24.dp),
@@ -999,6 +1058,15 @@ fun AppRoot() {
                         }
                     },
                 )
+                // Hidden Tasks/Updates pushed from the home header overflow menu.
+                ChatyPushedPage(pushedTasks) {
+                    androidx.activity.compose.BackHandler { pushedTasks = false }
+                    tasksDestinationContent()
+                }
+                ChatyPushedPage(pushedUpdates) {
+                    androidx.activity.compose.BackHandler { pushedUpdates = false }
+                    updatesDestinationContent()
+                }
                 if (showCenterEffects) com.example.chat.ui.camera.EffectPickerHost(onDismiss = { showCenterEffects = false })
                 storyCapture?.let { pending ->
                     androidx.compose.ui.window.Dialog(
@@ -1115,8 +1183,6 @@ fun AppRoot() {
                                     "/settings/storage" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.StorageMedia)
                                     "/settings/effects" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Effects)
                                     "/settings/permissions" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.Permissions)
-                                    "/settings/gb_features" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.AdvancedFeatures)
-                                    "/settings/chaty_customization_hub" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.ChatyCustomizationHub)
                                     "/settings/home" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.HomeScreen)
                                     "/settings/devices" -> settingsNavigate(com.example.chat.ui.settings.SettingsDestination.LinkedDevices)
                                     "/settings/account" -> pushedAccount = true
@@ -1166,6 +1232,18 @@ fun AppRoot() {
                             showToast = { msg -> settingsNotice = msg },
                         )
                     }
+                }
+                ChatyPushedPage(pushedNetworkUsage) {
+                    androidx.activity.compose.BackHandler { pushedNetworkUsage = false }
+                    com.example.chat.ui.settings.NetworkStatusScreen(
+                        onBack = { pushedNetworkUsage = false },
+                    )
+                }
+                ChatyPushedPage(pushedDataUsage) {
+                    androidx.activity.compose.BackHandler { pushedDataUsage = false }
+                    com.example.chat.ui.settings.DataUsageScreen(
+                        onBack = { pushedDataUsage = false },
+                    )
                 }
                 ChatyPushedPage(pushedThemeStudio) {
                     // Dart main_navigation_shell Quick Actions "Theme Studio" -> ThemeStudioScreen(prefs, ThemeController).
@@ -1329,6 +1407,14 @@ fun AppRoot() {
                 }
             }
             } // Preserve Home's saved navigation state while a page is pushed.
+            AuthRoute.Notifications -> com.example.chat.ui.notifications.NotificationsInboxScreen(
+                service = ServiceLocator.notifications,
+                onBack = { navigation.goBack() },
+                onOpenSettings = {
+                    pendingSettingsDestination = com.example.chat.ui.settings.SettingsDestination.Notifications
+                    navigation.goBack()
+                },
+            )
             AuthRoute.Security -> com.example.chat.ui.settings.security.SecurityCenterScreen(
                 preferences = ServiceLocator.preferencesController,
                 lockService = ServiceLocator.localLockService,
@@ -1545,14 +1631,10 @@ fun AppRoot() {
                     onBack = { navigation.goBack() },
                 )
             }
-            AuthRoute.ChatDetail -> {
+            AuthRoute.ChatDetail -> run {
                 val conversation = selectedConversation
                 if (conversation == null) {
-                    // Never write navigation state mid-composition: the demo sign-out cascade
-                    // nulls selectedConversation while this branch is on screen, and the
-                    // re-entrant invalidation recomposed a stale route lambda
-                    // (Composer.endReplaceGroup NPE at ChatDetailHost).
-                    androidx.compose.runtime.SideEffect { route = AuthRoute.Home }
+                    route = AuthRoute.Home
                 } else {
                     ChatDetailHost(
                         conversation = conversation,
@@ -1582,18 +1664,22 @@ fun AppRoot() {
         ChatySystemBarScrims(ServiceLocator.preferencesController, resolvedTheme.surfaceColor)
         // App-level calls, locks and notification islands are outside the route
         // container, so they need the same consumed safe-area boundary.
+        var releaseNotesFinished by androidx.compose.runtime.remember(route) { androidx.compose.runtime.mutableStateOf(false) }
         Box(Modifier.fillMaxSize().windowInsetsPadding(
             WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         )) {
         gate.Host()
-        // Dart ChatsHomeScreen.initState -> NotificationPermissionSheet.showIfNeeded (education sheet once, skipped when granted).
+        // Release notes must be dismissed before app-lock UI is presented.
         if (route == AuthRoute.Home) {
             com.example.chat.ui.onboarding.NotificationPermissionSheetHost(modifier = Modifier.fillMaxSize())
+            com.example.chat.ui.updates.UpdateChangelogHost(onFinished = { releaseNotesFinished = true })
+        } else {
+            releaseNotesFinished = false
         }
         } // Shared safe-area app overlays. Island owns its hardware anchor separately.
         com.example.chat.ui.calls.GlobalCallHost(isAuthenticated = ServiceLocator.apiBackend.isAuthenticated)
         // Dart shouldShowLock: authenticated && lock enabled && _appLockRequired.
-        if (lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
+        if (releaseNotesFinished && lockRequired && ServiceLocator.apiBackend.isAuthenticated &&
             ServiceLocator.preferencesController.security.isAppLockEnabled
         ) {
             com.example.chat.ui.settings.security.AppLockOverlay(
@@ -1614,6 +1700,7 @@ fun AppRoot() {
     }
     }
     }
+    } // app-wide reference layout, including pushed pages
 }
 
 /** Honest work-in-progress destination for not-yet-ported auth screens. */

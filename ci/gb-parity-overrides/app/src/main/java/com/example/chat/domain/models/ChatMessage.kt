@@ -73,7 +73,7 @@ data class ChatMessage(
             var parsedType = MessageType.text
             var parsedAttachment: MessageAttachment? = null
             var effectiveText = rawContent
-            val envelopeMetadata = mutableMapOf<String, Any?>()
+            val attachmentMetadata = linkedMapOf<String, Any?>()
 
             if (rawContent.startsWith("{") && rawContent.endsWith("}")) {
                 try {
@@ -82,19 +82,76 @@ data class ChatMessage(
                         val t = decoded.optString("type", "")
                         parsedType = messageTypeFromDatabase(t)
                         effectiveText = decoded.optString("text", "")
-                        // Preserve envelope flags so album projection cannot erase protection/forward hints.
-                        // These are untrusted content metadata, never authorization.
-                        for (key in decoded.keys()) {
-                            if (key !in setOf("type", "url", "name", "size", "text", "duration") && !decoded.isNull(key))
-                                envelopeMetadata[key] = decoded.get(key)
-                        }
                         parsedAttachment = MessageAttachment(
-                            id = json["uid"]?.toString() ?: json["id"]?.toString() ?: "",
+                            id = decoded.optString("id", json["uid"]?.toString() ?: json["id"]?.toString() ?: ""),
                             type = t.ifEmpty { "image" },
                             name = decoded.optString("name", "attachment"),
                             size = decoded.optString("size", ""),
                             url = decoded.optString("url", "").ifEmpty { null },
+                            durationSeconds = (decoded.opt("duration") as? Number)?.let { value ->
+                                val seconds = value.toDouble()
+                                if (seconds.isFinite() && seconds >= 0 && seconds <= Int.MAX_VALUE.toDouble() &&
+                                    seconds == kotlin.math.floor(seconds)) seconds.toInt() else 0
+                            } ?: 0,
                         )
+                        // Only the explicit envelope contract is retained. Unknown names and
+                        // values may contain secrets; record only their presence so projection
+                        // remains conservative without persisting their payload.
+                        val structuralKeys = setOf("id", "uid", "room_id", "conversation_id", "sender_id", "sender_name",
+                            "type", "url", "name", "size", "text", "duration", "created_at")
+                        val stickerKeys = setOf("chaty_sticker_version", "chaty_sticker_pack", "chaty_sticker_id")
+                        val stickerHint = com.example.chat.core.stickers.StickerMessagePolicy.parse(t,
+                            stickerKeys.associateWith { key -> if (decoded.has(key)) decoded.opt(key) else null })
+                        var unsupported = false
+                        decoded.keys().forEach { key ->
+                            val value = decoded.opt(key)
+                            when {
+                                key == "view_once" -> attachmentMetadata[key] = when (value) {
+                                    null, JSONObject.NULL -> null
+                                    is Boolean -> value
+                                    is String -> when (value.trim().lowercase(java.util.Locale.ROOT)) {
+                                        "true" -> true
+                                        "false" -> false
+                                        else -> true
+                                    }
+                                    else -> true
+                                }
+                                key.equals("view_once", ignoreCase = true) -> {
+                                    // An ambiguous protection spelling must never become unrestricted.
+                                    unsupported = true
+                                }
+                                key == "forwarded" && value is Boolean -> attachmentMetadata[key] = value
+                                key == "chaty_album_id" && value is String && value.isNotBlank() && value.length <= 128 -> attachmentMetadata[key] = value
+                                key in setOf("chaty_album_v", "chaty_album_index", "chaty_album_count") && value is Number -> {
+                                    val n = value.toDouble()
+                                    if (n.isFinite() && n == kotlin.math.floor(n) && when (key) {
+                                        "chaty_album_v" -> n == 1.0
+                                        "chaty_album_index" -> n >= 0 && n < 100
+                                        else -> n >= 2 && n <= 100
+                                    }) attachmentMetadata[key] = n.toInt()
+                                    else unsupported = true
+                                }
+                                key in setOf("p2p_invite_ciphertext", "p2p_invite_group") && value is String && value.isNotBlank() -> attachmentMetadata[key] = value
+                                key in setOf("p2p_invite_epoch", "p2p_transfer_version") && value is Number -> {
+                                    val n = value.toDouble()
+                                    if (n.isFinite() && n == kotlin.math.floor(n) &&
+                                        (if (key == "p2p_transfer_version") n == 1.0 else n >= 0 && n <= Int.MAX_VALUE.toDouble())) attachmentMetadata[key] = n.toInt()
+                                    else unsupported = true
+                                }
+                                key in stickerKeys -> {
+                                    // A complete validated display hint is allowed, never protection authority.
+                                    if (stickerHint.isEmpty()) unsupported = true
+                                }
+                                key in structuralKeys -> Unit
+                                else -> unsupported = true
+                            }
+                        }
+                        if (decoded.keys().asSequence().any { it != "view_once" && it.equals("view_once", ignoreCase = true) }) {
+                            attachmentMetadata["view_once"] = true
+                        }
+                        attachmentMetadata.putAll(stickerHint)
+                        if (unsupported) attachmentMetadata["unsupported_envelope_metadata"] = true
+
                     }
                 } catch (_: Exception) {
                 }
@@ -132,7 +189,7 @@ data class ChatMessage(
                     json["is_delivered"] == true || json["is_delivered"]?.toString() == "true" -> DeliveryState.delivered
                     else -> DeliveryState.sent
                 },
-                metadata = envelopeMetadata + if (senderName.isNotEmpty()) mapOf("sender_name" to senderName) else emptyMap(),
+                metadata = buildMap { if (senderName.isNotEmpty()) put("sender_name", senderName); putAll(attachmentMetadata) },
             )
         }
     }

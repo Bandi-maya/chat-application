@@ -59,6 +59,16 @@ fun CameraGlyph(kind: String, color: Color, size: Dp = 24.dp) {
                         lineTo(24f, 13f); lineTo(17f, 13f); close()
                     }, color)
                 }
+                "flash_auto" -> {
+                    drawPath(Path().apply {
+                        moveTo(18f, 3f); lineTo(8f, 17f); lineTo(15f, 17f); lineTo(13f, 29f)
+                        lineTo(24f, 13f); lineTo(17f, 13f); close()
+                    }, color)
+                    // Small "A" badge marks the auto state (GB flash indicator).
+                    drawLine(color, Offset(21f, 29f), Offset(23.5f, 22f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+                    drawLine(color, Offset(23.5f, 22f), Offset(26f, 29f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+                    drawLine(color, Offset(21.9f, 26.6f), Offset(25.1f, 26.6f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+                }
                 "filters" -> {
                     // Original geometry: familiar three-circle color-filter affordance.
                     drawCircle(color,7f,Offset(12f,12f),style=line)
