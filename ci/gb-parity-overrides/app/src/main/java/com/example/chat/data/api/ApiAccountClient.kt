@@ -63,28 +63,93 @@ class ApiAccountClient(
      *  against /api/v1; 200 returns (data.avatarUrl ?: data.url ?: ''); the
      *  current-user persistence stays with the ApiBackendService facade. */
     fun uploadProfilePhoto(filename: String, bytes: ByteArray): String {
-        val tok = token() ?: throw Exception("Not authenticated")
+        val tok = token()?.takeIf { it.isNotBlank() } ?: throw Exception("Not authenticated")
+        val base = baseUrl()
+        val tenant = tenantId()
         val headers = mapOf(
             "Authorization" to "Bearer $tok",
-            "x-tenant-id" to tenantId(),
+            "x-tenant-id" to tenant,
             "Content-Type" to "multipart/form-data; boundary=$BOUNDARY",
         )
         val body = buildMultipartBody(safeMultipartFilename(filename), bytes)
 
         val response: Pair<Int, String> = try {
             val primary = binaryTransport.execute(
-                "POST", "${baseUrl()}/app-users/upload-photo", headers, body,
+                "POST", "$base/app-users/upload-photo", headers, body,
             )
             if (primary.first == 404) {
+                if (baseUrl() != base || tenantId() != tenant || token() != tok) throw ApiScopeChangedException()
                 binaryTransport.execute(
-                    "POST", "${baseUrl()}/api/v1/app-users/upload-photo", headers, body,
+                    "POST", "$base/api/v1/app-users/upload-photo", headers, body,
                 )
             } else {
                 primary
             }
+        } catch (e: ApiScopeChangedException) {
+            throw e
         } catch (e: Exception) {
             throw Exception("Unable to reach server to upload photo: $e")
         }
+        if (baseUrl() != base || tenantId() != tenant || token() != tok) throw ApiScopeChangedException()
+
+        if (response.first == 200) {
+            val parsed = JSONObject(response.second)
+            val data = if (parsed.has("data")) parsed.get("data") else parsed
+            if (data is JSONObject) {
+                val avatarUrl = (if (data.has("avatarUrl") && !data.isNull("avatarUrl")) data.get("avatarUrl")
+                    else if (data.has("url") && !data.isNull("url")) data.get("url")
+                    else "").toString()
+                return avatarUrl
+            }
+            return ""
+        }
+
+        var detail = "Failed to upload profile photo (${response.first})"
+        try {
+            val parsed = JSONObject(response.second)
+            detail = parsed.optString("detail").ifEmpty {
+                parsed.optString("message").ifEmpty {
+                    parsed.optJSONObject("error")?.optString("message")?.ifEmpty { null } ?: detail
+                }
+            }
+        } catch (_: Exception) {
+        }
+        throw Exception(detail)
+    }
+
+    /** Scoped upload (fail-closed): the wire call uses only the immutable
+     *  [scope]; [isCurrent] is checked before sending, before the 404 retry,
+     *  and before the result escapes. Any drift aborts with
+     *  ApiScopeChangedException; blank identity never sends. */
+    fun uploadProfilePhoto(scope: ApiAccountScope, isCurrent: () -> Boolean, filename: String, bytes: ByteArray): String {
+        val tok = scope.token?.takeIf { it.isNotBlank() } ?: throw Exception("Not authenticated")
+        if (scope.userId.isNullOrBlank()) throw Exception("Not authenticated")
+        if (!isCurrent()) throw ApiScopeChangedException()
+        val headers = mapOf(
+            "Authorization" to "Bearer $tok",
+            "x-tenant-id" to scope.tenantId,
+            "Content-Type" to "multipart/form-data; boundary=$BOUNDARY",
+        )
+        val body = buildMultipartBody(safeMultipartFilename(filename), bytes)
+
+        val response: Pair<Int, String> = try {
+            val primary = binaryTransport.execute(
+                "POST", "${scope.baseUrl}/app-users/upload-photo", headers, body,
+            )
+            if (primary.first == 404) {
+                if (!isCurrent()) throw ApiScopeChangedException()
+                binaryTransport.execute(
+                    "POST", "${scope.baseUrl}/api/v1/app-users/upload-photo", headers, body,
+                )
+            } else {
+                primary
+            }
+        } catch (e: ApiScopeChangedException) {
+            throw e
+        } catch (e: Exception) {
+            throw Exception("Unable to reach server to upload photo: $e")
+        }
+        if (!isCurrent()) throw ApiScopeChangedException()
 
         if (response.first == 200) {
             val parsed = JSONObject(response.second)

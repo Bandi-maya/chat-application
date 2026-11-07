@@ -36,7 +36,7 @@ class CallIceRestartTest {
         override fun setAudioEnabled(enabled: Boolean) = true
         override fun setVideoEnabled(enabled: Boolean) = true
         override suspend fun switchCamera() = true
-        override fun setSpeakerphoneOn(on: Boolean) {}
+        override suspend fun setSpeakerphoneOn(on: Boolean) {}
         override suspend fun startScreenShare() = false
         override suspend fun stopScreenShare() {}
         override suspend fun dispose() {}

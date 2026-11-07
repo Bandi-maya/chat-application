@@ -20,7 +20,7 @@ class ApiMlsRpcClientTest {
         var requestBody: String? = null
         override fun execute(method: String, url: String, headers: Map<String, String>, body: String?): Pair<Int, String> {
             this.method = method; this.url = url; this.headers = headers; this.requestBody = body
-            return status to body
+            return status to this.body
         }
     }
 
@@ -140,7 +140,7 @@ class ApiMlsRpcClientReadsTest {
         var requestBody: String? = null
         override fun execute(method: String, url: String, headers: Map<String, String>, body: String?): Pair<Int, String> {
             this.method = method; this.url = url; this.requestBody = body
-            return status to body
+            return status to this.body
         }
     }
 
