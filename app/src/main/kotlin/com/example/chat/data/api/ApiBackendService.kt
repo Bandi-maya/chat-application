@@ -30,6 +30,7 @@ class ApiBackendService(
     context: Context,
     chatTransport: ApiHttpTransport = OkHttpApiTransport(),
 ) {
+    private val appContext = context.applicationContext
 
     private val authScopeLock = Any()
     val config = ApiBackendConfig(context, authScopeLock, ::notifyAuthScopeTransition)
@@ -46,6 +47,16 @@ class ApiBackendService(
     )
 
     private val session = ApiAuthSession(sessionStore, authScopeLock, ::notifyAuthScopeTransition)
+
+    /** Phase 5: server-controlled configuration, revalidated with ETag on
+     *  login and app start (never polled). Failures keep the last cache. */
+    val serverConfig = ApiConfigClient(
+        baseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        token = { session.token },
+        transport = OkHttpApiTransport(),
+        cache = ApiConfigStore(context.applicationContext),
+    )
     private val authScopeOwner = ApiAccountScopeOwner(authScopeLock, session::snapshot, config::snapshot)
     fun authSnapshot(): ApiAccountScope = authScopeOwner.snapshot()
     fun withAuthScope(expected: ApiAccountScope, block: () -> Unit): Boolean = authScopeOwner.withScope(expected, block)
@@ -226,6 +237,9 @@ class ApiBackendService(
     fun removeCallSignalListener(listener: (Map<String, Any?>) -> Unit) { callSignalListeners.remove(listener) }
 
     private val scopedCallListeners = java.util.concurrent.CopyOnWriteArrayList<(ApiAccountScope, Map<String, Any?>) -> Unit>()
+    /** Push ring nudge: one-shot REST poll of queued call signals while the
+     *  socket is down (app may be backgrounded). */
+    fun pollCallSignalsNow() = callCoordinator.pollNow()
     fun addScopedCallSignalListener(listener: (ApiAccountScope, Map<String, Any?>) -> Unit) = scopedCallListeners.add(listener)
     private val callRequests = CallRequestRegistry()
     private val sendRequests = CallRequestRegistry()
@@ -276,6 +290,28 @@ class ApiBackendService(
     }
 
     private val realtimeListener: ApiRealtimeClient.Listener = object : ApiRealtimeClient.Listener {
+        override fun onSecurityNewDevice(payload: org.json.JSONObject) {
+            securityEvents.tryEmit(payload)
+        }
+
+        override fun onSecureMessage(data: Map<String, Any?>) {
+            secureMessageIngest?.invoke(data)
+        }
+
+        override fun onSecureMessageEdited(data: Map<String, Any?>) {
+            secureMessageEditIngest?.invoke(data)
+        }
+
+        override fun onMessageDeleted(roomId: String, messageId: String) {
+            secureMessageDeleteIngest?.invoke(mapOf("room_id" to roomId, "id" to messageId, "for_everyone" to true))
+        }
+
+        override fun onConfigChanged() {
+            // Telegram-style push invalidation: revalidate (ETag) on the hint;
+            // the fresh document activates on the next app start.
+            chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
+        }
+
         override fun onNewMessage(message: ChatMessage) {
             var unknownRoom = false
             var isNewToList = false
@@ -560,10 +596,36 @@ class ApiBackendService(
     private val realtime: ApiRealtimeClient = ApiRealtimeClient(
         webSocketUrl = { resolveWebSocketUrl() },
         token = { session.token },
-        backoff = com.example.chat.data.network.BackoffPolicy(),
+        // Reconnect-storm-safe full jitter (500ms base, 30s cap): every retry is
+        // uniformly spread, so a server restart never sees a thundering herd.
+        backoff = com.example.chat.data.network.BackoffPolicy(
+            baseMs = 500L, maxMs = 30_000L, fullJitter = true,
+        ),
         connectionScopeIdentity = { authSnapshot() },
         connectionScopeGuard = { expected, action -> (expected as? ApiAccountScope)?.let { withAuthScope(it, action) } ?: false },
     ).apply { listener = realtimeListener }
+
+    /** Content-free push nudge (FCM or any wake transport): the message
+     *  itself told us nothing, so do a bounded sync over the authenticated
+     *  channel. Single-flight; safe to call repeatedly. */
+    @Volatile private var pushSyncRunning = false
+    fun onPushNudge() {
+        if (session.token == null || DemoMode.active) return
+        synchronized(this) {
+            if (pushSyncRunning) return
+            pushSyncRunning = true
+        }
+        chatScope.launch(Dispatchers.IO) {
+            try {
+                ensureFreshToken()
+                ensureOutboxLoaded()
+                flushOutbox()
+                loadConversations()
+            } finally {
+                pushSyncRunning = false
+            }
+        }
+    }
 
     /** Network regained after loss: reconnect the socket now instead of waiting out the backoff.
      *  No-op while connected, connecting or signed out. */
@@ -574,6 +636,29 @@ class ApiBackendService(
 
     /** Invalidates local media copies for deleted/removed messages. Set by the locator BEFORE initialize(). */
     @Volatile var onAttachmentsGone: (List<com.example.chat.data.local.AttachmentRef>) -> Unit = {}
+
+    /** Wired by ServiceLocator: secure-plane realtime envelopes (MLS) go to
+     *  the conversations repository for decrypt+merge with gap healing. */
+    @Volatile var secureMessageIngest: ((Map<String, Any?>) -> Unit)? = null
+
+    /** MLS edit fan-out (chat UI matrix): re-decrypt + update in place. */
+    @Volatile var secureMessageEditIngest: ((Map<String, Any?>) -> Unit)? = null
+
+    /** Delete-for-everyone fan-out: tombstone the local copy. */
+    @Volatile var secureMessageDeleteIngest: ((Map<String, Any?>) -> Unit)? = null
+
+    /** Wired by ServiceLocator. Binds sessions to this device's Ed25519 key:
+     *  login/register send x-device-id + x-device-public-key; every refresh
+     *  signs the presented refresh token as x-device-proof. Null = legacy
+     *  unbound sessions (still accepted by the server). */
+    @Volatile var deviceIdentity: DeviceIdentityManager? = null
+
+    /** Server security notifications (currently: new device signed in and
+     *  awaiting confirmation). Collected by the UI layer to prompt the user
+     *  to confirm or kill the session (48h auto-confirm server-side). */
+    val securityEvents = kotlinx.coroutines.flow.MutableSharedFlow<org.json.JSONObject>(
+        replay = 1, extraBufferCapacity = 8,
+    )
     private fun notifyGone(refs: List<com.example.chat.data.local.AttachmentRef>) {
         if (refs.isNotEmpty()) runCatching { onAttachmentsGone(refs) }
     }
@@ -1527,6 +1612,8 @@ class ApiBackendService(
                 seedDemoState()
                 DemoMode.active = true
             } else {
+                SessionRefreshWorker.schedule(appContext) // keep the session alive between app opens
+                chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
                 chatScope.launch { ensureFreshToken() }
                 realtime.connect()
                 startBackgroundSync()
@@ -1586,7 +1673,7 @@ class ApiBackendService(
             } else if (!tenant.isNullOrBlank()) {
                 config.setTenantId(tenant.trim(), useDefault = false)
             }
-            val result = auth.login(value, password)
+            val result = auth.login(value, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
             afterAuthAdopted()
@@ -1596,6 +1683,8 @@ class ApiBackendService(
     /** Dart _parseAuthResponse tail (api_backend_service.dart:565-572), shared by login, register,
      *  registerOrganization and oauth: connect the socket, load conversations/users/tasks, sync FCM. */
     private fun afterAuthAdopted() {
+        chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
+        SessionRefreshWorker.schedule(appContext) // 30-day background renewal; survives app not being opened
         purgeDemoResidueForRealAdopt()
         realtime.connect()
         startBackgroundSync()
@@ -1608,7 +1697,7 @@ class ApiBackendService(
 
     suspend fun register(email: String, username: String, password: String): ApiUserProfile =
         withContext(Dispatchers.IO) {
-            val result = auth.register(email, username, password)
+            val result = auth.register(email, username, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
             afterAuthAdopted()
@@ -1763,6 +1852,7 @@ class ApiBackendService(
             session.signOut()
         }
         saveRefreshToken(null)
+        SessionRefreshWorker.cancel(appContext)
         onlineIds.clear(); lastSeenById.clear(); typingUntil.clear()
         // Queued messages stay saved for this account and are sent after its next login.
         synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
@@ -1778,8 +1868,11 @@ class ApiBackendService(
     }
 
     // ---- Access-token refresh (/auth/refresh) ----
-    // Access tokens live JWT_EXPIRE_MINUTES (60 by default). Without a refresh every
-    // request starts failing with 401 an hour after login.
+    // Access tokens live ACCESS_TOKEN_EXPIRE_MINUTES (15 by default on the secure
+    // backend). Without a refresh every request starts failing with 401 shortly
+    // after login. Refresh tokens are single-use and rotated on every refresh:
+    // the rotated token returned by the server is persisted immediately, because
+    // replaying a consumed token revokes the whole session (reuse detection).
 
     private val refreshMutex = kotlinx.coroutines.sync.Mutex()
 
@@ -1801,22 +1894,48 @@ class ApiBackendService(
         val remaining = auth.secondsUntilExpiry(current) ?: return
         if (remaining > REFRESH_MARGIN_SECONDS) return
         if (remaining > 0 && isCallActive()) return
+        performRefresh(force = false)
+    }
+
+    /** Outcome of a refresh attempt, for the background worker's retry policy. */
+    enum class SessionRefreshOutcome { REFRESHED, NOT_NEEDED, NO_SESSION, UNAVAILABLE }
+
+    /** Bandi (2026-11-07): a user who never opens the app must still stay
+     *  signed in. SessionRefreshWorker calls this on a 30-day cadence; every
+     *  successful call slides the server's 180-day idle window forward, so
+     *  the session outlives any realistic gap between app opens. Network
+     *  failures return UNAVAILABLE (the worker retries with backoff) and
+     *  NEVER sign the user out; only a definitive server rejection does. */
+    suspend fun refreshSessionInBackground(): SessionRefreshOutcome {
+        if (session.token == null) session.restore()
+        if (session.token == null) return SessionRefreshOutcome.NO_SESSION
+        return performRefresh(force = true)
+    }
+
+    private suspend fun performRefresh(force: Boolean): SessionRefreshOutcome {
+        val current = session.token ?: return SessionRefreshOutcome.NO_SESSION
         refreshMutex.lock()
         try {
-            if (session.token != current) return // someone else refreshed meanwhile
-            val user = session.currentUser ?: return
-            val refreshToken = loadRefreshToken()
-            if (refreshToken == null) {
-                if (remaining <= 0) withContext(Dispatchers.Main) { signOut() }
-                return
-            }
-            when (val result = withContext(Dispatchers.IO) { auth.refresh(refreshToken) }) {
+            if (session.token != current) return SessionRefreshOutcome.REFRESHED // someone else refreshed meanwhile
+            val user = session.currentUser ?: return SessionRefreshOutcome.NO_SESSION
+            val refreshToken = loadRefreshToken() ?: return SessionRefreshOutcome.NO_SESSION
+            val proofHeaders = deviceIdentity?.proofHeaders(refreshToken) ?: emptyMap()
+            val result = withContext(Dispatchers.IO) { auth.refresh(refreshToken, extraHeaders = proofHeaders) }
+            return when (result) {
                 is ApiAuthClient.RefreshResult.Ok -> {
-                    session.adopt(ApiAuthResult(token = result.accessToken, user = user, refreshToken = refreshToken))
+                    val rotated = result.refreshToken ?: refreshToken
+                    saveRefreshToken(rotated) // rotation: the old token is dead from here on
+                    session.adopt(ApiAuthResult(token = result.accessToken, user = user, refreshToken = rotated))
                     realtime.connect()
+                    SessionRefreshOutcome.REFRESHED
                 }
-                ApiAuthClient.RefreshResult.Rejected -> withContext(Dispatchers.Main) { signOut() }
-                ApiAuthClient.RefreshResult.Unavailable -> Unit // retry on the next tick
+                ApiAuthClient.RefreshResult.Rejected -> {
+                    // The server states the session is dead (revoked, or a
+                    // replayed token tripped reuse detection). Only now sign out.
+                    withContext(Dispatchers.Main) { signOut() }
+                    SessionRefreshOutcome.NO_SESSION
+                }
+                ApiAuthClient.RefreshResult.Unavailable -> SessionRefreshOutcome.UNAVAILABLE // retry later
             }
         } finally {
             refreshMutex.unlock()
@@ -1834,7 +1953,9 @@ class ApiBackendService(
     }
 
     private companion object {
-        const val REFRESH_MARGIN_SECONDS = 10 * 60L
+        // 5-minute margin against the 15-minute access-token lifetime; the
+        // refresh is skipped while a call is active (unless already expired).
+        const val REFRESH_MARGIN_SECONDS = 5 * 60L
         const val TYPING_TTL_MS = 6_000L
     }
 }

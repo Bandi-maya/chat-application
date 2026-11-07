@@ -10,9 +10,20 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.devtools.ksp")
 }
 
-// Notifications and call alerts use Chaty's authenticated custom WebSocket; no FCM transport.
+// google-services.json is per-environment and not committed; without it the
+// plugin must not run or the build fails. FCM code compiles regardless and
+// stays inert until the file (and a build) exists.
+if (file("google-services.json").isFile) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
+// Push: content-free FCM data nudges (approved 2026-11-07) wake the app to
+// fetch+decrypt over the authenticated channel; the websocket carries
+// everything while the app is open. Requires google-services.json (not in
+// the repo) at app/ for release builds.
 
 // Only public client routing keys are read. Never embed credentials in these values.
 val routingKeys = setOf("REST_API_BASE_URL", "TENANT_ID", "WEBSOCKET_URL")
@@ -145,7 +156,18 @@ dependencies {
     implementation("androidx.camera:camera-effects:1.6.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha07")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1") // Ed25519 device-key signing (DeviceIdentityManager)
+    implementation("androidx.exifinterface:exifinterface:1.3.7") // orientation bake + EXIF strip (media tiers)
+    // Room + SQLCipher: encrypted local message DB (matrices 11/18). The
+    // passphrase lives in SecureKeyValueStore; never in prefs or code.
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+    implementation("net.zetetic:sqlcipher-android:4.6.1")
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // Required by the uniffi-generated Kotlin bindings (JNA native calls).
     implementation("net.java.dev.jna:jna:5.14.0@aar")

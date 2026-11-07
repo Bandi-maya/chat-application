@@ -151,3 +151,31 @@ class OfflineNetworkPolicyTest {
             assertTrue("malformed $bad must be restricted", r("view_once" to bad))
     }
 }
+
+class FullJitterBackoffTest {
+    @Test
+    fun fullJitterStaysWithinBounds() {
+        val policy = com.example.chat.data.network.BackoffPolicy(
+            baseMs = 500L, maxMs = 30_000L, fullJitter = true,
+        )
+        repeat(10_000) {
+            val attempt = (0..12).random()
+            val delay = policy.delayMs(attempt)
+            val cap = minOf(30_000L, 500L shl attempt)
+            assertTrue("delay $delay out of [0, $cap] at attempt $attempt", delay in 0..cap)
+        }
+    }
+
+    @Test
+    fun fullJitterSpreadsAcrossTheRange() {
+        // Deterministic extremes: random=0 -> 0 delay, random~1 -> the cap.
+        val low = com.example.chat.data.network.BackoffPolicy(
+            baseMs = 500L, maxMs = 30_000L, random = { 0.0 }, fullJitter = true,
+        )
+        val high = com.example.chat.data.network.BackoffPolicy(
+            baseMs = 500L, maxMs = 30_000L, random = { 0.9999 }, fullJitter = true,
+        )
+        assertTrue(low.delayMs(6) == 0L)
+        assertTrue(high.delayMs(6) in 30_000L..32_000L)
+    }
+}

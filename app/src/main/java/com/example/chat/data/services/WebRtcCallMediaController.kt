@@ -104,6 +104,19 @@ class WebRtcCallMediaController(
     override var onConnectionState: ((CallTransportState) -> Unit)? = null
     override var onIceFailed: (() -> Unit)? = null
 
+    /** restartIce: re-gather candidates on network switch / ICE failure without
+     *  tearing down the peer connection (WebRTC standard practice, MDN). The
+     *  next createOffer carries fresh ICE credentials for renegotiation. */
+    override fun restartIce(): Boolean {
+        val peer = peerConnection ?: return false
+        return try {
+            peer.restartIce()
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     /** Cumulative WebRTC RTP bytes since this peer connected. */
     var onTrafficBytes: ((uploadedBytes: Long, downloadedBytes: Long) -> Unit)? = null
     var onNetworkMetrics: ((upstreamKbps: Int, packetLossPercent: Double, roundTripTimeMs: Long) -> Unit)? = null

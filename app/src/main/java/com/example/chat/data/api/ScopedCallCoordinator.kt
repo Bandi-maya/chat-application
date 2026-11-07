@@ -60,6 +60,33 @@ class ScopedCallCoordinator(
             job.start()
         }
     }
+    /** One-shot poll for a push ring nudge (calls matrix "REST fallback for
+     *  ring when socket is down"): the app may be backgrounded when FCM wakes
+     *  it, so this bypasses the foreground gate and the backoff clock. Shares
+     *  the same single-flight slot and dedup as the foreground cadence. */
+    fun pollNow() {
+        val expected = current()
+        guarded(expected) {
+            val prepared = prepare(expected) ?: return@guarded
+            synchronized(stateLock) {
+                if (account !== expected || polling?.isActive == true) return@synchronized
+                polling = scope.launch(start = CoroutineStart.LAZY) {
+                    val result = prepared.first.poll(prepared.second)
+                    guarded(expected) {
+                        synchronized(stateLock) {
+                            if (account !== expected) return@synchronized
+                            if (result is ApiCallSignalClient.PollResult.Signals) {
+                                result.signals.forEach { signal ->
+                                    if (dedup.accept(expected.generation, signal, clock())) deliver(expected, signal)
+                                }
+                            }
+                        }
+                    }
+                }.also { it.start() }
+            }
+        }
+    }
+
     /** Invoke from existing cadence; never creates another loop. */
     fun tick() {
         val expected = current()

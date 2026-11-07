@@ -83,6 +83,19 @@ class ApiRealtimeClient(
         fun onMessagesCleared(roomId: String) {}
         /** call_signal: payload['data'] ?? payload, only when it is a Map. */
         fun onCallSignal(data: Map<String, Any?>) {}
+        /** security.new_device: server-side security notification (new device
+         *  signed in awaiting confirmation). Payload forwarded verbatim. */
+        fun onSecurityNewDevice(payload: org.json.JSONObject) {}
+        /** new_message carrying an encrypted envelope (MLS secure plane):
+         *  routed to the secure ingest instead of the plaintext parser. */
+        fun onSecureMessage(data: Map<String, Any?>) {}
+
+        /** MLS edit fan-out (chat UI matrix): same opaque envelope shape as
+         *  onSecureMessage plus edited_at; the repository re-decrypts and
+         *  updates the local copy. */
+        fun onSecureMessageEdited(data: Map<String, Any?>) {}
+        /** config_changed: server configuration was republished; revalidate. */
+        fun onConfigChanged() {}
         fun onScopedCallSignal(data: Map<String, Any?>, capturedScope: Any?) { onCallSignal(data) }
         /** messages_read: another participant read [messageIds] in [roomId]. */
         fun onMessagesRead(roomId: String, messageIds: List<String>, readerId: String) {}
@@ -112,6 +125,9 @@ class ApiRealtimeClient(
     private var socketUrl: String? = null
     private var connecting = false
     private var pingCancel: Scheduler.Cancelable? = null
+    /** Last time a pong (or any inbound frame) proved the connection alive. */
+    private var lastInboundAt: Long = 0L
+    private val nowMs: () -> Long = { System.currentTimeMillis() }
     private var reconnectCancel: Scheduler.Cancelable? = null
     private var reconnectAttempt = 0
 
@@ -284,6 +300,7 @@ class ApiRealtimeClient(
             if (socket !== this@ApiRealtimeClient.socket) return@post
             if (socketToken != token() || socketUrl != webSocketUrl() || socketScope !== connectionScopeIdentity()) return@post
             reconnectAttempt = 0
+            lastInboundAt = nowMs()
             handleMessage(text)
         }
 
@@ -304,6 +321,7 @@ class ApiRealtimeClient(
     private fun cleanupLocked() {
         pingCancel?.cancel()
         pingCancel = null
+        lastInboundAt = 0L
         try {
             socket?.close()
         } catch (_: Exception) {
@@ -330,6 +348,7 @@ class ApiRealtimeClient(
      *  schedules the reconnect, exactly like Dart. */
     private fun schedulePingLocked() {
         pingCancel?.cancel()
+        if (lastInboundAt == 0L) lastInboundAt = nowMs()  // fresh connection starts alive
         pingCancel = scheduler.schedule(PING_INTERVAL_MS) { pingTick() }
     }
 
@@ -337,6 +356,14 @@ class ApiRealtimeClient(
         val s = socket
         if (s == null || token() == null) {
             pingCancel = null
+            return
+        }
+        // Dead-connection detection: a proxy may have killed the socket without
+        // a close frame. No inbound traffic for PONG_TIMEOUT_MS => reconnect.
+        if (lastInboundAt > 0 && nowMs() - lastInboundAt > PONG_TIMEOUT_MS) {
+            pingCancel = null
+            cleanupLocked()
+            scheduleReconnectLocked()
             return
         }
         val ok = try {
@@ -359,7 +386,7 @@ class ApiRealtimeClient(
         try {
             val payload = JSONObject(text)
             when (payload.optString("type", "")) {
-                "pong" -> Unit
+                "pong" -> { lastInboundAt = nowMs() }
                 "call_signal" -> {
                     val raw = if (payload.has("data") && !payload.isNull("data")) {
                         payload.get("data")
@@ -375,17 +402,33 @@ class ApiRealtimeClient(
                         listener?.onScopedCallSignal(signal, socketScope)
                     }
                 }
+                "security.new_device" -> {
+                    listener?.onSecurityNewDevice(payload)
+                }
                 "new_message" -> {
                     val raw = dataOrMessage(payload) ?: return
-                    listener?.onNewMessage(ChatMessage.fromApi(ApiChatClient.deepMap(raw)))
+                    val mapped = ApiChatClient.deepMap(raw)
+                    if (mapped["encrypted"] == true) {
+                        listener?.onSecureMessage(mapped)
+                    } else {
+                        listener?.onNewMessage(ChatMessage.fromApi(mapped))
+                    }
+                }
+                "config_changed" -> {
+                    listener?.onConfigChanged()
                 }
                 "message_edited" -> {
                     val raw = dataOrMessage(payload) ?: return
-                    val msgId = str(raw, "uid") ?: str(raw, "id") ?: ""
-                    val roomId = str(raw, "room_id") ?: ""
-                    val newContent = str(raw, "content") ?: ""
-                    val editedAt = parseIsoOrNow(str(raw, "updated_at"))
-                    listener?.onMessageEdited(roomId, msgId, newContent, editedAt)
+                    val mapped = ApiChatClient.deepMap(raw)
+                    if (mapped["encrypted_payload"] != null || mapped["encrypted"] == true) {
+                        listener?.onSecureMessageEdited(mapped)
+                    } else {
+                        val msgId = str(raw, "uid") ?: str(raw, "id") ?: ""
+                        val roomId = str(raw, "room_id") ?: ""
+                        val newContent = str(raw, "content") ?: ""
+                        val editedAt = parseIsoOrNow(str(raw, "edited_at") ?: str(raw, "updated_at"))
+                        listener?.onMessageEdited(roomId, msgId, newContent, editedAt)
+                    }
                 }
                 "message_deleted" -> {
                     val raw = dataOrMessage(payload) ?: return
@@ -456,7 +499,9 @@ class ApiRealtimeClient(
             return url + (if (url.contains('?')) "&" else "?") + "token=" + encoded
         }
 
-        const val PING_INTERVAL_MS = 25_000L
+        const val PING_INTERVAL_MS = 45_000L  // proxies kill idle sockets at 60-120s
+        /** No pong for this many ms => the connection is silently dead. */
+        const val PONG_TIMEOUT_MS = 2 * PING_INTERVAL_MS
         const val RECONNECT_DELAY_MS = 4_000L
 
         /** Dart map access: missing key or JSON null both read as null. */

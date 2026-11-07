@@ -160,6 +160,10 @@ interface CallMediaController {
 
     /** ICE connection state failed (Dart onIceConnectionState == Failed). */
     var onIceFailed: (() -> Unit)?
+
+    /** ICE restart (calls matrix): re-gather candidates on network switch or ICE
+     *  failure without dropping the call. False when unsupported or not prepared. */
+    fun restartIce(): Boolean = false
 }
 
 /** Outbound signaling sink: ApiBackendService.sendCallSignal on the api
@@ -217,6 +221,11 @@ class CallSignalingService(
 
     private var cachedRemoteOfferSdp: String? = null
     private var media: CallMediaController? = null
+    // ICE restart bookkeeping (calls matrix "survive network switch mid-call"):
+    // bounded retries, reset when the connection recovers or a new call starts.
+    private var iceRestartAttempts = 0
+    private var iceRestartJob: Job? = null
+    private var lastNetworkTransport: String? = null
     private var lastAppliedNetworkProfile: CallNetworkProfile? = null
     private var callAccountScope: Any? = null
     private fun requireCallScope(expected: Any?) {
@@ -535,7 +544,35 @@ class CallSignalingService(
 
                 // Dual-channel delivery can repeat an offer. Never reset an
                 // existing session or revive a terminal call with the same ID.
-                if (active?.callId == callId) return@offerGuard
+                if (active?.callId == callId) {
+                    // ICE-restart renegotiation (calls matrix): same call id with a
+                    // fresh offer. Apply it and answer; keep the session alive.
+                    if (signal["ice_restart"] == true &&
+                        (active.state == CallSessionState.connected ||
+                            active.state == CallSessionState.reconnecting)
+                    ) {
+                        val restartOfferSdp = CallSignalCodec.sdp(signal["sdp"] ?: signal["offer"])
+                        val peer = media
+                        if (restartOfferSdp.isNotBlank() && peer != null) {
+                            val restartAccount = captureAccountScope()
+                            scope.launch {
+                                runCatching {
+                                    peer.setRemoteDescription(restartOfferSdp, "offer")
+                                    val restartAnswer = peer.createAnswer(active.isVideo)
+                                    guardCall(restartAccount, callId, peer) {
+                                        signalSender.sendCallSignal(senderId, mapOf(
+                                            "signal_type" to "answer",
+                                            "call_id" to callId,
+                                            "ice_restart" to true,
+                                            "sdp" to restartAnswer,
+                                        ))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return@offerGuard
+                }
                 val offerSdp = CallSignalCodec.sdp(signal["sdp"] ?: signal["offer"])
                 if (offerSdp.isBlank()) return@offerGuard
                 callAccountScope = captureAccountScope()
@@ -572,7 +609,8 @@ class CallSignalingService(
                 if (session?.callId == callId && session.isOutgoing) {
                     val answerSdp = CallSignalCodec.sdp(signal["sdp"] ?: signal["answer"])
                     val peer = media
-                    if (answerSdp.isNotEmpty() && !remoteDescriptionReady && peer != null) {
+                    val isRestartAnswer = signal["ice_restart"] == true
+                    if (answerSdp.isNotEmpty() && peer != null && (!remoteDescriptionReady || isRestartAnswer)) {
                         ringTimeoutJob?.cancel()
                         if (!receiveValid()) return
                         peer.setRemoteDescription(answerSdp, "answer")
@@ -580,7 +618,11 @@ class CallSignalingService(
                         if (!receiveGuard {
                             if (currentSession?.callId == callId && media === peer) {
                                 remoteDescriptionReady = true
-                                currentSession = session.copy(state = CallSessionState.connecting)
+                                iceRestartAttempts = 0
+                                currentSession = session.copy(
+                                    state = if (isRestartAnswer) CallSessionState.connected
+                                    else CallSessionState.connecting,
+                                )
                                 startConnectionTimeout(callId)
                                 notifyChanged()
                             }
@@ -1180,7 +1222,7 @@ class CallSignalingService(
         }
         peer.onRemoteStream = { guardCall(expectedAccount, callId, peer) { notifyChanged() } }
         peer.onConnectionState = { state -> guardCall(expectedAccount, callId, peer) { handlePeerConnectionState(state) } }
-        peer.onIceFailed = { guardCall(expectedAccount, callId, peer) { markTransportFailed("ICE negotiation failed.") } }
+        peer.onIceFailed = { guardCall(expectedAccount, callId, peer) { attemptIceRestart(expectedAccount, callId, peer) } }
         peer.prepare(isVideo, lowDataUsageEnabled(), iceServers)
         try { requireCallIdentity(expectedAccount, callId, peer) }
         catch (cancelled: kotlinx.coroutines.CancellationException) { peer.dispose(); throw cancelled }
@@ -1195,6 +1237,7 @@ class CallSignalingService(
             CallTransportState.connected -> {
                 ringTimeoutJob?.cancel()
                 connectionTimeoutJob?.cancel()
+                iceRestartAttempts = 0
                 currentSession = session.copy(
                     state = CallSessionState.connected,
                     connectedAt = now(),
@@ -1209,12 +1252,78 @@ class CallSignalingService(
                     currentSession = session.copy(state = CallSessionState.reconnecting)
                     startConnectionTimeout(session.callId)
                     notifyChanged()
+                    media?.let { attemptIceRestart(callAccountScope, session.callId, it) }
                 }
             }
-            CallTransportState.failed ->
-                markTransportFailed("WebRTC peer connection failed.")
+            CallTransportState.failed -> {
+                val peer = media
+                if (peer != null && (session.state == CallSessionState.connected ||
+                        session.state == CallSessionState.reconnecting)
+                ) {
+                    attemptIceRestart(callAccountScope, session.callId, peer)
+                } else {
+                    markTransportFailed("WebRTC peer connection failed.")
+                }
+            }
             CallTransportState.closed -> stopDurationTimer()
             CallTransportState.other -> Unit
+        }
+    }
+
+    /** ICE restart (calls matrix "survive network switch mid-call", WebRTC
+     *  restartIce standard practice): re-gather candidates without dropping the
+     *  call. Bounded retries; the caller re-offers with ice_restart=true, the
+     *  callee restarts locally and waits for that offer. */
+    private fun attemptIceRestart(expectedAccount: Any?, callId: String, peer: CallMediaController) {
+        val session = currentSession ?: return
+        if (session.callId != callId ||
+            (session.state != CallSessionState.connected &&
+                session.state != CallSessionState.reconnecting)
+        ) return
+        if (iceRestartAttempts >= 3) {
+            markTransportFailed("ICE negotiation failed after restart attempts.")
+            return
+        }
+        iceRestartAttempts += 1
+        if (session.state != CallSessionState.reconnecting) {
+            currentSession = session.copy(state = CallSessionState.reconnecting)
+            startConnectionTimeout(callId)
+            notifyChanged()
+        }
+        if (!peer.restartIce()) return
+        if (!session.isOutgoing) return
+        iceRestartJob?.cancel()
+        iceRestartJob = scope.launch {
+            runCatching {
+                val offerSdp = peer.createOffer(session.isVideo)
+                guardCall(expectedAccount, callId, peer) {
+                    signalSender.sendCallSignal(session.remoteUserId, mapOf(
+                        "signal_type" to "offer",
+                        "call_id" to callId,
+                        "call_type" to if (session.isVideo) "video" else "voice",
+                        "ice_restart" to true,
+                        "is_video" to session.isVideo,
+                        "sdp" to offerSdp,
+                    ))
+                }
+            }
+        }
+    }
+
+    /** Network transport changed (Wi-Fi <-> cellular). While a call is active,
+     *  restart ICE so the media path is re-established on the new network. */
+    fun onNetworkTransportChanged(transport: String) {
+        val session = currentSession ?: return
+        if (session.state != CallSessionState.connected &&
+            session.state != CallSessionState.reconnecting
+        ) {
+            lastNetworkTransport = transport
+            return
+        }
+        val last = lastNetworkTransport
+        lastNetworkTransport = transport
+        if (last != null && last != transport && transport != "unknown") {
+            media?.let { attemptIceRestart(callAccountScope, session.callId, it) }
         }
     }
 
