@@ -12,7 +12,7 @@ import java.io.File
 import java.io.IOException
 
 /** Client for the backend's encrypted attachment transient queue
- *  (/e2ee/attachments/*). The file bytes handed to [upload] must already be
+ *  (the /e2ee/attachments endpoints). The file bytes handed to [upload] must already be
  *  the client-side ciphertext - this client never sees plaintext or keys.
  *  Download returns the raw ciphertext bytes; [confirmDelivered] tells the
  *  server the blob can be deleted (deleted after delivery, by design). */

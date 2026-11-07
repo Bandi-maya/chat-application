@@ -73,7 +73,7 @@ class DeviceIdentityManager(
             secureStore.writeAll(
                 mapOf(
                     KEY_DEVICE_ID to created.deviceId,
-                    KEY_PRIVATE to Base64.encodeToString(created.privateKeyBytes, Base64.NO_WRAP),
+                    KEY_PRIVATE to Base64.encodeToString(privateKey.encoded, Base64.NO_WRAP),
                     KEY_PUBLIC to created.publicKeyBase64,
                 ),
             )
