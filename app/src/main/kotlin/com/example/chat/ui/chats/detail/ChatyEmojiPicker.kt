@@ -121,6 +121,7 @@ fun ChatyEmojiPickerSheet(
         )
     }
     var stickerTab by remember { mutableStateOf(false) }
+    var newsSection by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchOpen by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf(0) } // 0 = recents
@@ -233,6 +234,9 @@ fun ChatyEmojiPickerSheet(
                 modifier = Modifier.weight(1f),
                 unavailableReason = if (onStickerSend == null) "Sticker sending is not connected yet. Preview only." else null)
             }
+        } else {
+        if (composerMode && !reactionMode && newsSection) {
+            NewsCustomEmojiSection(theme = theme, modifier = Modifier.weight(1f))
         } else {
         // Search field (Dart SearchViewConfig, hint 'Search emoji…')
         if (searchOpen) {
@@ -394,6 +398,10 @@ fun ChatyEmojiPickerSheet(
             IconButton(onClick = { searchOpen = !searchOpen; if (!searchOpen) searchQuery = "" }) {
                 com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = "Search emoji", color = accent)
             }
+        }
+        }
+        if (composerMode && !reactionMode) {
+            CustomEmojiPackStrip(theme, newsSection, onSelect = { newsSection = it })
         }
         }
     }
