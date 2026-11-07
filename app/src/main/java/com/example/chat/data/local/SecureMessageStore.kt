@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.example.chat.data.e2ee.SecureKeyValueStore
 import java.security.SecureRandom
-import net.zetetic.database.sqlcipher.SupportFactory
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 /** Owns the Room+SQLCipher database handle (matrices 11/18). The 32-byte
  *  passphrase is generated on first use and stored in the Keystore-backed
@@ -31,7 +31,7 @@ class SecureMessageStore(
                 SecureMessageDatabase::class.java,
                 "chaty_messages.db",
             )
-                .openHelperFactory(SupportFactory(passphrase.toByteArray(Charsets.UTF_8)))
+                .openHelperFactory(SupportOpenHelperFactory(passphrase.toByteArray(Charsets.UTF_8)))
                 .build()
                 .also { db = it }
         }
