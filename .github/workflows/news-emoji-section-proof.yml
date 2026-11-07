@@ -12,6 +12,8 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     - name: Validate custom WebRTC backend route syntax
       run: node --check backend/routes/chaty-webrtc-ice.js
     - name: Restore pinned cumulative candidate source
