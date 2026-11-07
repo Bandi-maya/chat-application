@@ -7,7 +7,8 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StickerMessagePolicyTest {
-    private val sticker = BundledStickerPacks.packs.single().stickers.single()
+    private val sticker = BundledStickerPacks.packs.single { it.id == "user-supplied-anime" }
+        .stickers.single { it.id == "anime-drink" }
     private fun envelope(): JSONObject = JSONObject().put("type", "image").put("id", "attachment")
         .put("url", "https://example.invalid/sticker.webp").put("name", "sticker.webp").put("size", "101 KB")
         .put("text", "").also { o -> StickerMessagePolicy.metadata(sticker).forEach { (k,v) -> o.put(k,v) } }
