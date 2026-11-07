@@ -389,6 +389,18 @@ jobs:
               p=pathlib.Path(n);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
           print('REVIEWED-POSTNEXT','129e3ebc4ccb144a510dd384aa3efe658fe9532df6ef3257a56612b6b7ec7efb','files',len(expected))
           PYPOSTNEXT
+      - name: Restore hash-reviewed run5 UI sources after all overlays
+        run: |
+          python3 - <<'PYRUN5'
+          import hashlib,json,pathlib,subprocess
+          m=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())
+          paths=list(m['files'])
+          assert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts for n in paths)
+          subprocess.run(['git','checkout','HEAD','--',*paths],check=True)
+          for n,expected in m['files'].items():
+              assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n
+          print('RUN5-UI-RESTORED',len(paths),m['source_commit'])
+          PYRUN5
       - name: Call bundle source contracts
         run: python3 ci/tests/test_call_bundle_settings_contract.py -v
       - name: PDF identity and native parser contracts
@@ -636,6 +648,18 @@ jobs:
           if applied != 137:
               raise SystemExit(f"Expected 137 override files, applied {applied}")
           PYOVERRIDES
+      - name: Restore hash-reviewed run5 UI sources after all overlays
+        run: |
+          python3 - <<'PYRUN5'
+          import hashlib,json,pathlib,subprocess
+          m=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())
+          paths=list(m['files'])
+          assert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts for n in paths)
+          subprocess.run(['git','checkout','HEAD','--',*paths],check=True)
+          for n,expected in m['files'].items():
+              assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n
+          print('RUN5-UI-RESTORED',len(paths),m['source_commit'])
+          PYRUN5
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
       - uses: actions/setup-java@v4
@@ -842,6 +866,18 @@ jobs:
           PYLOGYPATCH
         env:
           PIN_ARCH: ${{ steps.pin.outputs.arch }}
+      - name: Restore hash-reviewed run5 UI sources after all overlays
+        run: |
+          python3 - <<'PYRUN5'
+          import hashlib,json,pathlib,subprocess
+          m=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())
+          paths=list(m['files'])
+          assert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts for n in paths)
+          subprocess.run(['git','checkout','HEAD','--',*paths],check=True)
+          for n,expected in m['files'].items():
+              assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n
+          print('RUN5-UI-RESTORED',len(paths),m['source_commit'])
+          PYRUN5
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -1273,6 +1309,18 @@ jobs:
               p=pathlib.Path(n);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
           print('REVIEWED-POSTNEXT','129e3ebc4ccb144a510dd384aa3efe658fe9532df6ef3257a56612b6b7ec7efb','files',len(expected))
           PYPOSTNEXT
+      - name: Restore hash-reviewed run5 UI sources after all overlays
+        run: |
+          python3 - <<'PYRUN5'
+          import hashlib,json,pathlib,subprocess
+          m=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())
+          paths=list(m['files'])
+          assert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts for n in paths)
+          subprocess.run(['git','checkout','HEAD','--',*paths],check=True)
+          for n,expected in m['files'].items():
+              assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n
+          print('RUN5-UI-RESTORED',len(paths),m['source_commit'])
+          PYRUN5
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair
@@ -1432,6 +1480,18 @@ jobs:
               p=pathlib.Path(n);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)
           print('REVIEWED-POSTNEXT','129e3ebc4ccb144a510dd384aa3efe658fe9532df6ef3257a56612b6b7ec7efb','files',len(expected))
           PYPOSTNEXT
+      - name: Restore hash-reviewed run5 UI sources after all overlays
+        run: |
+          python3 - <<'PYRUN5'
+          import hashlib,json,pathlib,subprocess
+          m=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())
+          paths=list(m['files'])
+          assert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts for n in paths)
+          subprocess.run(['git','checkout','HEAD','--',*paths],check=True)
+          for n,expected in m['files'].items():
+              assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n
+          print('RUN5-UI-RESTORED',len(paths),m['source_commit'])
+          PYRUN5
       - uses: actions/download-artifact@v4
         with:
           name: synthetic-runtime-apk-pair

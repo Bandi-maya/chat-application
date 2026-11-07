@@ -23,7 +23,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.VolumeOff
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -230,10 +230,9 @@ fun ConversationRow(
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                Icons.Rounded.Check,
-                                contentDescription = null,
-                                tint = Color(theme.onAccentColor),
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check,
+                                semanticLabel = null,
+                                color = Color(theme.onAccentColor),
                                 modifier = Modifier.size(26.dp),
                             )
                         }
@@ -256,10 +255,9 @@ fun ConversationRow(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                             if (locked) {
-                                Icon(
-                                    Icons.Rounded.Lock,
-                                    contentDescription = null,
-                                    tint = Color(theme.accentColor),
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock,
+                                    semanticLabel = null,
+                                    color = Color(theme.accentColor),
                                     modifier = Modifier.size(14.dp),
                                 )
                                 Spacer(Modifier.width(4.dp))
@@ -367,19 +365,17 @@ fun ConversationRow(
                         }
                         if (conversation.isMuted) {
                             Spacer(Modifier.width(6.dp))
-                            Icon(
-                                Icons.Rounded.VolumeOff,
-                                contentDescription = null,
-                                tint = Color(theme.secondaryTextColor),
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.mute,
+                                semanticLabel = null,
+                                color = Color(theme.secondaryTextColor),
                                 modifier = Modifier.size(14.dp),
                             )
                         }
                         if (conversation.isPinned) {
                             Spacer(Modifier.width(6.dp))
-                            Icon(
-                                Icons.Rounded.PushPin,
-                                contentDescription = null,
-                                tint = Color(theme.secondaryTextColor),
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.pin,
+                                semanticLabel = null,
+                                color = Color(theme.secondaryTextColor),
                                 modifier = Modifier.size(14.dp),
                             )
                         }

@@ -1,5 +1,6 @@
 package com.example.chat.ui.chats.detail
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,7 +30,7 @@ import androidx.compose.material.icons.rounded.Shortcut
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.TaskAlt
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -93,6 +94,7 @@ fun MessageActionSheetContent(
             Modifier
                 .fillMaxWidth()
                 .background(surfaceSecondary, RoundedCornerShape(999.dp))
+                .horizontalScroll(rememberScrollState())
                 .padding(vertical = 6.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically,
@@ -100,24 +102,23 @@ fun MessageActionSheetContent(
             quickSheetEmojis.forEach { emoji ->
                 Box(
                     Modifier
-                        .size(42.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .pointerInput(emoji) { detectTapGestures(onTap = { onReact(emoji) }) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(emoji, fontSize = 28.sp)
+                    AnimatedEmojiView(unicode = emoji, size = 28f, animate = false, mode = EmojiDisplayMode.reaction)
                 }
             }
             Box(
                 Modifier
-                    .size(38.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(Color(argbWithAlpha(theme.secondaryTextColor, 0.18)))
                     .pointerInput("more") { detectTapGestures(onTap = { onOpenAllReactions() }) },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.Add, contentDescription = "More reactions", tint = foreground,
-                    modifier = Modifier.size(22.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = "More reactions", color = foreground, size = 22.dp)
             }
         }
         Box(Modifier.height(16.dp))
@@ -126,7 +127,7 @@ fun MessageActionSheetContent(
         ActionGroupCard(theme) {
             actions.filter { !it.isDestructive }.forEach { action ->
                 ActionRow(
-                    icon = actionIcon(action, message),
+                    icon = actionIconId(action, message),
                     label = actionSheetLabel(action),
                     color = when (action.type) {
                         MessageActionType.reply, MessageActionType.forward,
@@ -144,7 +145,7 @@ fun MessageActionSheetContent(
         ActionGroupCard(theme) {
             actions.filter { it.isDestructive }.forEach { action ->
                 ActionRow(
-                    icon = actionIcon(action, message),
+                    icon = actionIconId(action, message),
                     label = actionSheetLabel(action),
                     color = danger,
                     textColor = danger,
@@ -152,7 +153,7 @@ fun MessageActionSheetContent(
                 )
             }
             ActionRow(
-                icon = Icons.Outlined.Flag,
+                icon = com.example.chat.ui.icons.ChatyIconId.report,
                 label = "Report Message",
                 color = foregroundSecondary,
                 textColor = foregroundSecondary,
@@ -171,6 +172,25 @@ private fun actionSheetLabel(action: MessageActionDescriptor): String = when (ac
     MessageActionType.copy -> "Copy Text"
     else -> action.label
 }
+
+fun actionIconId(action: MessageActionDescriptor, message: ChatMessage): com.example.chat.ui.icons.ChatyIconId =
+    when (action.type) {
+        MessageActionType.reply -> com.example.chat.ui.icons.ChatyIconId.reply
+        MessageActionType.forward -> com.example.chat.ui.icons.ChatyIconId.forward
+        MessageActionType.task -> com.example.chat.ui.icons.ChatyIconId.addTask
+        MessageActionType.pin -> if (action.label == "Unpin") com.example.chat.ui.icons.ChatyIconId.unpin else com.example.chat.ui.icons.ChatyIconId.pin
+        MessageActionType.star -> if (message.isStarred) com.example.chat.ui.icons.ChatyIconId.star else com.example.chat.ui.icons.ChatyIconId.starFilled
+        MessageActionType.copy -> com.example.chat.ui.icons.ChatyIconId.copy
+        MessageActionType.edit -> com.example.chat.ui.icons.ChatyIconId.edit
+        MessageActionType.select -> com.example.chat.ui.icons.ChatyIconId.check
+        MessageActionType.info -> com.example.chat.ui.icons.ChatyIconId.info
+        MessageActionType.deleteForMe, MessageActionType.deleteForEveryone -> com.example.chat.ui.icons.ChatyIconId.delete
+        MessageActionType.report -> com.example.chat.ui.icons.ChatyIconId.report
+        MessageActionType.blockUser -> com.example.chat.ui.icons.ChatyIconId.block
+        MessageActionType.react -> com.example.chat.ui.icons.ChatyIconId.emoji
+        MessageActionType.more -> com.example.chat.ui.icons.ChatyIconId.moreOptions
+        MessageActionType.translate -> com.example.chat.ui.icons.ChatyIconId.translate
+    }
 
 fun actionIcon(action: MessageActionDescriptor, message: ChatMessage): ImageVector =
     when (action.type) {
@@ -205,7 +225,7 @@ private fun ActionGroupCard(theme: ThemeConfig, content: @Composable () -> Unit)
 
 @Composable
 private fun ActionRow(
-    icon: ImageVector,
+    icon: com.example.chat.ui.icons.ChatyIconId,
     label: String,
     color: Color,
     textColor: Color,
@@ -219,7 +239,7 @@ private fun ActionRow(
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+        com.example.chat.ui.icons.ChatyIcon(icon, color = color, size = 22.dp)
         Box(Modifier.width(12.dp))
         Text(label, color = textColor, fontWeight = FontWeight.W600, fontSize = 15.sp)
     }

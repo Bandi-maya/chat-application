@@ -29,7 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -315,7 +315,7 @@ fun MessageManagementPage(
                     badgeColor = if (rule.enabled) colors.success else colors.foregroundTertiary,
                     trailing = {
                         IconButton(onClick = { deleteRule(rule) }) {
-                            Icon(Icons.Outlined.DeleteOutline, "Delete rule", tint = colors.error)
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.deleteOutline, semanticLabel = "Delete rule", color = colors.error)
                         }
                     },
                 )
@@ -372,7 +372,7 @@ fun MessageManagementPage(
                                 trailing = if (entry.state == "pending") {
                                     {
                                         IconButton(onClick = { cancelScheduled(entry) }) {
-                                            Icon(Icons.Rounded.Close, "Cancel scheduled")
+                                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Cancel scheduled")
                                         }
                                     }
                                 } else {

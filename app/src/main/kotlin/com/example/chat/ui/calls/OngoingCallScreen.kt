@@ -48,7 +48,7 @@ import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.VideocamOff
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -176,10 +176,9 @@ fun OngoingCallScreen(
                 modifier = Modifier.fillMaxSize().padding(padding).padding(28.dp),
             ) {
                 Spacer(Modifier.height(140.dp))
-                Icon(
-                    Icons.Rounded.CallEnd,
-                    contentDescription = null,
-                    tint = Color(theme.dangerColor),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd,
+                    semanticLabel = null,
+                    color = Color(theme.dangerColor),
                     modifier = Modifier.size(42.dp),
                 )
                 Spacer(Modifier.height(12.dp))
@@ -256,10 +255,9 @@ fun OngoingCallScreen(
                         LocalVideoSurface(videoSurfaces, mirror = session.isFrontCamera)
                     } else {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Rounded.VideocamOff,
-                                contentDescription = null,
-                                tint = callSecondary(),
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callVideoOff,
+                                semanticLabel = null,
+                                color = callSecondary(),
                             )
                         }
                     }
@@ -312,10 +310,9 @@ fun OngoingCallScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.Rounded.ChevronLeft,
-                            contentDescription = "Back",
-                            tint = callForeground(),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                            semanticLabel = "Back",
+                            color = callForeground(),
                         )
                     }
                     BoxWithConstraints(Modifier.weight(1f)) {
@@ -351,7 +348,7 @@ fun OngoingCallScreen(
                     }
                     }
                     if (onCallTools != null && !(iosLayout && !session.isVideo)) {
-                        IconButton(onClick = onCallTools) { Icon(Icons.Rounded.MoreHoriz, "Call tools", tint = callForeground()) }
+                        IconButton(onClick = onCallTools) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.more, semanticLabel = "Call tools", color = callForeground()) }
                     }
                     if (session.isVideo) {
                         IconButton(
@@ -367,10 +364,9 @@ fun OngoingCallScreen(
                     }
                     if (session.isVideo && effectProvider != null) {
                         IconButton(onClick = { effectProvider.showEffectSheet() }) {
-                            Icon(
-                                Icons.Rounded.AutoAwesome,
-                                contentDescription = "Call filter",
-                                tint = callForeground(),
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.autoAwesome,
+                                semanticLabel = "Call filter",
+                                color = callForeground(),
                             )
                         }
                     }
@@ -454,7 +450,7 @@ fun OngoingCallScreen(
                     if (shownCount < actions.size) {
                         Box {
                             CallControlButton("More call controls", false, callAccent, true, { showMore = !showMore }, controlBackground) { tint ->
-                                Icon(Icons.Rounded.MoreHoriz, null, tint = tint)
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.more, semanticLabel = null, color = tint)
                             }
                             com.example.chat.ui.kit.ChatyDropdownMenu(showMore, { showMore = false }) {
                                 actions.drop(shownCount).forEach { action ->
@@ -475,7 +471,7 @@ fun OngoingCallScreen(
                             onClick(label = "End call") { onEndCall(); true }
                         }) {
                         Box(Modifier.matchParentSize().clip(CircleShape).clickable { onEndCall() })
-                        Icon(Icons.Rounded.CallEnd, null, tint = com.example.chat.ui.theme.LocalAppColors.current.onError, modifier = Modifier.size(28.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = null, color = com.example.chat.ui.theme.LocalAppColors.current.onError, modifier = Modifier.size(28.dp))
                     }
                 }
                 if (compact) Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
@@ -752,7 +748,7 @@ private fun GoogleLatestProductionControls(
             contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.matchParentSize().clip(RoundedCornerShape(32.dp)).clickable(onClick = onEndCall))
-            Icon(Icons.Rounded.CallEnd, null, tint = com.example.chat.ui.theme.LocalAppColors.current.onError, modifier = Modifier.size(32.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = null, color = com.example.chat.ui.theme.LocalAppColors.current.onError, modifier = Modifier.size(32.dp))
         }
     }
 }
@@ -818,7 +814,7 @@ private fun BundleEndAction(color: Color, onEnd: () -> Unit, wide: Boolean, avai
         contentAlignment = Alignment.Center) {
         Box(Modifier.matchParentSize().clip(RoundedCornerShape(32.dp)).clickable(onClick = onEnd))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.CallEnd, null, tint = com.example.chat.ui.theme.LocalAppColors.current.onError, modifier = Modifier.size(28.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = null, color = com.example.chat.ui.theme.LocalAppColors.current.onError, modifier = Modifier.size(28.dp))
             if (wide) { Spacer(Modifier.width(8.dp)); Text("End call", color = com.example.chat.ui.theme.LocalAppColors.current.onError, maxLines = 1) }
         }
     }

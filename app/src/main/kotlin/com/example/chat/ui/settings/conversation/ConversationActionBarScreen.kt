@@ -26,7 +26,7 @@ import androidx.compose.material.icons.rounded.PhoneDisabled
 import androidx.compose.material.icons.rounded.SpeakerNotesOff
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Web
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -105,11 +105,11 @@ fun ConversationActionBarScreen(preferences: ChatyPreferencesController, onBack:
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.ChevronLeft, null, tint = primaryText, modifier = Modifier.size(22.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = null, color = primaryText, modifier = Modifier.size(22.dp))
                         Spacer(Modifier.width(8.dp))
                         if (!p.hideProfilePicture) {
                             Box(Modifier.size(36.dp).background(colors.surfaceSecondary, CircleShape), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Rounded.Person, null, tint = secondaryText, modifier = Modifier.size(20.dp))
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.profile, semanticLabel = null, color = secondaryText, modifier = Modifier.size(20.dp))
                             }
                             Spacer(Modifier.width(10.dp))
                         }
@@ -118,12 +118,12 @@ fun ConversationActionBarScreen(preferences: ChatyPreferencesController, onBack:
                             Text("Online", color = accent, fontSize = 12.sp)
                         }
                         if (!p.hideCallButton) {
-                            Icon(Icons.Rounded.Call, null, tint = primaryText, modifier = Modifier.size(20.dp))
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, semanticLabel = null, color = primaryText, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(14.dp))
-                            Icon(Icons.Rounded.Videocam, null, tint = primaryText, modifier = Modifier.size(22.dp))
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callVideo, semanticLabel = null, color = primaryText, modifier = Modifier.size(22.dp))
                             Spacer(Modifier.width(12.dp))
                         }
-                        Icon(Icons.Rounded.MoreVert, null, tint = primaryText, modifier = Modifier.size(20.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = null, color = primaryText, modifier = Modifier.size(20.dp))
                     }
                     if (!p.disableContactStatus) {
                         Text(

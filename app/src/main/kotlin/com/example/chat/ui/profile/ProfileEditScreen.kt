@@ -31,7 +31,7 @@ import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ModalBottomSheet
@@ -217,10 +217,9 @@ fun ProfileEditScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = { attemptBack() }) {
-                        Icon(
-                            Icons.Rounded.ChevronLeft,
-                            contentDescription = "Back",
-                            tint = Color(theme.primaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                            semanticLabel = "Back",
+                            color = Color(theme.primaryTextColor),
                         )
                     }
                 },
@@ -291,10 +290,9 @@ fun ProfileEditScreen(
                                 .padding(10.dp)
                                 .background(Color(theme.surfaceColor).copy(alpha = 0.85f), CircleShape),
                         ) {
-                            Icon(
-                                Icons.Rounded.Wallpaper,
-                                contentDescription = "Change banner photo",
-                                tint = Color(theme.primaryTextColor),
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.wallpaper,
+                                semanticLabel = "Change banner photo",
+                                color = Color(theme.primaryTextColor),
                                 modifier = Modifier.size(20.dp),
                             )
                         }
@@ -348,10 +346,9 @@ fun ProfileEditScreen(
                             .border(2.5.dp, Color(theme.surfaceColor), CircleShape)
                             .background(Color(theme.accentColor), CircleShape),
                     ) {
-                        Icon(
-                            Icons.Rounded.PhotoCamera,
-                            contentDescription = null,
-                            tint = Color(theme.onAccentColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera,
+                            semanticLabel = null,
+                            color = Color(theme.onAccentColor),
                             modifier = Modifier.size(17.dp),
                         )
                     }
@@ -367,7 +364,7 @@ fun ProfileEditScreen(
                     enabled = !isSaving,
                     label = { Text("Display Name") },
                     placeholder = { Text("Enter your full name") },
-                    leadingIcon = { Icon(Icons.Outlined.PersonOutline, contentDescription = null) },
+                    leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.profile, semanticLabel = null) },
                     supportingText = { Text("${displayName.length}/50") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -403,7 +400,7 @@ fun ProfileEditScreen(
                     enabled = !isSaving,
                     label = { Text("About / Status") },
                     placeholder = { Text("Say something about yourself or current mood") },
-                    leadingIcon = { Icon(Icons.Outlined.Info, contentDescription = null) },
+                    leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.info, semanticLabel = null) },
                     supportingText = { Text("${about.length}/140") },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
@@ -414,7 +411,7 @@ fun ProfileEditScreen(
                     onValueChange = {},
                     enabled = false,
                     label = { Text("Phone Number") },
-                    leadingIcon = { Icon(Icons.Outlined.Phone, contentDescription = null) },
+                    leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, semanticLabel = null) },
                     supportingText = { Text("Phone number is managed via Account settings") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -436,13 +433,13 @@ fun ProfileEditScreen(
             ListItem(
                 headlineContent = { Text("Capture Image") },
                 supportingContent = { Text("Use camera to take a new photo") },
-                leadingContent = { Icon(Icons.Rounded.CameraAlt, contentDescription = null) },
+                leadingContent = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera, semanticLabel = null) },
                 modifier = Modifier.clickable { pick(ProfileMediaSource.camera) },
             )
             ListItem(
                 headlineContent = { Text("Pick / Choose from Gallery") },
                 supportingContent = { Text("Select an image from device gallery") },
-                leadingContent = { Icon(Icons.Rounded.PhotoLibrary, contentDescription = null) },
+                leadingContent = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.gallery, semanticLabel = null) },
                 modifier = Modifier.clickable { pick(ProfileMediaSource.gallery) },
             )
             Spacer(Modifier.height(24.dp))

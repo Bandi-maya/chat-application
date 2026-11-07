@@ -34,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Lock
@@ -62,6 +63,8 @@ import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.ViewInAr
 import androidx.compose.material.icons.rounded.ViewQuilt
 import androidx.compose.material.icons.rounded.ViewSidebar
@@ -69,7 +72,7 @@ import androidx.compose.material.icons.rounded.ViewWeek
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -253,7 +256,25 @@ fun HeaderSettingsScreen(
                 )
                 divider()
                 HeaderReferenceSettingRow(
-                    iconContent = rowIcon(Icons.Rounded.DonutLarge), title = "Enable Instagram-like Stories",
+                    iconContent = rowIcon(Icons.Rounded.TaskAlt), title = "Hide Tasks tab",
+                    subtitle = "Remove Tasks from the bottom navigation",
+                    switchValue = preferences.gbBool("nav_hide_tasks"),
+                    onSwitchChanged = {
+                        preferences.updateGbFeatures(mapOf("nav_hide_tasks" to it), logTitle = "Hide Tasks tab")
+                    },
+                )
+                divider()
+                HeaderReferenceSettingRow(
+                    iconContent = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.updates, color = colors.primary, size = 21.dp) }, title = "Hide Updates tab",
+                    subtitle = "Remove Updates from the bottom navigation",
+                    switchValue = preferences.gbBool("nav_hide_updates"),
+                    onSwitchChanged = {
+                        preferences.updateGbFeatures(mapOf("nav_hide_updates" to it), logTitle = "Hide Updates tab")
+                    },
+                )
+                divider()
+                HeaderReferenceSettingRow(
+                    iconContent = rowIcon(Icons.Rounded.AutoStories), title = "Enable Instagram-like Stories",
                     switchValue = home.enableStoriesStrip,
                     onSwitchChanged = { updateHome(home.copy(enableStoriesStrip = it), "Stories Strip") },
                 )

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.AdminPanelSettings
@@ -54,7 +55,7 @@ import androidx.compose.material.icons.rounded.WarningAmber
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -211,7 +212,7 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
     @Composable
     fun ChevronRow(icon: ImageVector, title: String, subtitle: String, onTap: () -> Unit) {
         Row2(icon, title, subtitle, 11, onTap) {
-            Icon(Icons.Rounded.ChevronRight, null, tint = accent, modifier = Modifier.size(22.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = accent, modifier = Modifier.size(22.dp))
         }
     }
 
@@ -293,7 +294,7 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
                     SwitchRow(Icons.Outlined.Lock, "Hide the privacy option", "Hide the privacy option from the Home Screen Options menu.", p.hidePrivacyOption) {
                         preferences.updatePrivacy(p.copy(hidePrivacyOption = it), logTitle = "Hide the privacy option")
                     }
-                    SwitchRow(Icons.Rounded.SystemUpdateAlt, "Hide the update option", "Hide the Chaty Update option from the Home Screen Options menu.", p.hideUpdateOption) {
+                    SwitchRow(Icons.Rounded.History, "Hide the update option", "Hide the Chaty Update option from the Home Screen Options menu.", p.hideUpdateOption) {
                         preferences.updatePrivacy(p.copy(hideUpdateOption = it), logTitle = "Hide the update option")
                     }
 

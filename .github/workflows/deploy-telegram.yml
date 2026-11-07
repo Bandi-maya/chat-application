@@ -236,6 +236,18 @@ jobs:
             app/src/test/java/com/example/chat/ui/media/MediaLibraryServiceHardeningTest.kt \
             gradle.properties
 
+      - name: Restore hash-reviewed run5 UI sources after all overlays
+        run: |
+          python3 - <<'PYRUN5'
+          import hashlib,json,pathlib,subprocess
+          m=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())
+          paths=list(m['files'])
+          assert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts for n in paths)
+          subprocess.run(['git','checkout','HEAD','--',*paths],check=True)
+          for n,expected in m['files'].items():
+              assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n
+          print('RUN5-UI-RESTORED',len(paths),m['source_commit'])
+          PYRUN5
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
 
@@ -349,7 +361,7 @@ jobs:
           retention-days: 7
 
       - name: Send APK to Telegram
-        if: success()
+        if: ${{ success() && !contains(github.event.head_commit.message, '[chaty-no-telegram-once-20261107]') }}
         run: |
           APK_PATH="${{ steps.apk-info.outputs.apk_path }}"
           APP_NAME="Chaty Android App (Kotlin)"
@@ -381,7 +393,7 @@ jobs:
           fi
 
       - name: Send Failure Notification to Telegram
-        if: failure()
+        if: ${{ failure() && !contains(github.event.head_commit.message, '[chaty-no-telegram-once-20261107]') }}
         run: |
           COMMIT_SHA="${GITHUB_SHA::7}"
           BRANCH="${GITHUB_REF#refs/heads/}"

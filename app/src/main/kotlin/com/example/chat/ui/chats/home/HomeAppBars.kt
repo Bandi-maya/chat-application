@@ -65,7 +65,7 @@ import com.example.chat.ui.kit.ChatyTextButton
 import com.example.chat.ui.theme.LocalAppColors
 import com.example.chat.ui.kit.ChatyDropdownMenu as DropdownMenu
 import com.example.chat.ui.kit.ChatyDropdownMenuItem as DropdownMenuItem
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -231,12 +231,12 @@ fun StandardHomeAppBar(
         Row(Modifier.fillMaxWidth()
             // Collapse drives height to exactly 0; the expanded height scales with
             // font scale (sp->dp) so large text is not cut by clipToBounds.
-            .height(with(LocalDensity.current) { (com.example.chat.ui.navigation.ReferenceLayoutMetrics.expandedIdentityHeightDp.toFloat() * theme.fontScale.toFloat()).sp.toDp() } * (1f - headerCollapse))
-            .padding(top = (com.example.chat.ui.navigation.ReferenceLayoutMetrics.actionBarHeightDp * (1f - headerCollapse)).dp)
+            .height(with(LocalDensity.current) { (com.example.chat.ui.navigation.ReferenceLayoutMetrics.compactIdentityHeightDp.toFloat() * theme.fontScale.toFloat()).sp.toDp() } * (1f - headerCollapse))
+            .padding(top = 0.dp)
             .clipToBounds().alpha(1f - headerCollapse)
             .padding(horizontal = 24.dp)
             .combinedClickable(onClick = { if (homePrefs.nameTapOpensLocked) onIdentityTap() }, onLongClick = onIdentityLongPress),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
             // Use Chaty's selected icon family, never GB branding or a copied contact avatar.
             com.example.chat.ui.navigation.NavDestinationIcon(
                 if (forcedTypeIsSet) "groups" else "chats",
@@ -244,10 +244,10 @@ fun StandardHomeAppBar(
                 tint = Color(theme.primaryTextColor),
             )
             Spacer(Modifier.width(6.dp))
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(horizontalAlignment = Alignment.Start) {
                 Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     color = Color(theme.primaryTextColor),
-                    fontSize = (com.example.chat.ui.navigation.ReferenceLayoutMetrics.identityTextSizeSp * theme.fontScale).sp,
+                    fontSize = (com.example.chat.ui.navigation.ReferenceLayoutMetrics.compactIdentityTextSizeSp * theme.fontScale).sp,
                     fontWeight = FontWeight.W700)
                 if (showStatus) Text(userAbout, color = Color(theme.secondaryTextColor), fontSize = (14 * theme.fontScale).sp)
             }
@@ -311,10 +311,10 @@ fun StandardHomeAppBar(
         }
         if (effectiveShowSearch) {
             IconButton(onClick = onToggleSearch) {
-                Icon(
-                    if (isSearchOpen) Icons.Rounded.Close else Icons.Rounded.Search,
-                    contentDescription = if (isSearchOpen) "Close search" else "Search chats",
-                    tint = Color(theme.primaryTextColor),
+                com.example.chat.ui.icons.ChatyIcon(
+                    if (isSearchOpen) com.example.chat.ui.icons.ChatyIconId.close else com.example.chat.ui.icons.ChatyIconId.search,
+                    semanticLabel = if (isSearchOpen) "Close search" else "Search chats",
+                    color = Color(theme.primaryTextColor),
                 )
             }
         }
@@ -361,7 +361,7 @@ fun StandardHomeAppBar(
         } // bounded, scrollable optional action lane
         // Primary overflow stays visible and anchored, never hidden by horizontal scrolling.
         IconButton(onClick = onOpenOverflowMenu, modifier = Modifier.size(48.dp)) {
-            Icon(Icons.Rounded.MoreVert, contentDescription = "More options", tint = Color(theme.primaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = "More options", color = Color(theme.primaryTextColor))
         }
     }
     } // shared large/default header container
@@ -380,24 +380,24 @@ fun HomeOverflowMenu(
     onOpenArchived: () -> Unit = {},
 ) {
     // Linked Devices / Scheduler / Auto Reply are deferred to the next release (ReleaseFeatures).
-    val items: List<Triple<ImageVector, String, () -> Unit>> = listOfNotNull(
-        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.ScheduleSend, "Message Scheduler") { nav.onOpenMessageManagement() } else null,
-        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple(Icons.Outlined.Reply, "Auto Reply") { nav.onOpenMessageManagement() } else null,
-        Triple(Icons.Outlined.RestartAlt, "Restart Chaty") { nav.onRestartApp() },
-        Triple(Icons.Outlined.Dialpad, "Message a Number") { onMessageANumber() },
-        Triple(Icons.Outlined.Campaign, "Mass Message") { nav.onOpenNewChat(false, true) },
-        Triple(Icons.Outlined.GroupAdd, "New Group") { nav.onOpenNewChat(true, false) },
-        Triple(Icons.Outlined.ChatBubbleOutline, "New Chat") { nav.onOpenNewChat(false, false) },
-        Triple(Icons.Outlined.Call, "New Call") { nav.onNewCall() },
-        if (nav.showUpdatesEntry) Triple(Icons.Outlined.Update, "Updates") { nav.onOpenUpdates() } else null,
-        if (nav.showTasksEntry) Triple(Icons.Outlined.TaskAlt, "Tasks") { nav.onOpenTasks() } else null,
-        if (ReleaseFeatures.LINKED_DEVICES) Triple(Icons.Outlined.Devices, "Linked Devices") { nav.onOpenLinkedDevices() } else null,
-        Triple(Icons.Outlined.Star, "Starred Messages") { nav.onOpenStarredMessages() },
-        Triple(Icons.Outlined.Archive, "Archived Chats") { onOpenArchived() },
-        Triple(Icons.Outlined.DoneAll, "Mark All as Read") { onMarkAllAsRead() },
-        Triple(Icons.Outlined.Call, "Who can call me?") { nav.onWhoCanCallMe() },
-        Triple(Icons.Outlined.Share, "Share Chaty") { nav.onShareApp() },
-        Triple(Icons.Outlined.Settings, "Settings") { nav.onOpenSettings() },
+    val items: List<Triple<@Composable () -> Unit, String, () -> Unit>> = listOfNotNull(
+        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.scheduleSend, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Message Scheduler") { nav.onOpenMessageManagement() } else null,
+        if (ReleaseFeatures.MESSAGE_AUTOMATION) Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.reply, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Auto Reply") { nav.onOpenMessageManagement() } else null,
+        Triple({ Icon(Icons.Outlined.RestartAlt, null, tint = Color(theme.secondaryTextColor), modifier = Modifier.size(20.dp)) }, "Restart Chaty") { nav.onRestartApp() },
+        Triple({ Icon(Icons.Outlined.Dialpad, null, tint = Color(theme.secondaryTextColor), modifier = Modifier.size(20.dp)) }, "Message a Number") { onMessageANumber() },
+        Triple({ Icon(Icons.Outlined.Campaign, null, tint = Color(theme.secondaryTextColor), modifier = Modifier.size(20.dp)) }, "Mass Message") { nav.onOpenNewChat(false, true) },
+        Triple({ Icon(Icons.Outlined.GroupAdd, null, tint = Color(theme.secondaryTextColor), modifier = Modifier.size(20.dp)) }, "New Group") { nav.onOpenNewChat(true, false) },
+        Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats, color = Color(theme.secondaryTextColor), size = 20.dp) }, "New Chat") { nav.onOpenNewChat(false, false) },
+        Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, color = Color(theme.secondaryTextColor), size = 20.dp) }, "New Call") { nav.onNewCall() },
+        if (nav.showUpdatesEntry) Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.updates, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Updates") { nav.onOpenUpdates() } else null,
+        if (nav.showTasksEntry) Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.tasks, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Tasks") { nav.onOpenTasks() } else null,
+        if (ReleaseFeatures.LINKED_DEVICES) Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.desktop, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Linked Devices") { nav.onOpenLinkedDevices() } else null,
+        Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.star, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Starred Messages") { nav.onOpenStarredMessages() },
+        Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.archive, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Archived Chats") { onOpenArchived() },
+        Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.markRead, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Mark All as Read") { onMarkAllAsRead() },
+        Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Who can call me?") { nav.onWhoCanCallMe() },
+        Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.share, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Share Chaty") { nav.onShareApp() },
+        Triple({ com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.settings, color = Color(theme.secondaryTextColor), size = 20.dp) }, "Settings") { nav.onOpenSettings() },
     )
     DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape,
         expanded = expanded,
@@ -410,7 +410,7 @@ fun HomeOverflowMenu(
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(icon, contentDescription = null, tint = Color(theme.secondaryTextColor), modifier = Modifier.size(20.dp))
+                        icon()
                         Spacer(Modifier.width(12.dp))
                         Text(label, color = Color(theme.primaryTextColor), fontSize = 15.5.sp, fontWeight = FontWeight.Normal)
                     }
@@ -452,7 +452,7 @@ fun SelectionHomeAppBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClearSelection) {
-            Icon(Icons.Rounded.Close, contentDescription = "Clear selection", tint = Color(theme.primaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Clear selection", color = Color(theme.primaryTextColor))
         }
         Text(
             selectedCount.toString(),
@@ -462,41 +462,41 @@ fun SelectionHomeAppBar(
         )
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onTogglePin) {
-            Icon(
-                if (anyUnpinned) Icons.Outlined.OutlinedPushPin else Icons.Rounded.PushPin,
-                contentDescription = if (anyUnpinned) "Pin" else "Unpin",
-                tint = Color(theme.primaryTextColor),
+            com.example.chat.ui.icons.ChatyIcon(
+                if (anyUnpinned) com.example.chat.ui.icons.ChatyIconId.pin else com.example.chat.ui.icons.ChatyIconId.unpin,
+                semanticLabel = if (anyUnpinned) "Pin" else "Unpin",
+                color = Color(theme.primaryTextColor),
             )
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = Color(theme.primaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.delete, semanticLabel = "Delete", color = Color(theme.primaryTextColor))
         }
         IconButton(onClick = onToggleMute) {
-            Icon(
-                if (anyUnmuted) Icons.Outlined.VolumeOff else Icons.Outlined.VolumeUp,
-                contentDescription = if (anyUnmuted) "Mute" else "Unmute",
-                tint = Color(theme.primaryTextColor),
+            com.example.chat.ui.icons.ChatyIcon(
+                if (anyUnmuted) com.example.chat.ui.icons.ChatyIconId.mute else com.example.chat.ui.icons.ChatyIconId.unmute,
+                semanticLabel = if (anyUnmuted) "Mute" else "Unmute",
+                color = Color(theme.primaryTextColor),
             )
         }
         IconButton(onClick = onToggleArchive) {
-            Icon(Icons.Outlined.Archive, contentDescription = "Archive", tint = Color(theme.primaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.archive, semanticLabel = "Archive", color = Color(theme.primaryTextColor))
         }
         Box {
             IconButton(onClick = { overflowOpen = true }) {
-                Icon(Icons.Rounded.MoreVert, contentDescription = "More actions", tint = Color(theme.primaryTextColor))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = "More actions", color = Color(theme.primaryTextColor))
             }
             DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
                 SelectionMenuItem(
-                    icon = if (anyUnlocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
+                    icon = if (anyUnlocked) com.example.chat.ui.icons.ChatyIconId.lock else com.example.chat.ui.icons.ChatyIconId.unlock,
                     label = if (anyUnlocked) "Lock chat" else "Unlock chat",
                 ) { overflowOpen = false; onToggleLock() }
-                SelectionMenuItem(Icons.Outlined.MarkChatUnread, "Mark as unread") {
+                SelectionMenuItem(com.example.chat.ui.icons.ChatyIconId.markUnread, "Mark as unread") {
                     overflowOpen = false; onMarkUnread()
                 }
-                SelectionMenuItem(Icons.Outlined.MarkChatRead, "Mark as read") {
+                SelectionMenuItem(com.example.chat.ui.icons.ChatyIconId.markRead, "Mark as read") {
                     overflowOpen = false; onMarkRead()
                 }
-                SelectionMenuItem(Icons.Rounded.SelectAll, "Select all") {
+                SelectionMenuItem(com.example.chat.ui.icons.ChatyIconId.selectAll, "Select all") {
                     overflowOpen = false; onSelectAll()
                 }
             }
@@ -505,11 +505,11 @@ fun SelectionHomeAppBar(
 }
 
 @Composable
-private fun SelectionMenuItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+private fun SelectionMenuItem(icon: com.example.chat.ui.icons.ChatyIconId, label: String, onClick: () -> Unit) {
     DropdownMenuItem(
         text = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null)
+                com.example.chat.ui.icons.ChatyIcon(icon)
                 Spacer(Modifier.width(12.dp))
                 Text(label)
             }
@@ -538,12 +538,12 @@ fun HomeSearchField(
         textStyle = androidx.compose.ui.text.TextStyle(color = Color(theme.primaryTextColor)),
         placeholder = { Text(hint, color = Color(theme.secondaryTextColor)) },
         leadingIcon = {
-            Icon(Icons.Rounded.Search, contentDescription = null, tint = Color(theme.secondaryTextColor))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, color = Color(theme.secondaryTextColor))
         },
         trailingIcon = {
             if (value.isNotEmpty()) {
                 IconButton(onClick = { onValueChange("") }) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Clear search")
                 }
             }
         },
@@ -801,10 +801,9 @@ fun LockedChatsSetupDialog(
                             .background(Color(argbWithAlpha(theme.accentColor, 0.15)), RoundedCornerShape(10.dp))
                             .padding(10.dp),
                     ) {
-                        Icon(
-                            Icons.Outlined.Lock,
-                            contentDescription = null,
-                            tint = Color(theme.accentColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock,
+                            semanticLabel = null,
+                            color = Color(theme.accentColor),
                             modifier = Modifier.size(24.dp),
                         )
                     }

@@ -63,7 +63,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -233,14 +233,14 @@ fun SettingsRootScreen(
     )) {
         Column(Modifier.fillMaxSize()) {
             Row(
-                Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)).height(56.dp),
+                Modifier.fillMaxWidth().then(if (suppressDuplicateTitle) Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))).height(56.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (canGoBack) Box(Modifier.padding(8.dp)) { ChatyBackButton(onPressed = onBack) } else Spacer(Modifier.width(16.dp))
                 if (suppressDuplicateTitle) Spacer(Modifier.weight(1f))
                 else Text("Settings", Modifier.weight(1f).semantics { heading() }, color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                IconButton(onClick = { onNavigate(SettingsDestination.EditProfile) }) { Icon(Icons.Outlined.Edit, "Edit profile", Modifier.size(24.dp), tint = colors.foreground) }
-                IconButton(onClick = { onNavigate(SettingsDestination.SearchSettings) }) { Icon(Icons.Rounded.Search, "Search settings", Modifier.size(24.dp), tint = colors.foreground) }
+                IconButton(onClick = { onNavigate(SettingsDestination.EditProfile) }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.edit, semanticLabel = "Edit profile", modifier = Modifier.size(24.dp), color = colors.foreground) }
+                IconButton(onClick = { onNavigate(SettingsDestination.SearchSettings) }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = "Search settings", modifier = Modifier.size(24.dp), color = colors.foreground) }
                 IconButton(onClick = { onNavigate(SettingsDestination.QrCode) }) { Icon(Icons.Rounded.QrCode2, "QR code", Modifier.size(25.dp), tint = colors.foreground) }
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
@@ -258,12 +258,12 @@ fun SettingsRootScreen(
                                 Box(
                                     Modifier.fillMaxSize().background(Brush.linearGradient(listOf(accent.copy(alpha = 0.30f), colors.surface, colors.background))),
                                     contentAlignment = Alignment.Center,
-                                ) { Icon(Icons.Outlined.Wallpaper, null, Modifier.size(34.dp), tint = accent.copy(alpha = 0.65f)) }
+                                ) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.wallpaper, semanticLabel = null, modifier = Modifier.size(34.dp), color = accent.copy(alpha = 0.65f)) }
                             } else {
                                 val model = if (banner.startsWith("http://") || banner.startsWith("https://")) banner else "file://" + banner.removePrefix("file://")
                                 val fallback: @Composable () -> Unit = {
                                     Box(Modifier.fillMaxSize().background(colors.surfaceElevated), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Outlined.Wallpaper, null, Modifier.size(30.dp), tint = colors.foregroundSecondary)
+                                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.wallpaper, semanticLabel = null, modifier = Modifier.size(30.dp), color = colors.foregroundSecondary)
                                     }
                                 }
                                 ChatyAsyncImage(model, "Account banner", Modifier.fillMaxSize(), placeholder = fallback, error = fallback)
@@ -273,7 +273,7 @@ fun SettingsRootScreen(
                             Modifier.align(Alignment.TopEnd).padding(10.dp).size(48.dp).clip(CircleShape)
                                 .background(colors.surface.copy(alpha = 0.92f)).clickable { pickTarget = "banner" },
                             contentAlignment = Alignment.Center,
-                        ) { Icon(Icons.Outlined.Wallpaper, "Change account banner", Modifier.size(19.dp), tint = colors.foreground) }
+                        ) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.wallpaper, semanticLabel = "Change account banner", modifier = Modifier.size(19.dp), color = colors.foreground) }
                         // Dart Positioned(bottom: -40): 4dp padding ring around an 84dp avatar.
                         Box(
                             Modifier.offset(y = 40.dp).size(92.dp)
@@ -337,7 +337,7 @@ fun SettingsRootScreen(
                         shape = RoundedCornerShape(14.dp),
                         border = androidx.compose.foundation.BorderStroke(1.2.dp, colors.error.copy(alpha = 0.8f)),
                     ) {
-                        Icon(Icons.Rounded.Logout, null, Modifier.size(20.dp), tint = colors.error)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.logout, semanticLabel = null, modifier = Modifier.size(20.dp), color = colors.error)
                         Spacer(Modifier.width(8.dp))
                         Text("Log Out of Chaty", color = colors.error, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     }
@@ -405,7 +405,7 @@ fun SettingsRootScreen(
             containerColor = colors.surfaceElevated,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Info, null, tint = colors.accent)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.info, semanticLabel = null, color = colors.accent)
                     Spacer(Modifier.width(8.dp))
                     Text("About Chaty", color = colors.foreground, fontSize = 18.sp)
                 }
@@ -449,6 +449,6 @@ private fun RootItemTile(icon: ImageVector, tint: Color, title: String, subtitle
             }
         }
         Spacer(Modifier.width(8.dp))
-        Icon(Icons.Rounded.ChevronRight, null, Modifier.size(20.dp), tint = colors.foregroundSecondary)
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, modifier = Modifier.size(20.dp), color = colors.foregroundSecondary)
     }
 }

@@ -29,7 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Circle
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -85,7 +85,7 @@ fun GbCustomSwitch(
                 .background(if (value) colors.onPrimary else colors.foregroundSecondary, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            if (value) Icon(Icons.Rounded.Check, null, tint = active, modifier = Modifier.size(14.dp))
+            if (value) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, color = active, modifier = Modifier.size(14.dp))
             else Box(Modifier.size(width = 8.dp, height = 2.dp).background(colors.surface, RoundedCornerShape(1.dp)))
         }
     }
@@ -175,7 +175,7 @@ fun GbSettingRow(
                     .clickable { onColorTap?.invoke() },
             )
             trailing != null -> trailing()
-            showChevron || hasSubScreen -> Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary.copy(alpha = 0.72f), modifier = Modifier.padding(start = 8.dp).size(18.dp))
+            showChevron || hasSubScreen -> com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary.copy(alpha = 0.72f), modifier = Modifier.padding(start = 8.dp).size(18.dp))
         }
     }
 }

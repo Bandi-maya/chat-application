@@ -42,7 +42,7 @@ import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.SpeakerGroup
 import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.VolumeUp
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.ui.draw.shadow
@@ -126,7 +126,7 @@ fun AudioSettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.width(56.dp), contentAlignment = Alignment.Center) {
-                IconButton(onClick = onBack) { Icon(Icons.Rounded.ChevronLeft, "Back", tint = Color(themeConfig.primaryTextColor)) }
+                IconButton(onClick = onBack) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = Color(themeConfig.primaryTextColor)) }
             }
             Spacer(Modifier.width(16.dp))
             Text("Audio & Speakers", color = Color(themeConfig.primaryTextColor), fontSize = (19 * themeConfig.fontScale).sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.3).sp)

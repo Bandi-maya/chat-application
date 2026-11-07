@@ -36,7 +36,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -240,11 +240,10 @@ private fun LockScreenView(
                     .border(1.5.dp, primary.copy(alpha = 0.35f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Icons.Outlined.Lock,
-                    contentDescription = null,
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock,
+                    semanticLabel = null,
                     modifier = Modifier.size(34.dp),
-                    tint = primary,
+                    color = primary,
                 )
             }
             Spacer(Modifier.height(20.dp))
@@ -432,7 +431,7 @@ private fun UnlockedVaultView(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.LockOpen, contentDescription = null, modifier = Modifier.size(20.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.unlock, semanticLabel = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
                             if (controller.isDecoyMode) "Decoy Vault" else "Hidden Vault",
@@ -443,7 +442,7 @@ private fun UnlockedVaultView(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 actions = {
                     IconButton(onClick = onLock) {
-                        Icon(Icons.Outlined.Lock, contentDescription = "Lock Vault")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock, semanticLabel = "Lock Vault")
                     }
                 },
             )
@@ -529,9 +528,8 @@ private fun UnlockedVaultView(
                             IconButton(onClick = {
                                 scope.launch { controller.toggleConversationLock(conversation.id) }
                             }) {
-                                Icon(
-                                    Icons.Rounded.LockOpen,
-                                    contentDescription = "Unlock from Vault",
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.unlock,
+                                    semanticLabel = "Unlock from Vault",
                                     modifier = Modifier.size(20.dp),
                                 )
                             }

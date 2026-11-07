@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -110,10 +111,9 @@ fun BundleCompactCallCard(
                             .clickable { onAccept() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Call,
-                            contentDescription = "Accept",
-                            tint = Color.White,
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio,
+                            semanticLabel = "Accept",
+                            color = Color.White,
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -126,10 +126,9 @@ fun BundleCompactCallCard(
                             .clickable { onDecline() },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.CallEnd,
-                            contentDescription = "Decline",
-                            tint = Color.White,
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd,
+                            semanticLabel = "Decline",
+                            color = Color.White,
                             modifier = Modifier.size(20.dp),
                         )
                     }

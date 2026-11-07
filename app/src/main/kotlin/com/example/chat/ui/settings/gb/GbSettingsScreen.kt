@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Send
@@ -65,7 +66,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
@@ -217,7 +218,7 @@ fun GbSettingsScreen(
                 Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color(theme.secondaryTextColor), fontSize = (12.5f * fs).sp, fontWeight = FontWeight.W400)
             }
             Spacer(Modifier.width(8.dp))
-            Icon(Icons.Rounded.ChevronRight, null, tint = accent, modifier = Modifier.size(22.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = accent, modifier = Modifier.size(22.dp))
         }
     }
 
@@ -270,7 +271,7 @@ fun GbSettingsScreen(
             }
             Spacer(Modifier.height(12.dp))
             GbGroupCard {
-                GbRow(Icons.Rounded.SystemUpdate, colors.primary.copy(alpha = 0.14f), accent, "Updates", "Open Chaty release notes and versions") { dialog = GbDialog.Updates }
+                GbRow(Icons.Rounded.History, colors.primary.copy(alpha = 0.14f), accent, "Updates", "Open Chaty release notes and versions") { dialog = GbDialog.Updates }
                 GbDivider()
                 GbRow(Icons.Outlined.Info, colors.info.copy(alpha = 0.14f), colors.info, "About", "Follow the developer for the latest news") { dialog = GbDialog.About }
                 GbDivider()

@@ -44,7 +44,7 @@ import com.example.chat.ui.kit.ChatyActionButton
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import com.example.chat.ui.kit.ChatyTextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -124,7 +124,7 @@ fun ContextualNavigationFab(
     var directNumberOpen by remember { mutableStateOf(false) }
 
     val referenceShape = LocalReferenceDefaultPresentation.current && activeDestinationId in setOf(ChatyNavigationDestinationIds.chats, ChatyNavigationDestinationIds.groups)
-    val mainFabShape: androidx.compose.ui.graphics.Shape = if (referenceShape) RoundedCornerShape(16.dp) else CircleShape
+    val mainFabShape: androidx.compose.ui.graphics.Shape = CircleShape
     val accent = colors.primary
     val effectiveFabColor = prefs.fabNormalColor?.let(::Color) ?: accent
     val effectiveIconColor = prefs.fabIconsColor?.let(::Color) ?: colors.onPrimary
@@ -155,7 +155,7 @@ fun ContextualNavigationFab(
     fun fabIcon(defaultContent: @Composable () -> Unit) {
         if (activeDestinationId == ChatyNavigationDestinationIds.chats) {
             Box {
-                Icon(Icons.Rounded.ChatBubble, contentDescription = null, tint = effectiveIconColor, modifier = Modifier.size(24.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats, semanticLabel = null, color = effectiveIconColor, modifier = Modifier.size(24.dp))
                 if (prefs.showMetaAiIcon) {
                     Box(
                         contentAlignment = Alignment.Center,
@@ -167,7 +167,7 @@ fun ContextualNavigationFab(
                             .background(effectiveFabColor)
                             .border(1.dp, effectiveIconColor.copy(alpha = 0.95f), CircleShape),
                     ) {
-                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = effectiveIconColor, modifier = Modifier.size(10.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.autoAwesome, semanticLabel = null, color = effectiveIconColor, modifier = Modifier.size(10.dp))
                     }
                 }
             }
@@ -356,10 +356,10 @@ private fun HomeSpeedDialFab(
                 .padding(16.dp),
         ) {
             if (expanded) {
-                Icon(Icons.Rounded.Close, contentDescription = "Close quick actions", tint = iconColor, modifier = Modifier.size(24.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close quick actions", color = iconColor, modifier = Modifier.size(24.dp))
             } else {
                 Box {
-                    Icon(Icons.Rounded.ChatBubble, contentDescription = "Open quick actions", tint = iconColor, modifier = Modifier.size(24.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats, semanticLabel = "Open quick actions", color = iconColor, modifier = Modifier.size(24.dp))
                     if (showMetaAiIcon) {
                         Box(
                             contentAlignment = Alignment.Center,
@@ -371,7 +371,7 @@ private fun HomeSpeedDialFab(
                                 .background(normalColor)
                                 .border(1.dp, iconColor.copy(alpha = 0.95f), CircleShape),
                         ) {
-                            Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = iconColor, modifier = Modifier.size(10.dp))
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.autoAwesome, semanticLabel = null, color = iconColor, modifier = Modifier.size(10.dp))
                         }
                     }
                 }
@@ -411,7 +411,7 @@ private fun FabSecondaryActionsSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
             ) {
-                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = colors.primary, modifier = Modifier.size(20.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.autoAwesome, semanticLabel = null, color = colors.primary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 Text("Quick Actions & Tools", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.foreground)
             }

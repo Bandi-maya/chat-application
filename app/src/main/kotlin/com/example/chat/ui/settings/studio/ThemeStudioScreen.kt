@@ -29,7 +29,7 @@ import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.RoundedCorner
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -216,10 +216,9 @@ fun ThemeStudioScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.Rounded.ChevronLeft,
-                            contentDescription = "Back",
-                            tint = Color(theme.primaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                            semanticLabel = "Back",
+                            color = Color(theme.primaryTextColor),
                         )
                     }
                 },
@@ -361,10 +360,9 @@ fun ThemeStudioScreen(
                                 fontSize = 12.sp,
                             )
                         }
-                        Icon(
-                            Icons.Rounded.ChevronRight,
-                            contentDescription = null,
-                            tint = Color(theme.secondaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+                            semanticLabel = null,
+                            color = Color(theme.secondaryTextColor),
                         )
                     }
                 }
@@ -526,7 +524,7 @@ private fun ParticlesTab(
     BentoCard(
         title = "Particle Motion & Density",
         subtitle = "These values control the actual falling overlay, not a preview-only animation.",
-        headerLeading = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
+        headerLeading = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.autoAwesome, semanticLabel = null) },
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Fall speed", color = Color(theme.primaryTextColor), fontSize = 13.sp)

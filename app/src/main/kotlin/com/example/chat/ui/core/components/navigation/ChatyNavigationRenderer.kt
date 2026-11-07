@@ -27,7 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -71,6 +71,28 @@ class ChatyNavItemData(
 
 private fun ChatyNavItemData.shownIcon(): ImageVector = if (isSelected && activeIcon != null) activeIcon else icon
 
+/** Destination identity, not a temporal Update vector, chooses the navigation glyph. */
+private fun ChatyNavItemData.semanticIcon(): com.example.chat.ui.icons.ChatyIconId? = when (id) {
+    "chats" -> com.example.chat.ui.icons.ChatyIconId.chats
+    "groups" -> com.example.chat.ui.icons.ChatyIconId.groups
+    "updates" -> com.example.chat.ui.icons.ChatyIconId.updates
+    "tasks" -> com.example.chat.ui.icons.ChatyIconId.tasks
+    "calls" -> com.example.chat.ui.icons.ChatyIconId.calls
+    "settings" -> com.example.chat.ui.icons.ChatyIconId.settings
+    "desktop" -> com.example.chat.ui.icons.ChatyIconId.desktop
+    "profile" -> com.example.chat.ui.icons.ChatyIconId.profile
+    else -> null
+}
+
+@Composable
+private fun NavigationItemIcon(item: ChatyNavItemData, description: String?, modifier: Modifier, tint: Color) {
+    val semantic = item.semanticIcon()
+    if (semantic != null) com.example.chat.ui.icons.ChatyIcon(semantic, modifier = modifier, color = tint,
+        semanticLabel = description, selected = item.isSelected)
+    else Icon(item.shownIcon(), description, modifier, tint = tint)
+}
+
+
 /** Delegates visual presentation to the chosen variant while keeping identical interaction and semantics.
  *  [reducedMotion] = Dart MediaQuery.disableAnimationsOf (durations become 0). */
 @Composable
@@ -104,7 +126,7 @@ fun ChatyNavigationRenderer(
                     NavItemWrapper(item.onTap, reducedMotion) {
                         val tint by animateColorAsState(if (item.isSelected) active.copy(alpha = 0.14f) else Color.Transparent, tween(fastMs, easing = enter), label = "fd")
                         Box(Modifier.background(tint, RoundedCornerShape(20.dp)).padding(horizontal = 14.dp, vertical = 6.dp)) {
-                            BadgeAnchor(item.badgeCount) { Icon(item.shownIcon(), null, Modifier.size(22.dp), tint = if (item.isSelected) active else inactive) }
+                            BadgeAnchor(item.badgeCount) { NavigationItemIcon(item, null, Modifier.size(22.dp), tint = if (item.isSelected) active else inactive) }
                         }
                     }
                 }
@@ -116,7 +138,7 @@ fun ChatyNavigationRenderer(
                     NavItemWrapper(item.onTap, reducedMotion) {
                         val fill by animateColorAsState(if (item.isSelected) active else Color.Transparent, tween(fastMs, easing = enter), label = "cr")
                         Row(Modifier.background(fill, RoundedCornerShape(16.dp)).padding(horizontal = 18.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                            BadgeAnchor(item.badgeCount) { Icon(item.shownIcon(), null, Modifier.size(20.dp), tint = if (item.isSelected) Color.White else inactive) }
+                            BadgeAnchor(item.badgeCount) { NavigationItemIcon(item, null, Modifier.size(20.dp), tint = if (item.isSelected) Color.White else inactive) }
                             if (item.isSelected) {
                                 Spacer(Modifier.width(6.dp))
                                 Text(item.label, color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.W700)
@@ -139,7 +161,7 @@ fun ChatyNavigationRenderer(
                                     .padding(vertical = 8.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                BadgeAnchor(item.badgeCount) { Icon(item.shownIcon(), null, Modifier.size(20.dp), tint = if (item.isSelected) active else inactive) }
+                                BadgeAnchor(item.badgeCount) { NavigationItemIcon(item, null, Modifier.size(20.dp), tint = if (item.isSelected) active else inactive) }
                                 Spacer(Modifier.height(2.dp))
                                 Text(item.label, maxLines = 1, color = if (item.isSelected) active else inactive, fontSize = 10.5.sp,
                                     fontWeight = if (item.isSelected) FontWeight.W700 else FontWeight.W500)
@@ -163,7 +185,7 @@ fun ChatyNavigationRenderer(
                     NavItemWrapper(item.onTap, reducedMotion) {
                         val s by animateFloatAsState(if (item.isSelected) 1.08f else 1f, tween(fastMs, easing = enter), label = "gd")
                         Box(Modifier.scale(s)) {
-                            BadgeAnchor(item.badgeCount) { Icon(item.shownIcon(), null, Modifier.size(24.dp), tint = if (item.isSelected) active else inactive) }
+                            BadgeAnchor(item.badgeCount) { NavigationItemIcon(item, null, Modifier.size(24.dp), tint = if (item.isSelected) active else inactive) }
                         }
                     }
                 }
@@ -175,7 +197,7 @@ fun ChatyNavigationRenderer(
                     // Dart Tooltip(message: label): long-press tooltip is delegated to the platform content description.
                     NavItemWrapper(item.onTap, reducedMotion) {
                         Box(Modifier.padding(8.dp)) {
-                            BadgeAnchor(item.badgeCount) { Icon(item.shownIcon(), item.label, Modifier.size(24.dp), tint = if (item.isSelected) active else inactive) }
+                            BadgeAnchor(item.badgeCount) { NavigationItemIcon(item, item.label, Modifier.size(24.dp), tint = if (item.isSelected) active else inactive) }
                         }
                     }
                 }
@@ -186,7 +208,7 @@ fun ChatyNavigationRenderer(
                 items.forEach { item ->
                     NavItemWrapper(item.onTap, reducedMotion) {
                         Box(Modifier.border(2.dp, if (item.isSelected) active else Color.Transparent, CircleShape).padding(6.dp)) {
-                            BadgeAnchor(item.badgeCount) { Icon(item.shownIcon(), null, Modifier.size(22.dp), tint = if (item.isSelected) active else inactive) }
+                            BadgeAnchor(item.badgeCount) { NavigationItemIcon(item, null, Modifier.size(22.dp), tint = if (item.isSelected) active else inactive) }
                         }
                     }
                 }
@@ -207,7 +229,7 @@ fun ChatyNavigationRenderer(
                                     .background(fill, RoundedCornerShape(20.dp)).padding(vertical = 8.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                BadgeAnchor(item.badgeCount) { Icon(item.shownIcon(), null, Modifier.size(22.dp), tint = if (item.isSelected) active else inactive) }
+                                BadgeAnchor(item.badgeCount) { NavigationItemIcon(item, null, Modifier.size(22.dp), tint = if (item.isSelected) active else inactive) }
                             }
                         }
                     }
@@ -223,7 +245,7 @@ fun ChatyNavigationRenderer(
                             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Box(Modifier.height(3.dp).width(w).background(active, RoundedCornerShape(2.dp)))
                                 Spacer(Modifier.height(6.dp))
-                                BadgeAnchor(item.badgeCount) { Icon(item.shownIcon(), null, Modifier.size(22.dp), tint = if (item.isSelected) active else inactive) }
+                                BadgeAnchor(item.badgeCount) { NavigationItemIcon(item, null, Modifier.size(22.dp), tint = if (item.isSelected) active else inactive) }
                                 Spacer(Modifier.height(3.dp))
                                 Text(item.label, maxLines = 1, color = if (item.isSelected) active else inactive, fontSize = 11.sp,
                                     fontWeight = if (item.isSelected) FontWeight.W700 else FontWeight.W500)
@@ -244,7 +266,7 @@ fun ChatyNavigationRenderer(
                     Box(Modifier.weight(1f)) {
                         NavItemWrapper(item.onTap, reducedMotion) {
                             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                                BadgeAnchor(item.badgeCount) { Icon(item.shownIcon(), null, Modifier.size(24.dp), tint = if (item.isSelected) active else inactive) }
+                                BadgeAnchor(item.badgeCount) { NavigationItemIcon(item, null, Modifier.size(24.dp), tint = if (item.isSelected) active else inactive) }
                                 Spacer(Modifier.height(3.dp))
                                 Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis, color = if (item.isSelected) active else inactive,
                                     fontSize = 11.5.sp, fontWeight = if (item.isSelected) FontWeight.W700 else FontWeight.W500, letterSpacing = (-0.1).sp)

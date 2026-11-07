@@ -34,7 +34,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -100,7 +100,7 @@ fun AutoReplyRulesScreen(
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back")
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back")
                         }
                     }
                 },
@@ -110,7 +110,7 @@ fun AutoReplyRulesScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAddRule = true },
-                icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null) },
                 text = { Text("New Rule") },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White,
@@ -181,7 +181,7 @@ fun AutoReplyRulesScreen(
                         ),
                     )
                     TextButton(onClick = { showAddRule = true }) {
-                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Add Rule")
                     }
@@ -264,10 +264,9 @@ fun AutoReplyRulesScreen(
                                     onCheckedChange = { engine.toggleRule(index, it) },
                                 )
                                 IconButton(onClick = { engine.deleteRule(index) }) {
-                                    Icon(
-                                        Icons.Rounded.DeleteOutline,
-                                        contentDescription = "Delete Rule",
-                                        tint = Color(0xFFFF5252),
+                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.deleteOutline,
+                                        semanticLabel = "Delete Rule",
+                                        color = Color(0xFFFF5252),
                                     )
                                 }
                             }
@@ -362,7 +361,7 @@ private fun AddRuleSheet(
                 )
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close")
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close")
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -418,7 +417,7 @@ private fun AddRuleSheet(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Icon(Icons.Rounded.Check, contentDescription = null)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Save Auto-Reply Rule")
             }

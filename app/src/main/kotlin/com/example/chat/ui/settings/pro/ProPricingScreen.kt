@@ -23,7 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -244,10 +244,9 @@ private fun CheckItem(colors: AppColors, text: String) {
                 .background(colors.success.copy(alpha = 0.15f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                Icons.Rounded.Check,
-                contentDescription = null,
-                tint = colors.success,
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check,
+                semanticLabel = null,
+                color = colors.success,
                 modifier = Modifier.size(14.dp),
             )
         }

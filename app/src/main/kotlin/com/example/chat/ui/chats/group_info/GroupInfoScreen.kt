@@ -24,7 +24,7 @@ import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.PersonAdd
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -83,7 +83,7 @@ fun GroupInfoScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
                 }
                 Text(
                     "Group Info",
@@ -95,7 +95,7 @@ fun GroupInfoScreen(
                 IconButton(onClick = {
                     scope.launch { snackbar.showSnackbar("Group editing is not available in this build.") }
                 }) {
-                    Icon(Icons.Outlined.Edit, contentDescription = "Edit group info", tint = colors.foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.edit, semanticLabel = "Edit group info", color = colors.foreground)
                 }
             }
         },
@@ -152,7 +152,7 @@ fun GroupInfoScreen(
                     title = "Disappearing Messages",
                     titleColor = colors.foreground,
                     subtitle = "Settings unavailable in this build",
-                    trailing = { Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary) },
+                    trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) },
                     onClick = { scope.launch { snackbar.showSnackbar("Disappearing message settings are not available. No setting was changed.") } },
                 )
                 com.example.chat.ui.chats.contact_info.InfoTile(
@@ -160,7 +160,7 @@ fun GroupInfoScreen(
                     title = "Encryption Verification",
                     titleColor = colors.foreground,
                     subtitle = "Encryption has not been verified",
-                    trailing = { Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary) },
+                    trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) },
                     onClick = { scope.launch { snackbar.showSnackbar("No verified device-to-device safety number is available for this group.") } },
                 )
             }

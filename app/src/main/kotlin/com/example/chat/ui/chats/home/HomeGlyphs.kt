@@ -34,23 +34,15 @@ fun HomeGlyphIcon(
     strokeWidth: Float = 1.8f,
     semanticLabel: String? = null,
 ) {
-    val sem = if (!semanticLabel.isNullOrEmpty()) {
-        Modifier.semantics { contentDescription = semanticLabel }
-    } else {
-        Modifier
+    val role = when (glyph) {
+        HomeGlyph.camera -> com.example.chat.ui.icons.ChatyIconId.camera
+        HomeGlyph.qrScan -> com.example.chat.ui.icons.ChatyIconId.qrCode
+        HomeGlyph.ghostActive -> com.example.chat.ui.icons.ChatyIconId.ghost
+        HomeGlyph.ghostInactive -> com.example.chat.ui.icons.ChatyIconId.eye
     }
-    androidx.compose.foundation.Canvas(modifier.size(size).then(sem)) {
-        val sx = this.size.width / 24f
-        val sy = this.size.height / 24f
-        withTransform({ scale(sx, sy, pivot = Offset.Zero) }) {
-            when (glyph) {
-                HomeGlyph.camera -> drawCameraGlyph(color, strokeWidth)
-                HomeGlyph.qrScan -> drawQrScanGlyph(color, strokeWidth)
-                HomeGlyph.ghostActive -> drawGhostActiveGlyph(color, strokeWidth)
-                HomeGlyph.ghostInactive -> drawGhostInactiveGlyph(color, strokeWidth)
-            }
-        }
-    }
+    com.example.chat.ui.icons.ChatyIcon(role, modifier = modifier, size = size, color = color,
+        semanticLabel = semanticLabel, selected = glyph == HomeGlyph.ghostActive)
+
 }
 
 private fun DrawScope.stroke(width: Float, default: Float): Stroke =

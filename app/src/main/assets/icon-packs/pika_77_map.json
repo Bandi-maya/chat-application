@@ -39,5 +39,10 @@
  "schedule": "clock",
  "playArrow": "play_circle",
  "addTask": "ADAPTED (authored, see provenance.json)",
- "groups": "ADAPTED (authored, see provenance.json)"
+ "groups": "ADAPTED (authored, see provenance.json)",
+ "mail": "envelope",
+ "eye": "eye_on",
+ "eyeOff": "eye_off",
+ "workspace": "building_apartment_two",
+ "info": "information_circle (stroke dot uses a 0.01 stub segment: Android skips zero-length subpaths)"
 }

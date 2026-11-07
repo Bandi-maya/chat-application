@@ -33,7 +33,7 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -338,7 +338,7 @@ fun RegisterScreen(
                                 .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(Icons.Rounded.Info, contentDescription = null, tint = Color(theme.dangerColor), modifier = Modifier.size(18.dp))
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.info, semanticLabel = null, color = Color(theme.dangerColor), modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(msg, color = Color(theme.dangerColor), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         }
@@ -467,7 +467,7 @@ private fun OrgStatusBanner(
                     Box(
                         modifier = Modifier.background(Color(0xFFF59E0B).copy(alpha = 0.2f), CircleShape).padding(6.dp),
                     ) {
-                        Icon(Icons.Rounded.Lock, contentDescription = null, tint = Color(0xFFB45309), modifier = Modifier.size(16.dp))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock, semanticLabel = null, color = Color(0xFFB45309), modifier = Modifier.size(16.dp))
                     }
                     Spacer(Modifier.width(10.dp))
                     Column {
@@ -516,7 +516,7 @@ private fun OrgStatusBanner(
                 .border(1.dp, Color(argbWithAlpha(theme.dangerColor, 0.3)), RoundedCornerShape(12.dp))
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = Color(theme.dangerColor), modifier = Modifier.size(16.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.errorOutline, semanticLabel = null, color = Color(theme.dangerColor), modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
             Text(orgCheckError, color = Color(theme.dangerColor), fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
@@ -549,10 +549,9 @@ private fun RegisterOrgCard(theme: ThemeConfig, onClick: () -> Unit) {
             Spacer(Modifier.height(1.dp))
             Text("Set up a custom workspace & team space", color = Color(theme.secondaryTextColor), fontSize = 11.5.sp)
         }
-        Icon(
-            Icons.AutoMirrored.Rounded.ArrowForwardIos,
-            contentDescription = null,
-            tint = Color(theme.accentColor),
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+            semanticLabel = null,
+            color = Color(theme.accentColor),
             modifier = Modifier.size(14.dp),
         )
     }

@@ -36,8 +36,8 @@ import androidx.compose.material.icons.rounded.MarkEmailUnread
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material.icons.rounded.Settings as RoundedSettings
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.Settings
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -197,7 +197,7 @@ fun HomeFabSettingsScreen(preferences: ChatyPreferencesController, onBack: () ->
                         onChanged = { preferences.updateHome(preferences.home.copy(hidePluginsList = it)) },
                     )
                     GbSwitchTile(
-                        icon = Icons.Rounded.RoundedSettings, title = "Hide Chaty Settings FAB", subtitle = "Hide quick Chaty settings gear button from FAB speed dial", value = p.hideGbwaSettingsFab,
+                        icon = Icons.Rounded.Settings, title = "Hide Chaty Settings FAB", subtitle = "Hide quick Chaty settings gear button from FAB speed dial", value = p.hideGbwaSettingsFab,
                         onChanged = { preferences.updateHome(preferences.home.copy(hideGbwaSettingsFab = it)) },
                     )
                 }

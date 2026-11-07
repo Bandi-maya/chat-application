@@ -6,7 +6,7 @@ import androidx.compose.ui.semantics.role
 
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 
 import androidx.compose.foundation.selection.toggleable
 
@@ -51,7 +51,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -123,7 +123,7 @@ fun GbModalSheet(
                 }
                 trailing?.invoke()
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, "Dismiss", tint = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Dismiss", color = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
                 }
             }
             HorizontalDivider(color = colors.divider, thickness = 1.dp)
@@ -218,24 +218,17 @@ fun ChatyColorPickerModal(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ColorPickerLogic.presetSwatches.forEach { c ->
                     val sel = c == color
-                    // 48dp touch target around the 40dp swatch. clearAndSetSemantics puts the
-                    // label, selection and the single click action on ONE node with no
-                    // cross-node merging. Role is Tab because Compose exposes
-                    // SemanticsProperties.Selected as AccessibilityNodeInfo.isSelected only
-                    // for Role.Tab; Role.Button/RadioButton map it to isChecked instead
-                    // (AndroidComposeViewAccessibilityDelegateCompat), and this repo's camera
-                    // mode tabs prove the Tab + selected mapping end to end.
-                    val pick: () -> Unit = { color = c; hex = ColorPickerLogic.toHex(c) }
+                    // 48dp touch target around the 40dp swatch; TalkBack gets the color hex
+                    // and the selected state instead of an unlabeled circle.
                     Box(
                         Modifier.size(48.dp)
-                            .clip(CircleShape)
-                            .clearAndSetSemantics {
+                            .semantics(mergeDescendants = true) {
                                 contentDescription = "Preset color ${ColorPickerLogic.toHex(c)}"
                                 selected = sel
-                                role = Role.Tab
-                                onClick(null) { pick(); true }
+                                role = Role.Button
                             }
-                            .clickable { pick() },
+                            .clip(CircleShape)
+                            .clickable { color = c; hex = ColorPickerLogic.toHex(c) },
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(
@@ -244,9 +237,8 @@ fun ChatyColorPickerModal(
                                 .clip(CircleShape),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (sel) Icon(
-                                Icons.Rounded.Check, null, modifier = Modifier.size(20.dp),
-                                tint = if (ColorPickerLogic.luminance(c) > 0.5) Color.Black else Color.White,
+                            if (sel) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, modifier = Modifier.size(20.dp),
+                                color = if (ColorPickerLogic.luminance(c) > 0.5) Color.Black else Color.White,
                             )
                         }
                     }
@@ -351,7 +343,7 @@ fun GbChevronRow(icon: ImageVector, title: String, subtitle: String, onTap: () -
         Spacer(Modifier.width(14.dp))
         GbTextBlock(title, subtitle, Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
-        Icon(Icons.Rounded.ChevronRight, null, tint = accent, modifier = Modifier.size(22.dp))
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = accent, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -369,7 +361,7 @@ fun GbSubpageRow(icon: ImageVector, title: String, onTap: () -> Unit) {
         GbIconBox(icon, 40, 12, 21)
         Spacer(Modifier.width(14.dp))
         Text(title, Modifier.weight(1f), color = Color(config.primaryTextColor), fontSize = (15.5f * config.fontScale.toFloat()).sp, fontWeight = FontWeight.W600)
-        Icon(Icons.Rounded.ChevronRight, null, tint = accent, modifier = Modifier.size(22.dp))
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = accent, modifier = Modifier.size(22.dp))
     }
 }
 

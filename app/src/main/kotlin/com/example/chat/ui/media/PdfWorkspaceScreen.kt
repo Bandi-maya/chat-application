@@ -31,7 +31,7 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -269,7 +269,7 @@ fun PdfWorkspaceScreen(
                                         color = if (isDark) Color.White.copy(alpha = 0.54f) else Color.Black.copy(alpha = 0.54f),
                                     )
                                 }
-                                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.Gray)
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = Color.Gray)
                             }
                         }
                         Spacer(Modifier.height(8.dp))
@@ -333,7 +333,7 @@ fun PdfWorkspaceScreen(
                         },
                         modifier = Modifier.weight(1f),
                     ) {
-                        Icon(Icons.Rounded.Share, contentDescription = null)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.share, semanticLabel = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Share")
                     }
@@ -354,7 +354,7 @@ fun PdfWorkspaceScreen(
                         },
                         modifier = Modifier.weight(1f),
                     ) {
-                        Icon(Icons.Rounded.RemoveRedEye, contentDescription = null)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eye, semanticLabel = null)
                         Spacer(Modifier.width(6.dp))
                         Text("Open PDF")
                     }

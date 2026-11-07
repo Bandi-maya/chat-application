@@ -3,7 +3,7 @@ package com.example.chat.ui.navigation
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import com.example.chat.domain.models.UserProfile
@@ -22,7 +22,7 @@ fun ReferenceRootActions(
     onSettings: () -> Unit,
 ) {
     Row {
-        IconButton(onClick = onSearch) { Icon(Icons.Rounded.Search, "Search chats and messages", tint = colors.foreground) }
+        IconButton(onClick = onSearch) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = "Search chats and messages", color = colors.foreground) }
         IconButton(onClick = onSettings) {
             HomeAvatar(initials = user?.avatarInitials.orEmpty(),
                 color = parseAvatarColorHex(user?.avatarColorHex, colors.primary),

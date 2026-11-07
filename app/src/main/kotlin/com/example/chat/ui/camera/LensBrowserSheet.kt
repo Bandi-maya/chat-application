@@ -28,7 +28,7 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -422,10 +422,9 @@ private fun LensBrowserTile(
                         .background(Color.Black.copy(alpha = 0.35f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        Icons.Rounded.Lock,
-                        contentDescription = null,
-                        tint = Color.White,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock,
+                        semanticLabel = null,
+                        color = Color.White,
                         modifier = Modifier.size(20.dp),
                     )
                 }

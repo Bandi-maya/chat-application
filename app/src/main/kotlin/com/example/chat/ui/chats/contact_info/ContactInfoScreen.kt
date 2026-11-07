@@ -44,7 +44,7 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VerifiedUser
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -132,7 +132,7 @@ fun ContactInfoScreen(
         // GB contact-info top bar: back chevron only, no title (user reference 2026-11-03).
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             androidx.compose.material3.IconButton(onClick = onBack) {
-                Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
             }
         }
         Scaffold(
@@ -254,11 +254,11 @@ fun ContactInfoScreen(
             // GB row order: per-contact privacy sits right under the identity card (GB "Custom Privacy" row).
             Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
                 InfoTile(
-                    icon = { Icon(Icons.Rounded.Tune, contentDescription = null, tint = colors.primary) },
+                    icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.tune, semanticLabel = null, color = colors.primary) },
                     title = "Individual Privacy Controls",
                     titleColor = colors.foreground,
                     subtitle = "Read receipts, typing indicator, recording & online presence",
-                    trailing = { Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary) },
+                    trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) },
                     onClick = onOpenPrivacy,
                 )
             }
@@ -332,7 +332,7 @@ fun ContactInfoScreen(
                 Spacer(Modifier.weight(1f))
                 Text("${media.size + documents.size + links.size}", color = colors.foregroundSecondary, fontSize = 13.sp)
                 Spacer(Modifier.width(4.dp))
-                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary, modifier = Modifier.size(18.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.height(6.dp))
             Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
@@ -455,7 +455,7 @@ fun ContactInfoScreen(
                     },
                 )
                 InfoTile(
-                    icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = colors.error) },
+                    icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.deleteOutline, semanticLabel = null, color = colors.error) },
                     title = "Delete Conversation",
                     titleColor = colors.error,
                     subtitle = "Remove this chat and all message history.",

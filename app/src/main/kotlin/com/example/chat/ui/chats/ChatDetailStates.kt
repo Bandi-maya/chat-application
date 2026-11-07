@@ -15,7 +15,7 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -88,7 +88,7 @@ fun ChatMessagesStateOverlay(
                 Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, tint = secondary, modifier = Modifier.size(42.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats, semanticLabel = null, color = secondary, modifier = Modifier.size(42.dp))
                 Spacer(Modifier.height(10.dp))
                 Text("No messages yet", color = primary, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.height(6.dp))

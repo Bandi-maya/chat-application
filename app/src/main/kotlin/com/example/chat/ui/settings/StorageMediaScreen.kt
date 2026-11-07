@@ -7,7 +7,7 @@ import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Hd
 import androidx.compose.material.icons.rounded.UploadFile
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -110,7 +110,7 @@ fun StorageMediaScreen(
                     icon = Icons.Outlined.PhotoLibrary,
                     iconColor = colors.primary,
                     subtitle = if (mb == 1024) "Default" else null,
-                    trailing = { if (cacheLimitMb == mb) Icon(Icons.Rounded.Check, "Selected", tint = colors.primary) },
+                    trailing = { if (cacheLimitMb == mb) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = "Selected", color = colors.primary) },
                     onTap = { onCacheLimitChange(mb) },
                 )
             }
@@ -121,7 +121,7 @@ fun StorageMediaScreen(
                 icon = Icons.Rounded.CleaningServices,
                 iconColor = colors.primary,
                 subtitle = "Free local disk space without deleting server messages",
-                trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundSecondary) },
+                trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) },
                 onTap = onClearCache,
             )
         }

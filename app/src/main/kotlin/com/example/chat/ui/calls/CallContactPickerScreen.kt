@@ -58,7 +58,7 @@ import androidx.compose.material.icons.rounded.Voicemail
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -264,7 +264,7 @@ fun CallContactPickerScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = Color(theme.primaryTextColor))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = Color(theme.primaryTextColor))
                 }
                 Text(
                     if (isDialpad) "Add call" else "Contacts",
@@ -317,7 +317,7 @@ fun CallContactPickerScreen(
                         )
                     },
                     leadingIcon = if (!isDialpad) {
-                        { Icon(Icons.Rounded.Search, contentDescription = null, tint = Color(theme.secondaryTextColor)) }
+                        { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, color = Color(theme.secondaryTextColor)) }
                     } else null,
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = if (isDialpad) Color.Transparent else Color(theme.cardColor),
@@ -442,10 +442,9 @@ fun CallContactPickerScreen(
                                             onClick = { startCall(contact, isVideo = false) },
                                             enabled = !isStartingCall,
                                         ) {
-                                            Icon(
-                                                Icons.Rounded.Call,
-                                                contentDescription = "Voice call",
-                                                tint = Color(theme.accentColor),
+                                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio,
+                                                semanticLabel = "Voice call",
+                                                color = Color(theme.accentColor),
                                                 modifier = Modifier.size(21.dp),
                                             )
                                         }
@@ -453,10 +452,9 @@ fun CallContactPickerScreen(
                                             onClick = { startCall(contact, isVideo = true) },
                                             enabled = !isStartingCall,
                                         ) {
-                                            Icon(
-                                                Icons.Rounded.Videocam,
-                                                contentDescription = "Video call",
-                                                tint = Color(theme.accentColor),
+                                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callVideo,
+                                                semanticLabel = "Video call",
+                                                color = Color(theme.accentColor),
                                                 modifier = Modifier.size(22.dp),
                                             )
                                         }
@@ -566,10 +564,9 @@ fun CallContactPickerScreen(
                                 .background(Color(0xFF48D597), CircleShape)
                                 .clickable { triggerCall() },
                         ) {
-                            Icon(
-                                Icons.Rounded.Call,
-                                contentDescription = null,
-                                tint = Color.White,
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio,
+                                semanticLabel = null,
+                                color = Color.White,
                                 modifier = Modifier.size(28.dp),
                             )
                         }

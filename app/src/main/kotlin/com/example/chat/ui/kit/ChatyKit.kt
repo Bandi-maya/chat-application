@@ -39,7 +39,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,10 +51,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -99,8 +95,9 @@ fun ChatyBackButton(
 ) {
     val colors = LocalAppColors.current
     val haptic = rememberChatySelectionHaptic()
-    // indication = null keeps the custom press-scale look; the press state drives the same
-    // 0.92 scale as before.
+    // One standard activation path: clickable registers the semantics click action, keyboard/
+    // d-pad and accessibility activation, and Role.Button. indication = null keeps the custom
+    // press-scale look; the press state drives the same 0.92 scale as before.
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -108,24 +105,14 @@ fun ChatyBackButton(
         tween(ChatyMotionTokens.INSTANT_MS, easing = ChatyMotionTokens.enter),
         label = "backScale",
     )
-    // One node carries label, role and the single click action: clearAndSetSemantics
-    // collapses the 48dp target and its children into one "Back" node (same proven
-    // pattern as CameraCaptureModeButton) - a contentDescription left on the inner Icon
-    // surfaces as a separate, non-clickable node. clickable below keeps pointer,
-    // keyboard/d-pad and press-scale behavior; its own semantics are cleared, so exactly
-    // one click action and one haptic path exist.
     Box(
         modifier
             .size(48.dp)
             .clip(CircleShape)
-            .clearAndSetSemantics {
-                contentDescription = "Back"
-                role = Role.Button
-                onClick(null) { haptic(); onPressed(); true }
-            }
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                role = Role.Button,
             ) {
                 haptic()
                 onPressed()
@@ -141,7 +128,7 @@ fun ChatyBackButton(
                 .border(0.8.dp, colors.border, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.ChevronLeft, contentDescription = null, tint = colors.foreground, modifier = Modifier.size(24.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground, modifier = Modifier.size(24.dp))
         }
     }
 }

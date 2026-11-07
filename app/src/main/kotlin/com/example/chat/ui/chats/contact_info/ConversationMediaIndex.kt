@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -70,7 +71,7 @@ fun ConversationMediaIndex(messages: List<ChatMessage>, onOpen: (ChatMessage) ->
                             contentDescription = null, tint = colors.foregroundTertiary, modifier = Modifier.align(Alignment.Center).size(28.dp))
                         if (a.type == "video" && a.durationSeconds > 0) {
                             Row(Modifier.align(Alignment.BottomStart).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Outlined.Videocam, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callVideo, semanticLabel = null, color = Color.White, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(3.dp))
                                 Text("${a.durationSeconds / 60}:${(a.durationSeconds % 60).toString().padStart(2, '0')}", color = Color.White, fontSize = 11.sp)
                             }
@@ -99,7 +100,7 @@ fun ConversationMediaDialog(messages: List<ChatMessage>, onOpen: (ChatMessage) -
         Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onClose) { Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = LocalAppColors.current.foreground) }
+                    IconButton(onClick = onClose) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = LocalAppColors.current.foreground) }
                     Text("All media", color = LocalAppColors.current.foreground, fontSize = 19.sp,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, modifier = Modifier.padding(start = 8.dp))
                 }

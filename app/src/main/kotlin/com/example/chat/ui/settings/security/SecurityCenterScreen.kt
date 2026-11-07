@@ -30,7 +30,7 @@ import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.TouchApp
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -196,7 +196,7 @@ fun SecurityCenterScreen(
                             icon = Icons.Rounded.Style,
                             title = "Lock type",
                             subtitle = "${security.lockMethod} \u2022 tap to verify and change type",
-                            trailing = { Icon(Icons.Rounded.ChevronRight, null, tint = colors.foregroundTertiary, modifier = Modifier.size(20.dp)) },
+                            trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundTertiary, modifier = Modifier.size(20.dp)) },
                             onTap = { runFlow(SecurityIntent.changeMethod, null) },
                         )
                     }

@@ -129,27 +129,32 @@ fun ChatyIcon(
         ?: LocalChatyIconVariants.current[icon.name]?.let(ChatyIconThemeId::fromString)
         ?: LocalChatyIconTheme.current
     val resolved = color ?: LocalContentColor.current
-    val px = with(LocalDensity.current) { size.toPx() }.toDouble()
     val sem = if (!semanticLabel.isNullOrEmpty()) Modifier.semantics { contentDescription = semanticLabel } else Modifier
+    val supplemental = ChatySupplementalIcons.drawable(theme, icon)
+    if (supplemental != null) {
+        androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(supplemental), semanticLabel,
+            tint = resolved, modifier = modifier.then(Modifier.size(size)))
+        return
+    }
     if (ChatyIconPackCatalog.isAssetPack(theme)) {
         val drawable = ChatyAssetIcons.drawable(theme, icon, selected)
         if (drawable != null) {
             androidx.compose.material3.Icon(
                 painter = androidx.compose.ui.res.painterResource(drawable),
                 contentDescription = semanticLabel, tint = resolved,
-                modifier = modifier.size(size),
+                modifier = modifier.then(Modifier.size(size)),
             )
         } else {
-            androidx.compose.foundation.layout.Spacer(modifier.size(size).semantics {
+            androidx.compose.foundation.layout.Spacer(modifier.then(Modifier.size(size)).semantics {
                 contentDescription = "${theme.title}: ${icon.name} unavailable"
             })
         }
         return
     }
-    Canvas(modifier.size(size).then(sem)) {
+    Canvas(modifier.then(Modifier.size(size)).then(sem)) {
         drawIntoCanvas { canvas ->
             ChatyIconPainter.paint(
-                ComposeIconCanvas(canvas), px, icon, theme,
+                ComposeIconCanvas(canvas), this.size.width.toDouble(), icon, theme,
                 Color(resolved.alpha.toDouble(), resolved.red.toDouble(), resolved.green.toDouble(), resolved.blue.toDouble()),
             )
         }

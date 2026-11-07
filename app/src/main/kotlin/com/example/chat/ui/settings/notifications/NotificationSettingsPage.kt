@@ -50,7 +50,7 @@ import androidx.compose.material.icons.rounded.Visibility
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -123,7 +123,7 @@ private fun ToastPreview(text: String, hasAvatar: Boolean, hasElevation: Boolean
     ) {
         if (hasAvatar) {
             Box(Modifier.size(24.dp).background(Color.White.copy(alpha = 0.2f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.Person, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.profile, semanticLabel = null, color = Color.White, modifier = Modifier.size(14.dp))
             }
             Spacer(Modifier.width(8.dp))
         }
@@ -369,7 +369,7 @@ fun NotificationSettingsPage(
                             .padding(12.dp),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.Tune, null, tint = colors.primary, modifier = Modifier.size(18.dp))
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.tune, semanticLabel = null, color = colors.primary, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Reduce duplicate heads-up banners", fontSize = 13.sp, fontWeight = FontWeight.W700, color = colors.foreground)
                         }
@@ -378,7 +378,7 @@ fun NotificationSettingsPage(
                         Spacer(Modifier.height(8.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { scope.launch { try { bridge?.openNotificationChannelSettings() } catch (_: DynamicIslandException) {} } }) {
-                                Icon(Icons.Rounded.OpenInNew, null, modifier = Modifier.size(16.dp))
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.openInNew, semanticLabel = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text("App Notification Settings")
                             }

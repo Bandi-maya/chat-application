@@ -26,7 +26,7 @@ import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -245,7 +245,7 @@ fun MediaWorkspaceScreen(
                                         color = if (isDark) Color.White.copy(alpha = 0.54f) else Color.Black.copy(alpha = 0.54f),
                                     )
                                 }
-                                Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.Gray)
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = Color.Gray)
                             }
                         }
                         Spacer(Modifier.height(8.dp))
@@ -382,7 +382,7 @@ private fun FileThumb(file: MediaFileDescriptor) {
             contentDescription = file.name,
             modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Crop,
-            error = { Icon(Icons.Rounded.Image, contentDescription = null) },
+            error = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.gallery, semanticLabel = null) },
         )
         return
     }

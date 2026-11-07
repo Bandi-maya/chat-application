@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
 
 /** One revealable swipe action (chaty_kit.dart ChatySwipeAction). */
 data class HomeSwipeAction(
-    val icon: ImageVector,
+    val icon: com.example.chat.ui.icons.ChatyIconId,
     val label: String,
     val color: Color,
     val onTriggered: () -> Unit,
@@ -183,7 +183,7 @@ private fun SwipeActionCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
     ) {
-        Icon(action.icon, contentDescription = action.label, tint = foreground, modifier = Modifier.width(21.dp).height(21.dp))
+        com.example.chat.ui.icons.ChatyIcon(action.icon, semanticLabel = action.label, color = foreground, size = 21.dp)
         if (showLabel) {
             Spacer(Modifier.height(4.dp))
             Text(

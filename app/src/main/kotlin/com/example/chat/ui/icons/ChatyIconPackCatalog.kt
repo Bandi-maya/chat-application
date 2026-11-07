@@ -23,32 +23,32 @@ object ChatyIconPackCatalog {
         ChatyIconThemeId.hugeiconsFree to PackInfo(
             ChatyIconThemeId.hugeiconsFree, "Hugeicons Free",
             available = true,
-            reason = "Includes adapted status-ring center dot, forward, fullscreen and filled-heart icons, plus a scheduled-send composition. Other artwork is genuine Hugeicons Free. MIT; not Hugeicons Pro.",
+            reason = "Includes adapted status-ring center dot, forward, fullscreen and filled-heart icons, plus a scheduled-send composition. Also includes original supplemental action/selection/crop art; see original-supplemental-provenance.json. Other artwork is genuine Hugeicons Free. MIT; not Hugeicons Pro.",
             missingIcons = emptyList(),
         ),
         ChatyIconThemeId.majesticonsLine to PackInfo(
             ChatyIconThemeId.majesticonsLine, "Majesticons Line", available = true,
-            reason = "Includes adapted family-style additions for missing actions, status ring and upright earpiece. Genuine family artwork is retained where available. MIT.",
+            reason = "Includes adapted family-style additions for missing actions, status ring and upright earpiece. Includes original supplemental action/selection/crop art; genuine family artwork is retained where available. MIT.",
             missingIcons = emptyList(),
         ),
         ChatyIconThemeId.majesticonsSolid to PackInfo(
             ChatyIconThemeId.majesticonsSolid, "Majesticons Solid", available = true,
-            reason = "Includes adapted family-style additions for missing actions, status ring and upright earpiece. Genuine family artwork is retained where available. MIT.",
+            reason = "Includes adapted family-style additions for missing actions, status ring and upright earpiece. Includes original supplemental action/selection/crop art; genuine family artwork is retained where available. MIT.",
             missingIcons = emptyList(),
         ),
         ChatyIconThemeId.pikaiconsStroke to PackInfo(
             ChatyIconThemeId.pikaiconsStroke, "Pikaicons Stroke", available = true,
-            reason = "Includes adapted family-style additions for missing actions, status ring and state variants. Genuine family artwork is retained where available. MIT.",
+            reason = "Includes adapted family-style additions for missing actions, status ring and state variants. Includes original supplemental action/selection/crop art; genuine family artwork is retained where available. MIT.",
             missingIcons = emptyList(),
         ),
         ChatyIconThemeId.pikaiconsSolid to PackInfo(
             ChatyIconThemeId.pikaiconsSolid, "Pikaicons Solid", available = true,
-            reason = "Includes adapted family-style additions for missing actions, status ring and state variants. Genuine family artwork is retained where available. MIT.",
+            reason = "Includes adapted family-style additions for missing actions, status ring and state variants. Includes original supplemental action/selection/crop art; genuine family artwork is retained where available. MIT.",
             missingIcons = emptyList(),
         ),
         ChatyIconThemeId.phosphorRegular to PackInfo(
             ChatyIconThemeId.phosphorRegular, "Phosphor Regular", available = true,
-            reason = "Includes adapted scheduled-send and stop-screen-sharing compositions, and a mobile-device earpiece icon. Other artwork is genuine Phosphor. MIT.",
+            reason = "Includes adapted scheduled-send and stop-screen-sharing compositions, and a mobile-device earpiece icon. Also includes original supplemental action/selection/crop art. Other artwork is genuine Phosphor. MIT.",
             missingIcons = emptyList(),
         ),
     )

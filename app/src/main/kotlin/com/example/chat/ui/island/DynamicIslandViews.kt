@@ -378,7 +378,7 @@ private fun IslandVectorIcon(
     color: Color,
     size: androidx.compose.ui.unit.Dp,
 ) {
-    androidx.compose.material3.Icon(
+    com.example.chat.ui.icons.ChatyPackAwareIcon(
         imageVector = icon ?: androidx.compose.material.icons.Icons.Rounded.NotificationsActive,
         contentDescription = null,
         tint = color,

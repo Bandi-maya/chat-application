@@ -33,7 +33,7 @@ import androidx.compose.material.icons.rounded.Upload
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -278,12 +278,12 @@ fun TemplatesSettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Search templates and components") },
                         leadingIcon = {
-                            Icon(Icons.Rounded.Search, contentDescription = null, tint = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, color = colors.foregroundSecondary, modifier = Modifier.size(20.dp))
                         },
                         trailingIcon = {
                             if (query.isNotEmpty()) {
                                 IconButton(onClick = { query = "" }) {
-                                    Icon(Icons.Rounded.Close, contentDescription = "Clear search", tint = colors.foregroundSecondary, modifier = Modifier.size(18.dp))
+                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Clear search", color = colors.foregroundSecondary, modifier = Modifier.size(18.dp))
                                 }
                             }
                         },
@@ -430,7 +430,7 @@ fun TemplatesSettingsScreen(
                                     fontWeight = if (isOverridden) FontWeight.W600 else FontWeight.W400,
                                 )
                             }
-                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundSecondary)
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary)
                         }
                     }
                 }

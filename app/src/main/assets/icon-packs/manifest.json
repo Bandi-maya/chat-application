@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-03T14:35 IST (v2 - corrected converter + verified XML renders)",
+  "generated": "2026-11-06T18:30 IST (v3 - five new icon IDs: mail, eye, eyeOff, workspace, info; 77 -> 82 per pack)",
   "converter": "svg2vd v3: preserves per-path fill/stroke semantics (fill=none -> no fillColor); handles path/circle/ellipse/rect/line/polyline/polygon; fill-rule evenodd -> fillType. All renders below are from the generated Android XML, not source SVGs.",
   "android_layout": "flat res/drawable with unique prefixes (ic_hgf_, ic_mjl_, ic_mjs_, ic_pks_, ic_pkf_, ic_phr_) - no custom qualifiers",
   "themes": {
@@ -8,10 +8,10 @@
       "license": "MIT (verified LICENSE bytes, @phosphor-icons/core@2.1.1)",
       "source": "https://github.com/phosphor-icons/core / npm @phosphor-icons/core 2.1.1",
       "prefix": "ic_phr_",
-      "coverage": "77/77",
+      "coverage": "82/82",
       "available": true,
       "notes": [
-        "77 semantic IDs mapped; 2 explicit compositions (scheduled send, stop screen sharing); earpiece uses mobile-device adaptation; genuine same-family native fill variants for nine navigation destinations",
+        "82 semantic IDs mapped; 2 explicit compositions (scheduled send, stop screen sharing); earpiece uses mobile-device adaptation; genuine same-family native fill variants for nine navigation destinations; v3 adds mail, eye, eyeOff, workspace, info from genuine Phosphor glyphs (envelope-simple, eye, eye-slash, building-office, info)",
         "User approved related-style SVG adaptations 2026-11-03. Resource compilation and JVM mapping tests passed; Android runtime acceptance remains pending."
       ],
       "map_file": "phos_77_map.json"
@@ -20,10 +20,10 @@
       "title": "Hugeicons Free",
       "license": "MIT (verified)",
       "prefix": "ic_hgf_",
-      "coverage": "77/77",
+      "coverage": "82/82",
       "missing": [],
       "notes": [
-        "Adapted forward (mirrored genuine Reply), fullscreen (authored 1.5 stroke corners), filled heart (filled genuine path), scheduled-send (genuine family composition). Provenance and authored SVGs bundled. Not Hugeicons Pro.",
+        "Adapted forward (mirrored genuine Reply), fullscreen (authored 1.5 stroke corners), filled heart (filled genuine path), scheduled-send (genuine family composition). Provenance and authored SVGs bundled. Not Hugeicons Pro. v3 adds mail (Mail01), eye (View), eyeOff (ViewOffSlash), workspace (Building03), info (InformationCircle) - all genuine @hugeicons/core-free-icons 4.4.0",
         "Updates genuine ring retained with authored center dot, labeled adapted."
       ],
       "map_file": "chatyid_map.json",
@@ -31,32 +31,32 @@
     },
     "majesticonsLine": {
       "prefix": "ic_mjl_",
-      "coverage": "77/77 genuine + explicitly adapted glyphs",
+      "coverage": "82/82 genuine + explicitly adapted glyphs",
       "license": "MIT",
       "missing_count": 0,
       "notes": [
-        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected."
+        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected. v3 adds mail, eye, eyeOff, info (genuine Majesticons) and workspace (ADAPTED, authored family-style, see maj-pika-adapted-provenance.json)"
       ],
       "title": "Majesticons line",
       "available": true
     },
     "majesticonsSolid": {
       "prefix": "ic_mjs_",
-      "coverage": "77/77 genuine + explicitly adapted glyphs",
+      "coverage": "82/82 genuine + explicitly adapted glyphs",
       "license": "MIT",
       "missing_count": 0,
       "notes": [
-        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected."
+        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected. v3 adds mail, eye, eyeOff, info (genuine Majesticons) and workspace (ADAPTED, authored family-style, see maj-pika-adapted-provenance.json)"
       ],
       "title": "Majesticons solid",
       "available": true
     },
     "pikaiconsStroke": {
       "prefix": "ic_pks_",
-      "coverage": "77/77 genuine + explicitly adapted glyphs",
+      "coverage": "82/82 genuine + explicitly adapted glyphs",
       "license": "MIT (@pikaicons/core-free@0.1.0)",
       "notes": [
-        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected."
+        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected. v3 adds mail (Envelope), eye (EyeOn), eyeOff (EyeOff), workspace (BuildingApartmentTwo), info (InformationCircle - dot drawn as 0.01 stub segment, Android skips zero-length subpaths) - all genuine @pikaicons/core-free 0.1.0"
       ],
       "title": "Pikaicons stroke",
       "available": true,
@@ -64,10 +64,10 @@
     },
     "pikaiconsSolid": {
       "prefix": "ic_pkf_",
-      "coverage": "77/77 genuine + explicitly adapted glyphs",
+      "coverage": "82/82 genuine + explicitly adapted glyphs",
       "license": "MIT (@pikaicons/core-free@0.1.0)",
       "notes": [
-        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected."
+        "Genuine family artwork retained where mapped; missing actions authored/adapted in family style. Per-icon provenance and adapted SVGs bundled. Updates status-ring semantic corrected; Majesticons upright earpiece corrected. v3 adds mail (Envelope), eye (EyeOn), eyeOff (EyeOff), workspace (BuildingApartmentTwo), info (InformationCircle - dot drawn as 0.01 stub segment, Android skips zero-length subpaths) - all genuine @pikaicons/core-free 0.1.0"
       ],
       "title": "Pikaicons solid",
       "available": true,
@@ -103,5 +103,13 @@
       "title": "Lordicon",
       "reason": "free tier carries distribution restriction; user decision pending"
     }
-  ]
+  ],
+  "supplemental_draft": {
+    "status": "source-only draft, not compiled or runtime verified",
+    "original_id_prefix_preserved": 82,
+    "appended_roles": 184,
+    "provenance_file": "original-supplemental-provenance.json",
+    "mapping_file": "original-supplemental-map.json",
+    "coverage": "184/184 supplemental semantic roles across all16 selectable packs (2944routes); original82-role catalog separately recorded; source/XML coverage only, not app-wide consumer completeness or runtime acceptance"
+  }
 }

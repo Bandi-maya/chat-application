@@ -16,7 +16,7 @@ import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import com.example.chat.ui.kit.ChatyTextButton
 import com.example.chat.ui.theme.LocalAppColors
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -75,7 +75,7 @@ fun TaskPriorityBadge(priority: TaskPriority, colors: TaskColors) {
             .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Flag, contentDescription = null, tint = col, modifier = Modifier.size(11.dp))
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.report, semanticLabel = null, color = col, modifier = Modifier.size(11.dp))
         Spacer(Modifier.width(3.dp))
         Text(text, color = col, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
     }

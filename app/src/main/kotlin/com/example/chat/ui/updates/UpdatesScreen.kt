@@ -51,7 +51,7 @@ import androidx.compose.material.icons.rounded.TextSnippet
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -234,7 +234,7 @@ fun UpdatesScreen(
                         .border(2.dp, colors.surface, CircleShape)
                         .padding(2.dp),
                 ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, tint = colors.onPrimary, modifier = Modifier.size(13.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null, color = colors.onPrimary, modifier = Modifier.size(13.dp))
                 }
             }
             Spacer(Modifier.width(16.dp))
@@ -258,15 +258,14 @@ fun UpdatesScreen(
                     .clickable { captureAndPublishStory() }
                     .padding(8.dp),
             ) {
-                Icon(
-                    Icons.Rounded.PhotoCamera,
-                    contentDescription = "Capture photo for status",
-                    tint = colors.primary,
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.camera,
+                    semanticLabel = "Capture photo for status",
+                    color = colors.primary,
                     modifier = Modifier.size(24.dp),
                 )
             }
             Spacer(Modifier.width(2.dp))
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.foregroundTertiary)
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundTertiary)
         }
 
         // RECENT UPDATES header
@@ -295,7 +294,7 @@ fun UpdatesScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth().padding(32.dp),
             ) {
-                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = colors.foregroundTertiary, modifier = Modifier.size(40.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.autoAwesome, semanticLabel = null, color = colors.foregroundTertiary, modifier = Modifier.size(40.dp))
                 Spacer(Modifier.height(8.dp))
                 Text("No recent updates", color = colors.foregroundSecondary, fontSize = 12.5.sp)
             }

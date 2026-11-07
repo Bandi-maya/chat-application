@@ -32,7 +32,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -185,7 +185,7 @@ fun UniversalChatyIconsScreen(
                     Modifier.background(accent, RoundedCornerShape(20.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Filled.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, color = Color.Black, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Applied", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.W800)
                 }
@@ -442,7 +442,7 @@ fun UniversalChatyIconsScreen(
             placeholder = {
                 Text("Search icons by name (e.g. camera, calls)…", color = secondaryText)
             },
-            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = secondaryText) },
+            leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = null, color = secondaryText) },
             singleLine = true,
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(

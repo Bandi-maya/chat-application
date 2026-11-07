@@ -23,7 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Shortcut
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1190,10 +1190,9 @@ fun ChatDetailHost(
                 ) {
                     Spacer(Modifier.height(14.dp))
                     Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Rounded.Shortcut,
-                            contentDescription = null,
-                            tint = Color(theme.accentColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.forward,
+                            semanticLabel = null,
+                            color = Color(theme.accentColor),
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(

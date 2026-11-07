@@ -20,7 +20,7 @@ import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Unarchive
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -83,10 +83,9 @@ fun ArchivedChatsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = { selectedIds = emptySet() }) {
-                        Icon(
-                            Icons.Rounded.ChevronLeft,
-                            contentDescription = "Clear selection",
-                            tint = Color(theme.primaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                            semanticLabel = "Clear selection",
+                            color = Color(theme.primaryTextColor),
                         )
                     }
                     Text(
@@ -100,10 +99,10 @@ fun ArchivedChatsScreen(
                         selectedIds.forEach(onToggleArchive)
                         selectedIds = emptySet()
                     }) {
-                        Icon(Icons.Outlined.Unarchive, contentDescription = "Unarchive", tint = Color(theme.primaryTextColor))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.unarchive, semanticLabel = "Unarchive", color = Color(theme.primaryTextColor))
                     }
                     IconButton(onClick = { showDeleteConfirm = true }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = Color(theme.primaryTextColor))
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.delete, semanticLabel = "Delete", color = Color(theme.primaryTextColor))
                     }
                 }
             } else {
@@ -115,10 +114,9 @@ fun ArchivedChatsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.Rounded.ChevronLeft,
-                            contentDescription = "Back",
-                            tint = Color(theme.primaryTextColor),
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                            semanticLabel = "Back",
+                            color = Color(theme.primaryTextColor),
                         )
                     }
                     Text("Archived", color = Color(theme.primaryTextColor), fontSize = 19.sp)
@@ -130,10 +128,9 @@ fun ArchivedChatsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                 ) {
-                    Icon(
-                        Icons.Outlined.Archive,
-                        contentDescription = null,
-                        tint = Color(theme.secondaryTextColor),
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.archive,
+                        semanticLabel = null,
+                        color = Color(theme.secondaryTextColor),
                         modifier = Modifier.width(56.dp).height(56.dp),
                     )
                     Spacer(Modifier.height(16.dp))

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -132,11 +133,11 @@ internal fun MediaAttachmentPreview(
                         )
                     }
                     com.example.chat.data.media.ResolvedSource.Reason.NOT_ALLOWED -> {
-                        Icon(Icons.Rounded.Lock, contentDescription = "Not available")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock, semanticLabel = "Not available")
                         Text("Not available", style = MaterialTheme.typography.labelSmall)
                     }
                     com.example.chat.data.media.ResolvedSource.Reason.SIGNED_OUT -> {
-                        Icon(Icons.Rounded.Lock, contentDescription = "Sign in to view")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.lock, semanticLabel = "Sign in to view")
                         Text("Sign in to view", style = MaterialTheme.typography.labelSmall)
                     }
                     null -> {
@@ -164,7 +165,7 @@ internal fun MediaAttachmentPreview(
             )
         }
         if (video) FilledIconButton(onClick = { open() }, modifier = Modifier.align(Alignment.Center)) {
-            Icon(Icons.Rounded.PlayArrow, "Play video")
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.playArrow, semanticLabel = "Play video")
         }
         videoDurationMs?.let { ms ->
             Text(

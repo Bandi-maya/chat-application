@@ -44,7 +44,7 @@ import androidx.compose.material.icons.rounded.VideocamOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -336,10 +336,9 @@ fun MediaViewerScreen(
                     .padding(start = 4.dp, end = 4.dp),
             ) {
                 IconButton(onClick = ::closeViewer) {
-                    Icon(
-                        Icons.Rounded.ChevronLeft,
-                        contentDescription = "Back",
-                        tint = foreground,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back,
+                        semanticLabel = "Back",
+                        color = foreground,
                     )
                 }
                 Column(Modifier.weight(1f)) {
@@ -359,13 +358,12 @@ fun MediaViewerScreen(
                 }
                 if (type in setOf("video", "audio") && !restrictedViewOnce && error == null) TextButton(onClick = { if (ownedActions) onOwnedEdit?.invoke() else trimming = true }, enabled = signedUrl != null || providedModel != null) { Text("Trim") }
                 if (type == "image" && !title.endsWith(".gif", ignoreCase = true) && !restrictedViewOnce && error == null) IconButton(onClick = { if (ownedActions) onOwnedEdit?.invoke() else editing = true }, enabled = signedUrl != null || providedModel != null) {
-                    Icon(Icons.Rounded.Edit, "Edit a copy", tint = foreground)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.edit, semanticLabel = "Edit a copy", color = foreground)
                 }
                 if (!restrictedViewOnce && error == null) IconButton(onClick = ::openExternally, enabled = signedUrl != null || providedModel != null) {
-                    Icon(
-                        Icons.Rounded.OpenInNew,
-                        contentDescription = "Open with app",
-                        tint = foreground,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.openInNew,
+                        semanticLabel = "Open with app",
+                        color = foreground,
                     )
                 }
                 if (type in setOf("image", "video") && !restrictedViewOnce && error == null) IconButton(onClick = ::saveToGallery, enabled = signedUrl != null || providedModel != null) {
@@ -376,10 +374,9 @@ fun MediaViewerScreen(
                     )
                 }
                 if (!restrictedViewOnce && error == null) IconButton(onClick = ::share, enabled = signedUrl != null || providedModel != null) {
-                    Icon(
-                        Icons.Rounded.Share,
-                        contentDescription = "Share file link",
-                        tint = foreground,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.share,
+                        semanticLabel = "Share file link",
+                        color = foreground,
                     )
                 }
                 Spacer(Modifier.width(4.dp)) // ChatySpacing.xs
@@ -515,10 +512,9 @@ fun MediaViewerScreen(
                                                     )
                                                     .padding(12.dp),
                                             ) {
-                                                Icon(
-                                                    Icons.Rounded.PlayArrow,
-                                                    contentDescription = "Play",
-                                                    tint = foreground,
+                                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.playArrow,
+                                                    semanticLabel = "Play",
+                                                    color = foreground,
                                                     modifier = Modifier.size(54.dp),
                                                 )
                                             }
@@ -777,9 +773,8 @@ private fun MediaViewerFallbackCard(
                 ),
                 modifier = Modifier.width(180.dp),
             ) {
-                Icon(
-                    Icons.Rounded.OpenInNew,
-                    contentDescription = null,
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.openInNew,
+                    semanticLabel = null,
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))

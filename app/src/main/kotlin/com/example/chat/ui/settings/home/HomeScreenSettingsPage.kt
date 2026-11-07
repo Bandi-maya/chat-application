@@ -35,11 +35,9 @@ import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.HorizontalRule
-import androidx.compose.material.icons.rounded.TaskAlt
-import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.rounded.ViewHeadline
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -65,7 +63,6 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.preferences.ChatyPreferencesController
 import com.example.chat.ui.kit.ChatyBackButton
 import com.example.chat.ui.kit.ChatyHapticsPort
-import com.example.chat.ui.kit.GbLivePreviewCard
 import com.example.chat.ui.theme.LocalAppColors
 import com.example.chat.ui.theme.LocalThemeConfig
 
@@ -139,7 +136,7 @@ fun HomeScreenSettingsPage(
             }
             Spacer(Modifier.width(14.dp))
             Text(title, color = primaryText, fontSize = (15.5f * fs).sp, fontWeight = FontWeight.W600, modifier = Modifier.weight(1f))
-            Icon(Icons.Rounded.ChevronRight, null, tint = accent, modifier = Modifier.size(22.dp))
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = accent, modifier = Modifier.size(22.dp))
         }
     }
 
@@ -173,33 +170,6 @@ fun HomeScreenSettingsPage(
             Text("Home Screen", color = primaryText, fontSize = (20f * fs).sp, fontWeight = FontWeight.W700, letterSpacing = (-0.3).sp)
         }
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp)) {
-            GbLivePreviewCard(label = "BOTTOM NAVIGATION PREVIEW") {
-                val items = buildList {
-                    add(Icons.Outlined.ChatBubbleOutline to "Chats")
-                    if (!preferences.gbBool("nav_hide_updates")) add(Icons.Rounded.Update to "Updates")
-                    if (!preferences.gbBool("nav_hide_tasks")) add(Icons.Rounded.TaskAlt to "Tasks")
-                    add(Icons.Outlined.Call to "Calls")
-                }
-                Row(Modifier.fillMaxWidth()) {
-                    items.forEach { (ic, label) ->
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(ic, null, tint = colors.primary, modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.height(4.dp))
-                            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, color = colors.foregroundSecondary, fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-            card {
-                sectionDivider("Bottom navigation")
-                switchRow(Icons.Rounded.TaskAlt, "Hide Tasks tab", "Remove Tasks from the bottom navigation", preferences.gbBool("nav_hide_tasks")) {
-                    preferences.updateGbFeatures(mapOf("nav_hide_tasks" to it), logTitle = "Hide Tasks tab")
-                }
-                switchRow(Icons.Rounded.Update, "Hide Updates tab", "Remove Updates from the bottom navigation", preferences.gbBool("nav_hide_updates")) {
-                    preferences.updateGbFeatures(mapOf("nav_hide_updates" to it), logTitle = "Hide Updates tab")
-                }
-            }
-            Spacer(Modifier.height(16.dp))
             card {
                 subpageRow(Icons.Rounded.ViewHeadline, "Header", onOpenHeader)
                 divider()

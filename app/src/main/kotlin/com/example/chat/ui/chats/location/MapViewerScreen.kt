@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.MyLocation
@@ -200,9 +201,9 @@ fun MapViewerScreen(
     Surface(modifier = Modifier.fillMaxSize(), color = mapColors.background, contentColor = mapColors.onBackground) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                IconButton(onClick = { stopLocate(); gate.cancel(); onDismiss() }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Back" }) { Icon(Icons.Rounded.ChevronLeft, contentDescription = null) }
+                IconButton(onClick = { stopLocate(); gate.cancel(); onDismiss() }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Back" }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = null) }
                 Text("Map", modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.titleMedium)
-                IconButton(onClick = { friendsMapOpen = true }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Friends map" }) { Icon(Icons.Rounded.Groups, contentDescription = null) }
+                IconButton(onClick = { friendsMapOpen = true }, modifier = Modifier.size(48.dp).semantics { contentDescription = "Friends map" }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.groups, semanticLabel = null) }
             }
             Box(Modifier.fillMaxWidth().weight(1f)) {
             if (mapActive) {
@@ -218,7 +219,7 @@ fun MapViewerScreen(
                 )
             }
             Column(Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                FilledIconButton(onClick = { mapView?.control("zoomIn") }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Zoom in" }, shape = androidx.compose.foundation.shape.CircleShape) { Icon(Icons.Rounded.Add, contentDescription = null) }
+                FilledIconButton(onClick = { mapView?.control("zoomIn") }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Zoom in" }, shape = androidx.compose.foundation.shape.CircleShape) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null) }
                 FilledIconButton(onClick = { mapView?.control("zoomOut") }, enabled = rendererReady, colors = controlColors, modifier = Modifier.size(48.dp).semantics { contentDescription = "Zoom out" }, shape = androidx.compose.foundation.shape.CircleShape) { Icon(Icons.Rounded.Remove, contentDescription = null) }
                 FilledIconButton(onClick = { mapView?.control("toggleBuildings") }, enabled = rendererReady, colors = controlColors,
                     modifier = Modifier.size(48.dp).semantics { contentDescription = "Toggle 3D buildings"; stateDescription = buildingsStateDescription }, shape = androidx.compose.foundation.shape.CircleShape) { Text(if (buildingsEnabled) "2D" else "3D", modifier = Modifier.clearAndSetSemantics { }) }
@@ -230,7 +231,7 @@ fun MapViewerScreen(
                     listOf("liberty" to "Streets", "positron" to "Light", "dark" to "Dark", "bright" to "Bright", "fiord" to "Fiord").forEach { (style, label) ->
                         ChatyDropdownMenuItem(
                             text = { Text(label, color = mapColors.onSurface, fontSize = 15.5.sp, fontWeight = FontWeight.W600) },
-                            trailingIcon = { if (selectedStyle == style) Icon(Icons.Rounded.Check, contentDescription = "Selected") },
+                            trailingIcon = { if (selectedStyle == style) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = "Selected") },
                             onClick = { layersOpen = false; mapView?.selectStyle(style) },
                         )
                     }

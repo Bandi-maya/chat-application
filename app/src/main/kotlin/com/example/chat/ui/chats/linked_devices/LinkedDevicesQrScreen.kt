@@ -31,7 +31,7 @@ import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
@@ -158,7 +158,7 @@ fun LinkedDevicesQrScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back", tint = colors.foreground)
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
                     }
                     Text(title, color = colors.foreground, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 }
@@ -181,7 +181,7 @@ fun LinkedDevicesQrScreen(
                             Tab(
                                 selected = selectedTab == 0,
                                 onClick = { selectedTab = 0 },
-                                icon = { Icon(Icons.Rounded.Devices, contentDescription = null) },
+                                icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.desktop, semanticLabel = null) },
                                 text = { Text("Devices") },
                                 selectedContentColor = colors.primary,
                                 unselectedContentColor = colors.foreground.copy(alpha = 0.55f),
@@ -290,7 +290,7 @@ private fun DevicesView(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = colors.foregroundSecondary, modifier = Modifier.size(44.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.errorOutline, semanticLabel = null, color = colors.foregroundSecondary, modifier = Modifier.size(44.dp))
                 Spacer(Modifier.height(10.dp))
                 Text("Could not load devices", color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Spacer(Modifier.height(6.dp))
@@ -306,7 +306,7 @@ private fun DevicesView(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(Icons.Rounded.Devices, contentDescription = null, tint = colors.foregroundSecondary, modifier = Modifier.size(44.dp))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.desktop, semanticLabel = null, color = colors.foregroundSecondary, modifier = Modifier.size(44.dp))
                 Spacer(Modifier.height(10.dp))
                 Text("No linked devices", color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Spacer(Modifier.height(6.dp))
@@ -377,10 +377,9 @@ private fun DevicesView(
                                     }
                                 } else {
                                     IconButton(onClick = { onRevoke(device) }) {
-                                        Icon(
-                                            Icons.AutoMirrored.Rounded.Logout,
-                                            contentDescription = "Log out device",
-                                            tint = colors.error,
+                                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.logout,
+                                            semanticLabel = "Log out device",
+                                            color = colors.error,
                                         )
                                     }
                                 }

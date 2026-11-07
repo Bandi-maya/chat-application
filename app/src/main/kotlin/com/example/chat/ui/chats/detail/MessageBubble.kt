@@ -59,7 +59,7 @@ import androidx.compose.material.icons.rounded.Shortcut
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.VideocamOff
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -288,10 +288,9 @@ fun ChatMessageBubble(
                     },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.Outlined.Cancel,
-                    contentDescription = null,
-                    tint = Color(colorOverrides?.deletedMessageIconColor ?: theme.secondaryTextColor),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close,
+                    semanticLabel = null,
+                    color = Color(colorOverrides?.deletedMessageIconColor ?: theme.secondaryTextColor),
                     modifier = Modifier.size(17.dp),
                 )
                 Box(Modifier.width(7.dp))
@@ -529,10 +528,9 @@ fun ChatMessageBubble(
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                Icons.Outlined.Cancel,
-                                contentDescription = null,
-                                tint = Color(
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close,
+                                semanticLabel = null,
+                                color = Color(
                                     colorOverrides?.deletedMessageIconColor
                                         ?: argbWithAlpha(textColor, 0.8),
                                 ),
@@ -597,10 +595,9 @@ fun ChatMessageBubble(
                             Modifier.padding(bottom = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                Icons.Rounded.Shortcut,
-                                contentDescription = null,
-                                tint = Color(argbWithAlpha(textColor, 0.6)),
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.forward,
+                                semanticLabel = null,
+                                color = Color(argbWithAlpha(textColor, 0.6)),
                                 modifier = Modifier.size(11.dp),
                             )
                             Box(Modifier.width(3.dp))
@@ -961,8 +958,8 @@ private fun TaskCardChip(
                         .border(2.dp, toggleBorder, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (isCompleted) Icon(Icons.Rounded.Check, contentDescription = null,
-                        tint = Color.White, modifier = Modifier.size(14.dp))
+                    if (isCompleted) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null,
+                        color = Color.White, modifier = Modifier.size(14.dp))
                 }
             }
             Spacer(Modifier.width(10.dp))
@@ -987,10 +984,9 @@ private fun TaskCardChip(
                     ),
             )
             if (onTaskMenu != null) {
-                Icon(
-                    Icons.Rounded.MoreVert,
-                    contentDescription = null,
-                    tint = textColor.copy(alpha = 0.6f),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions,
+                    semanticLabel = null,
+                    color = textColor.copy(alpha = 0.6f),
                     modifier = Modifier
                         .padding(start = 4.dp)
                         .size(18.dp)
@@ -1018,10 +1014,9 @@ private fun TaskCardChip(
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 )
                 Spacer(Modifier.width(6.dp))
-                Icon(
-                    Icons.Rounded.Schedule,
-                    contentDescription = null,
-                    tint = if (isOverdue) Color(theme.dangerColor) else textColor.copy(alpha = 0.65f),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.schedule,
+                    semanticLabel = null,
+                    color = if (isOverdue) Color(theme.dangerColor) else textColor.copy(alpha = 0.65f),
                     modifier = Modifier.size(12.dp),
                 )
                 Spacer(Modifier.width(3.dp))
@@ -1090,19 +1085,17 @@ private fun MessageMetaRow(
             Box(Modifier.width(4.dp))
         }
         if (message.isPinned) {
-            Icon(
-                Icons.Rounded.PushPin,
-                contentDescription = null,
-                tint = Color(argbWithAlpha(textColor, 0.7)),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.pin,
+                semanticLabel = null,
+                color = Color(argbWithAlpha(textColor, 0.7)),
                 modifier = Modifier.size(11.dp),
             )
             Box(Modifier.width(3.dp))
         }
         if (message.isStarred) {
-            Icon(
-                Icons.Rounded.Star,
-                contentDescription = null,
-                tint = Color(0xFFFFC107),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.starFilled,
+                semanticLabel = null,
+                color = Color(0xFFFFC107),
                 modifier = Modifier.size(11.dp),
             )
             Box(Modifier.width(3.dp))
@@ -1442,10 +1435,9 @@ private fun DocumentPreview(
                 fontSize = 10.5.sp,
             )
         }
-        Icon(
-            Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint = textColor.copy(alpha = 0.7f),
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+            semanticLabel = null,
+            color = textColor.copy(alpha = 0.7f),
         )
     }
 }
@@ -1493,10 +1485,9 @@ private fun LocationCard(message: ChatMessage, textColor: Color, accentColor: Co
                     fontSize = 10.5.sp,
                 )
             }
-            Icon(
-                Icons.Rounded.OpenInNew,
-                contentDescription = null,
-                tint = textColor.copy(alpha = 0.7f),
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.openInNew,
+                semanticLabel = null,
+                color = textColor.copy(alpha = 0.7f),
                 modifier = Modifier.size(17.dp),
             )
         }
@@ -1606,10 +1597,9 @@ private fun P2pFileInviteCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Rounded.VideocamOff,
-                        contentDescription = "Video transfer",
-                        tint = Color.White.copy(alpha = 0.72f),
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callVideoOff,
+                        semanticLabel = "Video transfer",
+                        color = Color.White.copy(alpha = 0.72f),
                         modifier = Modifier.size(38.dp),
                     )
                     Text("SECURE VIDEO", color = Color.White.copy(alpha = 0.70f), fontSize = 9.sp, fontWeight = FontWeight.W800)
@@ -1619,7 +1609,7 @@ private fun P2pFileInviteCard(
                         .clip(CircleShape).background(accentColor.copy(alpha = 0.92f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = "Receive video", tint = Color.White, modifier = Modifier.size(30.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.playArrow, semanticLabel = "Receive video", color = Color.White, modifier = Modifier.size(30.dp))
                 }
                 Text(
                     "END-TO-END ENCRYPTED",
@@ -1742,10 +1732,9 @@ private fun ViewOnceExpiredCard(textColor: Color, onTap: (() -> Unit)? = null) {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            Icons.Rounded.VisibilityOff,
-            contentDescription = null,
-            tint = textColor.copy(alpha = 0.55f),
+        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.eyeOff,
+            semanticLabel = null,
+            color = textColor.copy(alpha = 0.55f),
             modifier = Modifier.size(16.dp),
         )
         Box(Modifier.width(7.dp))
@@ -1820,10 +1809,9 @@ private fun SwipeToReplyContainer(
                     .background(surfaceColor.copy(alpha = progress), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Icons.Rounded.Reply,
-                    contentDescription = "Reply",
-                    tint = accentColor.copy(alpha = progress),
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.reply,
+                    semanticLabel = "Reply",
+                    color = accentColor.copy(alpha = progress),
                     modifier = Modifier.size(18.dp),
                 )
             }

@@ -300,7 +300,7 @@ fun DynamicIslandOverlayHost(
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
-                            androidx.compose.material3.Icon(
+                            com.example.chat.ui.icons.ChatyPackAwareIcon(
                                 imageVector = secondaryPayload.iconData
                                     ?: Icons.Rounded.Notifications,
                                 contentDescription = "Secondary activity: ${secondaryPayload.title}",

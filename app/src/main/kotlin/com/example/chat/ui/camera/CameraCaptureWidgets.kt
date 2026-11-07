@@ -708,19 +708,11 @@ fun CameraCaptureBottomControls(
                             .semantics { contentDescription = if (videoPaused) "Resume recording" else "Pause recording" },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (videoPaused) {
-                            androidx.compose.foundation.Canvas(Modifier.size(18.dp)) {
-                                val w = size.width; val h = size.height
-                                drawPath(androidx.compose.ui.graphics.Path().apply {
-                                    moveTo(w * .25f, h * .12f); lineTo(w * .25f, h * .88f); lineTo(w * .88f, h * .5f); close()
-                                }, color = Color.White)
-                            }
-                        } else {
-                            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Box(Modifier.width(5.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White))
-                                Box(Modifier.width(5.dp).height(18.dp).clip(RoundedCornerShape(2.dp)).background(Color.White))
-                            }
-                        }
+                        com.example.chat.ui.icons.ChatyIcon(
+                            if (videoPaused) com.example.chat.ui.icons.ChatyIconId.playArrow
+                            else com.example.chat.ui.icons.ChatyIconId.pause,
+                            color = Color.White, size = 18.dp,
+                        )
                     }
                 }
             } else {

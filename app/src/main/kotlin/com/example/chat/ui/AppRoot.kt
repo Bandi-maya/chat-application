@@ -283,7 +283,6 @@ fun AppRoot() {
             ServiceLocator.apiBackend.addListener(signOutListener)
             onDispose { ServiceLocator.apiBackend.removeListener(signOutListener) }
         }
-        var showLockPrompt by remember { mutableStateOf(false) }
         // Dart _handleSecurityPreferenceChanged: disabling app lock clears pending lock state.
         androidx.compose.runtime.DisposableEffect(Unit) {
             val prefListener: () -> Unit = {
@@ -294,40 +293,9 @@ fun AppRoot() {
             ServiceLocator.preferencesController.addListener(prefListener)
             onDispose { ServiceLocator.preferencesController.removeListener(prefListener) }
         }
-        // Dart _schedulePostLoginAppLockPrompt: 650ms after the shell appears post-login,
-        // offer app-lock setup unless a usable lock method is already configured.
+        // Setup remains available in Settings; never solicit App Lock on signed-in startup.
         androidx.compose.runtime.LaunchedEffect(route, promptPending) {
-            if (promptPending && route == AuthRoute.Home) {
-                kotlinx.coroutines.delay(650)
-                promptPending = false
-                val sec = ServiceLocator.preferencesController.security
-                val ready = sec.isAppLockEnabled &&
-                    com.example.chat.data.services.ProtectedResourceGate.isMethodConfigured(
-                        ServiceLocator.localLockService, sec.lockMethod,
-                    )
-                if (!ready && ServiceLocator.apiBackend.isAuthenticated) showLockPrompt = true
-            }
-        }
-        if (showLockPrompt) {
-            com.example.chat.ui.kit.ChatyConfirmationDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
-                onDismissRequest = { showLockPrompt = false },
-                title = { androidx.compose.material3.Text("Enable App Lock?") },
-                text = {
-                    androidx.compose.material3.Text(
-                        "You can protect Chaty with biometrics, device lock, PIN, pattern, or password. Setup is optional and can be changed anytime in Settings.",
-                    )
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(onClick = { showLockPrompt = false }) {
-                        androidx.compose.material3.Text("Not now")
-                    }
-                },
-                confirmButton = {
-                    androidx.compose.material3.Button(onClick = { showLockPrompt = false; route = AuthRoute.Security }) {
-                        androidx.compose.material3.Text("Open settings")
-                    }
-                },
-            )
+            if (promptPending && route == AuthRoute.Home) promptPending = false
         }
         Box(Modifier.fillMaxSize()) {
         // Own top/cutout safety once for every route. windowInsetsPadding consumes
@@ -794,6 +762,10 @@ fun AppRoot() {
                 }
                 }
                 com.example.chat.ui.navigation.MainNavigationShell(
+                    unreadCounts = ServiceLocator.apiBackend.conversations.filter { !it.isArchived }.let { conversations ->
+                        mapOf("chats" to conversations.filter { !shellHome.separateChatsAndGroups || !it.isGroup }.sumOf { it.unreadCount },
+                            "groups" to conversations.filter { it.isGroup }.sumOf { it.unreadCount })
+                    },
                     rootHeaderActions = {
                         com.example.chat.ui.navigation.ReferenceRootActions(
                             colors = shellColors, user = ServiceLocator.apiBackend.currentUser?.let { u ->

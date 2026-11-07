@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -290,7 +291,8 @@ private fun ReferenceHorizontalPuck(twoWay: Boolean, background: Color, accept: 
                     } },
                 )
             }, contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.Call, null, tint = if (offset < 0f) decline else accept, modifier = Modifier.size(30.dp))
+            val tint = if (offset < 0f) decline else accept
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, semanticLabel = null, color = tint, modifier = Modifier.size(30.dp))
         }
     }
 }
@@ -542,7 +544,7 @@ private fun GoogleClassicIncomingCall(
                     upA11yLabel = "Answer call", downA11yLabel = null,
                     modifier = Modifier.testTag("google_classic_answer_puck"),
                 ) { Box(Modifier.size(72.dp).background(callSurface(), CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Call, null, tint = tokens.acceptColor, modifier = Modifier.size(32.dp))
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, semanticLabel = null, color = tokens.acceptColor, modifier = Modifier.size(32.dp))
                 } }
                 Spacer(Modifier.height(16.dp))
                 TextButton(onClick = onDecline, modifier = Modifier.heightIn(min = 48.dp)) { Text("Decline", color = tokens.declineColor) }
@@ -700,10 +702,9 @@ private fun AzureRingVerticalIncomingCall(
                 color = tokens.secondaryText,
             )
             Spacer(Modifier.weight(1f))
-            Icon(
-                imageVector = Icons.Rounded.CallEnd,
-                contentDescription = null,
-                tint = tokens.declineColor,
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd,
+                semanticLabel = null,
+                color = tokens.declineColor,
                 modifier = Modifier.size(30.dp),
             )
             VerticalDottedTrack(tokens.secondaryText)
@@ -747,10 +748,9 @@ private fun AzureRingVerticalIncomingCall(
                 }
             }
             VerticalDottedTrack(tokens.secondaryText)
-            Icon(
-                imageVector = Icons.Rounded.Call,
-                contentDescription = null,
-                tint = tokens.acceptColor,
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio,
+                semanticLabel = null,
+                color = tokens.acceptColor,
                 modifier = Modifier.size(30.dp),
             )
             Spacer(Modifier.weight(1f))
@@ -946,10 +946,9 @@ private fun NextcloudTalkIncomingCall(
                     .testTag("nextcloud_decline"),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.CallEnd,
-                    contentDescription = null,
-                    tint = com.example.chat.ui.theme.LocalAppColors.current.onError,
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd,
+                    semanticLabel = null,
+                    color = com.example.chat.ui.theme.LocalAppColors.current.onError,
                     modifier = Modifier.size(26.dp),
                 )
             }
@@ -970,10 +969,9 @@ private fun NextcloudTalkIncomingCall(
                         .background(tokens.acceptColor),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Call,
-                        contentDescription = null,
-                        tint = com.example.chat.ui.theme.LocalAppColors.current.onSuccess,
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio,
+                        semanticLabel = null,
+                        color = com.example.chat.ui.theme.LocalAppColors.current.onSuccess,
                         modifier = Modifier.size(30.dp),
                     )
                 }
@@ -1309,10 +1307,10 @@ fun SharedIncomingCallBanner(session: ChatyCallSession, pending: Boolean,
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onDecline, enabled = !pending, modifier = Modifier.weight(1f).heightIn(min = 52.dp), colors = ButtonDefaults.buttonColors(containerColor = com.example.chat.ui.theme.LocalAppColors.current.error, contentColor = com.example.chat.ui.theme.LocalAppColors.current.onError)) {
-                        Icon(Icons.Rounded.CallEnd, null); Spacer(Modifier.width(6.dp)); Text("Decline")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = null); Spacer(Modifier.width(6.dp)); Text("Decline")
                     }
                     Button(onAccept, enabled = !pending, modifier = Modifier.weight(1f).heightIn(min = 52.dp), colors = ButtonDefaults.buttonColors(containerColor = com.example.chat.ui.theme.LocalAppColors.current.success, contentColor = com.example.chat.ui.theme.LocalAppColors.current.onSuccess)) {
-                        Icon(Icons.Rounded.Call, null); Spacer(Modifier.width(6.dp)); Text("Answer")
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callAudio, semanticLabel = null); Spacer(Modifier.width(6.dp)); Text("Answer")
                     }
                 }
             }

@@ -46,7 +46,7 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material.icons.outlined.Call as CallOutlined
 import androidx.compose.material.icons.outlined.Circle as CircleOutlined
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -316,7 +316,7 @@ private fun FloatingRailHeader(t: ThemeConfig, title: String) {
             verticalArrangement = Arrangement.SpaceEvenly, horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Ic(Icons.Rounded.ChatBubble, col(t.accentColor), 16.dp)
-            Ic(Icons.Rounded.AutoStories, col(t.secondaryTextColor), 16.dp)
+            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.updates, color = col(t.secondaryTextColor), modifier = Modifier.size(16.dp))
         }
         Spacer(Modifier.width(10.dp))
         Text(title, color = col(t.primaryTextColor), fontSize = 19.sp, fontWeight = FontWeight.W800, modifier = Modifier.weight(1f))

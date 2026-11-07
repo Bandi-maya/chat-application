@@ -23,7 +23,7 @@ import androidx.compose.material.icons.rounded.CallEnd
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -321,7 +321,7 @@ private fun EdgeIncomingCall(data: IncomingCallData) {
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.weight(1f).height(56.dp),
                 ) {
-                    Icon(Icons.Rounded.CallEnd, contentDescription = null)
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Decline", fontWeight = FontWeight.Bold)
                 }

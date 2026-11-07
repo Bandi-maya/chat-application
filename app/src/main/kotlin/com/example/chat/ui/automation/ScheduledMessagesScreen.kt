@@ -40,7 +40,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -116,7 +116,7 @@ fun ScheduledMessagesScreen(
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back")
+                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back")
                         }
                     }
                 },
@@ -140,7 +140,7 @@ fun ScheduledMessagesScreen(
                         showSchedule = true
                     }
                 },
-                icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, semanticLabel = null) },
                 text = { Text("Schedule") },
             )
         },
@@ -159,11 +159,10 @@ fun ScheduledMessagesScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(
-                    Icons.Rounded.Schedule,
-                    contentDescription = null,
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.schedule,
+                    semanticLabel = null,
                     modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -201,11 +200,10 @@ fun ScheduledMessagesScreen(
                     ) {
                         Column(Modifier.padding(16.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Rounded.ChatBubbleOutline,
-                                    contentDescription = null,
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats,
+                                    semanticLabel = null,
                                     modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
@@ -238,11 +236,10 @@ fun ScheduledMessagesScreen(
                             Text(msg.body, style = MaterialTheme.typography.bodyMedium)
                             Spacer(Modifier.height(12.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Rounded.AccessTime,
-                                    contentDescription = null,
+                                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.schedule,
+                                    semanticLabel = null,
                                     modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
@@ -255,11 +252,10 @@ fun ScheduledMessagesScreen(
                                     TextButton(
                                         onClick = { scope.launch { service.cancelScheduledMessage(msg.id) } },
                                     ) {
-                                        Icon(
-                                            Icons.Rounded.Cancel,
-                                            contentDescription = null,
+                                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close,
+                                            semanticLabel = null,
                                             modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.error,
+                                            color = MaterialTheme.colorScheme.error,
                                         )
                                         Spacer(Modifier.width(4.dp))
                                         Text("Cancel", color = MaterialTheme.colorScheme.error)
@@ -332,10 +328,9 @@ private fun ScheduleMessageSheet(
                 .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 24.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Rounded.ScheduleSend,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.scheduleSend,
+                    semanticLabel = null,
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
@@ -345,7 +340,7 @@ private fun ScheduleMessageSheet(
                 )
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close")
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.close, semanticLabel = "Close")
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -411,7 +406,7 @@ private fun ScheduleMessageSheet(
                     )
                 }
                 IconButton(onClick = { showDatePicker = true }) {
-                    Icon(Icons.Rounded.ChevronRight, contentDescription = "Pick date & time")
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = "Pick date & time")
                 }
             }
             Spacer(Modifier.height(20.dp))
@@ -423,7 +418,7 @@ private fun ScheduleMessageSheet(
                 },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Rounded.ScheduleSend, contentDescription = null)
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.scheduleSend, semanticLabel = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Confirm Schedule")
             }
