@@ -302,10 +302,6 @@ class ApiBackendService(
             secureMessageEditIngest?.invoke(data)
         }
 
-        override fun onMessageDeleted(roomId: String, messageId: String) {
-            secureMessageDeleteIngest?.invoke(mapOf("room_id" to roomId, "id" to messageId, "for_everyone" to true))
-        }
-
         override fun onConfigChanged() {
             // Telegram-style push invalidation: revalidate (ETag) on the hint;
             // the fresh document activates on the next app start.
@@ -390,6 +386,7 @@ class ApiBackendService(
         }
 
         override fun onMessageDeleted(roomId: String, messageId: String) {
+            secureMessageDeleteIngest?.invoke(mapOf("room_id" to roomId, "id" to messageId, "for_everyone" to true))
             var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
             synchronized(chatLock) {
                 val list = _messages[roomId] ?: return@synchronized
