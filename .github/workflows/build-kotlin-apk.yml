@@ -1,15 +1,15 @@
-name: Build kotlin APK
+name: Build, Test and Deliver Kotlin APK
 
+# Single CI workflow for the kotlin branch (consolidated 2026-11-08,
+# user-approved): every push compiles the app, runs the full JVM unit-test
+# tier, compiles the instrumentation tests, uploads the debug APK artifact
+# and delivers it to Telegram. Emulator tiers stay disabled per the 2026-11-03
+# user directive. The old candidate-overlay zip store was retired: the tree
+# is the single source of truth.
 on:
   workflow_dispatch:
   push:
     branches: [kotlin]
-    paths:
-      # Batched builds: bump ci/kotlin-build-trigger.txt once per committed
-      # slice to fire exactly one build (editor commits land one file at a
-      # time, so a broad push trigger would queue a full build per file).
-      - ci/kotlin-build-trigger.txt
-      - ci/kotlin-retry-trigger.txt
 
 jobs:
   gate:
@@ -32,38 +32,19 @@ jobs:
           if [ -z "$B" ] || [ "$B" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$B^{commit}" 2>/dev/null; then B="HEAD~1"; fi
           CH=$(git diff --name-only "$B" HEAD)
           printf 'GATE-CHANGED\n%s\n' "$CH"
-          if printf '%s\n' "$CH" | grep -qx 'ci/kotlin-build-trigger.txt'; then echo "build=true" >> "$GITHUB_OUTPUT"; else echo "build=false" >> "$GITHUB_OUTPUT"; fi
+          # Single-workflow consolidation: every push to kotlin builds + tests.
+          echo "build=true" >> "$GITHUB_OUTPUT"
           if printf '%s\n' "$CH" | grep -qx 'ci/kotlin-retry-trigger.txt'; then echo "retry=true" >> "$GITHUB_OUTPUT"; else echo "retry=false" >> "$GITHUB_OUTPUT"; fi
 
   build:
     needs: gate
     if: needs.gate.outputs.build == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Validate custom WebRTC backend route syntax
         run: node --check backend/routes/chaty-webrtc-ice.js
-      - name: Restore pinned cumulative candidate source
-        run: |
-          python3 - <<'PYOVERLAY'
-          import base64,hashlib,json,pathlib,zipfile,io
-          d=pathlib.Path('ci/candidate-overlay')
-          m=json.loads((d/'manifest.json').read_text())
-          raw=base64.b64decode(''.join(p.read_text().strip() for p in sorted(d.glob('part-*.b64'))),validate=True)
-          assert hashlib.sha256(raw).hexdigest()==m['archive_sha256']
-          z=zipfile.ZipFile(io.BytesIO(raw))
-          assert set(z.namelist())==set(m['files'])
-          for p in z.infolist():
-              n=p.filename; q=pathlib.PurePosixPath(n)
-              assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
-              assert (n == 'build.gradle.kts' or n.startswith(('app/','ci/','tools/location-map/'))) and '/build/' not in n and '/.env' not in n
-              assert (p.external_attr >> 16) & 0o170000 != 0o120000
-              data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
-              target=pathlib.Path(n); assert not target.is_symlink()
-              assert all(not parent.is_symlink() for parent in target.parents)
-              target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
-          print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
           PYOVERLAY
       - name: Patch pinned candidate sources for com.logybyte.chaty
         run: |
@@ -445,6 +426,27 @@ jobs:
           path: runtime-apks/
           if-no-files-found: error
 
+      - name: Send Failure Notification to Telegram
+        if: ${{ failure() && !contains(github.event.head_commit.message, '[chaty-no-telegram-once-20261107]') }}
+        run: |
+          COMMIT_SHA="${GITHUB_SHA::7}"
+          BRANCH="${GITHUB_REF#refs/heads/}"
+
+          MESSAGE="❌ Chaty Android APK build FAILED
+          🌿 Branch: ${BRANCH}
+          🔗 Commit: ${COMMIT_SHA}
+          ⚙️ Run ID: ${GITHUB_RUN_ID}
+          Check GitHub Actions for details."
+
+          TELEGRAM_CHAT="${{ secrets.TELEGRAM_CHANNEL_ID }}"
+          if [ -z "$TELEGRAM_CHAT" ]; then
+            TELEGRAM_CHAT="${{ secrets.TELEGRAM_CHAT_ID }}"
+          fi
+
+          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && [ -n "$TELEGRAM_CHAT" ]; then
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"               -d chat_id="$TELEGRAM_CHAT"               -d text="$MESSAGE"
+          fi
+
   # Runtime verification tier: boots the real app on an emulator and executes
   # the OpenMLS native engine over JNI (two-party protocol roundtrip, not app
   # E2E messaging). Separate job so the compile/test/APK job keeps its
@@ -466,26 +468,6 @@ jobs:
       CHATY_TEST_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v4
-      - name: Restore pinned cumulative candidate source
-        run: |
-          python3 - <<'PYOVERLAY'
-          import base64,hashlib,json,pathlib,zipfile,io
-          d=pathlib.Path('ci/candidate-overlay')
-          m=json.loads((d/'manifest.json').read_text())
-          raw=base64.b64decode(''.join(p.read_text().strip() for p in sorted(d.glob('part-*.b64'))),validate=True)
-          assert hashlib.sha256(raw).hexdigest()==m['archive_sha256']
-          z=zipfile.ZipFile(io.BytesIO(raw))
-          assert set(z.namelist())==set(m['files'])
-          for p in z.infolist():
-              n=p.filename; q=pathlib.PurePosixPath(n)
-              assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
-              assert (n == 'build.gradle.kts' or n.startswith(('app/','ci/','tools/location-map/'))) and '/build/' not in n and '/.env' not in n
-              assert (p.external_attr >> 16) & 0o170000 != 0o120000
-              data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
-              target=pathlib.Path(n); assert not target.is_symlink()
-              assert all(not parent.is_symlink() for parent in target.parents)
-              target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
-          print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
           PYOVERLAY
       - name: Patch pinned candidate sources for com.logybyte.chaty
         run: |
@@ -702,29 +684,6 @@ jobs:
             echo "select_excluded=com.example.chat.LockBadgeMotionProofTest#animationFrameCalibrationDiag" >> "$GITHUB_OUTPUT"
           fi
           echo "RETRY-PIN mode=$TAG run=$RUN_ID archive=$ARCH"
-      - name: Restore pinned cumulative candidate source
-        run: |
-          python3 - <<'PYOVERLAY'
-          import base64,hashlib,json,pathlib,zipfile,io,os
-          d=pathlib.Path('ci/candidate-overlay')
-          m=json.loads((d/'manifest.json').read_text())
-          raw=base64.b64decode(''.join(p.read_text().strip() for p in sorted(d.glob('part-*.b64'))),validate=True)
-          assert hashlib.sha256(raw).hexdigest()==m['archive_sha256']
-          assert m['archive_sha256']==os.environ['PIN_ARCH'], 'overlay archive mismatch vs retry pin'
-          z=zipfile.ZipFile(io.BytesIO(raw))
-          assert set(z.namelist())==set(m['files'])
-          for p in z.infolist():
-              n=p.filename; q=pathlib.PurePosixPath(n)
-              assert not q.is_absolute() and '..' not in q.parts and not n.startswith('.') and not n.endswith('/')
-              assert (n == 'build.gradle.kts' or n.startswith(('app/','ci/','tools/location-map/'))) and '/build/' not in n and '/.env' not in n
-              assert (p.external_attr >> 16) & 0o170000 != 0o120000
-              data=z.read(p); assert hashlib.sha256(data).hexdigest()==m['files'][n]
-              target=pathlib.Path(n); assert not target.is_symlink()
-              assert all(not parent.is_symlink() for parent in target.parents)
-              target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
-          print('CANDIDATE-OVERLAY',m['archive_sha256'],'files',len(m['files']))
-          PYOVERLAY
-        env:
           PIN_ARCH: ${{ steps.pin.outputs.arch }}
       - name: Patch pinned candidate sources for com.logybyte.chaty
         run: |
