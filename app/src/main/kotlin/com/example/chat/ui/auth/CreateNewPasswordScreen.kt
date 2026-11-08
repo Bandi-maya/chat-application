@@ -124,6 +124,7 @@ fun CreateNewPasswordScreen(
                 AuthTextField(
                     label = "Password",
                     hintText = "Enter a strong password",
+                    capsule = true,
                     theme = theme,
                     value = password,
                     onValueChange = { password = it },
@@ -146,6 +147,7 @@ fun CreateNewPasswordScreen(
                 AuthTextField(
                     label = "Confirm Password",
                     hintText = "Confirm password",
+                    capsule = true,
                     theme = theme,
                     value = confirmPassword,
                     onValueChange = { confirmPassword = it },
@@ -177,6 +179,7 @@ fun CreateNewPasswordScreen(
                     theme = theme,
                     onClick = { handleResetPassword() },
                     isLoading = isLoading,
+                    capsule = true,
                 )
             }
         }

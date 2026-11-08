@@ -190,6 +190,7 @@ fun OtpVerificationScreen(
                         theme = theme,
                         onClick = { handleContinue() },
                         isLoading = isLoading,
+                        capsule = true,
                     )
                     Spacer(Modifier.height(8.dp))
                     TextButton(

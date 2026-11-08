@@ -109,6 +109,7 @@ fun ProfileEditScreen(
     var displayName by remember { mutableStateOf(user.displayName) }
     var username by remember { mutableStateOf(user.username) }
     var usernameCheckLoading by remember { mutableStateOf(false) }
+    var usernameTaken by remember { mutableStateOf(false) }
     // Live availability check, debounced (report 5.1); the save path re-checks
     // against the server too, so a stale result here never decides alone.
     LaunchedEffect(username) {
@@ -131,7 +132,6 @@ fun ProfileEditScreen(
     }
     var about by remember { mutableStateOf(user.about) }
     var isSaving by remember { mutableStateOf(false) }
-    var usernameTaken by remember { mutableStateOf(false) }
     var newAvatarUrl by remember { mutableStateOf<String?>(null) }
     var newBannerUrl by remember { mutableStateOf<String?>(null) }
     var showDiscardDialog by remember { mutableStateOf(false) }

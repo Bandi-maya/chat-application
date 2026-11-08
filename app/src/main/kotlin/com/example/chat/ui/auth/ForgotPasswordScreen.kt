@@ -113,6 +113,7 @@ fun ForgotPasswordScreen(
                     AuthTextField(
                         label = "Email",
                         hintText = "Enter email",
+                        capsule = true,
                         theme = theme,
                         value = email,
                         onValueChange = { email = it },
@@ -135,13 +136,14 @@ fun ForgotPasswordScreen(
                         theme = theme,
                         onClick = { handleSend() },
                         isLoading = isLoading,
+                        capsule = true,
                     )
                     if (emailSent) {
                         Spacer(Modifier.height(14.dp))
                         OutlinedButton(
                             onClick = onBack,
                             modifier = Modifier.fillMaxWidth().height(48.dp),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                            shape = androidx.compose.foundation.shape.CircleShape,
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
                                 Color(argbWithAlpha(theme.accentColor, 0.5)),

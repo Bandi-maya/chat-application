@@ -253,6 +253,7 @@ fun RegisterScreen(
                         AuthTextField(
                             label = "Organization / Workspace ID",
                             hintText = "e.g. acme-corp or school_123",
+                            capsule = true,
                             theme = theme,
                             value = workspace,
                             onValueChange = { onWorkspaceChanged(it) },
@@ -283,6 +284,7 @@ fun RegisterScreen(
                     AuthTextField(
                         label = "Email",
                         hintText = "Enter email",
+                        capsule = true,
                         theme = theme,
                         value = email,
                         onValueChange = { email = it },
@@ -293,6 +295,7 @@ fun RegisterScreen(
                     AuthTextField(
                         label = "Username",
                         hintText = "Choose a unique username",
+                        capsule = true,
                         theme = theme,
                         value = username,
                         onValueChange = { username = it },
@@ -310,6 +313,7 @@ fun RegisterScreen(
                     AuthTextField(
                         label = "Password",
                         hintText = "Minimum 6 characters",
+                        capsule = true,
                         theme = theme,
                         value = password,
                         onValueChange = { password = it },
@@ -361,6 +365,7 @@ fun RegisterScreen(
                         theme = theme,
                         onClick = { if (!registrationBlocked) handleRegister() },
                         isLoading = isLoading,
+                        capsule = true,
                     )
                     Spacer(Modifier.height(14.dp))
 
