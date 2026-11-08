@@ -59,6 +59,7 @@ import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.example.chat.ui.kit.ChatyAdaptiveLogic
 
 /** Result of the workspace availability/self-registration probe
  *  (ApiBackendService.checkOrganization on the Dart side). */
@@ -222,7 +223,7 @@ fun RegisterScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(modifier = Modifier.widthIn(max = 440.dp).fillMaxWidth()) {
+                Column(modifier = Modifier.widthIn(max = ChatyAdaptiveLogic.AUTH_COLUMN_MAX_DP.dp).fillMaxWidth()) {
                     Text(
                         "Everything You Need!",
                         color = Color(theme.primaryTextColor),

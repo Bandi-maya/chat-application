@@ -52,6 +52,7 @@ import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.core.validators.ChatyValidators
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.launch
+import com.example.chat.ui.kit.ChatyAdaptiveLogic
 
 /** Label for the secure-storage-failure support action. A share chooser is
  *  not customer care, so this is "Share error report" until a verified support
@@ -154,7 +155,7 @@ fun LoginScreen(
         ) {
             Column(
                 modifier = Modifier
-                    .widthIn(max = 400.dp)
+                    .widthIn(max = ChatyAdaptiveLogic.AUTH_COLUMN_MAX_DP.dp)
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 20.dp),
             ) {

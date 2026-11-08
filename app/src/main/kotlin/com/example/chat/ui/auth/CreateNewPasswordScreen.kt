@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.launch
+import com.example.chat.ui.kit.ChatyAdaptiveLogic
 
 /** Port of lib/features/auth/create_new_password_screen.dart (api @ 3bee780d).
  *
@@ -104,7 +105,7 @@ fun CreateNewPasswordScreen(
                 .padding(horizontal = 24.dp, vertical = 20.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Column(modifier = Modifier.widthIn(max = 440.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.widthIn(max = ChatyAdaptiveLogic.AUTH_COLUMN_MAX_DP.dp).fillMaxWidth()) {
                 AuthBackButton(onClick = onBack)
                 Spacer(Modifier.height(28.dp))
                 Text(

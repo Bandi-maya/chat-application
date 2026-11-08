@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.ThemeConfig
+import com.example.chat.ui.kit.ChatyAdaptiveLogic
 import com.example.chat.ui.theme.LocalThemeConfig
 
 /** Port of lib/features/auth/welcome_screen.dart. */
@@ -29,7 +31,15 @@ fun WelcomeScreen(onLogin: () -> Unit, onRegister: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // R3: auth content caps at 460dp, centered (responsive plan).
+            Column(
+                modifier = Modifier
+                    .widthIn(max = ChatyAdaptiveLogic.AUTH_COLUMN_MAX_DP.dp)
+                    .fillMaxWidth()
+                    .weight(1f),
+            ) {
             Spacer(Modifier.height(24.dp))
             Column(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -60,6 +70,7 @@ fun WelcomeScreen(onLogin: () -> Unit, onRegister: () -> Unit) {
             Spacer(Modifier.height(14.dp))
             AuthSecondaryButton(text = "Register", theme = theme, onClick = onRegister)
             Spacer(Modifier.height(24.dp))
+            }
         }
     }
 }

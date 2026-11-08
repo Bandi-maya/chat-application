@@ -58,6 +58,7 @@ import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.core.validators.ChatyValidators
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.launch
+import com.example.chat.ui.kit.ChatyAdaptiveLogic
 
 /** Port of lib/features/auth/register_organization_screen.dart. The backend
  *  call is injected; AppRoot wires ApiBackendService.registerOrganization
@@ -172,7 +173,7 @@ fun RegisterOrganizationScreen(
         ) {
             Column(
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
+                    .widthIn(max = ChatyAdaptiveLogic.AUTH_COLUMN_MAX_DP.dp)
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 20.dp),
             ) {

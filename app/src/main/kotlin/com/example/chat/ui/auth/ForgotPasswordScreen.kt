@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.theme.argbWithAlpha
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.launch
+import com.example.chat.ui.kit.ChatyAdaptiveLogic
 
 /** Port of lib/features/auth/forgot_password_screen.dart. The recovery call is
  *  injected; AppRoot wires AuthRepository.resetPassword (the ChatyBackendService
@@ -89,7 +90,7 @@ fun ForgotPasswordScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(modifier = Modifier.widthIn(max = 440.dp).fillMaxWidth()) {
+                Column(modifier = Modifier.widthIn(max = ChatyAdaptiveLogic.AUTH_COLUMN_MAX_DP.dp).fillMaxWidth()) {
                     AuthIllustration(type = "forgot_password", theme = theme, height = 190)
                     Spacer(Modifier.height(16.dp))
                     Text(

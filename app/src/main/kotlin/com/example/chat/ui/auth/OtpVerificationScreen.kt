@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.example.chat.ui.kit.ChatyAdaptiveLogic
 
 /** Email OTP entry, reached after registration (VerifyEmail) or after the
  *  forgot-password request (ResetPassword).
@@ -131,7 +132,7 @@ fun OtpVerificationScreen(
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(modifier = Modifier.widthIn(max = 440.dp).fillMaxWidth()) {
+                Column(modifier = Modifier.widthIn(max = ChatyAdaptiveLogic.AUTH_COLUMN_MAX_DP.dp).fillMaxWidth()) {
                     AuthIllustration(type = "otp", theme = theme, height = 190)
                     Spacer(Modifier.height(16.dp))
                     Text(
