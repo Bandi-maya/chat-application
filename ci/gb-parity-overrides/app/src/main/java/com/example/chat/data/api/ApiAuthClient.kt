@@ -6,7 +6,7 @@ import java.util.Base64
 /** Context-free port of the api branch's REST auth surface
  *  (lib/data/services/api_backend_service.dart auth subset +
  *  lib/data/services/username_login_service.dart). This is the service the
- *  api-branch auth screens actually call; the Supabase AuthRepository backs
+ *  api-branch auth screens actually call; the backend session plane backs
  *  the ChatyBackendService facade paths instead.
  *
  *  Endpoint layout (primary, with the Dart 404 fallbacks):

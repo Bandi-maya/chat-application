@@ -5,7 +5,6 @@ import com.example.chat.core.crypto.MlsStorageInitializationFailure
 import com.example.chat.core.util.parseIsoToInstant
 import com.example.chat.data.e2ee.MlsE2eeService
 import com.example.chat.data.local.SnapshotCodec
-import com.example.chat.data.remote.PostgrestQueryClient
 import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.ChatMessage
@@ -34,7 +33,6 @@ class ConversationsRepository(
     private val rpc: SupabaseRpc,
     /** Table client for the deleteConversation direct-table fallback
      *  (Dart: _client.from('conversations').delete().eq('id', ..)). */
-    private val queryClient: PostgrestQueryClient? = null,
     private val mls: () -> MlsE2eeService?,
     private val currentUserId: () -> String?,
     private val shouldSendReadReceipts: (String) -> Boolean = { true },
@@ -652,12 +650,6 @@ class ConversationsRepository(
                 "delete_conversation",
                 mapOf("p_conversation_id" to conversationId),
             )
-        }.onFailure {
-            runCatching {
-                queryClient?.from("conversations")
-                    ?.eq("id", conversationId)
-                    ?.delete()
-            }
         }
         loadConversations()
         notifyChanged()
