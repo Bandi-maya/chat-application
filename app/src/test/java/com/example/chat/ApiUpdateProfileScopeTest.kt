@@ -31,7 +31,7 @@ class ApiUpdateProfileScopeTest {
         val e = Env(); e.login("u1", "a"); val s = e.owner.snapshot(); val c = mutableListOf<Call>()
         val r = client(e, c, listOf(404, 200)) { }.updateProfile(s, { e.owner.snapshot() === s }, about = "x")
         assertTrue(r.first)
-        assertEquals(listOf("https://a.invalid/app-users/profile", "https://a.invalid/api/v1/app-users/profile"), c.map { it.url })
+        assertEquals(listOf("https://a.invalid/profile/me", "https://a.invalid/api/v1/profile/me"), c.map { it.url })
         assertTrue(c.all { it.auth == "Bearer a" && it.tenant == "t1" })
     }
     @Test fun retryNeverRereadsLiveBaseTenantToken() {
@@ -39,7 +39,7 @@ class ApiUpdateProfileScopeTest {
         // stale check always true: proves routing itself comes from the captured scope, not live config
         client(e, c, listOf(404, 200)) { if (it == 0) { e.routing = ApiRoutingSnapshot("t2", "https://b.invalid", "wss://b", 9); e.login("u2", "b") } }
             .updateProfile(s, { true }, about = "x")
-        assertEquals(listOf("https://a.invalid/app-users/profile", "https://a.invalid/api/v1/app-users/profile"), c.map { it.url })
+        assertEquals(listOf("https://a.invalid/profile/me", "https://a.invalid/api/v1/profile/me"), c.map { it.url })
         assertTrue(c.all { it.auth == "Bearer a" && it.tenant == "t1" })
     }
     @Test fun everyTransitionBeforeDuringAfterIsStale() {
