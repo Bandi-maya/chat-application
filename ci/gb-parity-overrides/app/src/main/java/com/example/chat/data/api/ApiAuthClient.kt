@@ -26,6 +26,9 @@ data class ApiUserProfile(
     val email: String = "",
     val phone: String = "",
     val avatarUrl: String? = null,
+    /** Server-side users.email_verified; defaults true so profiles parsed from
+     *  older backends (or stored sessions) never show a false banner. */
+    val emailVerified: Boolean = true,
 )
 
 data class ApiAuthResult(val token: String, val user: ApiUserProfile, val refreshToken: String? = null)
@@ -269,6 +272,60 @@ class ApiAuthClient(
         throw Exception(errorMsg)
     }
 
+    /** POST auth/email/verification/send: asks the server to email a fresh
+     *  6-digit code. Enumeration-safe — the server answers the same whether
+     *  or not the address is registered, and the generic message passes through. */
+    fun sendEmailVerification(email: String): String = postOtpMail(
+        "auth/email/verification/send",
+        JSONObject().put("email", email.trim()).toString(),
+        fallbackMessage = "If an account exists with this email, a verification code has been sent.",
+    )
+
+    /** POST auth/email/verification/confirm: marks the address verified when
+     *  the code matches. Wrong codes carry "N attempts remaining" in detail. */
+    fun confirmEmailVerification(email: String, code: String): String = postOtpMail(
+        "auth/email/verification/confirm",
+        JSONObject().put("email", email.trim()).put("code", code.trim()).toString(),
+        fallbackMessage = "Email verified.",
+    )
+
+    /** POST auth/reset-password: the code from the forgot-password email sets
+     *  the new password; the server revokes every existing session. */
+    fun resetPasswordWithCode(email: String, code: String, newPassword: String): String = postOtpMail(
+        "auth/reset-password",
+        JSONObject().put("email", email.trim()).put("code", code.trim())
+            .put("new_password", newPassword).toString(),
+        fallbackMessage = "Password updated.",
+    )
+
+    /** Shared POST + message/detail handling for the email-OTP endpoints
+     *  (same envelope as forgotPassword: data.message on 200, detail on error). */
+    private fun postOtpMail(path: String, body: String, fallbackMessage: String): String {
+        val response: Pair<Int, String> = try {
+            postWithFallback(path, body, tenant = tenantId().trim())
+        } catch (e: Exception) {
+            throw Exception("Unable to reach server. Please check your internet connection.")
+        }
+        if (response.first == 200) {
+            return try {
+                val parsed = JSONObject(response.second)
+                val data = if (parsed.has("data")) parsed.get("data") else parsed
+                (if (data is JSONObject && data.has("message") && !data.isNull("message"))
+                    data.get("message").toString()
+                else null) ?: fallbackMessage
+            } catch (_: Exception) {
+                fallbackMessage
+            }
+        }
+        var errorMsg = "Request failed (${response.first})"
+        try {
+            val parsed = JSONObject(response.second)
+            errorMsg = parsed.optString("detail").ifEmpty { parsed.optString("message").ifEmpty { errorMsg } }
+        } catch (_: Exception) {
+        }
+        throw Exception(errorMsg)
+    }
+
     /** ApiBackendService.checkOrganization. */
     fun checkOrganization(workspace: String): Map<String, Any?> {
         val clean = workspace.trim()
@@ -424,6 +481,7 @@ class ApiAuthClient(
                 email = firstString(userObj, "email") ?: "",
                 phone = firstString(userObj, "mobile", "phone") ?: "",
                 avatarUrl = photo,
+                emailVerified = userObj.optBoolean("email_verified", true),
             )
             val refresh = if (dataObj.has("refresh_token") && !dataObj.isNull("refresh_token")) dataObj.get("refresh_token").toString()
                 else if (dataObj.has("refreshToken") && !dataObj.isNull("refreshToken")) dataObj.get("refreshToken").toString() else null

@@ -1709,6 +1709,23 @@ class ApiBackendService(
         auth.forgotPassword(email)
     }
 
+    suspend fun sendEmailVerification(email: String): String = withContext(Dispatchers.IO) {
+        auth.sendEmailVerification(email)
+    }
+
+    suspend fun confirmEmailVerification(email: String, code: String): String = withContext(Dispatchers.IO) {
+        auth.confirmEmailVerification(email, code)
+    }
+
+    suspend fun resetPasswordWithCode(email: String, code: String, newPassword: String): String =
+        withContext(Dispatchers.IO) {
+            auth.resetPasswordWithCode(email, code, newPassword)
+        }
+
+    /** After a successful verification confirm: flip the session flag so the
+     *  unverified-email banner disappears without a fresh login. */
+    fun markEmailVerified() = session.markEmailVerified()
+
     /** ApiBackendService.registerOrganization: on success applies the new
      *  tenant (Dart setTenantId) and adopts the returned admin session. */
     suspend fun registerOrganization(

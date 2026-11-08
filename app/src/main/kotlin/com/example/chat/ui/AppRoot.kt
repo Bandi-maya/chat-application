@@ -56,7 +56,7 @@ import androidx.compose.material.icons.rounded.Animation
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch, Notifications }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, OtpVerification, CreateNewPassword, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch, Notifications }
 
 private class AuthNavigationState {
     private var current by mutableStateOf(AuthRoute.Splash)
@@ -138,6 +138,15 @@ fun AppRoot() {
         // Login or Register; pop returns to whichever pushed it.
         var registerOrigin by remember { mutableStateOf(AuthRoute.Welcome) }
         var orgOrigin by remember { mutableStateOf(AuthRoute.Login) }
+        // Email-OTP flow state (auth research flow): the OTP screen serves both
+        // registration verification and password reset; the reset code is
+        // carried to the new-password screen because the server only validates
+        // it at auth/reset-password.
+        var otpEmail by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+        var otpPurposeVerify by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
+        var otpOrigin by remember { mutableStateOf(AuthRoute.ForgotPassword) }
+        var resetCode by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+        var pendingRegisterEmail by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
         var selectedConversation by remember { mutableStateOf<com.example.chat.domain.models.Conversation?>(null) }
         var selectedInitialMessageId by remember { mutableStateOf<String?>(null) }
         var pendingSettingsDestination by androidx.compose.runtime.saveable.rememberSaveable {
@@ -305,12 +314,15 @@ fun AppRoot() {
         // system Back must follow the same targets as each screen's on-screen back arrow.
         androidx.activity.compose.BackHandler(
             enabled = route == AuthRoute.Login || route == AuthRoute.Register ||
-                route == AuthRoute.ForgotPassword || route == AuthRoute.RegisterOrganization,
+                route == AuthRoute.ForgotPassword || route == AuthRoute.RegisterOrganization ||
+                route == AuthRoute.OtpVerification || route == AuthRoute.CreateNewPassword,
         ) {
             route = when (route) {
                 AuthRoute.ForgotPassword -> AuthRoute.Login
                 AuthRoute.RegisterOrganization -> orgOrigin
                 AuthRoute.Register -> registerOrigin
+                AuthRoute.OtpVerification -> otpOrigin
+                AuthRoute.CreateNewPassword -> AuthRoute.OtpVerification
                 else -> AuthRoute.Welcome
             }
         }
@@ -318,7 +330,8 @@ fun AppRoot() {
         // it. Nested handlers (sheets, info, settings) below take precedence.
         androidx.activity.compose.BackHandler(
             enabled = route !in listOf(AuthRoute.Home, AuthRoute.Splash, AuthRoute.Welcome,
-                AuthRoute.Login, AuthRoute.Register, AuthRoute.ForgotPassword, AuthRoute.RegisterOrganization),
+                AuthRoute.Login, AuthRoute.Register, AuthRoute.ForgotPassword, AuthRoute.RegisterOrganization,
+                AuthRoute.OtpVerification, AuthRoute.CreateNewPassword),
         ) {
             if (route == AuthRoute.ChatDetail) {
                 ServiceLocator.apiBackend.setActiveConversation(null)
@@ -366,7 +379,13 @@ fun AppRoot() {
                     ServiceLocator.appScope.launch {
                         ServiceLocator.preferencesStorage.setStoredUserId(userId)
                     }
-                    route = AuthRoute.Home
+                    // The registration already sent a verification code: land
+                    // on the OTP screen (skippable — verification is a nudge,
+                    // not a gate, per the locked OTP defaults).
+                    otpEmail = pendingRegisterEmail
+                    otpPurposeVerify = true
+                    otpOrigin = AuthRoute.Register
+                    route = if (pendingRegisterEmail.isBlank()) AuthRoute.Home else AuthRoute.OtpVerification
                 },
                 onRegisterOrganization = { orgOrigin = AuthRoute.Register; route = AuthRoute.RegisterOrganization },
                 loadSavedTenant = {
@@ -382,6 +401,7 @@ fun AppRoot() {
                     } else if (!tenant.isNullOrBlank()) {
                         ServiceLocator.apiBackend.config.setTenantId(tenant, useDefault = false)
                     }
+                    pendingRegisterEmail = email.trim()
                     val user = ServiceLocator.apiBackend.register(email, username, password)
                     user.id to user.displayName
                 },
@@ -398,6 +418,66 @@ fun AppRoot() {
                 // Dart prefers ApiBackendService.forgotPassword when registered
                 // (it is, in locator) over the Supabase path.
                 sendRecovery = { email -> ServiceLocator.apiBackend.forgotPassword(email) },
+                onSent = { email ->
+                    otpEmail = email
+                    otpPurposeVerify = false
+                    otpOrigin = AuthRoute.ForgotPassword
+                    route = AuthRoute.OtpVerification
+                },
+            )
+        }
+        val otpScreen: @Composable () -> Unit = {
+            com.example.chat.ui.auth.OtpVerificationScreen(
+                email = otpEmail,
+                purpose = if (otpPurposeVerify) com.example.chat.ui.auth.OtpPurpose.VerifyEmail
+                    else com.example.chat.ui.auth.OtpPurpose.ResetPassword,
+                onBack = { route = otpOrigin },
+                verify = { code ->
+                    // VerifyEmail only: confirm marks the address verified
+                    // server-side; mirror the flag locally so the home banner
+                    // disappears without a fresh login.
+                    ServiceLocator.apiBackend.confirmEmailVerification(otpEmail, code)
+                    ServiceLocator.apiBackend.markEmailVerified()
+                },
+                resend = {
+                    if (otpPurposeVerify) ServiceLocator.apiBackend.sendEmailVerification(otpEmail)
+                    else ServiceLocator.apiBackend.forgotPassword(otpEmail)
+                },
+                onVerified = { code ->
+                    if (otpPurposeVerify) {
+                        route = AuthRoute.Home
+                    } else {
+                        resetCode = code
+                        route = AuthRoute.CreateNewPassword
+                    }
+                },
+                onSkip = if (otpPurposeVerify) ({ route = AuthRoute.Home }) else null,
+            )
+        }
+        val createNewScreen: @Composable () -> Unit = {
+            val resetCtx = androidx.compose.ui.platform.LocalContext.current
+            com.example.chat.ui.auth.CreateNewPasswordScreen(
+                email = otpEmail,
+                onBack = { route = AuthRoute.OtpVerification },
+                submitNewPassword = { newPassword ->
+                    ServiceLocator.apiBackend.resetPasswordWithCode(otpEmail, resetCode, newPassword)
+                    // Research 4a.6: sign straight back in with the new password
+                    // instead of dropping the user on the login form. The reset
+                    // revoked every session, so this fresh login is also what
+                    // restores the app to a working authenticated state.
+                    // (null, false): keep the tenant the user already signed in
+                    // with — the reset must not clobber a custom workspace.
+                    val user = ServiceLocator.apiBackend.login(otpEmail, newPassword, null, false)
+                    ServiceLocator.appLock.onSignedIn()
+                    promptPending = true
+                    ServiceLocator.appScope.launch {
+                        ServiceLocator.preferencesStorage.setStoredUserId(user.id)
+                    }
+                },
+                showSuccess = { msg ->
+                    android.widget.Toast.makeText(resetCtx, msg, android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onPasswordUpdated = { route = AuthRoute.Home },
             )
         }
         val orgScreen: @Composable () -> Unit = {
@@ -473,6 +553,8 @@ fun AppRoot() {
                 onLogin = { route = AuthRoute.Login },
                 onRegister = { registerOrigin = AuthRoute.Welcome; route = AuthRoute.Register },
             )
+            AuthRoute.OtpVerification -> otpScreen()
+            AuthRoute.CreateNewPassword -> createNewScreen()
             AuthRoute.Login, AuthRoute.Register, AuthRoute.ForgotPassword, AuthRoute.RegisterOrganization -> {
                 // Dart keeps each pushed-under screen (and its form state) alive: Login under Register/Forgot/
                 // RegisterOrganization, Register under RegisterOrganization. State is in-memory only (no saved

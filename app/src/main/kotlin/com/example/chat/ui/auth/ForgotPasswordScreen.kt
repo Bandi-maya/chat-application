@@ -38,6 +38,10 @@ import kotlinx.coroutines.launch
 fun ForgotPasswordScreen(
     onBack: () -> Unit,
     sendRecovery: suspend (email: String) -> Unit,
+    /** Called once the reset code email is accepted: the flow continues on the
+     *  OTP screen (research 4a.5: the masked destination on the OTP screen IS
+     *  the generic confirmation — no separate "check your email" page). */
+    onSent: (email: String) -> Unit = {},
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
@@ -65,6 +69,7 @@ fun ForgotPasswordScreen(
                 sendRecovery(email.trim())
                 isLoading = false
                 emailSent = true
+                onSent(email.trim())
             } catch (e: Exception) {
                 isLoading = false
                 errorMessage = (e.message ?: e.toString()).replaceFirst("Exception: ", "")
@@ -97,7 +102,7 @@ fun ForgotPasswordScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         if (emailSent)
-                            "We sent a secure recovery link. Open the newest email on this device; Chaty will reopen through the reset-password callback."
+                            "If an account exists with this email, a 6-digit reset code is on its way."
                         else
                             "Enter the email registered with your Chaty account.",
                         color = Color(theme.secondaryTextColor),
@@ -126,7 +131,7 @@ fun ForgotPasswordScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                     AuthPrimaryButton(
-                        text = if (emailSent) "Resend Recovery Email" else "Send Recovery Email",
+                        text = if (emailSent) "Resend Code" else "Send Reset Code",
                         theme = theme,
                         onClick = { handleSend() },
                         isLoading = isLoading,

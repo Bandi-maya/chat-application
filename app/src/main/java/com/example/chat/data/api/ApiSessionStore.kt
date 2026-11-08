@@ -53,6 +53,7 @@ fun apiUserToJson(user: ApiUserProfile): String = JSONObject()
     .put("email", user.email)
     .put("phone", user.phone)
     .put("avatarUrl", user.avatarUrl ?: JSONObject.NULL)
+    .put("emailVerified", user.emailVerified)
     .toString()
 
 fun apiUserFromJson(raw: String): ApiUserProfile {
@@ -67,6 +68,7 @@ fun apiUserFromJson(raw: String): ApiUserProfile {
         email = obj.optString("email"),
         phone = obj.optString("phone"),
         avatarUrl = if (obj.isNull("avatarUrl")) null else obj.optString("avatarUrl"),
+        emailVerified = obj.optBoolean("emailVerified", true),
     )
 }
 
@@ -135,6 +137,20 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
             throw ApiSessionStorageException(failure, e)
         }
         state = ApiAuthSnapshot(result.user, result.token, state.generation + 1)
+        onTransition()
+    }
+
+    /** Flip emailVerified on the in-memory + stored profile after a successful
+     *  verification confirm, so the unverified banner disappears without a
+     *  fresh login. A failed store write only skips persistence; the in-memory
+     *  state still updates (the next login re-reads the server flag anyway). */
+    fun markEmailVerified() = synchronized(scopeLock) {
+        val user = state.user ?: return@synchronized
+        if (user.emailVerified) return@synchronized
+        val updated = user.copy(emailVerified = true)
+        val token = state.token
+        if (token != null) runCatching { store.save(token, apiUserToJson(updated)) }
+        state = ApiAuthSnapshot(updated, state.token, state.generation + 1)
         onTransition()
     }
 

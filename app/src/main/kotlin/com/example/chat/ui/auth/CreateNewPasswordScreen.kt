@@ -37,30 +37,11 @@ import kotlinx.coroutines.launch
 
 /** Port of lib/features/auth/create_new_password_screen.dart (api @ 3bee780d).
  *
- *  Reached in the Dart app ONLY from the Supabase recovery path:
- *  main.dart _handleAuthUiEvent pushes it on AuthChangeEvent.passwordRecovery
- *  (the otp_verification_screen.dart route to it is dead code — nothing in the
- *  api branch navigates to OtpVerificationScreen). The custom backend's
- *  forgot-password endpoint only sends the email; it has no in-app reset
- *  surface in the Dart source either, so this screen is intentionally wired to
- *  the Supabase session, NOT ApiBackendService.
- *
- *  Wiring contract for the integration owner (AppRoot):
- *  - Route: add AuthRoute.CreateNewPassword and navigate to it when
- *    AuthSessionManager emits AuthChangeEvent.passwordRecovery (Dart pushes
- *    with pushAndRemoveUntil clearing the stack; a plain route swap matches).
- *  - submitNewPassword: mirror the Dart body exactly —
- *      if (ServiceLocator.sessionManager.currentAuthUser() == null)
- *          throw Exception(CreateNewPasswordLogic.NO_SESSION_MESSAGE)
- *      ServiceLocator.sessionManager.updateUserPassword(newPassword)
- *      ServiceLocator.sessionManager.signOut()
- *    (Dart: session null check, auth.updateUser(UserAttributes(password:)),
- *    then auth.signOut() so the user signs in fresh with the new password.)
- *  - On success this screen calls showSuccess(SUCCESS_MESSAGE) and then
- *    onPasswordUpdated(); Dart shows the SnackBar via the app-level
- *    ScaffoldMessenger and immediately replaces the stack with LoginScreen,
- *    so wire showSuccess to an app-level snackbar host and onPasswordUpdated
- *    to AuthRoute.Login.
+ *  Reached from OtpVerificationScreen (ResetPassword purpose) after the
+ *  forgot-password email arrives. AppRoot wires submitNewPassword to the
+ *  custom backend: auth/reset-password with the emailed code, then an
+ *  automatic sign-in with the new password (research 4a.6), landing on Home
+ *  via onPasswordUpdated. showSuccess is wired to a Toast.
  *
  *  [email] is part of the Dart widget contract (main.dart passes
  *  state.session?.user.email) but is never rendered in the source; kept

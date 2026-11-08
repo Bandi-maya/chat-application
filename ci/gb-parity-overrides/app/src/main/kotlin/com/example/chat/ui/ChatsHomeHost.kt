@@ -1,6 +1,19 @@
 package com.example.chat.ui
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -87,6 +100,26 @@ fun ChatsHomeHost(
     } else null
     ChatsHomeScreen(
         headerBottom = headerBottom,
+        // Email-verification nudge (research 4a.4): signed-in but unverified
+        // users get a banner with one-tap resend; verification is never forced
+        // and the banner lives only in this composition (reappears next launch).
+        connectionBanner = if (me != null && !me!!.emailVerified) {
+            {
+                EmailVerificationBanner(
+                    email = me?.email ?: "",
+                    onResend = {
+                        scope.launch {
+                            val address = me?.email ?: ""
+                            try {
+                                toast(api.sendEmailVerification(address))
+                            } catch (e: Exception) {
+                                toast(com.example.chat.ui.auth.OtpVerificationLogic.displayError(e))
+                            }
+                        }
+                    },
+                )
+            }
+        } else null,
         templates = com.example.chat.ui.chats.home.resolveHomeTemplates(templateController.config, com.example.chat.core.preferences.HomePresentationPolicy.isDefault(prefs.home.homeStyle), templateController.chatList),
         conversations = conversations,
         requiresSubscription = api.requiresSubscription,
@@ -271,4 +304,35 @@ fun ChatsHomeHost(
         }
     }
 
+}
+
+/** "Confirm your email" banner for unverified accounts (research 4a.4). */
+@Composable
+private fun EmailVerificationBanner(email: String, onResend: () -> Unit) {
+    val theme = com.example.chat.ui.theme.LocalThemeConfig.current
+    Surface(
+        color = Color(com.example.chat.core.theme.argbWithAlpha(theme.accentColor, 0.12)),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+        ) {
+            Text(
+                "Confirm your email ${com.example.chat.ui.auth.OtpVerificationLogic.maskEmail(email)} to secure your account.",
+                color = Color(theme.primaryTextColor),
+                fontSize = 13.sp,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onResend) {
+                Text(
+                    "Send code",
+                    color = Color(theme.accentColor),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+    }
 }
