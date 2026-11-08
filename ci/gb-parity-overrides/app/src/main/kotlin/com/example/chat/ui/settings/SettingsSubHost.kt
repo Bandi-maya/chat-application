@@ -53,7 +53,7 @@ fun SettingsSubHost(
             // Server privacy planes (research 5.2/5.3); fail-closed lambdas
             // let the screen keep its legacy local look on pre-plane servers.
             loadPresencePrivacy = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.presencePrivacy() } },
-            savePresencePrivacy = { ls, ol, ex -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.putPresencePrivacy(ls, ol, ex) } },
+            savePresencePrivacy = { ls, ol, ex -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.putPresencePrivacy(ls ?: "everyone", ol ?: "same_as_last_seen", ex) } },
             loadCallPolicy = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().callPolicy() } },
             saveCallPolicy = { policy, ex -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().putCallPolicy(policy, ex) } },
             loadBlocked = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().blocks() } },

@@ -599,7 +599,7 @@ private fun ServerWhoCanCallMeDialog(
                     Text(
                         "Your existing exceptions stay in place.",
                         Modifier.padding(start = 16.dp, top = 6.dp),
-                        color = colors.secondaryText,
+                        color = colors.foregroundSecondary,
                         fontSize = 12.sp,
                     )
                 }
@@ -626,7 +626,7 @@ private fun LastSeenOnlineDialog(
         title = { Text("Last seen & online") },
         text = {
             Column {
-                Text("Who can see my last seen", color = colors.secondaryText, fontSize = 12.sp, fontWeight = FontWeight.W600)
+                Text("Who can see my last seen", color = colors.foregroundSecondary, fontSize = 12.sp, fontWeight = FontWeight.W600)
                 PrivacyOptionsLogic.audienceLabels.forEach { opt ->
                     Row(
                         Modifier.fillMaxWidth().clickable(enabled = !busy) { lastSeen = opt }.padding(horizontal = 8.dp),
@@ -644,12 +644,12 @@ private fun LastSeenOnlineDialog(
                     Text(
                         "Your existing exceptions stay in place.",
                         Modifier.padding(start = 16.dp, top = 2.dp),
-                        color = colors.secondaryText,
+                        color = colors.foregroundSecondary,
                         fontSize = 12.sp,
                     )
                 }
                 Spacer(Modifier.height(10.dp))
-                Text("Who can see when I'm online", color = colors.secondaryText, fontSize = 12.sp, fontWeight = FontWeight.W600)
+                Text("Who can see when I'm online", color = colors.foregroundSecondary, fontSize = 12.sp, fontWeight = FontWeight.W600)
                 PrivacyOptionsLogic.onlineLabels.forEach { opt ->
                     Row(
                         Modifier.fillMaxWidth().clickable(enabled = !busy) { online = opt }.padding(horizontal = 8.dp),
@@ -667,7 +667,7 @@ private fun LastSeenOnlineDialog(
                     Text(
                         "You won't see other people's last seen either.",
                         Modifier.padding(start = 16.dp, top = 6.dp),
-                        color = colors.secondaryText,
+                        color = colors.foregroundSecondary,
                         fontSize = 12.sp,
                     )
                 }
@@ -692,7 +692,7 @@ private fun BlockedContactsDialog(
         title = { Text("Blocked contacts") },
         text = {
             if (blocked.isEmpty()) {
-                Text("No blocked contacts.", color = colors.secondaryText)
+                Text("No blocked contacts.", color = colors.foregroundSecondary)
             } else {
                 Column {
                     blocked.forEach { entry ->
@@ -702,7 +702,7 @@ private fun BlockedContactsDialog(
                         ) {
                             Column(Modifier.weight(1f)) {
                                 Text(entry.displayName, fontWeight = FontWeight.W600)
-                                Text("@${entry.username}", color = colors.secondaryText, fontSize = 12.sp)
+                                Text("@${entry.username}", color = colors.foregroundSecondary, fontSize = 12.sp)
                             }
                             TextButton(onClick = { if (!busy) onUnblock(entry) }) { Text("Unblock") }
                         }
