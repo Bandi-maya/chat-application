@@ -9,7 +9,7 @@ class BackendRoutingPolicyTest {
     @Test fun restDotenvThenBuildThenUserDefault() {
         assertEquals("https://local.invalid/api/v1", BackendRoutingPolicy.restBase("https://local.invalid/api/v1", "https://build.invalid"))
         assertEquals("https://build.invalid", BackendRoutingPolicy.restBase("", "https://build.invalid"))
-        assertEquals("https://api.hub.logybyte.in", BackendRoutingPolicy.restBase("", ""))
+        assertEquals("https://api.chat.logybyte.in", BackendRoutingPolicy.restBase("", ""))
     }
     @Test fun tenantSavedThenDotenvUnlessDefaultSelected() {
         assertEquals("saved", BackendRoutingPolicy.tenant("dotenv", " saved ", false, "build"))
@@ -20,8 +20,8 @@ class BackendRoutingPolicyTest {
     @Test fun suppliedDefaultsStayLiteralAndOverridesWin() {
         assertEquals("chat-application", BackendRoutingPolicy.DEFAULT_TENANT_ID)
         val template = BackendRoutingPolicy.websocketTemplate("", "")
-        assertEquals("wss://api.hub.logybyte.in/api/v1/chat/ws/{userId}", template)
-        assertEquals("wss://api.hub.logybyte.in/api/v1/chat/ws/u-42", ApiRealtimeClient.resolveWebSocketUrl(
+        assertEquals("wss://api.chat.logybyte.in/api/v1/chat/ws/{userId}", template)
+        assertEquals("wss://api.chat.logybyte.in/api/v1/chat/ws/u-42", ApiRealtimeClient.resolveWebSocketUrl(
             "u-42", template, "", BackendRoutingPolicy.DEFAULT_REST_API_BASE_URL))
         assertEquals("wss://local.invalid/{userId}", BackendRoutingPolicy.websocketTemplate("wss://local.invalid/{userId}", "wss://build.invalid/{userId}"))
         assertEquals("wss://build.invalid/{userId}", BackendRoutingPolicy.websocketTemplate("", "wss://build.invalid/{userId}"))
