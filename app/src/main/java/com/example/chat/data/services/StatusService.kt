@@ -1,13 +1,12 @@
 package com.example.chat.data.services
 
-import com.example.chat.data.remote.PostgrestQueryClient
-import com.example.chat.data.remote.SupabaseStorageClient
+import com.example.chat.data.api.ApiStatusClient
 import com.example.chat.domain.models.PrivacyPreferencesSnapshot
 import com.example.chat.domain.models.PrivacyPublication
 import com.example.chat.domain.models.PrivacyPublicationPolicy
 import com.example.chat.domain.models.UserProfile
 import java.time.Instant
-import java.util.UUID
+import org.json.JSONObject
 
 data class StatusRecord(
     val id: String,
@@ -41,30 +40,25 @@ data class StatusViewer(
 )
 
 /**
- * Exact port of lib/data/services/status_service.dart's publishing, viewing
- * and deletion paths (publishText / pickAndPublish's validation+upload
- * pipeline as [publishMediaBytes] / publishMediaFile equivalent /
- * markViewed / viewersFor / deleteStatus / _insert / _fromRow /
- * _safeFileName / _fallbackMime). The platform file picker is a UI concern;
- * callers hand bytes + display name in. The revocation-watch stream and its
- * notification fan-out port with the realtime wiring slice.
+ * Status publishing, viewing and deletion on the live backend's status
+ * plane (the /status routes): the server stores an opaque payload blob per post,
+ * enforces a hard 24h expiry, and tracks views. The payload here is a JSON
+ * document (see [encodePayload] / [decodePayload]) carrying the text and,
+ * for media posts, the URL of the previously uploaded media file.
+ *
+ * The service keeps the fail-closed contract of the original port: while
+ * [identityBound] is false every write throws [StatusIdentityUnboundException]
+ * with zero network calls, and reads return empty.
  *
  * Preferences are seams: the full preferences controller lands with M7/M8.
  */
 class StatusService(
-    private val queryClient: PostgrestQueryClient,
-    private val storage: SupabaseStorageClient,
-    private val rpc: com.example.chat.data.messaging.SupabaseRpc,
+    private val api: ApiStatusClient,
+    /** Uploads media bytes and returns their public URL (custom backend /chat/upload). */
+    private val mediaUpload: suspend (filename: String, bytes: ByteArray, mimeType: String) -> String,
     private val currentUserId: () -> String?,
     private val privacy: () -> PrivacyPreferencesSnapshot,
     private val publicationPolicy: PrivacyPublicationPolicy = PrivacyPublicationPolicy(),
-    /** Supabase realtime for the status_updates stream; null keeps the poll stand-in. */
-    private val statusChannelFactory: ((
-        topic: String,
-        tables: List<com.example.chat.data.remote.PostgresChangeSubscription>,
-        onChange: (com.example.chat.data.remote.PostgresChange) -> Unit,
-        onStatus: (com.example.chat.data.remote.RealtimeSubscribeStatus) -> Unit,
-    ) -> com.example.chat.data.remote.RealtimeChannel)? = null,
     /** preferences.preferencesReady */
     private val preferencesReady: () -> Boolean = { true },
     /** gbBool('yoHideStatViewV2') */
@@ -74,10 +68,10 @@ class StatusService(
     /** gbDouble('abo_saleh_audio_limit_check' | 'Up_size_limit', fallback). */
     private val gbSizeLimitMb: (key: String, fallback: Double) -> Double = { _, fb -> fb },
     /**
-     * True only when the signed-in app account is proven to own the Supabase session this service
-     * writes through. No source contract links the custom-backend account (ApiAccountScope) to the
-     * GoTrue session, so the default is false: every write below fails closed with zero network
-     * calls. Do not pass a constant true; wire a real, verified binding when one exists.
+     * True only when the signed-in app account is proven to own the backend
+     * session this service writes through. The default is false: every write
+     * below fails closed with zero network calls. Do not pass a constant
+     * true; wire a real, verified binding when one exists.
      */
     private val identityBound: () -> Boolean = { false },
 ) {
@@ -89,41 +83,17 @@ class StatusService(
     }
 
     /**
-     * Dart watchActiveStatuses (status_updates stream, newest first, unexpired,
-     * deleted rows kept only when anti-delete is on). The Supabase realtime
-     * stream is not ported on this plane, so this polls the same table on a
-     * fixed interval; it never fabricates rows.
+     * Active statuses, newest first. The live plane has no realtime stream
+     * for status, so this polls the feed on a fixed interval; it never
+     * fabricates rows, and on a failed poll it re-serves the last good feed.
      */
     fun watchActiveStatuses(
         keepDeleted: () -> Boolean = { false },
         pollMillis: Long = 60_000L,
-    ): kotlinx.coroutines.flow.Flow<List<StatusRecord>> {
-        val factory = statusChannelFactory
-        if (factory == null) return pollActiveStatuses(keepDeleted, pollMillis)
-        // Dart .from('status_updates').stream(primaryKey: id): the full filtered list is re-emitted whenever
-        // the table changes. Realtime change events trigger a re-query; the poll interval stays as a
-        // safety net while the socket is not subscribed (supabase_dart reconnects internally).
-        return kotlinx.coroutines.flow.channelFlow {
-            val refresh = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
-            val subscribed = java.util.concurrent.atomic.AtomicBoolean(false)
-            val userId = currentUserId()
-            val channel = if (userId == null || !identityBound()) null else try {
-                factory(
-                    "chaty-status-$userId",
-                    listOf(com.example.chat.data.remote.PostgresChangeSubscription(table = "status_updates")),
-                    { refresh.trySend(Unit) },
-                    { st -> subscribed.set(st == com.example.chat.data.remote.RealtimeSubscribeStatus.subscribed) },
-                )
-            } catch (_: Exception) { null }
-            try {
-                while (true) {
-                    send(queryActive(keepDeleted))
-                    val waitMs = if (subscribed.get()) pollMillis * 10 else pollMillis
-                    kotlinx.coroutines.withTimeoutOrNull(waitMs) { refresh.receive() }
-                }
-            } finally {
-                channel?.close()
-            }
+    ): kotlinx.coroutines.flow.Flow<List<StatusRecord>> = kotlinx.coroutines.flow.flow {
+        while (true) {
+            emit(queryActive(keepDeleted))
+            kotlinx.coroutines.delay(pollMillis)
         }
     }
 
@@ -131,13 +101,15 @@ class StatusService(
         if (!identityBound()) { lastActive = emptyList(); return emptyList() }
         if (currentUserId() == null) return emptyList()
         val result: List<StatusRecord> = try {
-            val rows = queryClient.from("status_updates")
-                .select()
-                .order("created_at", ascending = false)
-                .execute()
+            val feed = api.feed() ?: throw IllegalStateException("feed failed")
             val now = Instant.now()
-            val keep = keepDeleted()
-            rows.map { fromRow(it) }.filter { it.expiresAt.isAfter(now) && (!it.isDeleted || keep) }
+            feed.flatMap { entry ->
+                entry.posts.mapNotNull { post ->
+                    val rec = fromPayload(post, entry)
+                    // Server purges expired rows; the filter stays as clock-skew protection.
+                    if (rec.expiresAt.isAfter(now)) rec else null
+                }
+            }.sortedByDescending { it.createdAt }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -149,17 +121,7 @@ class StatusService(
 
     @Volatile private var lastActive: List<StatusRecord> = emptyList()
 
-    private fun pollActiveStatuses(
-        keepDeleted: () -> Boolean,
-        pollMillis: Long,
-    ): kotlinx.coroutines.flow.Flow<List<StatusRecord>> = kotlinx.coroutines.flow.flow {
-        while (true) {
-            emit(queryActive(keepDeleted))
-            kotlinx.coroutines.delay(pollMillis)
-        }
-    }
-
-    /** Exact port of publishText. */
+    /** Publish a text status. */
     suspend fun publishText(text: String): StatusRecord {
         // Offline demo: status posts need the server; refuse.
         if (com.example.chat.data.demo.DemoMode.active) throw IllegalStateException(com.example.chat.data.demo.DemoMode.UNAVAILABLE_MESSAGE)
@@ -170,9 +132,10 @@ class StatusService(
     }
 
     /**
-     * Exact port of pickAndPublish's post-picker pipeline and
-     * publishMediaFile: identical validation, size limits, object naming,
-     * upload, insert, and upload-rollback on insert failure.
+     * Publish a media status: same validation and size limits as the
+     * original port, then upload-then-post. If the post fails after the
+     * upload succeeded the media file is orphaned server-side (the backend
+     * has no per-file delete); the post itself is never half-created.
      */
     suspend fun publishMediaBytes(
         bytes: ByteArray,
@@ -203,39 +166,30 @@ class StatusService(
             )
         }
 
-        val userId = currentUserId()
-            ?: throw IllegalStateException("Authentication required.")
+        currentUserId() ?: throw IllegalStateException("Authentication required.")
         val safeName = safeFileName(displayName)
-        val objectPath = "$userId/${UUID.randomUUID()}_$safeName"
         val effectiveMime = mimeType ?: fallbackMime(mediaType)
 
-        storage.upload(BUCKET, objectPath, bytes, effectiveMime)
-
-        try {
-            return insert(
-                text = text.trim(),
-                mediaType = mediaType,
-                mediaPath = objectPath,
-                mediaName = safeName,
-                mediaSize = size,
-                mimeType = effectiveMime,
-                durationSeconds = durationSeconds,
-            )
-        } catch (error: Throwable) {
-            runCatching { storage.remove(BUCKET, listOf(objectPath)) }
-            throw error
-        }
+        val url = mediaUpload(safeName, bytes, effectiveMime)
+        return insert(
+            text = text.trim(),
+            mediaType = mediaType,
+            mediaPath = url,
+            mediaName = safeName,
+            mediaSize = size,
+            mimeType = effectiveMime,
+            durationSeconds = durationSeconds,
+        )
     }
 
-    /** Exact port of createSignedUrl (default 900s). */
+    /** Media URLs on this plane are already absolute; kept for interface parity. */
     suspend fun createSignedUrl(path: String, expiresInSeconds: Int = 900): String {
         requireBound()
-        return storage.createSignedUrl(BUCKET, path, expiresInSeconds)
+        return path
     }
 
-    /** Exact port of markViewed: gated on preferences readiness, the
-     *  publication policy, and the gb hide-view flag; silently no-ops when
-     *  publication is suppressed. */
+    /** Gated on preferences readiness, the publication policy, and the gb
+     *  hide-view flag; silently no-ops when publication is suppressed. */
     suspend fun markViewed(status: StatusRecord): Boolean {
         requireBound()
         if (!preferencesReady()) return false
@@ -243,38 +197,21 @@ class StatusService(
             PrivacyPublication.statusView, privacy(),
         ) && !gbHideStatusView()
         if (!mayPublish) return false
-        rpc.rpc(
-            "mark_status_viewed",
-            mapOf("p_status_id" to status.id, "p_hide_view" to false),
-        )
-        return true
+        return api.recordView(status.id)
     }
 
-    /** Exact port of viewersFor (embedded profiles join; errors -> empty). */
+    /** Who viewed an own status (server enforces ownership). Errors -> empty. */
     suspend fun viewersFor(statusId: String): List<StatusViewer> {
         requireBound()
         return try {
-            val rows = queryClient.from("status_view_events")
-                .select(
-                    "viewer_id,viewed_at," +
-                        "profiles!status_view_events_viewer_id_fkey(" +
-                        "display_name,username,avatar_initials,avatar_color_hex)",
-                )
-                .eq("status_id", statusId)
-                .order("viewed_at", ascending = false)
-                .execute()
-            rows.map { row ->
-                @Suppress("UNCHECKED_CAST")
-                val profile = (row["profiles"] as? Map<String, Any?>) ?: emptyMap()
+            (api.views(statusId) ?: emptyList()).map { v ->
                 StatusViewer(
-                    userId = row["viewer_id"]?.toString() ?: "",
-                    displayName = profile["display_name"]?.toString() ?: "Chaty user",
-                    username = profile["username"]?.toString() ?: "user",
-                    avatarInitials = profile["avatar_initials"]?.toString() ?: "CU",
-                    avatarColorHex = profile["avatar_color_hex"]?.toString() ?: "0xFF6366F1",
-                    viewedAt = com.example.chat.core.util.parseIsoToInstant(
-                        row["viewed_at"]?.toString(),
-                    ) ?: Instant.now(),
+                    userId = v.userId,
+                    displayName = v.displayName.ifEmpty { "Chaty user" },
+                    username = v.username.ifEmpty { "user" },
+                    avatarInitials = initialsOf(v.displayName, v.username),
+                    avatarColorHex = "0xFF6366F1",
+                    viewedAt = com.example.chat.core.util.parseIsoToInstant(v.viewedAt) ?: Instant.now(),
                 )
             }
         } catch (error: Throwable) {
@@ -282,17 +219,19 @@ class StatusService(
         }
     }
 
-    /** Exact port of deleteStatus (own-status guard + RPC). */
+    /** Delete an own status (own-status guard + server delete). */
     suspend fun deleteStatus(status: StatusRecord) {
         requireBound()
         val userId = currentUserId()
         if (userId == null || userId != status.userId) {
             throw IllegalStateException("You can only delete your own status.")
         }
-        rpc.rpc("delete_status_update", mapOf("p_status_id" to status.id))
+        if (!api.delete(status.id)) {
+            throw IllegalStateException("Status could not be deleted.")
+        }
     }
 
-    /** Exact port of _insert (24h expiry, inserted row returned). */
+    /** POST the payload and shape the returned record (24h expiry comes from the server). */
     private suspend fun insert(
         text: String,
         mediaType: String,
@@ -304,28 +243,38 @@ class StatusService(
     ): StatusRecord {
         val userId = currentUserId()
             ?: throw IllegalStateException("Authentication required.")
-        val expiresAt = Instant.now().plus(java.time.Duration.ofHours(24))
-        val rows = queryClient.from("status_updates").insert(
-            mapOf(
-                "user_id" to userId,
-                "content" to text,
-                "media_path" to mediaPath,
-                "media_type" to mediaType,
-                "mime_type" to mimeType,
-                "media_name" to mediaName,
-                "media_size" to mediaSize,
-                "duration_seconds" to durationSeconds,
-                "expires_at" to expiresAt.toString(),
-            ),
+        val payload = encodePayload(
+            text = text,
+            mediaType = mediaType,
+            mediaPath = mediaPath,
+            mediaName = mediaName,
+            mimeType = mimeType,
+            mediaSize = mediaSize,
+            durationSeconds = durationSeconds,
         )
-        val row = rows.firstOrNull()
-            ?: throw IllegalStateException("Status insert returned no row.")
-        return fromRow(row)
+        val (id, expiresAtRaw) = api.postStatus(payload)
+            ?: throw IllegalStateException("Status could not be published.")
+        return StatusRecord(
+            id = id,
+            userId = userId,
+            text = text,
+            mediaType = mediaType,
+            mediaPath = mediaPath,
+            mediaName = mediaName,
+            mediaSize = mediaSize,
+            durationSeconds = durationSeconds,
+            createdAt = Instant.now(),
+            expiresAt = com.example.chat.core.util.parseIsoToInstant(expiresAtRaw)
+                ?: Instant.now().plus(java.time.Duration.ofHours(24)),
+            deletedAt = null,
+        )
     }
 
     companion object {
-        const val BUCKET = "status-media"
         const val STORAGE_LIMIT_MB = 50
+
+        /** Payload schema version written by [encodePayload]. */
+        const val PAYLOAD_VERSION = 1
 
         /** Dart num.round(): half away from zero (Math.round is half toward +infinity).
          *  Finite values only; Dart throws on NaN/Infinity, which is not ported. */
@@ -334,27 +283,49 @@ class StatusService(
             return if (d < 0) -Math.round(-d) else Math.round(d)
         }
 
-        /** Exact port of _fromRow. */
-        fun fromRow(row: Map<String, Any?>): StatusRecord = StatusRecord(
-            id = row["id"]?.toString() ?: "",
-            userId = row["user_id"]?.toString() ?: "",
-            text = row["content"]?.toString() ?: "",
-            mediaType = row["media_type"]?.toString() ?: "text",
-            mediaPath = row["media_path"]?.toString(),
-            mediaName = row["media_name"]?.toString(),
-            mediaSize = (row["media_size"] as? Number)?.let { dartRound(it) }
-                ?: row["media_size"]?.toString()?.toLongOrNull() ?: 0,
-            durationSeconds = (row["duration_seconds"] as? Number)?.let { dartRound(it) } ?: 0,
-            createdAt = com.example.chat.core.util.parseIsoToInstant(
-                row["created_at"]?.toString(),
-            ) ?: Instant.now(),
-            expiresAt = com.example.chat.core.util.parseIsoToInstant(
-                row["expires_at"]?.toString(),
-            ) ?: Instant.now(),
-            deletedAt = row["deleted_at"]?.let {
-                com.example.chat.core.util.parseIsoToInstant(it.toString())
-            },
-        )
+        /** Serialize a status to the opaque payload the server stores. */
+        fun encodePayload(
+            text: String,
+            mediaType: String,
+            mediaPath: String? = null,
+            mediaName: String? = null,
+            mimeType: String? = null,
+            mediaSize: Long = 0,
+            durationSeconds: Long = 0,
+        ): String {
+            val o = JSONObject()
+            o.put("v", PAYLOAD_VERSION)
+            o.put("media_type", mediaType)
+            o.put("content", text)
+            if (mediaPath != null) o.put("media_path", mediaPath)
+            if (mediaName != null) o.put("media_name", mediaName)
+            if (mimeType != null) o.put("mime_type", mimeType)
+            if (mediaSize > 0) o.put("media_size", mediaSize)
+            if (durationSeconds > 0) o.put("duration_seconds", durationSeconds)
+            return o.toString()
+        }
+
+        /** Rebuild a record from a feed post. Payloads written by older or
+         *  foreign clients that are not our JSON shape surface as plain text. */
+        fun fromPayload(
+            post: ApiStatusClient.StatusPostEntry,
+            author: ApiStatusClient.StatusFeedEntry,
+        ): StatusRecord {
+            val o = runCatching { JSONObject(post.payload) }.getOrNull()
+            return StatusRecord(
+                id = post.id,
+                userId = author.userId,
+                text = o?.optString("content") ?: post.payload,
+                mediaType = o?.optString("media_type")?.takeIf { it.isNotEmpty() } ?: "text",
+                mediaPath = o?.optString("media_path")?.takeIf { it.isNotEmpty() },
+                mediaName = o?.optString("media_name")?.takeIf { it.isNotEmpty() },
+                mediaSize = o?.optLong("media_size") ?: 0,
+                durationSeconds = o?.optLong("duration_seconds") ?: 0,
+                createdAt = com.example.chat.core.util.parseIsoToInstant(post.createdAt) ?: Instant.now(),
+                expiresAt = com.example.chat.core.util.parseIsoToInstant(post.expiresAt) ?: Instant.now(),
+                deletedAt = null,
+            )
+        }
 
         /** Exact port of _safeFileName. */
         fun safeFileName(source: String): String {
@@ -371,6 +342,16 @@ class StatusService(
             "video" -> "video/mp4"
             "audio" -> "audio/mp4"
             else -> "application/octet-stream"
+        }
+
+        private fun initialsOf(displayName: String, username: String): String {
+            val base = displayName.ifEmpty { username }.trim()
+            if (base.isEmpty()) return "CU"
+            val parts = base.split(Regex("\\s+")).filter { it.isNotEmpty() }
+            return when {
+                parts.size >= 2 -> (parts[0].take(1) + parts[1].take(1)).uppercase()
+                else -> base.take(2).uppercase()
+            }
         }
     }
 }

@@ -1033,19 +1033,34 @@ object ServiceLocator {
         )
     }
 
+    private val statusClient: com.example.chat.data.api.ApiStatusClient by lazy {
+        com.example.chat.data.api.ApiStatusClient(
+            baseUrl = { apiBackend.config.restApiBaseUrl },
+            tenantId = { apiBackend.config.tenantId },
+            token = { apiBackend.authSnapshot().token },
+            transport = com.example.chat.data.api.OkHttpApiTransport(),
+        )
+    }
+
     val statusService: StatusService by lazy {
         StatusService(
-            queryClient = queryClient,
-            storage = storageClient,
-            rpc = rpcClient,
+            api = statusClient,
+            mediaUpload = { name, bytes, _ ->
+                val result = apiBackend.uploadMedia(name, bytes)
+                (result["url"] ?: result["public_url"] ?: result["media_url"])?.toString()
+                    ?: throw IllegalStateException("Media upload returned no URL.")
+            },
             currentUserId = currentUserId,
             privacy = { preferencesController.privacy.toPublicationSnapshot() },
             preferencesReady = { preferencesController.preferencesReady },
             gbHideStatusView = { preferencesController.gbBool("yoHideStatViewV2") },
             gbAudioStatusEnabled = { preferencesController.gbBool("abu9aleh_status_audio") },
             gbSizeLimitMb = { key, fallback -> preferencesController.gbDouble(key, fallback) },
-            statusChannelFactory = { topic, tables, onChange, onStatus ->
-                SupabaseRealtimeChannel(supabaseUrl, publishableKey, accessToken, topic, tables, onChange, onStatus).also { it.start() }
+            // Status now lives on the custom backend: a live API session (user
+            // + token) is the identity binding. Still fail-closed when signed out.
+            identityBound = {
+                val scope = apiBackend.authSnapshot()
+                !scope.userId.isNullOrBlank() && !scope.token.isNullOrBlank()
             },
         )
     }

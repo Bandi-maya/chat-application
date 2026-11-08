@@ -1,7 +1,7 @@
 package com.example.chat
 
-import com.example.chat.data.remote.PostgrestQueryClient
-import com.example.chat.data.remote.SupabaseStorageClient
+import com.example.chat.data.api.ApiHttpTransport
+import com.example.chat.data.api.ApiStatusClient
 import com.example.chat.data.services.StatusIdentityUnboundException
 import com.example.chat.data.services.StatusRecord
 import com.example.chat.data.services.StatusService
@@ -9,12 +9,6 @@ import com.example.chat.domain.models.PrivacyPreferencesSnapshot
 import java.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import okhttp3.Interceptor
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Protocol
-import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,34 +16,39 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 /** Offline JVM tests: every StatusService write fails closed while identity is unbound.
- *  Real PostgrestQueryClient and SupabaseStorageClient run over counting fake OkHttp. */
+ *  The live status plane runs over a counting fake ApiHttpTransport. */
 class StatusFailClosedTest {
     private var http = 0
-    private var rpcCalls = 0
+    private var uploads = 0
 
-    private val ok = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
+    private val transport = ApiHttpTransport { method, url, _, body ->
         http++
-        Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("x")
-            .body("""[{"id":"s1","user_id":"A","created_at":"2026-10-27T01:00:00Z","expires_at":"2026-10-28T01:00:00Z"}]"""
-                .toResponseBody("application/json".toMediaType())).build()
-    }).build()
-
-    private val rpc = object : com.example.chat.data.messaging.SupabaseRpc {
-        override suspend fun rpc(function: String, params: Map<String, Any?>): Any? { rpcCalls++; return null }
+        when {
+            method == "POST" && url.endsWith("/status/post") ->
+                200 to """{"success":true,"data":{"id":"s1","expires_at":"2026-10-28T01:00:00Z"}}"""
+            method == "GET" && url.endsWith("/status/feed") ->
+                200 to """{"success":true,"data":{"statuses":[]}}"""
+            method == "DELETE" ->
+                200 to """{"success":true,"data":null}"""
+            else -> 200 to """{"success":true,"data":{}}"""
+        }
     }
 
     private fun svc(bound: (() -> Boolean)? = null): StatusService {
-        val q = PostgrestQueryClient("http://h", "k", { "LIVE" }, ok)
-        val s = SupabaseStorageClient("http://h", "k", { "LIVE" }, ok)
-        return if (bound == null) StatusService(q, s, rpc, { "A" }, { PrivacyPreferencesSnapshot() })
-        else StatusService(q, s, rpc, { "A" }, { PrivacyPreferencesSnapshot() }, identityBound = bound)
+        val client = ApiStatusClient({ "http://10.0.2.2:8000" }, { "chat-application" }, { "tok" }, transport)
+        val upload: suspend (String, ByteArray, String) -> String = { _, _, _ ->
+            uploads++
+            "http://h/uploads/x"
+        }
+        return if (bound == null) StatusService(client, upload, { "A" }, { PrivacyPreferencesSnapshot() })
+        else StatusService(client, upload, { "A" }, { PrivacyPreferencesSnapshot() }, identityBound = bound)
     }
 
     private val rec = StatusRecord("s1", "A", "", "text", null, null, 0, 0, Instant.now(), Instant.now(), null)
 
     private fun assertUnbound(block: suspend () -> Unit) = runBlocking {
         try { block(); fail("expected StatusIdentityUnboundException") } catch (_: StatusIdentityUnboundException) {}
-        assertEquals(0, http); assertEquals(0, rpcCalls)
+        assertEquals(0, http); assertEquals(0, uploads)
     }
 
     @Test fun defaultIsNotAvailable() { assertFalse(svc().isAvailable()) }
@@ -69,7 +68,7 @@ class StatusFailClosedTest {
     @Test fun watchEmitsEmptyAndMakesZeroNetworkCalls() = runBlocking {
         val first = svc().watchActiveStatuses().first()
         assertTrue(first.isEmpty())
-        assertEquals(0, http); assertEquals(0, rpcCalls)
+        assertEquals(0, http); assertEquals(0, uploads)
     }
 
     @Test fun messageIsTheAgreedUserText() {
@@ -82,15 +81,15 @@ class StatusFailClosedTest {
         assertFalse(m.contains("@") || m.contains("Bearer") || m.contains("user_id") || m.contains("supabase", true))
     }
 
-    @Test fun explicitlyBoundStillWorksSoGateIsTheOnlyChange() = runBlocking {
+    @Test fun explicitlyBoundPublishesOverTheLivePlane() = runBlocking {
         val s = svc { true }
         assertTrue(s.isAvailable())
         s.publishText("hello")
         assertEquals(1, http)
         s.deleteStatus(rec)
-        assertEquals(1, rpcCalls)
-        val before = http
+        assertEquals(2, http)
         s.watchActiveStatuses().first()
-        assertEquals(before + 1, http) // the status_updates query ran
+        assertEquals(3, http) // the status feed poll ran
+        assertEquals(0, uploads)
     }
 }

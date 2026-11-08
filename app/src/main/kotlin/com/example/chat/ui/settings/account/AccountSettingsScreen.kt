@@ -230,17 +230,10 @@ fun AccountSettingsScreen(
                 }
 
                 // 2. WORKSPACE & SUBSCRIPTION
+                // Subscription & Plans tile hidden: there is no order backend
+                // yet (the create-order route does not exist), so the plan
+                // flow is unreachable until payments are built.
                 ChatySettingsSection(title = "Workspace & Registration") {
-                    ChatySettingsTile(
-                        icon = Icons.Rounded.WorkspacePremium,
-                        iconColor = colors.accent,
-                        title = "Subscription & Plans",
-                        subtitle = "Manage workspace plan, billing & feature limits",
-                        onTap = {
-                            val (orgId, orgName) = organization()
-                            onOpenSubscription(orgId, orgName)
-                        },
-                    )
                     WorkspaceRegistrationToggle(
                         organization = organization,
                         checkOrganization = checkOrganization,

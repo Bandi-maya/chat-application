@@ -1,5 +1,6 @@
 package com.example.chat
 
+import com.example.chat.data.api.ApiStatusClient
 import com.example.chat.data.services.StatusService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -7,13 +8,28 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Pure JVM parity checks for status_service.dart _fromRow/_safeFileName/_fallbackMime.
- *  No network, no account. Source vs api: lib/data/services/status_service.dart:437-481. */
+/** Pure JVM checks for the status payload codec (encodePayload/fromPayload)
+ *  and the helpers that survived the move to the live backend's status
+ *  plane (_safeFileName/_fallbackMime/dartRound). No network, no account. */
 class StatusServiceRowParityTest {
 
-    @Test fun fromRowDefaultsMatchDart() {
-        val r = StatusService.fromRow(emptyMap())
-        assertEquals("", r.id)
+    private fun entry(userId: String = "u1") = ApiStatusClient.StatusFeedEntry(
+        userId = userId, username = "user", displayName = "User", own = true, posts = emptyList(),
+    )
+
+    private fun post(payload: String, id: String = "s1") = ApiStatusClient.StatusPostEntry(
+        id = id,
+        payload = payload,
+        createdAt = "2026-10-27T01:00:00Z",
+        expiresAt = "2026-10-28T01:00:00Z",
+    )
+
+    @Test fun textPayloadRoundTrips() {
+        val payload = StatusService.encodePayload(text = "hello world", mediaType = "text")
+        val r = StatusService.fromPayload(post(payload), entry())
+        assertEquals("s1", r.id)
+        assertEquals("u1", r.userId)
+        assertEquals("hello world", r.text)
         assertEquals("text", r.mediaType)
         assertNull(r.mediaPath)
         assertEquals(0L, r.mediaSize)
@@ -21,16 +37,34 @@ class StatusServiceRowParityTest {
         assertNull(r.deletedAt)
         assertFalse(r.hasMedia)
         assertFalse(r.isDeleted)
+        assertEquals(24 * 3600L, r.expiresAt.epochSecond - r.createdAt.epochSecond)
     }
 
-    @Test fun fromRowNumericFieldsRoundLikeDart() {
-        // Dart: (num).round() -> 2.6 becomes 3, 2.4 becomes 2.
-        val r = StatusService.fromRow(mapOf("media_size" to 2.6, "duration_seconds" to 7.5))
-        assertEquals(3L, r.mediaSize)
-        assertEquals(8L, r.durationSeconds)
-        val s = StatusService.fromRow(mapOf("media_size" to "1024", "duration_seconds" to "9"))
-        assertEquals(1024L, s.mediaSize)
-        assertEquals(0L, s.durationSeconds) // Dart: non-num duration -> 0
+    @Test fun mediaPayloadRoundTrips() {
+        val payload = StatusService.encodePayload(
+            text = "look",
+            mediaType = "image",
+            mediaPath = "https://api.example/uploads/chat_ab12.jpg",
+            mediaName = "pic.jpg",
+            mimeType = "image/jpeg",
+            mediaSize = 1024,
+            durationSeconds = 9,
+        )
+        val r = StatusService.fromPayload(post(payload), entry())
+        assertTrue(r.hasMedia)
+        assertEquals("image", r.mediaType)
+        assertEquals("https://api.example/uploads/chat_ab12.jpg", r.mediaPath)
+        assertEquals("pic.jpg", r.mediaName)
+        assertEquals(1024L, r.mediaSize)
+        assertEquals(9L, r.durationSeconds)
+    }
+
+    @Test fun foreignPayloadSurfacesAsPlainText() {
+        // Payloads not written by this client (no JSON shape) must still be readable.
+        val r = StatusService.fromPayload(post("just some words"), entry())
+        assertEquals("just some words", r.text)
+        assertEquals("text", r.mediaType)
+        assertFalse(r.hasMedia)
     }
 
     @Test fun dartRoundHalfAwayFromZero() {
@@ -41,25 +75,6 @@ class StatusServiceRowParityTest {
         assertEquals(0L, StatusService.dartRound(0.4))
         assertEquals(5L, StatusService.dartRound(5))
         assertEquals(4_294_967_297L, StatusService.dartRound(4_294_967_296.5))
-    }
-
-    @Test fun fromRowNegativeHalfMatchesDart() {
-        val r = StatusService.fromRow(mapOf("media_size" to -2.5, "duration_seconds" to -0.5))
-        assertEquals(-3L, r.mediaSize)
-        assertEquals(-1L, r.durationSeconds)
-    }
-
-    @Test fun fromRowMediaAndDeleted() {
-        val r = StatusService.fromRow(
-            mapOf(
-                "id" to "s1", "user_id" to "u1", "content" to "hi", "media_type" to "image",
-                "media_path" to "u1/a.jpg", "created_at" to "2026-10-27T01:00:00Z",
-                "expires_at" to "2026-10-28T01:00:00Z", "deleted_at" to "2026-10-27T02:00:00Z",
-            ),
-        )
-        assertTrue(r.hasMedia)
-        assertTrue(r.isDeleted)
-        assertEquals(24 * 3600L, r.expiresAt.epochSecond - r.createdAt.epochSecond)
     }
 
     @Test fun safeFileName() {

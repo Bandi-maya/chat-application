@@ -56,7 +56,7 @@ import androidx.compose.material.icons.rounded.Animation
  *  Chats home, conversation, register, forgot-password and organization
  *  registration destinations land in their own parity slices; the register /
  *  forgot-password / org buttons route to honest WIP stubs until then. */
-private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, SubscriptionPlan, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch, Notifications }
+private enum class AuthRoute { Splash, Welcome, Login, Register, ForgotPassword, RegisterOrganization, Home, ChatDetail, Security, LockedChats, HiddenVault, MessageManagement, LinkedDevices, Starred, NewChat, GlobalSearch, Notifications }
 
 private class AuthNavigationState {
     private var current by mutableStateOf(AuthRoute.Splash)
@@ -64,7 +64,7 @@ private class AuthNavigationState {
     operator fun getValue(owner: Any?, property: kotlin.reflect.KProperty<*>): AuthRoute = current
     operator fun setValue(owner: Any?, property: kotlin.reflect.KProperty<*>, next: AuthRoute) {
         if (next == current) return
-        if (next == AuthRoute.Welcome || (next == AuthRoute.Home && current in listOf(AuthRoute.Splash, AuthRoute.Login, AuthRoute.Register, AuthRoute.SubscriptionPlan))) {
+        if (next == AuthRoute.Welcome || (next == AuthRoute.Home && current in listOf(AuthRoute.Splash, AuthRoute.Login, AuthRoute.Register))) {
             history.clear()
         } else if (current != AuthRoute.Splash) {
             history.add(current)
@@ -139,9 +139,6 @@ fun AppRoot() {
         var registerOrigin by remember { mutableStateOf(AuthRoute.Welcome) }
         var orgOrigin by remember { mutableStateOf(AuthRoute.Login) }
         var selectedConversation by remember { mutableStateOf<com.example.chat.domain.models.Conversation?>(null) }
-        var planOrgId by remember { mutableStateOf("") }
-        var planOrgName by remember { mutableStateOf("") }
-        var planIsNew by remember { mutableStateOf(false) }
         var selectedInitialMessageId by remember { mutableStateOf<String?>(null) }
         var pendingSettingsDestination by androidx.compose.runtime.saveable.rememberSaveable {
             mutableStateOf<com.example.chat.ui.settings.SettingsDestination?>(null)
@@ -407,13 +404,14 @@ fun AppRoot() {
             com.example.chat.ui.auth.RegisterOrganizationScreen(
                 onBack = { route = orgOrigin },
                 onRegistered = { userId, regOrgId, regOrgName ->
-                    planOrgId = regOrgId; planOrgName = regOrgName; planIsNew = true
+                    // Subscription step hidden until an order backend exists:
+                    // a new workspace goes straight to Home.
                     ServiceLocator.appLock.onSignedIn()
                     promptPending = true
                     ServiceLocator.appScope.launch {
                         ServiceLocator.preferencesStorage.setStoredUserId(userId)
                     }
-                    route = AuthRoute.SubscriptionPlan
+                    route = AuthRoute.Home
                 },
                 registerOrganization = { tenantId, orgName, adminUser, adminEmail, adminPass, adminFull, allowReg ->
                     val (user, orgId, orgNameResolved) = ServiceLocator.apiBackend.registerOrganization(
@@ -492,20 +490,6 @@ fun AppRoot() {
                     if (route == AuthRoute.RegisterOrganization) PreAuthLayer(true, orgScreen)
                 }
             }
-            AuthRoute.SubscriptionPlan -> com.example.chat.ui.subscription.PlanSubscriptionScreen(
-                organizationId = planOrgId,
-                organizationName = planOrgName,
-                isNewRegistration = planIsNew,
-                onBack = { navigation.goBack() },
-                // Dart pushAndRemoveUntil(MainNavigationShell).
-                onSubscribed = { route = AuthRoute.Home },
-                loadPlans = { id -> ServiceLocator.apiBackend.getAvailablePlans(id) },
-                subscribe = { id, planId, months ->
-                    if (!ServiceLocator.apiBackend.subscribeToPlan(id, planId, months)) {
-                        throw Exception("Subscription failed")
-                    }
-                },
-            )
             AuthRoute.Home -> homeStateHolder.SaveableStateProvider("home") { run {
                 // Observe ApiBackendService chat state (listener -> recompose).
                 var chatRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -943,11 +927,7 @@ fun AppRoot() {
                     onOpenStarredMessages = { route = AuthRoute.Starred },
                     // Dart chats_home banner: org uid ?: tenantId ?: config tenant; isNewRegistration=false.
                     onSelectPlan = {
-                        val org = ServiceLocator.apiBackend.currentOrganization
-                        planOrgId = org?.get("uid")?.toString() ?: org?.get("tenantId")?.toString() ?: ServiceLocator.apiBackend.config.tenantId
-                        planOrgName = org?.get("name")?.toString() ?: ServiceLocator.apiBackend.config.tenantId
-                        planIsNew = false
-                        route = AuthRoute.SubscriptionPlan
+                        // Plan flow hidden: no order backend yet.
                     },
                     onOpenProfile = { pushedProfile = true },
                     onOpenQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
@@ -974,11 +954,7 @@ fun AppRoot() {
                     onOpenStarredMessages = { route = AuthRoute.Starred },
                     // Dart chats_home banner: org uid ?: tenantId ?: config tenant; isNewRegistration=false.
                     onSelectPlan = {
-                        val org = ServiceLocator.apiBackend.currentOrganization
-                        planOrgId = org?.get("uid")?.toString() ?: org?.get("tenantId")?.toString() ?: ServiceLocator.apiBackend.config.tenantId
-                        planOrgName = org?.get("name")?.toString() ?: ServiceLocator.apiBackend.config.tenantId
-                        planIsNew = false
-                        route = AuthRoute.SubscriptionPlan
+                        // Plan flow hidden: no order backend yet.
                     },
                     onOpenProfile = { pushedProfile = true },
                     onOpenQr = { linkedDevicesOnly = false; route = AuthRoute.LinkedDevices },
@@ -1321,10 +1297,8 @@ fun AppRoot() {
                                     (org?.get("name")?.toString() ?: ServiceLocator.apiBackend.config.tenantId)
                             },
                             onBack = { pushedAccount = false },
-                            onOpenSubscription = { orgId, orgName ->
-                                planOrgId = orgId; planOrgName = orgName; planIsNew = false
-                                pushedAccount = false
-                                route = AuthRoute.SubscriptionPlan
+                            onOpenSubscription = { _, _ ->
+                                // Plan flow hidden: no order backend yet.
                             },
                             checkOrganization = { ws -> ServiceLocator.apiBackend.checkOrganization(ws) },
                             updateRegistrationSupport = { id, allow -> ServiceLocator.apiBackend.updateOrganizationRegistrationSupport(id, allow) },
