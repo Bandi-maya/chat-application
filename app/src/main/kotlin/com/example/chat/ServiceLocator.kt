@@ -123,7 +123,7 @@ object ServiceLocator {
         com.example.chat.data.api.ApiMediaStorageClient(
             baseUrl = { apiBackend.config.restApiBaseUrl.trimEnd('/').replace(Regex("/api/v[0-9]+$"), "") },
             tenantId = { apiBackend.config.tenantId },
-            token = { apiBackend.session.token },
+            token = { apiBackend.authSnapshot().token },
         )
     }
 

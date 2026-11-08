@@ -118,13 +118,13 @@ class ApiMlsRpcClient(
     /** GET /app-users?q= — the backend's profile search (replaces the
      *  Supabase search_profiles RPC under D1). Same row shape the repository
      *  hydrates with profileFromRow. */
-    private fun headers(): MutableMap<String, String> {
+    private suspend fun headers(): MutableMap<String, String> {
         val headers = mutableMapOf("Content-Type" to "application/json", "x-tenant-id" to tenantId())
         token()?.let { headers["Authorization"] = "Bearer $it" }
         return headers
     }
 
-    private fun executeWithFallback(method: String, path: String, body: String?): Pair<Int, String> {
+    private suspend fun executeWithFallback(method: String, path: String, body: String?): Pair<Int, String> {
         val base = baseUrl().trimEnd('/')
         var response = transport.execute(method, "$base/$path", headers(), body)
         if (response.first == 404) {
@@ -137,7 +137,7 @@ class ApiMlsRpcClient(
     }
 
     /** delete_conversation -> DELETE /chat/rooms/{id}. */
-    private fun deleteConversation(params: Map<String, Any?>): Any? {
+    private suspend fun deleteConversation(params: Map<String, Any?>): Any? {
         val id = ApiPathSegments.safe(params["p_conversation_id"]?.toString() ?: "")
             ?: throw IllegalArgumentException("Invalid conversation identifier.")
         executeWithFallback("DELETE", "chat/rooms/$id", null)
@@ -145,7 +145,7 @@ class ApiMlsRpcClient(
     }
 
     /** mark_conversation_read -> POST /chat/rooms/{id}/read. */
-    private fun markConversationRead(params: Map<String, Any?>): Any? {
+    private suspend fun markConversationRead(params: Map<String, Any?>): Any? {
         val id = ApiPathSegments.safe(params["p_conversation_id"]?.toString() ?: "")
             ?: throw IllegalArgumentException("Invalid conversation identifier.")
         executeWithFallback("POST", "chat/rooms/$id/read", "{}")
@@ -155,7 +155,7 @@ class ApiMlsRpcClient(
     /** get_conversation_members -> GET /chat/rooms/{id}/members; rows are
      *  shaped for ConversationsRepository.profileFromRow (id/display_name/
      *  username). */
-    private fun conversationMembers(params: Map<String, Any?>): Any? {
+    private suspend fun conversationMembers(params: Map<String, Any?>): Any? {
         val id = ApiPathSegments.safe(params["p_conversation_id"]?.toString() ?: "")
             ?: throw IllegalArgumentException("Invalid conversation identifier.")
         val response = executeWithFallback("GET", "chat/rooms/$id/members", null)

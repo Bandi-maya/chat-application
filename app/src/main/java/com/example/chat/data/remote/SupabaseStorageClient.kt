@@ -31,7 +31,7 @@ class SupabaseStorageClient(
         path: String,
         bytes: ByteArray,
         contentType: String,
-        onProgress: ((transferred: Long, total: Long) -> Unit)? = null,
+        onProgress: ((transferred: Long, total: Long) -> Unit)?,
     ): Unit = withContext(Dispatchers.IO) {
         com.example.chat.data.demo.DemoMode.requireRealBackend()
         val bearer = accessToken()
