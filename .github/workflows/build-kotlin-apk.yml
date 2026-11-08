@@ -453,7 +453,7 @@ jobs:
   # duration. Same Rust cache as the build job, so its native build is warm.
   runtime-smoke:
     needs: [build, gate]
-    if: false # EMULATOR TIER DISABLED 2026-11-03 (user directive): no emulator runs; delete this line to re-enable
+    if: github.event_name == 'workflow_dispatch' # emulator tier: manual dispatch only (Bandi 2026-11-08); pushes stay emulator-free per the 2026-11-03 directive
     runs-on: ubuntu-latest
     # Job bound grounded in run-133 measured runner phases: core-ui 39.5min,
     # calls-camera 18.1, all other shards <=8.7. 60 for core-ui leaves 12min of
