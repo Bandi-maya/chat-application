@@ -430,13 +430,17 @@ class ApiBackendService(
         override fun onMessagesRead(roomId: String, messageIds: List<String>, readerId: String) {
             val myId = session.currentUser?.id
             if (readerId.isNotEmpty() && readerId == myId) return
+            // Live backend sends no message_ids when a reader marks the whole
+            // room read ({room_id, user_id, read_at}); the client delivers an
+            // empty list for that form, meaning "all of my messages here".
+            val markAll = messageIds.isEmpty() && readerId.isNotEmpty()
             val ids = messageIds.toSet()
             var changed = false
             synchronized(chatLock) {
                 val list = _messages[roomId] ?: return@synchronized
                 for (i in list.indices) {
                     val m = list[i]
-                    if (m.id in ids && m.senderId == myId && m.deliveryState != DeliveryState.read) {
+                    if ((markAll || m.id in ids) && m.senderId == myId && m.deliveryState != DeliveryState.read) {
                         list[i] = m.copy(deliveryState = DeliveryState.read)
                         changed = true
                     }

@@ -327,7 +327,9 @@ class ApiChatClient(
         if (token() == null) throw Exception("Not authenticated")
         val response = transport.execute(
             "POST", "${base()}/chat/rooms/direct", authHeaders(json = true),
-            JSONObject().put("target_user_id", targetUserId).toString(),
+            // Live backend (Logy-Byte/chat-backend) accepts recipient_id
+            // (or other_user_id / user_id); target_user_id is rejected with 400.
+            JSONObject().put("recipient_id", targetUserId).toString(),
         )
         return when (response.first) {
             200 -> {
@@ -349,7 +351,9 @@ class ApiChatClient(
         if (token() == null) throw Exception("Not authenticated")
         val body = JSONObject()
             .put("name", name.trim())
-            .put("member_user_ids", JSONArray(memberUserIds))
+            // Live backend accepts member_ids (or participant_ids);
+            // member_user_ids is silently ignored and the group is created empty.
+            .put("member_ids", JSONArray(memberUserIds))
         val response = try {
             val r = transport.execute("POST", "${base()}/chat/rooms/group", authHeaders(json = true), body.toString())
             if (r.first == 404) {
@@ -402,7 +406,9 @@ class ApiChatClient(
      *  error or 404 falls back to /app-users (then /api/v1/app-users). */
     fun listUsers(query: String?): List<UserProfile>? {
         if (token() == null) return null
-        val qParam = if (!query.isNullOrBlank()) "?search=${java.net.URLEncoder.encode(query.trim(), "UTF-8")}" else ""
+        // Live backend filters /app-users with the q parameter; search= is
+        // ignored there and would return the whole directory unfiltered.
+        val qParam = if (!query.isNullOrBlank()) "?q=${java.net.URLEncoder.encode(query.trim(), "UTF-8")}" else ""
         var response: Pair<Int, String>
         try {
             response = getWithFallback("chat/users$qParam")

@@ -9,6 +9,12 @@ class ApiAccountDeletionClientTest {
             try { api.delete(scope(), { true }, "me"); fail("$status must not complete") } catch (_: IllegalStateException) {}
         }
     }
+    @Test fun successEnvelopeIsExplicitCompletion() {
+        // Live backend: 200 {"success": true, "data": null, "message": "User deleted successfully."}
+        ApiAccountDeletionClient(ApiHttpTransport { _, _, _, _ ->
+            200 to "{\"success\":true,\"data\":null,\"message\":\"User deleted successfully.\"}"
+        }).delete(scope(), { true }, "me")
+    }
     @Test fun noContentIsExplicitCompletion() {
         ApiAccountDeletionClient(ApiHttpTransport { method, _, _, body -> assertEquals("DELETE", method); assertNull(body); 204 to "" }).delete(scope(), { true }, "me")
     }

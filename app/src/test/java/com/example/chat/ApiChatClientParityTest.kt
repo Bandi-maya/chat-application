@@ -147,7 +147,7 @@ class ApiChatClientParityTest {
     @Test
     fun listUsersSearchQueryEncoded() {
         val t = FakeTransport { call ->
-            assertTrue(call.url.contains("?search=alice+rao"))
+            assertTrue(call.url.contains("?q=alice+rao"))
             200 to """{"data":[]}"""
         }
         client(t).listUsers("alice rao")

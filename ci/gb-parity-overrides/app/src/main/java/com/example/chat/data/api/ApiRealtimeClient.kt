@@ -417,7 +417,9 @@ class ApiRealtimeClient(
                 "config_changed" -> {
                     listener?.onConfigChanged()
                 }
-                "message_edited" -> {
+                // Live backend emits message_updated for edits (message_edited
+                // was the Dart-era name); accept both.
+                "message_edited", "message_updated" -> {
                     val raw = dataOrMessage(payload) ?: return
                     val mapped = ApiChatClient.deepMap(raw)
                     if (mapped["encrypted_payload"] != null || mapped["encrypted"] == true) {
@@ -444,9 +446,17 @@ class ApiRealtimeClient(
                 "messages_read" -> {
                     val raw = dataOrMessage(payload) ?: return
                     val roomId = str(raw, "room_id") ?: return
-                    val ids = raw.optJSONArray("message_ids") ?: return
-                    val list = (0 until ids.length()).mapNotNull { i -> ids.optString(i, "").ifEmpty { null } }
-                    listener?.onMessagesRead(roomId, list, str(raw, "reader_id") ?: "")
+                    // Live backend sends {room_id, user_id, read_at} with no
+                    // message_ids array (it means: everything read up to
+                    // read_at). Deliver with an empty list so the service can
+                    // mark all of my messages in the room read, instead of
+                    // dropping the event entirely.
+                    val ids = raw.optJSONArray("message_ids")
+                    val list = ids?.let { arr ->
+                        (0 until arr.length()).mapNotNull { i -> arr.optString(i, "").ifEmpty { null } }
+                    } ?: emptyList()
+                    val reader = str(raw, "reader_id") ?: str(raw, "user_id") ?: ""
+                    listener?.onMessagesRead(roomId, list, reader)
                 }
                 "messages_delivered" -> {
                     val raw = dataOrMessage(payload) ?: return

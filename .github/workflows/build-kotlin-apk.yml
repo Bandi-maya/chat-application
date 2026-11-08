@@ -45,7 +45,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate custom WebRTC backend route syntax
         run: node --check backend/routes/chaty-webrtc-ice.js
-          PYOVERLAY
       - name: Patch pinned candidate sources for com.logybyte.chaty
         run: |
           python3 - <<'PYLOGYPATCH'
@@ -468,7 +467,6 @@ jobs:
       CHATY_TEST_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v4
-          PYOVERLAY
       - name: Patch pinned candidate sources for com.logybyte.chaty
         run: |
           python3 - <<'PYLOGYPATCH'

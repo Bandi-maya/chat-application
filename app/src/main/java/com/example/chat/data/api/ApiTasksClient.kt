@@ -65,8 +65,9 @@ class ApiTasksClient(
             .put("title", title)
             .put("description", description)
             .put("priority", priority)
-            .put("due_date", dueAtIso)
-            .put("assigned_to_ids", JSONArray(assigneeIds))
+            // Live backend has no due_date field and a single assigned_to_id;
+            // due_date/assigned_to_ids are silently ignored (assignee lost).
+            .put("assigned_to_id", assigneeIds.firstOrNull())
             .toString()
         val response = transport.execute("POST", "${base()}/tasks", authHeaders(json = true), payload)
         if (response.first == 200) {
@@ -116,8 +117,8 @@ class ApiTasksClient(
                 .put("title", title)
                 .put("description", description)
                 .put("priority", priority)
-                .put("due_date", dueAtIso)
-                .put("assigned_to_ids", JSONArray(assigneeIds))
+                // Live backend has no due_date field and a single assigned_to_id.
+                .put("assigned_to_id", assigneeIds.firstOrNull())
                 .toString()
             val response = transport.execute(
                 "PUT", "${base()}/tasks/$taskPath", authHeaders(json = true), payload,
