@@ -26,8 +26,8 @@ object ReleaseFeatures {
      *  and becomes cross-device only when the deployed backend exposes toggle_message_reaction. */
     const val MESSAGE_REACTIONS = true
 
-    /** Call history list in the Calls tab. Calls work; history needs a call-log API. */
-    const val CALL_HISTORY = false
+    /** Call history list in the Calls tab, backed by the server call-history plane (research 5.4). */
+    const val CALL_HISTORY = true
 
     /** Blocking contacts. Needs a block-list API. */
     const val BLOCK_CONTACTS = true

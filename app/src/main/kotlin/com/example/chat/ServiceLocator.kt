@@ -859,6 +859,14 @@ object ServiceLocator {
         CallHistoryService(queryClient = queryClient, currentUserId = currentUserId)
     }
 
+    /** Call history plane (research 5.4): server-backed per-viewer log. */
+    val apiCallHistory: com.example.chat.data.services.ApiCallHistoryService by lazy {
+        com.example.chat.data.services.ApiCallHistoryService(
+            client = { apiBackend.callHistoryPlane() },
+            currentUserId = currentUserId,
+        )
+    }
+
     val gbFeatures: GbFeatureBackendService by lazy {
         GbFeatureBackendService(queryClient = queryClient, rpcClient = rpcClient, currentUserId = currentUserId)
     }

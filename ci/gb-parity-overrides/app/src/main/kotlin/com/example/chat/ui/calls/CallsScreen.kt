@@ -31,6 +31,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.paneTitle
@@ -64,7 +68,11 @@ fun CallsScreen(
     onRefresh: () -> Unit,
     onOpenAddCall: () -> Unit,
     onRedial: (remoteUserId: String, displayName: String, initials: String?, colorHex: String?, isVideo: Boolean) -> Unit,
+    // Call history plane (research 5.4): per-viewer delete + clear all.
+    onDeleteEntry: (CallRecord) -> Unit = {},
+    onClearAll: (() -> Unit)? = null,
 ) {
+    var showClearConfirm by remember { mutableStateOf(false) }
     val theme = LocalThemeConfig.current
     val titlePresentedByShell = LocalDestinationTitlePresentation.current ==
         com.example.chat.core.templates.ChatyNavigationDestinationIds.calls
@@ -110,6 +118,19 @@ fun CallsScreen(
                         letterSpacing = (-0.4).sp,
                         modifier = Modifier.weight(1f),
                     )
+                    if (onClearAll != null && records.isNotEmpty()) {
+                        androidx.compose.material3.TextButton(onClick = { showClearConfirm = true }) {
+                            Text("Clear", color = Color(theme.dangerColor), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            if (titlePresentedByShell && onClearAll != null && records.isNotEmpty()) item {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    Spacer(Modifier.weight(1f))
+                    androidx.compose.material3.TextButton(onClick = { showClearConfirm = true }) {
+                        Text("Clear call log", color = Color(theme.dangerColor), fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 
@@ -151,6 +172,14 @@ fun CallsScreen(
                 else -> items(records, key = { it.id }) { call ->
                     val remoteUserId = call.participantIds.firstOrNull { it.isNotEmpty() && it != currentUserId }
                         ?: call.callerId
+                    val swipeDelete = listOf(
+                        com.example.chat.ui.chats.home.HomeSwipeAction(
+                            icon = com.example.chat.ui.icons.ChatyIconId.delete,
+                            label = "Delete",
+                            color = Color(theme.dangerColor),
+                            onTriggered = { onDeleteEntry(call) },
+                        ),
+                    )
                     val contact = contactFor(remoteUserId)
                     val isMissed = call.direction == CallDirection.missed
                     val isVideo = call.type == CallType.video
@@ -164,6 +193,10 @@ fun CallsScreen(
                         append(if (call.durationSeconds > 0) "${call.durationSeconds}s" else "No connection")
                     }
 
+                    com.example.chat.ui.chats.home.HomeSwipeActions(
+                        actions = swipeDelete,
+                        backgroundColor = com.example.chat.ui.navigation.LocalReferenceContentSurface.current ?: Color(theme.backgroundColor),
+                    ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -218,9 +251,27 @@ fun CallsScreen(
                             )
                         }
                     }
+                    }
                 }
             }
         }
+    }
+    if (showClearConfirm) {
+        com.example.chat.ui.kit.ChatyConfirmationDialog(
+            shape = com.example.chat.ui.kit.ChatyModalShape,
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text("Clear call log?", color = Color(theme.primaryTextColor)) },
+            text = { Text("This removes the call history on this account only.", color = Color(theme.secondaryTextColor)) },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    showClearConfirm = false
+                    onClearAll?.invoke()
+                }) { Text("Clear", color = Color(theme.dangerColor), fontWeight = FontWeight.Bold) }
+            },
+        )
     }
 }
 

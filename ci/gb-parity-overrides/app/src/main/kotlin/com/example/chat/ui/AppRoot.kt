@@ -1043,10 +1043,11 @@ fun AppRoot() {
                     onOpenLinkedDevices = { linkedDevicesOnly = true; route = AuthRoute.LinkedDevices },
                                 )
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.calls -> {
-                                val history = ServiceLocator.callHistory
+                                // Call history plane (research 5.4): server-backed log.
+                                val history = ServiceLocator.apiCallHistory
                                 val callScope = androidx.compose.runtime.rememberCoroutineScope()
-                                // Call history needs a call-log API (next release); calls themselves work.
-                                androidx.compose.runtime.LaunchedEffect(Unit) { if (ReleaseFeatures.CALL_HISTORY) history.start() }
+                                var callRev by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                                androidx.compose.runtime.LaunchedEffect(Unit) { if (ReleaseFeatures.CALL_HISTORY) { history.start(); callRev++ } }
                                 if (showCallPicker) {
                                     androidx.compose.ui.window.Dialog(
                                         onDismissRequest = { showCallPicker = false },
@@ -1085,12 +1086,33 @@ fun AppRoot() {
                                         )
                                     }
                                 }
+                                @Suppress("UNUSED_EXPRESSION") callRev
                                 com.example.chat.ui.calls.CallsScreen(
                                     records = history.records,
                                     historyUnavailable = history.lastError != null,
                                     currentUserId = ServiceLocator.apiBackend.currentUser?.id ?: "",
                                     contactFor = { id -> ServiceLocator.apiBackend.users.firstOrNull { it.id == id } },
-                                    onRefresh = { callScope.launch { history.refresh() } },
+                                    onRefresh = { callScope.launch { history.refresh(); callRev++ } },
+                                    onDeleteEntry = { record ->
+                                        callScope.launch {
+                                            try {
+                                                history.deleteEntry(record)
+                                            } catch (_: Exception) {
+                                                android.widget.Toast.makeText(shellCtx, "Couldn't remove the call. Try again.", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                            callRev++
+                                        }
+                                    },
+                                    onClearAll = {
+                                        callScope.launch {
+                                            try {
+                                                history.clearAll()
+                                            } catch (_: Exception) {
+                                                android.widget.Toast.makeText(shellCtx, "Couldn't clear the call log. Try again.", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                            callRev++
+                                        }
+                                    },
                                     // Dart calls_screen FAB: push CallContactPickerScreen(dialpad).
                                     onOpenAddCall = { showCallPicker = true },
                                     onRedial = { remoteUserId, displayName, initials, colorHex, isVideo ->
