@@ -307,6 +307,9 @@ fun AppRoot() {
         // Own top/cutout safety once for every route. windowInsetsPadding consumes
         // these insets, so a child safeDrawing app bar does not add them twice.
         // Bottom/IME ownership stays with each route and the navigation shell.
+        // R1: measure the window once at the root; screens read
+        // LocalChatyWindowMetrics and re-measure on rotate/split/fold.
+        com.example.chat.ui.kit.ChatyWindowMetricsProvider {
         Box(Modifier.fillMaxSize().windowInsetsPadding(
             WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         )) {
@@ -573,6 +576,17 @@ fun AppRoot() {
                 }
             }
             AuthRoute.Home -> homeStateHolder.SaveableStateProvider("home") { run {
+                // R7 (responsive plan): at expanded width Home is list pane + open
+                // chat pane; a row tap keeps the app on Home and fills the pane.
+                val windowMetrics = com.example.chat.ui.kit.LocalChatyWindowMetrics.current
+                val expandedListDetail = com.example.chat.ui.kit.ChatyAdaptiveLogic.isListDetail(windowMetrics.widthDp)
+                // Shrinking below expanded while a pane chat is open hands the chat
+                // to the full-screen ChatDetail route so it is not silently lost.
+                androidx.compose.runtime.LaunchedEffect(expandedListDetail) {
+                    if (!expandedListDetail && selectedConversation != null) {
+                        route = AuthRoute.ChatDetail
+                    }
+                }
                 // Observe ApiBackendService chat state (listener -> recompose).
                 var chatRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
                 androidx.compose.runtime.DisposableEffect(Unit) {
@@ -997,7 +1011,23 @@ fun AppRoot() {
                     onOpenConversation = { conversation ->
                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
                         selectedConversation = conversation
-                        route = AuthRoute.ChatDetail
+                        if (!expandedListDetail) route = AuthRoute.ChatDetail
+                    },
+                    expandedListDetail = expandedListDetail,
+                    paneConversation = if (expandedListDetail) selectedConversation else null,
+                    chatPane = { paneConv ->
+                        ChatDetailHost(
+                            conversation = paneConv,
+                            initialMessageId = null,
+                            onBack = {
+                                ServiceLocator.apiBackend.setActiveConversation(null)
+                                selectedConversation = null
+                            },
+                            onOpenConversation = { next ->
+                                ServiceLocator.apiBackend.setActiveConversation(next.id)
+                                selectedConversation = next
+                            },
+                        )
                     },
                     onOpenSecurity = { route = AuthRoute.Security },
                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
@@ -1024,7 +1054,23 @@ fun AppRoot() {
                                     onOpenConversation = { conversation ->
                                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
                                         selectedConversation = conversation
-                                        route = AuthRoute.ChatDetail
+                                        if (!expandedListDetail) route = AuthRoute.ChatDetail
+                                    },
+                                    expandedListDetail = expandedListDetail,
+                                    paneConversation = if (expandedListDetail) selectedConversation else null,
+                                    chatPane = { paneConv ->
+                                        ChatDetailHost(
+                                            conversation = paneConv,
+                                            initialMessageId = null,
+                                            onBack = {
+                                                ServiceLocator.apiBackend.setActiveConversation(null)
+                                                selectedConversation = null
+                                            },
+                                            onOpenConversation = { next ->
+                                                ServiceLocator.apiBackend.setActiveConversation(next.id)
+                                                selectedConversation = next
+                                            },
+                                        )
                                     },
                                     onOpenSecurity = { route = AuthRoute.Security },
                                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
@@ -1763,6 +1809,7 @@ fun AppRoot() {
             }
         }
         } // Shared safe-area route container.
+        } // ChatyWindowMetricsProvider
         }
         // Resolved status/navigation bar colours are drawn under the bars (Compose owns the painting;
         // the window stays transparent). User-picked colours win; unset bars take the theme surface.

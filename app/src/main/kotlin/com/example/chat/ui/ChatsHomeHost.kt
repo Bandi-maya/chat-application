@@ -59,6 +59,11 @@ fun ChatsHomeHost(
     /** Opens a root destination (tasks/updates) as a pushed screen; used when the
      *  user hides them from the rail into the home header overflow menu. */
     onOpenDestination: (String) -> Unit = {},
+    /** R7 expanded list-detail: when true and [chatPane] is given, the open
+     *  conversation renders beside the list instead of pushing a route. */
+    expandedListDetail: Boolean = false,
+    paneConversation: Conversation? = null,
+    chatPane: (@Composable (Conversation) -> Unit)? = null,
 ) {
     val api = ServiceLocator.apiBackend
     val prefs = ServiceLocator.preferencesController
@@ -125,6 +130,9 @@ fun ChatsHomeHost(
         requiresSubscription = api.requiresSubscription,
         subscriptionMessage = api.subscriptionErrorMessage,
         onOpenConversation = onOpenConversation,
+        expandedListDetail = expandedListDetail,
+        paneConversation = paneConversation,
+        chatPane = chatPane,
         currentUserId = me?.id ?: "",
         // Presence/typing published by the custom backend socket.
         presenceFor = { conversationId, otherUserId ->

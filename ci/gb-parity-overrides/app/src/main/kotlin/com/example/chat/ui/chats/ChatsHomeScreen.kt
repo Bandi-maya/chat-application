@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import com.example.chat.core.preferences.HomePresetNormalizer
 import com.example.chat.ui.effects.listEntrance
 import com.example.chat.domain.models.Conversation
+import com.example.chat.ui.kit.ChatyAdaptiveLogic
 import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.HomePreferences
 import com.example.chat.domain.models.SecurityPreferences
@@ -127,6 +128,10 @@ fun ChatsHomeScreen(
     requiresSubscription: Boolean,
     subscriptionMessage: String?,
     onOpenConversation: (Conversation) -> Unit,
+    /** R7 expanded list-detail: the open conversation renders beside the list. */
+    expandedListDetail: Boolean = false,
+    paneConversation: Conversation? = null,
+    chatPane: (@Composable (Conversation) -> Unit)? = null,
     currentUserId: String = "",
     identity: HomeIdentity = HomeIdentity(),
     contacts: List<UserProfile> = emptyList(),
@@ -587,7 +592,7 @@ fun ChatsHomeScreen(
                 surfaceOverride = preferencesController?.universal?.listBackgroundColor?.let(::Color),
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             ) {
-            Column(Modifier.fillMaxSize()) {
+            val listColumnContent: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit = {
                 if (!isSelectionMode) {
                     if (searchEnabled && searchPlacement == "Header action" && isSearchOpen) {
                         HomeSearchField(
@@ -724,6 +729,41 @@ fun ChatsHomeScreen(
                         }
                     }
                 }
+            }
+            // R7 (responsive plan): at expanded width the chat list becomes a
+            // fixed 360-400dp pane with the open chat beside it (WhatsApp
+            // tablet behavior); otherwise the single column is unchanged.
+            if (chatPane != null && expandedListDetail) {
+                val paneWidthDp = ChatyAdaptiveLogic.homePaneWidth(
+                    com.example.chat.ui.kit.LocalChatyWindowMetrics.current.widthDp,
+                )
+                Row(Modifier.fillMaxSize()) {
+                    Box(Modifier.width(paneWidthDp.dp).fillMaxHeight()) {
+                        Column(Modifier.fillMaxSize(), content = listColumnContent)
+                    }
+                    Spacer(
+                        Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(Color(theme.surfaceColor)),
+                    )
+                    Box(Modifier.weight(1f)) {
+                        val paneConv = paneConversation
+                        if (paneConv != null) {
+                            chatPane(paneConv)
+                        } else {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    "Select a chat",
+                                    color = Color(theme.secondaryTextColor),
+                                    fontSize = 15.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxSize(), content = listColumnContent)
             }
             }
         }
