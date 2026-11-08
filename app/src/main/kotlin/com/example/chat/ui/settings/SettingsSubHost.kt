@@ -13,7 +13,9 @@ import com.example.chat.ui.settings.notifications.NotificationToastSettingsScree
 import com.example.chat.ui.settings.privacy.PrivacyCenterScreen
 import com.example.chat.ui.settings.conversation.*
 import com.example.chat.ui.settings.home.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.chat.ui.settings.universal.*
 
 private enum class ConvSub { ActionBar, Bubbles, Entry, More }
@@ -46,7 +48,17 @@ fun SettingsSubHost(
     val themeConfig = com.example.chat.ui.theme.LocalThemeConfig.current
     val toast: (String) -> Unit = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     when (destination) {
-        SettingsDestination.Privacy -> PrivacyCenterScreen(preferences = prefs, onBack = onBack)
+        SettingsDestination.Privacy -> PrivacyCenterScreen(
+            preferences = prefs, onBack = onBack,
+            // Server privacy planes (research 5.2/5.3); fail-closed lambdas
+            // let the screen keep its legacy local look on pre-plane servers.
+            loadPresencePrivacy = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.presencePrivacy() } },
+            savePresencePrivacy = { ls, ol, ex -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.putPresencePrivacy(ls, ol, ex) } },
+            loadCallPolicy = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().callPolicy() } },
+            saveCallPolicy = { policy, ex -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().putCallPolicy(policy, ex) } },
+            loadBlocked = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().blocks() } },
+            unblockUser = { id -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().unblock(id) } },
+        )
         SettingsDestination.Effects -> NavigationEffectsScreen(preferences = prefs, onBack = onBack)
         // Dart settings_root_screen '/settings/notifications' => NotificationSettingsPage (the toast-only screen is not
         // instantiated anywhere in Dart). Dynamic Island native bridge has no Kotlin implementation: bridge = null.

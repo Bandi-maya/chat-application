@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.RemoveRedEye
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.rounded.AcUnit
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.EditNote
@@ -67,6 +68,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -134,6 +136,8 @@ fun WhoCanCallMeDialog(preferences: ChatyPreferencesController, onDismiss: () ->
 
 private sealed interface PrivacyModal {
     object WhoCanCall : PrivacyModal
+    object LastSeen : PrivacyModal
+    object Blocked : PrivacyModal
     class Custom(val title: String) : PrivacyModal
     object Recovery : PrivacyModal
     object Reset : PrivacyModal
@@ -145,7 +149,19 @@ private sealed interface PrivacyModal {
  * as UI (the lock flow is in SecurityCenterScreen). UNCOMPILED (Compose).
  */
 @Composable
-fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> Unit) {
+fun PrivacyCenterScreen(
+    preferences: ChatyPreferencesController,
+    onBack: () -> Unit,
+    // Server privacy planes (research 5.2/5.3). Null = wire legacy local
+    // behaviour (pre-plane server); the server-backed rows then keep the
+    // old local-preference presentation.
+    loadPresencePrivacy: (suspend () -> com.example.chat.data.api.ApiPresenceClient.PresencePrivacy?)? = null,
+    savePresencePrivacy: (suspend (String?, String?, List<String>?) -> com.example.chat.data.api.ApiPresenceClient.PresencePrivacy?)? = null,
+    loadCallPolicy: (suspend () -> com.example.chat.data.api.ApiContactsClient.CallPolicy)? = null,
+    saveCallPolicy: (suspend (String, List<String>?) -> com.example.chat.data.api.ApiContactsClient.CallPolicy)? = null,
+    loadBlocked: (suspend () -> List<com.example.chat.data.api.ApiContactsClient.BlockedEntry>)? = null,
+    unblockUser: (suspend (String) -> Unit)? = null,
+) {
     val config = LocalThemeConfig.current
     val appColors = LocalAppColors.current
     val scope = rememberCoroutineScope()
@@ -158,6 +174,26 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
         onDispose { preferences.removeListener(l) }
     }
     var modal by remember { mutableStateOf<PrivacyModal?>(null) }
+
+    // Server privacy planes (research 5.2/5.3). null after load = plane
+    // unavailable; rows then fail closed to the legacy local behaviour.
+    var presencePrivacy by remember { mutableStateOf<com.example.chat.data.api.ApiPresenceClient.PresencePrivacy?>(null) }
+    var presenceLoaded by remember { mutableStateOf(false) }
+    var serverCallPolicy by remember { mutableStateOf<com.example.chat.data.api.ApiContactsClient.CallPolicy?>(null) }
+    var blockedUsers by remember { mutableStateOf<List<com.example.chat.data.api.ApiContactsClient.BlockedEntry>?>(null) }
+    var serverBusy by remember { mutableStateOf(false) }
+    LaunchedEffect(loadPresencePrivacy, loadCallPolicy, loadBlocked) {
+        if (loadPresencePrivacy != null) {
+            presencePrivacy = try { loadPresencePrivacy() } catch (_: Exception) { null }
+            presenceLoaded = true
+        }
+        if (loadCallPolicy != null) {
+            serverCallPolicy = try { loadCallPolicy() } catch (_: Exception) { null }
+        }
+        if (loadBlocked != null) {
+            blockedUsers = try { loadBlocked() } catch (_: Exception) { null }
+        }
+    }
 
     val accent = Color(config.accentColor)
     val bg = Color(config.backgroundColor)
@@ -287,7 +323,27 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
                     SwitchRow(Icons.Rounded.ForwardToInbox, "Disable Forwarded", "Allows you to resend messages without Forwarded tag", p.disableForwardedLabel) {
                         preferences.updatePrivacy(p.copy(disableForwardedLabel = it), logTitle = "Disable Forwarded")
                     }
-                    ChevronRow(Icons.Outlined.Call, "Who can call me?", p.whoCanCallMe) { modal = PrivacyModal.WhoCanCall }
+                    if (loadPresencePrivacy != null && presenceLoaded) {
+                        ChevronRow(
+                            Icons.Rounded.Visibility,
+                            "Last seen & online",
+                            presencePrivacy?.let { PrivacyOptionsLogic.audienceLabel(it.lastSeenPolicy) } ?: "Not available on this server",
+                        ) {
+                            if (presencePrivacy != null) modal = PrivacyModal.LastSeen else snack("Not available on this server")
+                        }
+                    }
+                    ChevronRow(
+                        Icons.Outlined.Call,
+                        "Who can call me?",
+                        serverCallPolicy?.let { PrivacyOptionsLogic.audienceLabel(it.policy) } ?: p.whoCanCallMe,
+                    ) { modal = PrivacyModal.WhoCanCall }
+                    if (loadBlocked != null && blockedUsers != null) {
+                        ChevronRow(
+                            Icons.Rounded.Block,
+                            "Blocked contacts",
+                            if (blockedUsers!!.isEmpty()) "None" else "${blockedUsers!!.size} blocked",
+                        ) { modal = PrivacyModal.Blocked }
+                    }
                     ChevronRow(Icons.Outlined.AdminPanelSettings, "Custom Privacy", "View all") { modal = PrivacyModal.Custom("Custom") }
 
                     SectionDivider("Specific Privacy")
@@ -358,7 +414,80 @@ fun PrivacyCenterScreen(preferences: ChatyPreferencesController, onBack: () -> U
     }
 
     when (val m = modal) {
-        PrivacyModal.WhoCanCall -> WhoCanCallMeDialog(preferences) { modal = null }
+        PrivacyModal.WhoCanCall -> if (loadCallPolicy != null && saveCallPolicy != null && serverCallPolicy != null) {
+            ServerWhoCanCallMeDialog(
+                current = serverCallPolicy!!,
+                busy = serverBusy,
+                onPick = { label ->
+                    val policy = PrivacyOptionsLogic.audiencePolicy(label) ?: return@ServerWhoCanCallMeDialog
+                    if (serverBusy) return@ServerWhoCanCallMeDialog
+                    serverBusy = true
+                    scope.launch {
+                        try {
+                            // exceptions omitted: the server keeps the existing list.
+                            serverCallPolicy = saveCallPolicy(policy, null)
+                            PrivacyOptionsLogic.audienceLabel(serverCallPolicy!!.policy)?.let { serverLabel ->
+                                preferences.updatePrivacy(preferences.privacy.copy(whoCanCallMe = serverLabel), logTitle = "Who can call me")
+                            }
+                            modal = null
+                        } catch (e: Exception) {
+                            snack(e.message ?: "Could not save the call policy")
+                        } finally {
+                            serverBusy = false
+                        }
+                    }
+                },
+                onDismiss = { modal = null },
+            )
+        } else {
+            WhoCanCallMeDialog(preferences) { modal = null }
+        }
+        PrivacyModal.LastSeen -> presencePrivacy?.let { pp ->
+            LastSeenOnlineDialog(
+                current = pp,
+                busy = serverBusy,
+                onSave = { lastSeenLabel, onlineLabel ->
+                    val lsPolicy = PrivacyOptionsLogic.audiencePolicy(lastSeenLabel) ?: return@LastSeenOnlineDialog
+                    val olPolicy = PrivacyOptionsLogic.onlinePolicy(onlineLabel) ?: return@LastSeenOnlineDialog
+                    if (serverBusy || savePresencePrivacy == null) return@LastSeenOnlineDialog
+                    serverBusy = true
+                    scope.launch {
+                        try {
+                            // exceptions omitted: the server keeps the existing list.
+                            presencePrivacy = savePresencePrivacy(lsPolicy, olPolicy, null)
+                            modal = null
+                        } catch (e: Exception) {
+                            snack(e.message ?: "Could not save presence privacy")
+                        } finally {
+                            serverBusy = false
+                        }
+                    }
+                },
+                onDismiss = { modal = null },
+            )
+        }
+        PrivacyModal.Blocked -> blockedUsers?.let { list ->
+            BlockedContactsDialog(
+                blocked = list,
+                busy = serverBusy,
+                onUnblock = { entry ->
+                    if (serverBusy || unblockUser == null) return@BlockedContactsDialog
+                    serverBusy = true
+                    scope.launch {
+                        try {
+                            unblockUser(entry.userId)
+                            blockedUsers = blockedUsers!!.filterNot { it.userId == entry.userId }
+                            snack("${entry.displayName} unblocked")
+                        } catch (e: Exception) {
+                            snack(e.message ?: "Could not unblock")
+                        } finally {
+                            serverBusy = false
+                        }
+                    }
+                },
+                onDismiss = { modal = null },
+            )
+        }
         is PrivacyModal.Custom -> CustomPrivacyDialog(preferences, m.title) { modal = null }
         PrivacyModal.Recovery -> RecoveryQuestionDialog(
             onCancel = { modal = null },
@@ -432,5 +561,155 @@ private fun RecoveryQuestionDialog(onCancel: () -> Unit, onSave: () -> Unit) {
         },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
         confirmButton = { Button(onClick = onSave) { Text("Save") } },
+    )
+}
+
+/** Server-backed Who Can Call Me (research 5.3): same four WhatsApp options
+ *  as the legacy dialog, saved to the contacts plane so calls are actually
+ *  enforced server-side. Choosing "My Contacts Except…" keeps the existing
+ *  exception list (exception editing comes with the contacts UI). */
+@Composable
+private fun ServerWhoCanCallMeDialog(
+    current: com.example.chat.data.api.ApiContactsClient.CallPolicy,
+    busy: Boolean,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+    val selected = PrivacyOptionsLogic.audienceLabel(current.policy)
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
+        onDismissRequest = onDismiss,
+        title = { Text("Who can call me?") },
+        text = {
+            Column {
+                PrivacyOptionsLogic.audienceLabels.forEach { opt ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable(enabled = !busy) { onPick(opt) }.padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = opt == selected,
+                            onClick = { if (!busy) onPick(opt) },
+                            colors = RadioButtonDefaults.colors(selectedColor = colors.primary),
+                        )
+                        Text(opt, Modifier.padding(start = 8.dp))
+                    }
+                }
+                if (selected == "My Contacts Except…") {
+                    Text(
+                        "Your existing exceptions stay in place.",
+                        Modifier.padding(start = 16.dp, top = 6.dp),
+                        color = colors.secondaryText,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+/** Server-backed Last seen & online (research 5.2): WhatsApp's exact shape -
+ *  four audiences for last seen, two for online. */
+@Composable
+private fun LastSeenOnlineDialog(
+    current: com.example.chat.data.api.ApiPresenceClient.PresencePrivacy,
+    busy: Boolean,
+    onSave: (String, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+    var lastSeen by remember { mutableStateOf(PrivacyOptionsLogic.audienceLabel(current.lastSeenPolicy) ?: "My Contacts") }
+    var online by remember { mutableStateOf(PrivacyOptionsLogic.onlineLabel(current.onlinePolicy) ?: "Same as last seen") }
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
+        onDismissRequest = onDismiss,
+        title = { Text("Last seen & online") },
+        text = {
+            Column {
+                Text("Who can see my last seen", color = colors.secondaryText, fontSize = 12.sp, fontWeight = FontWeight.W600)
+                PrivacyOptionsLogic.audienceLabels.forEach { opt ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable(enabled = !busy) { lastSeen = opt }.padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = opt == lastSeen,
+                            onClick = { if (!busy) lastSeen = opt },
+                            colors = RadioButtonDefaults.colors(selectedColor = colors.primary),
+                        )
+                        Text(opt, Modifier.padding(start = 8.dp))
+                    }
+                }
+                if (lastSeen == "My Contacts Except…") {
+                    Text(
+                        "Your existing exceptions stay in place.",
+                        Modifier.padding(start = 16.dp, top = 2.dp),
+                        color = colors.secondaryText,
+                        fontSize = 12.sp,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Text("Who can see when I'm online", color = colors.secondaryText, fontSize = 12.sp, fontWeight = FontWeight.W600)
+                PrivacyOptionsLogic.onlineLabels.forEach { opt ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable(enabled = !busy) { online = opt }.padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = opt == online,
+                            onClick = { if (!busy) online = opt },
+                            colors = RadioButtonDefaults.colors(selectedColor = colors.primary),
+                        )
+                        Text(opt, Modifier.padding(start = 8.dp))
+                    }
+                }
+                if (lastSeen == "Nobody") {
+                    Text(
+                        "You won't see other people's last seen either.",
+                        Modifier.padding(start = 16.dp, top = 6.dp),
+                        color = colors.secondaryText,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = { if (!busy) onSave(lastSeen, online) }) { Text("Save") } },
+    )
+}
+
+/** Server-backed blocked list (research 5.3): silent unblock, no leaks. */
+@Composable
+private fun BlockedContactsDialog(
+    blocked: List<com.example.chat.data.api.ApiContactsClient.BlockedEntry>,
+    busy: Boolean,
+    onUnblock: (com.example.chat.data.api.ApiContactsClient.BlockedEntry) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = LocalAppColors.current
+    AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
+        onDismissRequest = onDismiss,
+        title = { Text("Blocked contacts") },
+        text = {
+            if (blocked.isEmpty()) {
+                Text("No blocked contacts.", color = colors.secondaryText)
+            } else {
+                Column {
+                    blocked.forEach { entry ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(entry.displayName, fontWeight = FontWeight.W600)
+                                Text("@${entry.username}", color = colors.secondaryText, fontSize = 12.sp)
+                            }
+                            TextButton(onClick = { if (!busy) onUnblock(entry) }) { Text("Unblock") }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
     )
 }

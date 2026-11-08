@@ -103,6 +103,10 @@ class ApiRealtimeClient(
         fun onInitialPresence(onlineUserIds: List<String>) {}
         /** user_presence: one user went online/offline (lastSeen is ISO-8601 or null when hidden). */
         fun onPresence(userId: String, isOnline: Boolean, lastSeen: String?) {}
+        /** presence.changed (presence plane): privacy-filtered view of one
+         *  user for THIS viewer - exactly one of online / lastSeenAt / approx
+         *  is meaningful; all null means the server shows nothing. */
+        fun onPresenceChanged(userId: String, online: Boolean, lastSeenAt: String?, approx: String?) {}
         /** typing: [userId] started/stopped typing in [roomId]. */
         fun onTyping(roomId: String, userId: String, isTyping: Boolean) {}
         /** messages_delivered: my messages in [roomId] created at or before [deliveredUpTo]
@@ -473,6 +477,16 @@ class ApiRealtimeClient(
                     val raw = dataOrMessage(payload) ?: return
                     val userId = str(raw, "user_id") ?: return
                     listener?.onPresence(userId, raw.optBoolean("is_online", false), str(raw, "last_seen"))
+                }
+                "presence.changed" -> {
+                    val raw = dataOrMessage(payload) ?: return
+                    val userId = str(raw, "user_id") ?: return
+                    listener?.onPresenceChanged(
+                        userId,
+                        raw.optBoolean("online", false),
+                        str(raw, "last_seen_at"),
+                        str(raw, "approx"),
+                    )
                 }
                 "typing" -> {
                     val raw = dataOrMessage(payload) ?: return

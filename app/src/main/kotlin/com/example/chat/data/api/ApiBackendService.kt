@@ -11,7 +11,6 @@ import com.example.chat.domain.models.Conversation
 import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.MessageType
-import com.example.chat.domain.models.PresenceState
 import com.example.chat.domain.models.UserProfile
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +46,28 @@ class ApiBackendService(
     )
 
     private val session = ApiAuthSession(sessionStore, authScopeLock, ::notifyAuthScopeTransition)
+
+    // Contacts / presence / call-history planes (research 5.2-5.4). All
+    // fail-closed: a pre-plane server throws PlaneUnavailable and the UI
+    // shows nothing rather than guessing.
+    private val contactsClient = ApiContactsClient(
+        baseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        transport = OkHttpApiTransport(),
+        token = { session.token },
+    )
+    private val presenceClient = ApiPresenceClient(
+        baseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        transport = OkHttpApiTransport(),
+        token = { session.token },
+    )
+    private val callHistoryClient = ApiCallHistoryClient(
+        baseUrl = { config.restApiBaseUrl },
+        tenantId = { config.tenantId },
+        transport = OkHttpApiTransport(),
+        token = { session.token },
+    )
 
     /** Phase 5: server-controlled configuration, revalidated with ETag on
      *  login and app start (never polled). Failures keep the last cache. */
@@ -463,6 +484,16 @@ class ApiBackendService(
             notifyChatListeners()
         }
 
+        override fun onPresenceChanged(userId: String, online: Boolean, lastSeenAt: String?, approx: String?) {
+            // Server already privacy-filtered this view for us; store exactly
+            // what it said and drop everything else (fail-closed).
+            if (online) onlineIds.add(userId) else onlineIds.remove(userId)
+            val seen = parseIsoOrNull(lastSeenAt)
+            if (seen != null) lastSeenById[userId] = seen else lastSeenById.remove(userId)
+            if (approx != null) approxPresenceById[userId] = approx else approxPresenceById.remove(userId)
+            notifyChatListeners()
+        }
+
         override fun onMessagesDelivered(roomId: String, deliveredUpTo: String) {
             val upTo = parseIsoOrNull(deliveredUpTo) ?: return
             val myId = session.currentUser?.id ?: return
@@ -492,6 +523,7 @@ class ApiBackendService(
 
     private val onlineIds: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     private val lastSeenById = java.util.concurrent.ConcurrentHashMap<String, Instant>()
+    private val approxPresenceById = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val typingUntil = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     /** Online per the backend (respects the other user's "who can see me online" setting). */
@@ -499,6 +531,29 @@ class ApiBackendService(
 
     /** Last-seen time the backend published, or null when unknown/hidden. */
     fun lastSeenOf(userId: String): Instant? = lastSeenById[userId]
+
+    /** Telegram-style approximation bucket when the server hides exact
+     *  presence (recently | within_week | within_month | long_ago). */
+    fun approxPresenceOf(userId: String): String? = approxPresenceById[userId]
+
+    /** One-shot privacy-filtered presence for the chat header (research 5.2:
+     *  header shows online / last seen / bucket; nothing when the server
+     *  says nothing). */
+    suspend fun fetchPresence(userId: String): ApiPresenceClient.PresenceView =
+        withContext(Dispatchers.IO) { presenceClient.presence(userId) }
+
+    fun presencePrivacy(): ApiPresenceClient.PresencePrivacy? = presenceClient.privacy()
+
+    fun putPresencePrivacy(lastSeenPolicy: String, onlinePolicy: String, exceptions: List<String>?): ApiPresenceClient.PresencePrivacy? =
+        presenceClient.putPrivacy(lastSeenPolicy, onlinePolicy, exceptions)
+
+    // --- Contacts plane (research 5.3) ------------------------------------
+
+    fun contactsPlane(): ApiContactsClient = contactsClient
+
+    // --- Call history plane (research 5.4) ---------------------------------
+
+    fun callHistoryPlane(): ApiCallHistoryClient = callHistoryClient
 
     /** True while [userId] is typing in [roomId] (expires after a few seconds without updates). */
     fun isTyping(roomId: String, userId: String): Boolean {
@@ -981,10 +1036,9 @@ class ApiBackendService(
         val fetched = withContext(Dispatchers.IO) { chat.listUsers(query) } ?: return
         // Seed "last seen" from the directory (last_seen) for offline users. Online state itself
         // comes from the WebSocket (initial_presence / user_presence), which is always fresher.
-        for (u in fetched) {
-            if (u.id.isEmpty() || u.id == session.currentUser?.id) continue
-            if (u.presence == PresenceState.offline) lastSeenById.putIfAbsent(u.id, u.lastSeenAt)
-        }
+        // The directory's legacy last_seen is unfiltered (pre-plane leak),
+        // so it is NOT used to seed presence: the privacy-filtered presence
+        // plane (GET /presence/{id} + presence.changed) is the only source.
         synchronized(chatLock) {
             if (query.isNullOrBlank()) {
                 _users.clear()

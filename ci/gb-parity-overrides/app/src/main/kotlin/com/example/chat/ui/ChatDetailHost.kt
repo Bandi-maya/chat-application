@@ -56,7 +56,7 @@ import com.example.chat.ui.chats.ChatDetailScreen
 import com.example.chat.ui.chats.detail.ForwardSend
 import com.example.chat.ui.chats.detail.ForwardTargets
 import com.example.chat.ui.chats.home.HomeAvatar
-import com.example.chat.ui.chats.home.HomeFormatters
+import com.example.chat.data.api.ApiPresenceClient
 import com.example.chat.ui.chats.home.parseAvatarColorHex
 import com.example.chat.ui.theme.LocalThemeConfig
 import kotlinx.coroutines.delay
@@ -405,14 +405,34 @@ fun ChatDetailHost(
     // Supabase realtime plane (rt) is only consulted for the recording indicator.
     val activity = otherId?.let { rt.activityFor(conversation.id, it) }
     val otherTyping = otherId != null && api.isTyping(conversation.id, otherId)
-    val presenceOnline = isDirect && otherId != null && api.isUserOnline(otherId)
+
+    // Presence plane (research 5.2): one-shot privacy-filtered fetch on open,
+    // then presence.changed keeps it live. Fail-closed: a pre-plane server
+    // (or a hidden user) shows no line at all.
+    var fetchedPresence by remember(conversation.id, otherId) { mutableStateOf<ApiPresenceClient.PresenceView?>(null) }
+    LaunchedEffect(conversation.id, otherId) {
+        if (isDirect && otherId != null) {
+            fetchedPresence = try {
+                api.fetchPresence(otherId)
+            } catch (_: Exception) {
+                ApiPresenceClient.PresenceView.Unavailable
+            }
+        }
+    }
+    val presenceOnline = isDirect && otherId != null &&
+        (api.isUserOnline(otherId) || fetchedPresence is ApiPresenceClient.PresenceView.Online)
     val presenceText: String? = if (isDirect) {
+        val fetchedLastSeen = (fetchedPresence as? ApiPresenceClient.PresenceView.LastSeen)?.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+        val fetchedApprox = (fetchedPresence as? ApiPresenceClient.PresenceView.Approx)?.bucket
         when {
             activity?.isRecording == true -> "recording voice message…"
             otherTyping -> "typing…"
             otherId == null -> null
-            presenceOnline -> "online"
-            else -> HomeFormatters.formatLastSeen(api.lastSeenOf(otherId)).ifEmpty { null }
+            else -> com.example.chat.ui.chats.PresenceLineLogic.headerText(
+                presenceOnline,
+                api.lastSeenOf(otherId) ?: fetchedLastSeen,
+                api.approxPresenceOf(otherId) ?: fetchedApprox,
+            )
         }
     } else {
         if (api.anyoneTyping(conversation.id)) "someone is typing…" else "${live.participantIds.size} participants"
