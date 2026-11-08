@@ -297,6 +297,30 @@ class ApiChatClient(
         }
     }
 
+    /** GET /chat/settings (+ /api/v1 fallback): the generic client-preferences
+     *  blob (extras) plus its updated_at, for the preferences controller's
+     *  last-writer-wins sync. Null on transport failure; a null extras map
+     *  means the row exists but no blob was ever pushed. */
+    fun getChatSettingsExtras(): Pair<Map<String, Any?>?, String?>? {
+        if (token() == null) return null
+        return try {
+            var response = transport.execute("GET", "${base()}/chat/settings", authHeaders(), null)
+            if (response.first == 404) {
+                response = transport.execute("GET", "${base()}/api/v1/chat/settings", authHeaders(), null)
+            }
+            if (response.first != 200) return null
+            val data = JSONObject(response.second).optJSONObject("data") ?: return null
+            val extras = data.optJSONObject("extras")
+            @Suppress("UNCHECKED_CAST")
+            val map = extras?.let { deep(it) as Map<String, Any?> }
+            val updatedAt = if (data.isNull("updated_at")) null
+                else data.optString("updated_at").ifEmpty { null }
+            Pair(map, updatedAt)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** PATCH /chat/settings (+ /api/v1 fallback) with the privacy fields the
      *  server enforces (last seen / online audience, read receipts, typing).
      *  Returns true when the server accepted the update. */

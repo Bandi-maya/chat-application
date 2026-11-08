@@ -8,12 +8,10 @@ import com.example.chat.core.preferences.RemoteSettingsRow
 import com.example.chat.core.preferences.RemoteSettingsStore
 import com.example.chat.data.auth.AuthSessionManager
 import com.example.chat.data.realtime.RealtimePreferences
-import com.example.chat.data.remote.PostgrestQueryClient
+import com.example.chat.data.api.ApiBackendService
 import com.example.chat.data.services.PresenceService
 import com.example.chat.domain.models.PrivacyPreferences
 import com.example.chat.domain.models.PrivacyPreferencesSnapshot
-import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter
 
 /** PreferencesBlobStore over the Android SharedPreferences-backed storage. */
 class AndroidPreferencesBlobStore(
@@ -33,35 +31,22 @@ class AndroidPreferencesBlobStore(
     }
 }
 
-/** user_feature_settings seam over PostgREST, mirroring the Dart controller's
- *  client.from('user_feature_settings') calls. */
-class SupabaseRemoteSettingsStore(
-    private val queryClient: PostgrestQueryClient,
+/** RemoteSettingsStore over the API backend's /chat/settings extras blob.
+ *  The typed privacy fields ride their own sync (ApiBackendService
+ *  .syncChatPrivacy); this carries everything else (theme, wallpaper, font
+ *  scale, feature flags) with last-writer-wins on updated_at. */
+class ApiRemoteSettingsStore(
+    private val apiBackend: ApiBackendService,
 ) : RemoteSettingsStore {
     override suspend fun fetch(userId: String): RemoteSettingsRow? {
-        val rows = queryClient.from("user_feature_settings")
-            .select("settings, updated_at")
-            .eq("user_id", userId)
-            .limit(1)
-            .execute()
-        val row = rows.firstOrNull() ?: return null
-        @Suppress("UNCHECKED_CAST")
-        return RemoteSettingsRow(
-            settings = row["settings"] as? Map<String, Any?>,
-            updatedAt = row["updated_at"]?.toString(),
-        )
+        val (settings, updatedAt) = apiBackend.remoteSettingsFetch() ?: return null
+        return RemoteSettingsRow(settings = settings, updatedAt = updatedAt)
     }
 
     override suspend fun push(userId: String, snapshot: Map<String, Any?>) {
-        queryClient.from("user_feature_settings").upsert(
-            mapOf(
-                "user_id" to userId,
-                "settings" to snapshot,
-                "updated_at" to OffsetDateTime.now(java.time.ZoneOffset.UTC)
-                    .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
-            ),
-            onConflict = "user_id",
-        )
+        if (!apiBackend.remoteSettingsPush(snapshot)) {
+            throw IllegalStateException("Remote settings push failed.")
+        }
     }
 }
 

@@ -6,7 +6,7 @@ import java.util.Base64
 /** Context-free port of the api branch's REST auth surface
  *  (lib/data/services/api_backend_service.dart auth subset +
  *  lib/data/services/username_login_service.dart). This is the service the
- *  api-branch auth screens actually call; the Supabase AuthRepository backs
+ *  api-branch auth screens actually call; the backend session plane backs
  *  the ChatyBackendService facade paths instead.
  *
  *  Endpoint layout (primary, with the Dart 404 fallbacks):
@@ -26,6 +26,8 @@ data class ApiUserProfile(
     val email: String = "",
     val phone: String = "",
     val avatarUrl: String? = null,
+    /** Server-side users.public_profile.banner_url (profile banner image). */
+    val bannerUrl: String? = null,
     /** Server-side users.email_verified; defaults true so profiles parsed from
      *  older backends (or stored sessions) never show a false banner. */
     val emailVerified: Boolean = true,
@@ -73,9 +75,14 @@ class ApiAuthClient(
         about: String? = null,
         username: String? = null,
         avatarUrl: String? = null,
+        phone: String? = null,
+        avatarColorHex: String? = null,
+        avatarInitials: String? = null,
+        bannerUrl: String? = null,
     ): Pair<Boolean, String> {
         val tok = token() ?: throw Exception("Not authenticated")
-        return putProfile(baseUrl(), tenantId(), tok, displayName, about, username, avatarUrl) { }
+        return putProfile(baseUrl(), tenantId(), tok, displayName, about, username, avatarUrl,
+            phone, avatarColorHex, avatarInitials, bannerUrl) { }
     }
 
     /** Account-bound form: route, tenant and token come ONLY from [expected] (captured once, never re-read on the
@@ -90,11 +97,16 @@ class ApiAuthClient(
         about: String? = null,
         username: String? = null,
         avatarUrl: String? = null,
+        phone: String? = null,
+        avatarColorHex: String? = null,
+        avatarInitials: String? = null,
+        bannerUrl: String? = null,
     ): Pair<Boolean, String> {
         val tok = expected.token?.takeIf { it.isNotBlank() && !expected.userId.isNullOrBlank() }
             ?: throw Exception("Not authenticated")
         if (expected.baseUrl.isBlank()) throw Exception("Not authenticated")
-        return putProfile(expected.baseUrl, expected.tenantId, tok, displayName, about, username, avatarUrl) {
+        return putProfile(expected.baseUrl, expected.tenantId, tok, displayName, about, username, avatarUrl,
+            phone, avatarColorHex, avatarInitials, bannerUrl) {
             if (!isCurrent()) throw ApiScopeChangedException()
         }
     }
@@ -102,6 +114,7 @@ class ApiAuthClient(
     private fun putProfile(
         base: String, tenant: String, authToken: String,
         displayName: String?, about: String?, username: String?, avatarUrl: String?,
+        phone: String?, avatarColorHex: String?, avatarInitials: String?, bannerUrl: String?,
         check: () -> Unit,
     ): Pair<Boolean, String> {
         val headers = mapOf(
@@ -118,6 +131,10 @@ class ApiAuthClient(
         if (about != null) newPayload.put("about", about.trim())
         if (avatarUrl != null) newPayload.put("avatar", avatarUrl.trim())
         if (username != null) newPayload.put("username", username.trim())
+        if (phone != null) newPayload.put("phone", phone.trim())
+        if (avatarColorHex != null) newPayload.put("avatar_color_hex", avatarColorHex.trim())
+        if (avatarInitials != null) newPayload.put("avatar_initials", avatarInitials.trim())
+        if (bannerUrl != null) newPayload.put("banner_url", bannerUrl.trim())
 
         val legacyPayload = JSONObject()
         if (displayName != null) legacyPayload.put("full_name", displayName.trim())
@@ -126,6 +143,9 @@ class ApiAuthClient(
         val publicProfile = JSONObject()
         if (about != null) publicProfile.put("about", about.trim())
         if (avatarUrl != null) publicProfile.put("avatarUrl", avatarUrl.trim())
+        if (avatarColorHex != null) publicProfile.put("avatar_color_hex", avatarColorHex.trim())
+        if (avatarInitials != null) publicProfile.put("avatar_initials", avatarInitials.trim())
+        if (bannerUrl != null) publicProfile.put("banner_url", bannerUrl.trim())
         legacyPayload.put("publicProfile", publicProfile)
 
         check()
@@ -568,12 +588,19 @@ class ApiAuthClient(
                 extractedName = if (username.isNotEmpty()) username else (payload.str("sub") ?: "User")
             }
 
-            val initials = if (extractedName.isNotEmpty())
+            val derivedInitials = if (extractedName.isNotEmpty())
                 extractedName.split(Regex("\\s+"))
                     .map { if (it.isNotEmpty()) it[0].toString() else "" }
                     .take(2).joinToString("").uppercase()
             else if (username.isNotEmpty()) username.substring(0, 1).uppercase()
             else "U"
+            // Server-side overrides (users.public_profile) win over derived.
+            val initials = firstString(userObj, "avatar_initials")?.trim()?.takeIf { it.isNotEmpty() }
+                ?: derivedInitials
+            val colorHex = firstString(userObj, "avatar_color_hex", "avatarColorHex")?.trim()
+                ?.takeIf { it.isNotEmpty() } ?: "0xFF6366F1"
+            val banner = firstString(userObj, "banner_url")
+                ?: userObj.optJSONObject("public_profile")?.optString("banner_url")?.takeIf { it.isNotEmpty() }
 
             val photo = firstString(userObj, "photo", "avatar_url", "avatarUrl")
                 ?: (userObj.optJSONObject("public_profile")?.optString("avatarUrl"))
@@ -598,10 +625,12 @@ class ApiAuthClient(
                 displayName = extractedName,
                 username = username,
                 avatarInitials = initials,
+                avatarColorHex = colorHex,
                 about = extractedAbout,
                 email = firstString(userObj, "email") ?: "",
                 phone = firstString(userObj, "mobile", "phone") ?: "",
                 avatarUrl = photo,
+                bannerUrl = banner,
                 emailVerified = userObj.optBoolean("email_verified", true),
             )
             val refresh = if (dataObj.has("refresh_token") && !dataObj.isNull("refresh_token")) dataObj.get("refresh_token").toString()

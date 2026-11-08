@@ -1,25 +1,26 @@
 package com.example.chat.data.messaging
 
 import com.example.chat.core.util.parseIsoToInstant
-import com.example.chat.data.remote.PostgrestQueryClient
+import com.example.chat.data.api.ApiTasksClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.TaskPriority
 import com.example.chat.domain.models.TaskStatus
 import java.time.Instant
-import java.util.UUID
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * Exact port of the backend_service.dart task paths (_loadTasks,
- * _taskFromRow, createTask non-demo, _updateTaskStatusAsync, updateTask,
- * deleteTask) plus the status/priority database mappings. Demo mode does not
- * exist on api. [onDataChanged] mirrors the surrounding _loadConversations /
+ * Task cache backed by the Chaty backend tasks plane (/tasks) via
+ * [ApiTasksClient]; the retired Supabase task RPCs are gone. The Tasks tab
+ * itself rides TasksController -> ApiTasksClient directly; this repository
+ * remains the hydration cache plus the status/priority mappings the parity
+ * tests pin. [notifyChanged] mirrors the surrounding _loadConversations /
  * _loadMessages refreshes the Dart side bundles with task mutations.
  */
 class TasksRepository(
-    private val rpc: SupabaseRpc,
-    private val queryClient: PostgrestQueryClient? = null,
+    private val tasksPlane: () -> ApiTasksClient,
     private val notifyChanged: () -> Unit = {},
     /** Dart createTask/updateTaskStatus/updateTask/deleteTask also refresh
      *  conversations (and messages where loaded); wiring supplies that. */
@@ -28,15 +29,13 @@ class TasksRepository(
 ) {
     val tasks = mutableListOf<ChatTask>()
 
-    /** Exact port of _loadTasks (get_my_tasks RPC + _taskFromRow). */
+    /** GET /tasks. A fetch failure keeps the previous cache (nothing
+     *  user-facing reads it mid-hydration; the Tasks tab owns its own
+     *  plane-backed state). */
     suspend fun loadTasks() {
-        val raw = rpc.rpc("get_my_tasks", emptyMap())
-        val rows = raw as? List<*> ?: emptyList<Any?>()
+        val fresh = withContext(Dispatchers.IO) { tasksPlane().listTasks() } ?: return
         tasks.clear()
-        for (item in rows) {
-            val row = item as? Map<String, Any?> ?: continue
-            tasks.add(taskFromRow(row))
-        }
+        tasks.addAll(fresh)
     }
 
     /** Exact port of createTask's non-demo path. */
@@ -50,22 +49,18 @@ class TasksRepository(
         labels: List<String> = emptyList(),
         sourceMessageId: String? = null,
     ): ChatTask {
-        val clientTaskId = UUID.randomUUID().toString()
-        val raw = rpc.rpc(
-            "create_chat_task",
-            mapOf(
-                "p_conversation_id" to sourceConversationId,
-                "p_client_task_id" to clientTaskId,
-                "p_title" to title.trim(),
-                "p_assignee_ids" to assigneeIds,
-                "p_priority" to taskPriorityToDatabase(priority),
-                "p_due_at" to dueAt.toString(),
-                "p_description" to description.trim(),
-                "p_labels" to labels,
-                "p_source_message_id" to sourceMessageId,
-            ),
-        )
-        val id = raw?.toString() ?: ""
+        // The backend task model has no conversation link / labels /
+        // multi-assignee yet (see ApiTasksClient); those stay local-only
+        // until the plane grows them.
+        val created = withContext(Dispatchers.IO) {
+            tasksPlane().createTask(
+                title = title.trim(),
+                description = description.trim(),
+                assigneeIds = assigneeIds,
+                priority = taskPriorityToDatabase(priority),
+                dueAtIso = dueAt.toString(),
+            )
+        }
         coroutineScope {
             val a = launch { loadTasks() }
             val b = launch { refreshConversations() }
@@ -73,7 +68,7 @@ class TasksRepository(
             a.join(); b.join(); c.join()
         }
         notifyChanged()
-        return tasks.first { it.id == id }
+        return tasks.firstOrNull { it.id == created.id } ?: created
     }
 
     /** Exact port of _updateTaskStatusAsync (optimistic, then RPC). */
@@ -83,13 +78,7 @@ class TasksRepository(
             tasks[index] = tasks[index].copy(status = status, updatedAt = Instant.now())
             notifyChanged()
         }
-        rpc.rpc(
-            "update_task_status",
-            mapOf(
-                "p_task_id" to taskId,
-                "p_status" to taskStatusToDatabase(status),
-            ),
-        )
+        withContext(Dispatchers.IO) { tasksPlane().updateTaskStatus(taskId, status) }
         loadTasks()
         notifyChanged()
     }
@@ -117,18 +106,16 @@ class TasksRepository(
             )
             notifyChanged()
         }
-        rpc.rpc(
-            "update_chat_task",
-            mapOf(
-                "p_task_id" to taskId,
-                "p_title" to title.trim(),
-                "p_description" to description.trim(),
-                "p_assignee_ids" to assigneeIds,
-                "p_priority" to taskPriorityToDatabase(priority),
-                "p_due_at" to dueAt.toString(),
-                "p_labels" to labels,
-            ),
-        )
+        withContext(Dispatchers.IO) {
+            tasksPlane().updateTask(
+                taskId = taskId,
+                title = title.trim(),
+                description = description.trim(),
+                assigneeIds = assigneeIds,
+                priority = taskPriorityToDatabase(priority),
+                dueAtIso = dueAt.toString(),
+            )
+        }
         loadTasks()
         notifyChanged()
     }
@@ -138,7 +125,7 @@ class TasksRepository(
         tasks.removeAll { it.id == taskId }
         notifyChanged()
         runCatching {
-            queryClient?.from("tasks")?.eq("id", taskId)?.delete()
+            withContext(Dispatchers.IO) { tasksPlane().deleteTask(taskId) }
         }
         loadTasks()
         notifyChanged()

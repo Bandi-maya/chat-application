@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
 import com.example.chat.ui.kit.ChatyAdaptiveLogic
 
 /** Port of lib/features/auth/forgot_password_screen.dart. The recovery call is
- *  injected; AppRoot wires AuthRepository.resetPassword (the ChatyBackendService
+ *  injected; AppRoot wires ApiBackendService.resetPasswordWithCode (the
  *  path — the ApiBackendService variant lands with the organization slice). */
 @Composable
 fun ForgotPasswordScreen(

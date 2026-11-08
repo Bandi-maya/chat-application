@@ -2,11 +2,9 @@ package com.example.chat
 
 import android.content.Context
 import com.example.chat.core.crypto.uniffi.UniffiMlsEngine
-import com.example.chat.data.auth.AuthRepository
 import com.example.chat.data.auth.AuthSessionManager
 import com.example.chat.data.auth.EncryptedGoTrueSessionStorage
 import com.example.chat.data.auth.SessionStore
-import com.example.chat.data.auth.SupabaseAuthClient
 import com.example.chat.data.e2ee.MlsE2eeService
 import com.example.chat.data.local.LocalSnapshotCacheService
 import com.example.chat.data.local.SecureKeyValueStoreImpl
@@ -19,11 +17,6 @@ import com.example.chat.data.realtime.RichChatRealtimeService
 import com.example.chat.data.realtime.EventNotificationIcon
 import com.example.chat.data.realtime.RealtimeBackend
 import com.example.chat.data.realtime.RealtimePreferences
-import com.example.chat.data.remote.PostgrestQueryClient
-import com.example.chat.data.remote.PostgrestRpcClient
-import com.example.chat.data.remote.SupabaseRealtimeChannel
-import com.example.chat.data.remote.SupabaseStorageClient
-import com.example.chat.data.services.CallHistoryService
 import com.example.chat.data.services.ChatyNotificationService
 import com.example.chat.data.services.ConnectionHealthService
 import com.example.chat.data.services.ContactRelationshipService
@@ -55,10 +48,28 @@ object ServiceLocator {
     @Volatile
     private var appContext: Context? = null
 
+    /** R5 in-app chat font size (approved responsive plan 8 Nov 2026):
+     *  Small 0.85 / Default 1.0 / Large 1.15, applied to chat message text
+     *  and timestamps only. Stored locally in chaty_prefs; instant. */
+    val chatFontScale = androidx.compose.runtime.mutableStateOf(1.0f)
+
+    fun loadChatFontScale() {
+        val v = requireContext().getSharedPreferences("chaty_prefs", Context.MODE_PRIVATE)
+            .getFloat("chat_font_scale", 1.0f)
+        chatFontScale.value = if (v in 0.8f..1.2f) v else 1.0f
+    }
+
+    fun setChatFontScale(scale: Float) {
+        chatFontScale.value = scale
+        requireContext().getSharedPreferences("chaty_prefs", Context.MODE_PRIVATE)
+            .edit().putFloat("chat_font_scale", scale).apply()
+    }
+
     /** Mirrors main.dart's pre-runApp wiring: config init + setupLocator().
      *  Called once from ChatyApplication.onCreate. */
     fun init(context: Context) {
         appContext = context.applicationContext
+        loadChatFontScale()
         appTrafficMonitor.start(appScope)
         com.example.chat.core.theme.ThemePresets.platformIsLightProvider = {
             (requireContext().resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) != android.content.res.Configuration.UI_MODE_NIGHT_YES
@@ -79,39 +90,41 @@ object ServiceLocator {
 
     // ── config (dart-define equivalents; defaults match main.dart) ────────
 
-    private val supabaseUrl: String get() = SupabaseAuthClient.SUPABASE_URL
-    private val publishableKey: String get() = SupabaseAuthClient.SUPABASE_PUBLISHABLE_KEY
 
     // ── auth + session (M3) ───────────────────────────────────────────────
-
-    val authClient: SupabaseAuthClient by lazy { SupabaseAuthClient() }
 
     private val sessionStorage: com.example.chat.data.auth.SessionStorage by lazy { EncryptedGoTrueSessionStorage(requireContext()) }
 
     val sessionManager: AuthSessionManager by lazy {
-        AuthSessionManager(auth = authClient, storage = sessionStorage)
+        AuthSessionManager(storage = sessionStorage)
     }
 
-    private val accessToken: suspend () -> String? = { sessionManager.accessToken() }
-
-    private val currentUserId: () -> String? = { sessionManager.currentUserId() }
-
-    val authRepository: AuthRepository by lazy {
-        AuthRepository(auth = authClient, sessions = sessionStorage, rpc = rpcClient, sessionManager = sessionManager)
-    }
+    private val currentUserId: () -> String? =
+        { apiBackend.currentUser?.id ?: sessionManager.currentUserId() }
 
     // ── remote clients ────────────────────────────────────────────────────
 
-    val queryClient: PostgrestQueryClient by lazy {
-        PostgrestQueryClient(supabaseUrl, publishableKey, accessToken)
+    /** Fail-closed realtime channel for planes the backend has no
+     *  postgres-changes equivalent for: reports `closed` once (honest
+     *  disconnected health) and never delivers changes. Catch-up rides
+     *  ApiBackendService's websocket + background sync. */
+    private fun inertRealtimeChannel(
+        onStatus: (com.example.chat.data.remote.RealtimeSubscribeStatus) -> Unit,
+    ): com.example.chat.data.remote.RealtimeChannel {
+        onStatus(com.example.chat.data.remote.RealtimeSubscribeStatus.closed)
+        return object : com.example.chat.data.remote.RealtimeChannel {
+            override fun close() {}
+        }
     }
 
-    val rpcClient: PostgrestRpcClient by lazy {
-        PostgrestRpcClient(supabaseUrl, publishableKey, accessToken)
-    }
-
-    val storageClient: SupabaseStorageClient by lazy {
-        SupabaseStorageClient(supabaseUrl, publishableKey, accessToken)
+    /** Media uploads go to the chat backend (POST /chat/upload); the server
+     *  returns absolute public URLs. */
+    val storageClient: com.example.chat.data.remote.MediaStorageBackend by lazy {
+        com.example.chat.data.api.ApiMediaStorageClient(
+            baseUrl = { apiBackend.config.restApiBaseUrl.trimEnd('/').replace(Regex("/api/v[0-9]+$"), "") },
+            tenantId = { apiBackend.config.tenantId },
+            token = { apiBackend.session.token },
+        )
     }
 
     // ── local storage ─────────────────────────────────────────────────────
@@ -372,7 +385,7 @@ object ServiceLocator {
     val preferencesController: com.example.chat.core.preferences.ChatyPreferencesController by lazy {
         com.example.chat.core.preferences.ChatyPreferencesController(
             store = AndroidPreferencesBlobStore(preferencesStorage),
-            remote = SupabaseRemoteSettingsStore(queryClient),
+            remote = ApiRemoteSettingsStore(apiBackend),
             lockStore = localLockService,
             auth = SessionAndApiAuthSource(GoTrueAuthPlane(sessionManager), ApiBackendAuthPlane(apiBackend)),
             scope = appScope,
@@ -532,7 +545,6 @@ object ServiceLocator {
             // profile search) ride the Chaty backend too - the Supabase
             // PostgREST client is retired from the messaging path.
             rpc = mlsRpcClient,
-            queryClient = queryClient,
             mls = { mls },
             currentUserId = currentUserId,
             pendingStore = pendingSends,
@@ -580,8 +592,8 @@ object ServiceLocator {
 
     val tasksRepository: TasksRepository by lazy {
         TasksRepository(
-            rpc = rpcClient,
-            queryClient = queryClient,
+            // Backend tasks plane; the retired Supabase task RPCs are gone.
+            tasksPlane = { apiBackend.tasksClient },
             refreshConversations = { conversationsRepository.loadConversations(loadMembers = true) },
             refreshMessagesIfLoaded = { conversationId ->
                 if (conversationsRepository.messagesByChatId.containsKey(conversationId)) {
@@ -770,7 +782,10 @@ object ServiceLocator {
 
     val presenceService: PresenceService by lazy {
         PresenceService(
-            queryClient = queryClient,
+            // Backend REST heartbeat (POST /presence/heartbeat); the retired
+            // Supabase profiles write is gone. Server TTL is 90s: the
+            // foreground loop in ChatyPresenceEffect keeps it fresh.
+            heartbeat = { online -> apiBackend.presenceHeartbeat(online) },
             currentUserId = currentUserId,
             privacy = { preferencesController.privacy.toPresenceSnapshot() },
         )
@@ -778,12 +793,15 @@ object ServiceLocator {
 
     val profileService: ProfileService by lazy {
         ProfileService(
-            queryClient = queryClient,
+            apiBackend = apiBackend,
             conversationsRepository = conversationsRepository,
             tasksRepository = tasksRepository,
             presenceService = presenceService,
-            currentAuthUser = { sessionManager.currentAuthUser() },
-            privacy = { preferencesController.privacy.toPresenceSnapshot() },
+            currentAuthUser = {
+                apiBackend.currentUser?.let {
+                    com.example.chat.data.services.AuthUserSnapshot(id = it.id, email = it.email, phone = it.phone)
+                } ?: sessionManager.currentAuthUser()
+            },
             scope = appScope,
             mls = mls,
         )
@@ -791,8 +809,8 @@ object ServiceLocator {
 
     val contactRelationships: ContactRelationshipService by lazy {
         ContactRelationshipService(
-            queryClient = queryClient,
-            rpc = rpcClient,
+            // Backend contacts plane; the retired Supabase tables are gone.
+            contacts = { apiBackend.contactsPlane() },
             currentUserId = currentUserId,
             secureStore = object : com.example.chat.data.services.SecureValueStore {
                 override suspend fun read(key: String): String? = secureStore.read(key)
@@ -855,10 +873,6 @@ object ServiceLocator {
         )
     }
 
-    val callHistory: CallHistoryService by lazy {
-        CallHistoryService(queryClient = queryClient, currentUserId = currentUserId)
-    }
-
     /** Call history plane (research 5.4): server-backed per-viewer log. */
     val apiCallHistory: com.example.chat.data.services.ApiCallHistoryService by lazy {
         com.example.chat.data.services.ApiCallHistoryService(
@@ -868,7 +882,10 @@ object ServiceLocator {
     }
 
     val gbFeatures: GbFeatureBackendService by lazy {
-        GbFeatureBackendService(queryClient = queryClient, rpcClient = rpcClient, currentUserId = currentUserId)
+        // Backend migration: no server-side automation plane exists yet, so
+        // the service runs fail-closed (null clients = local-only no-ops)
+        // until the backend grows one.
+        GbFeatureBackendService(queryClient = null, rpcClient = null, currentUserId = currentUserId)
     }
 
     val scheduledMessageService: com.example.chat.ui.automation.ScheduledMessageService by lazy {
@@ -902,10 +919,12 @@ object ServiceLocator {
                 override fun isConversationMuted(conversationId: String) =
                     conversationsRepository.conversationsById[conversationId]?.isMuted == true
             },
-            query = queryClient,
-            rpc = rpcClient,
-            channelFactory = { topic, tables, onChange, onStatus ->
-                SupabaseRealtimeChannel(supabaseUrl, publishableKey, accessToken, topic, tables, onChange, onStatus).also { it.start() }
+            readPlane = com.example.chat.data.realtime.BackendRichChatReadPlane(apiBackend),
+            markDeliveredRpc = { id -> apiBackend.markConversationDeliveredBackend(id) },
+            // No server-side recording-state plane yet: fail closed (no-op).
+            setRecordingRpc = { _, _ -> },
+            channelFactory = { _, _, _, onStatus ->
+                inertRealtimeChannel(onStatus)
             },
             currentUserId = currentUserId,
             connectionHealth = ConnectionHealthSinkAdapter(connectionHealth),
@@ -914,9 +933,7 @@ object ServiceLocator {
 
     val realtimeReconciliation: RealtimeReconciliationService by lazy {
         RealtimeReconciliationService(
-            supabaseUrl = supabaseUrl,
-            publishableKey = publishableKey,
-            accessToken = accessToken,
+            channelFactory = { _, _, _, onStatus -> inertRealtimeChannel(onStatus) },
             currentUserId = currentUserId,
             hasConversation = { id -> conversationsRepository.conversationsById.containsKey(id) },
             hasLoadedMessages = { id -> conversationsRepository.messagesByChatId.containsKey(id) },
@@ -1033,7 +1050,10 @@ object ServiceLocator {
             presenceService = presenceService,
             scope = appScope,
             mls = mls,
-            authSignOut = { sessionManager.signOut() },
+            authSignOut = {
+                apiBackend.signOut()
+                sessionManager.clearLocal()
+            },
             kickPendingSends = { appScope.launch { outgoingQueue.processQueue() } },
             onSignedOut = { mediaCache.purgeTransientTemps() },
             apiScopeIdentity = { apiBackend.authSnapshot() },

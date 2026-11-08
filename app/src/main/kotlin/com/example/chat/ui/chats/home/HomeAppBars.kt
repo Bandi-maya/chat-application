@@ -631,7 +631,8 @@ fun HomeFilterChips(
                     filter,
                     color = if (selected) accent else Color(theme.secondaryTextColor),
                     fontWeight = if (selected) FontWeight.W700 else FontWeight.W500,
-                    fontSize = 13.sp,
+                    // R4: capsule chip labels scale with the system font up to 1.3x, then clamp.
+                    fontSize = com.example.chat.ui.kit.clampedLabelSp(13f),
                 )
             }
         }

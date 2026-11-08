@@ -127,6 +127,21 @@ class ApiContactsClient(
         return out
     }
 
+    /** GET /contacts/requests/outgoing: pending asks the caller sent.
+     *  Fail-closed PlaneUnavailable on a pre-plane server. */
+    fun outgoing(): List<ContactRequestItem> {
+        val response = execute("GET", "contacts/requests/outgoing", null)
+        if (response.first != 200) throw Exception(errorOf(response))
+        val data = JSONObject(response.second).optJSONArray("data") ?: return emptyList()
+        val out = mutableListOf<ContactRequestItem>()
+        for (i in 0 until data.length()) {
+            val raw = data.getJSONObject(i)
+            val to = raw.optJSONObject("to") ?: continue
+            out.add(ContactRequestItem(requestId = raw.optString("request_id"), from = parseEntry(to)))
+        }
+        return out
+    }
+
     /** POST /contacts/respond {request_id, action: accept|decline}. */
     fun respond(requestId: String, action: String): String {
         val body = JSONObject().put("request_id", requestId).put("action", action).toString()
@@ -156,6 +171,13 @@ class ApiContactsClient(
      *  ways, never tells the other side. */
     fun block(username: String) {
         val body = JSONObject().put("username", username.trim()).toString()
+        val response = execute("POST", "block", body)
+        if (response.first != 200) throw Exception(errorOf(response))
+    }
+
+    /** POST /block by user id (same silent semantics as [block]). */
+    fun blockUser(userId: String) {
+        val body = JSONObject().put("user_id", userId.trim()).toString()
         val response = execute("POST", "block", body)
         if (response.first != 200) throw Exception(errorOf(response))
     }

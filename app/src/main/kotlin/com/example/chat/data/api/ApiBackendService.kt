@@ -135,9 +135,20 @@ class ApiBackendService(
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             moderationClient.report(expected, { authSnapshot() === expected }, messageId, reason, details)
         }
+
+    /** Chat-detail block toggle. Cross-check 2026-11-08: this used to hit the
+     *  pending /moderation/blocks plane (always 404 on the live backend), so
+     *  the toggle could never succeed. The contacts plane owns blocking
+     *  (POST /block, DELETE /block/{id}), the same plane the privacy settings
+     *  read, so writes and reads now agree. Same account-scope guards as the
+     *  moderation path. */
     suspend fun setUserBlocked(expected: ApiAccountScope, userId: String, blocked: Boolean) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            moderationClient.block(expected, { authSnapshot() === expected }, userId, blocked)
+            check(authSnapshot() === expected) { "Account changed. Open this chat again." }
+            val id = ApiPathSegments.safe(userId) ?: throw IllegalArgumentException("Invalid user identifier.")
+            require(id != expected.userId) { "You cannot block yourself." }
+            if (blocked) contactsClient.blockUser(id) else contactsClient.unblock(id)
+            check(authSnapshot() === expected) { "Account changed. Result was not applied." }
         }
 
     private val accountDeletion = ApiAccountDeletionClient(chatTransport)
@@ -542,6 +553,11 @@ class ApiBackendService(
     suspend fun fetchPresence(userId: String): ApiPresenceClient.PresenceView =
         withContext(Dispatchers.IO) { presenceClient.presence(userId) }
 
+    /** POST /presence/heartbeat (REST presence transport; server believes
+     *  online for 90s only). Fail-closed false. */
+    suspend fun presenceHeartbeat(online: Boolean): Boolean =
+        withContext(Dispatchers.IO) { presenceClient.heartbeat(online) }
+
     fun presencePrivacy(): ApiPresenceClient.PresencePrivacy? = presenceClient.privacy()
 
     fun putPresencePrivacy(lastSeenPolicy: String, onlinePolicy: String, exceptions: List<String>?): ApiPresenceClient.PresencePrivacy? =
@@ -637,6 +653,20 @@ class ApiBackendService(
             if (!ok && lastPrivacySync == key) lastPrivacySync = null // retry on the next change/tick
         }
     }
+
+    /** Rich-realtime migration seam: delivery receipt for a conversation via
+     *  the REST chat plane (replaces the mark_conversation_delivered rpc). */
+    suspend fun markConversationDeliveredBackend(conversationId: String) =
+        withContext(Dispatchers.IO) { chat.markRoomDelivered(conversationId) }
+
+    /** Remote settings-blob sync seam for the preferences controller
+     *  (RemoteSettingsStore over /chat/settings extras): fetch returns
+     *  (blob, updatedAt), null on transport failure. Push replaces the blob. */
+    suspend fun remoteSettingsFetch(): Pair<Map<String, Any?>?, String?>? =
+        withContext(Dispatchers.IO) { chat.getChatSettingsExtras() }
+
+    suspend fun remoteSettingsPush(snapshot: Map<String, Any?>): Boolean =
+        withContext(Dispatchers.IO) { chat.updateChatSettings(mapOf("extras" to snapshot)) }
 
     /** Hook set by the locator: true while a call is in progress (token refresh waits until it ends). */
     @Volatile var isCallActive: () -> Boolean = { false }
@@ -1835,16 +1865,22 @@ class ApiBackendService(
         about: String? = null,
         username: String? = null,
         avatarUrl: String? = null,
+        phone: String? = null,
+        avatarColorHex: String? = null,
+        avatarInitials: String? = null,
+        bannerUrl: String? = null,
         expectedScope: ApiAccountScope? = null,
     ): ApiUserProfile {
         val expected = expectedScope ?: authSnapshot()
         return withContext(Dispatchers.IO) {
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            auth.updateProfile(expected, { authSnapshot() === expected }, displayName, about, username, avatarUrl)
+            auth.updateProfile(expected, { authSnapshot() === expected }, displayName, about, username, avatarUrl,
+                phone, avatarColorHex, avatarInitials, bannerUrl)
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             var updated: ApiUserProfile? = null
             if (!withAuthScope(expected) {
-                updated = session.updateProfileFields(displayName, about, username, avatarUrl)
+                updated = session.updateProfileFields(displayName, about, username, avatarUrl,
+                    phone, avatarColorHex, avatarInitials, bannerUrl)
             }) throw ApiScopeChangedException()
             notifyChatListeners()
             updated ?: throw ApiScopeChangedException()

@@ -53,6 +53,7 @@ fun apiUserToJson(user: ApiUserProfile): String = JSONObject()
     .put("email", user.email)
     .put("phone", user.phone)
     .put("avatarUrl", user.avatarUrl ?: JSONObject.NULL)
+    .put("bannerUrl", user.bannerUrl ?: JSONObject.NULL)
     .put("emailVerified", user.emailVerified)
     .toString()
 
@@ -68,6 +69,7 @@ fun apiUserFromJson(raw: String): ApiUserProfile {
         email = obj.optString("email"),
         phone = obj.optString("phone"),
         avatarUrl = if (obj.isNull("avatarUrl")) null else obj.optString("avatarUrl"),
+        bannerUrl = if (obj.isNull("bannerUrl")) null else obj.optString("bannerUrl"),
         emailVerified = obj.optBoolean("emailVerified", true),
     )
 }
@@ -161,6 +163,10 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
         about: String?,
         username: String?,
         avatarUrl: String?,
+        phone: String? = null,
+        avatarColorHex: String? = null,
+        avatarInitials: String? = null,
+        bannerUrl: String? = null,
     ): ApiUserProfile = synchronized(scopeLock) {
         val current = currentUser ?: throw Exception("Not authenticated")
         val effectiveName = if (!displayName.isNullOrBlank()) displayName.trim() else current.displayName
@@ -171,7 +177,10 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
             username = if (!username.isNullOrBlank()) username.trim() else current.username,
             about = about?.trim() ?: current.about,
             avatarUrl = avatarUrl?.trim() ?: current.avatarUrl,
-            avatarInitials = initials,
+            avatarInitials = avatarInitials?.trim()?.takeIf { it.isNotEmpty() } ?: initials,
+            avatarColorHex = avatarColorHex?.trim()?.takeIf { it.isNotEmpty() } ?: current.avatarColorHex,
+            phone = phone?.trim() ?: current.phone,
+            bannerUrl = bannerUrl?.trim() ?: current.bannerUrl,
         )
         val currentToken = token
         if (!currentToken.isNullOrBlank()) {

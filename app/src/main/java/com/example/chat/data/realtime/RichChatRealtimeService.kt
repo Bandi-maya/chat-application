@@ -1,7 +1,5 @@
 package com.example.chat.data.realtime
 
-import com.example.chat.data.messaging.SupabaseRpc
-import com.example.chat.data.remote.PostgrestQueryClient
 import com.example.chat.data.remote.PostgresChange
 import com.example.chat.data.remote.PostgresChangeSubscription
 import com.example.chat.data.remote.RealtimeChannel
@@ -91,12 +89,45 @@ interface RealtimeBackend {
  * with the new user id (null on sign-out), mirroring onAuthStateChange.
  * Demo mode does not exist on api; nothing here special-cases it.
  */
+/** Backend migration seam for the rich realtime plane's table reads. The
+ *  chat backend has no postgres-changes equivalent: presence rows come from
+ *  the privacy-filtered directory; typing and receipt planes do not exist
+ *  server-side yet, so they fail closed (empty) until the websocket event
+ *  plane grows them. */
+interface RichChatReadPlane {
+    suspend fun presenceVisibilityRows(): List<Map<String, Any?>>
+    suspend fun typingStateRows(conversationId: String): List<Map<String, Any?>>
+    suspend fun recentMessageRows(conversationId: String): List<Map<String, Any?>>
+    suspend fun receiptRows(messageIds: List<String>): List<Map<String, Any?>>
+}
+
+/** Production read plane over the live backend. */
+class BackendRichChatReadPlane(
+    private val apiBackend: com.example.chat.data.api.ApiBackendService,
+) : RichChatReadPlane {
+    override suspend fun presenceVisibilityRows(): List<Map<String, Any?>> =
+        apiBackend.users.map {
+            mapOf(
+                "owner_user_id" to it.id,
+                "presence" to com.example.chat.data.services.PresenceService.presenceToDatabase(it.presence),
+                "last_seen_at" to it.lastSeenAt?.toString(),
+            )
+        }
+
+    override suspend fun typingStateRows(conversationId: String): List<Map<String, Any?>> = emptyList()
+
+    override suspend fun recentMessageRows(conversationId: String): List<Map<String, Any?>> = emptyList()
+
+    override suspend fun receiptRows(messageIds: List<String>): List<Map<String, Any?>> = emptyList()
+}
+
 class RichChatRealtimeService(
     private val preferences: RealtimePreferences,
     private val notifications: EventNotificationSink,
     private val backend: RealtimeBackend,
-    private val query: PostgrestQueryClient,
-    private val rpc: SupabaseRpc,
+    private val readPlane: RichChatReadPlane,
+    private val markDeliveredRpc: suspend (conversationId: String) -> Unit,
+    private val setRecordingRpc: suspend (conversationId: String, isRecording: Boolean) -> Unit,
     private val channelFactory: (
         topic: String,
         tables: List<PostgresChangeSubscription>,
@@ -225,7 +256,7 @@ class RichChatRealtimeService(
 
     private suspend fun loadPresenceProjection(emitNotifications: Boolean) {
         if (currentUserId() == null) return
-        val rows = query.from("contact_presence_visibility").select().execute()
+        val rows = readPlane.presenceVisibilityRows()
         for (row in rows) applyPresenceRow(row, emitNotification = emitNotifications)
     }
 
@@ -258,8 +289,7 @@ class RichChatRealtimeService(
     }
 
     private suspend fun loadActivity(conversationId: String, emitNotifications: Boolean) {
-        val rows = query.from("typing_states").select()
-            .eq("conversation_id", conversationId).execute()
+        val rows = readPlane.typingStateRows(conversationId)
         val activeKeys = HashSet<String>()
         for (row in rows) {
             val key = applyActivityRow(row, emitNotification = emitNotifications)
@@ -327,11 +357,7 @@ class RichChatRealtimeService(
     }
 
     private suspend fun loadMessageRuntime(conversationId: String) {
-        val rows = query.from("messages").select("id,sender_id,metadata")
-            .eq("conversation_id", conversationId)
-            .order("created_at", ascending = false)
-            .limit(200)
-            .execute()
+        val rows = readPlane.recentMessageRows(conversationId)
         val messageIds = mutableListOf<String>()
         for (row in rows) {
             val messageId = row["id"]?.toString() ?: ""
@@ -346,10 +372,7 @@ class RichChatRealtimeService(
             }
         }
         if (messageIds.isEmpty()) return
-        val receipts = query.from("message_receipts")
-            .select("message_id,user_id,delivered_at,read_at")
-            .inFilter("message_id", messageIds)
-            .execute()
+        val receipts = readPlane.receiptRows(messageIds)
         for (row in receipts) applyReceiptRow(row)
     }
 
@@ -390,12 +413,7 @@ class RichChatRealtimeService(
 
     suspend fun markConversationDelivered(conversationId: String) {
         if (currentUserId() == null) return
-        runCatching {
-            rpc.rpc(
-                "mark_conversation_delivered",
-                mapOf("p_conversation_id" to conversationId),
-            )
-        }
+        runCatching { markDeliveredRpc(conversationId) }
     }
 
     suspend fun setRecording(conversationId: String, isRecording: Boolean) {
@@ -407,15 +425,7 @@ class RichChatRealtimeService(
         ) {
             return
         }
-        runCatching {
-            rpc.rpc(
-                "set_recording_state",
-                mapOf(
-                    "p_conversation_id" to conversationId,
-                    "p_is_recording" to isRecording,
-                ),
-            )
-        }
+        runCatching { setRecordingRpc(conversationId, isRecording) }
     }
 
     private fun subscribeRealtime() {

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.Icons
@@ -295,8 +296,9 @@ fun PrivacyCenterScreen(
                 fontWeight = FontWeight.W700, letterSpacing = (-0.3).sp,
             )
         }
-        Box(Modifier.weight(1f)) {
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp)) {
+        // R2/R3: grouped lists capped at 720dp centered (approved plan 8 Nov 2026).
+        Box(Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+            Column(Modifier.fillMaxWidth().widthIn(max = 720.dp).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Row(
                     Modifier.fillMaxWidth()
                         .background(accent.copy(alpha = if (isDark) 0.18f else 0.12f), RoundedCornerShape(16.dp))

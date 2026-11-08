@@ -74,6 +74,20 @@ class ApiPresenceClient(
         }
     }
 
+    /** POST /presence/heartbeat - REST presence transport. The websocket is
+     *  primary, but proxies that block Upgrade must not leave the client
+     *  invisible; the server only believes online for 90s, so the app
+     *  heartbeats while foregrounded. Fail-closed: false on any error. */
+    fun heartbeat(online: Boolean = true): Boolean {
+        val body = JSONObject().put("online", online).toString()
+        val response = try {
+            execute("POST", "presence/heartbeat", body)
+        } catch (_: Exception) {
+            return false
+        }
+        return response.first == 200
+    }
+
     /** GET /privacy/presence. */
     fun privacy(): PresencePrivacy? {
         val response = execute("GET", "privacy/presence", null)

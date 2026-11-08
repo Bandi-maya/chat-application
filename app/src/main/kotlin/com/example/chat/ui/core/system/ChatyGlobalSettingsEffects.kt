@@ -64,6 +64,9 @@ fun ChatyPresenceEffect(
     val auth by rememberUpdatedState(authenticated)
     val pub by rememberUpdatedState(publish)
     var wasActive by remember { mutableStateOf(false) }
+    // Last state actually published; the heartbeat loop below only runs
+    // while the user is published online (server TTL is 90s).
+    var publishedOnline by remember { mutableStateOf(false) }
     fun flags(): Triple<Boolean, Boolean, Boolean> {
         val p = preferences
         return Triple(
@@ -76,9 +79,18 @@ fun ChatyPresenceEffect(
     fun apply(d: PresenceDecision) {
         wasActive = d.overrideWasActive
         when (d.action) {
-            PresenceAction.Offline -> pub(false)
-            PresenceAction.Online -> pub(true)
+            PresenceAction.Offline -> { publishedOnline = false; pub(false) }
+            PresenceAction.Online -> { publishedOnline = true; pub(true) }
             PresenceAction.None -> {}
+        }
+    }
+    // REST heartbeat: while published online, refresh every 45s so the
+    // server's 90s freshness window never lapses in the foreground.
+    val isOnline by rememberUpdatedState(publishedOnline)
+    androidx.compose.runtime.LaunchedEffect(publishedOnline) {
+        while (isOnline && auth()) {
+            kotlinx.coroutines.delay(45_000)
+            if (isOnline && auth()) pub(true)
         }
     }
     // Preference-change handler (runs on every preference recomposition, like the Dart listener).

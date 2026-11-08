@@ -40,6 +40,47 @@ class ApiChatClientParityTest {
     }
 
     @Test
+    fun getChatSettingsExtrasParsesBlobAndUpdatedAt() {
+        val t = FakeTransport { call ->
+            assertEquals("GET", call.method)
+            assertEquals("http://10.0.2.2:8000/chat/settings", call.url)
+            assertEquals("Bearer tok", call.headers["Authorization"])
+            200 to "{\"data\":{\"extras\":{\"theme\":{\"mode\":\"dark\"},\"font\":{\"scale\":1.25}},\"updated_at\":\"2026-11-08T15:30:00\",\"who_can_see_last_seen\":\"contacts\"}}"
+        }
+        val (extras, updatedAt) = client(t).getChatSettingsExtras()!!
+        assertEquals("dark", ((extras!!["theme"] as Map<*, *>)["mode"]))
+        assertEquals(1.25, ((extras["font"] as Map<*, *>)["scale"] as Number).toDouble(), 0.0001)
+        assertEquals("2026-11-08T15:30:00", updatedAt)
+    }
+
+    @Test
+    fun getChatSettingsExtrasHandlesMissingBlobAndFailures() {
+        // Row exists but no blob pushed yet.
+        var t = FakeTransport { 200 to "{\"data\":{\"extras\":null,\"updated_at\":null}}" }
+        val (extras, updatedAt) = client(t).getChatSettingsExtras()!!
+        assertNull(extras)
+        assertNull(updatedAt)
+        // Transport failure -> null (caller treats local as authoritative).
+        t = FakeTransport { 500 to "boom" }
+        assertNull(client(t).getChatSettingsExtras())
+        // Signed out -> no network call.
+        t = FakeTransport { throw AssertionError("must not call transport") }
+        assertNull(client(t, tok = null).getChatSettingsExtras())
+    }
+
+    @Test
+    fun updateChatSettingsCarriesExtrasBlob() {
+        val t = FakeTransport { call ->
+            assertEquals("PATCH", call.method)
+            val body = org.json.JSONObject(call.body)
+            val extras = body.getJSONObject("extras")
+            assertEquals("light", extras.getJSONObject("theme").getString("mode"))
+            200 to "{\"data\":{}}"
+        }
+        assertTrue(client(t).updateChatSettings(mapOf("extras" to mapOf("theme" to mapOf("mode" to "light")))))
+    }
+
+    @Test
     fun listRoomsSendsAuthAndTenantHeaders() {
         val t = FakeTransport { call ->
             assertEquals("http://10.0.2.2:8000/chat/rooms?include_tasks=false", call.url)

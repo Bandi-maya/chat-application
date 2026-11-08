@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -243,7 +244,9 @@ fun SettingsRootScreen(
                 IconButton(onClick = { onNavigate(SettingsDestination.SearchSettings) }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = "Search settings", modifier = Modifier.size(24.dp), color = colors.foreground) }
                 IconButton(onClick = { onNavigate(SettingsDestination.QrCode) }) { Icon(Icons.Rounded.QrCode2, "QR code", Modifier.size(25.dp), tint = colors.foreground) }
             }
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            // R2/R3: grouped lists capped at 720dp centered on larger
+            // windows (approved responsive plan 8 Nov 2026).
+            Column(Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).align(Alignment.CenterHorizontally).verticalScroll(rememberScrollState())) {
                 Column(Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     val bannerHeight = ((LocalConfiguration.current.screenWidthDp - 32) * 9f / 16f).dp
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {

@@ -71,6 +71,14 @@ class ApiMlsRpcClient(
     override suspend fun rpc(function: String, params: Map<String, Any?>): Any? =
         withContext(Dispatchers.IO) {
             if (function == "search_profiles") return@withContext searchProfiles(params)
+            // ConversationsRepository's legacy rpc names that map onto the
+            // REST chat plane (the methods endpointFor's e2ee table cannot
+            // express: non-POST verbs, ids in the path).
+            when (function) {
+                "delete_conversation" -> return@withContext deleteConversation(params)
+                "mark_conversation_read" -> return@withContext markConversationRead(params)
+                "get_conversation_members" -> return@withContext conversationMembers(params)
+            }
             val path = endpointFor(function)
             val headers = mutableMapOf(
                 "Content-Type" to "application/json",
@@ -110,6 +118,63 @@ class ApiMlsRpcClient(
     /** GET /app-users?q= — the backend's profile search (replaces the
      *  Supabase search_profiles RPC under D1). Same row shape the repository
      *  hydrates with profileFromRow. */
+    private fun headers(): MutableMap<String, String> {
+        val headers = mutableMapOf("Content-Type" to "application/json", "x-tenant-id" to tenantId())
+        token()?.let { headers["Authorization"] = "Bearer $it" }
+        return headers
+    }
+
+    private fun executeWithFallback(method: String, path: String, body: String?): Pair<Int, String> {
+        val base = baseUrl().trimEnd('/')
+        var response = transport.execute(method, "$base/$path", headers(), body)
+        if (response.first == 404) {
+            response = transport.execute(method, "$base/api/v1/$path", headers(), body)
+        }
+        if (response.first !in 200..299) {
+            throw IllegalStateException("$method $path failed (${response.first})")
+        }
+        return response
+    }
+
+    /** delete_conversation -> DELETE /chat/rooms/{id}. */
+    private fun deleteConversation(params: Map<String, Any?>): Any? {
+        val id = ApiPathSegments.safe(params["p_conversation_id"]?.toString() ?: "")
+            ?: throw IllegalArgumentException("Invalid conversation identifier.")
+        executeWithFallback("DELETE", "chat/rooms/$id", null)
+        return null
+    }
+
+    /** mark_conversation_read -> POST /chat/rooms/{id}/read. */
+    private fun markConversationRead(params: Map<String, Any?>): Any? {
+        val id = ApiPathSegments.safe(params["p_conversation_id"]?.toString() ?: "")
+            ?: throw IllegalArgumentException("Invalid conversation identifier.")
+        executeWithFallback("POST", "chat/rooms/$id/read", "{}")
+        return null
+    }
+
+    /** get_conversation_members -> GET /chat/rooms/{id}/members; rows are
+     *  shaped for ConversationsRepository.profileFromRow (id/display_name/
+     *  username). */
+    private fun conversationMembers(params: Map<String, Any?>): Any? {
+        val id = ApiPathSegments.safe(params["p_conversation_id"]?.toString() ?: "")
+            ?: throw IllegalArgumentException("Invalid conversation identifier.")
+        val response = executeWithFallback("GET", "chat/rooms/$id/members", null)
+        val data = JSONObject(response.second).optJSONObject("data") ?: return emptyList<Map<String, Any?>>()
+        val members = data.optJSONArray("members") ?: return emptyList<Map<String, Any?>>()
+        val rows = mutableListOf<Map<String, Any?>>()
+        for (i in 0 until members.length()) {
+            val m = members.optJSONObject(i) ?: continue
+            rows.add(mapOf(
+                "id" to m.optString("user_id"),
+                "username" to m.optString("username"),
+                "display_name" to m.optString("display_name"),
+                "role" to m.optString("role"),
+                "status" to m.optString("status"),
+            ))
+        }
+        return rows
+    }
+
     private suspend fun searchProfiles(params: Map<String, Any?>): Any? {
         val query = params["p_query"]?.toString()?.trim().orEmpty()
         val headers = mutableMapOf("x-tenant-id" to tenantId())

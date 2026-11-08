@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -103,8 +104,11 @@ fun CallsScreen(
             }
         },
     ) { padding ->
+        // R2/R3: rows full width on compact, capped at 720dp centered on
+        // medium/expanded (approved responsive plan 8 Nov 2026).
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
+            modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp),
             contentPadding = PaddingValues(bottom = 80.dp),
         ) {
             if (!titlePresentedByShell) item {
@@ -255,6 +259,7 @@ fun CallsScreen(
                     }
                 }
             }
+        }
         }
     }
     if (showClearConfirm) {

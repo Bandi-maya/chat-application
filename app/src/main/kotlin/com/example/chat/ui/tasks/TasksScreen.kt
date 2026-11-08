@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -325,7 +326,11 @@ private fun TaskListView(
         return
     }
 
+    // R2/R3: task cards capped at 720dp centered on larger windows
+    // (approved responsive plan 8 Nov 2026).
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     LazyColumn(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -340,6 +345,7 @@ private fun TaskListView(
                 onDeleteTask = { onDeleteTask(task) },
             )
         }
+    }
     }
 }
 

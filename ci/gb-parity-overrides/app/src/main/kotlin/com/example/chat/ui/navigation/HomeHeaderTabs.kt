@@ -148,7 +148,8 @@ fun HomeHeaderTabsBar(
                             NavigationCatalog.labelFor(id),
                             color = if (selected) colors.foreground else colors.foregroundSecondary,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 13.sp,
+                            // R4: tab labels scale with the system font up to 1.3x, then clamp.
+                            fontSize = com.example.chat.ui.kit.clampedLabelSp(13f),
                             maxLines = 1,
                             softWrap = false,
                             overflow = TextOverflow.Ellipsis,

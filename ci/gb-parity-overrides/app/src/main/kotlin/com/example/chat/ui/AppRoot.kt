@@ -310,6 +310,9 @@ fun AppRoot() {
         // R1: measure the window once at the root; screens read
         // LocalChatyWindowMetrics and re-measure on rotate/split/fold.
         com.example.chat.ui.kit.ChatyWindowMetricsProvider {
+        androidx.compose.runtime.CompositionLocalProvider(
+            com.example.chat.ui.kit.LocalChatFontScale provides com.example.chat.ServiceLocator.chatFontScale.value,
+        ) {
         Box(Modifier.fillMaxSize().windowInsetsPadding(
             WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         )) {
@@ -1473,7 +1476,7 @@ fun AppRoot() {
                             service = {
                                 com.example.chat.data.services.ProfileMediaService(
                                     storage = ServiceLocator.storageClient,
-                                    currentUserId = { ServiceLocator.sessionManager.currentUserId() },
+                                    currentUserId = { ServiceLocator.apiBackend.currentUser?.id ?: ServiceLocator.sessionManager.currentUserId() },
                                     imageCompressor = { b, sq, q -> com.example.chat.ui.profile.ProfileImageCompressor.compress(b, sq, q) },
                                 )
                             },
@@ -1491,15 +1494,16 @@ fun AppRoot() {
                                     try { editFlow.banner(com.example.chat.data.services.ProfileMediaSource.valueOf(source.name)) }
                                     catch (_: com.example.chat.data.services.ProfileMediaCancelledException) { null }
                                 },
-                                onSave = { name, username, about, avatarUrl, _ ->
-                                    // Dart updateUser -> api.updateProfile(name, about, username, updated.avatarUrl);
-                                    // bannerUrl is not sent by the api-branch backend either.
-                                    // Goes through PUT /profile/me (research 5.1) so username
-                                    // changes persist; the client falls back to the legacy route
-                                    // on servers that predate the profile plane.
+                                onSave = { name, username, about, avatarUrl, bannerUrl ->
+                                    // PUT /profile/me (research 5.1) so username changes persist;
+                                    // the client falls back to the legacy route on servers that
+                                    // predate the profile plane. banner_url rides the plane too
+                                    // (backend gap pass 2026-11-08) - it was uploaded but never
+                                    // sent before.
                                     ServiceLocator.apiBackend.updateProfile(
                                         displayName = name, about = about, username = username,
                                         avatarUrl = avatarUrl ?: editUser.avatarUrl,
+                                        bannerUrl = bannerUrl ?: editUser.bannerUrl,
                                     )
                                 },
                                 // Live username availability (research 5.1). Servers predating
@@ -1809,6 +1813,7 @@ fun AppRoot() {
             }
         }
         } // Shared safe-area route container.
+        } // ChatFontScale provider
         } // ChatyWindowMetricsProvider
         }
         // Resolved status/navigation bar colours are drawn under the bars (Compose owns the painting;
@@ -1882,6 +1887,7 @@ private fun toDomainUser(u: com.example.chat.data.api.ApiUserProfile): com.examp
         id = u.id, displayName = u.displayName, username = u.username,
         avatarInitials = u.avatarInitials, avatarColorHex = u.avatarColorHex, about = u.about,
         lastSeenAt = java.time.Instant.now(), email = u.email, phone = u.phone, avatarUrl = u.avatarUrl,
+        bannerUrl = u.bannerUrl,
     )
 
 /** settings_root_screen.dart _editAccountAvatar/_editAccountBanner: pick (camera/gallery), upload through
@@ -1899,19 +1905,13 @@ private fun rememberRootProfilePhoto(): RootProfilePhoto {
         service = {
             com.example.chat.data.services.ProfileMediaService(
                 storage = ServiceLocator.storageClient,
-                currentUserId = { ServiceLocator.sessionManager.currentUserId() },
+                currentUserId = { ServiceLocator.apiBackend.currentUser?.id ?: ServiceLocator.sessionManager.currentUserId() },
                 imageCompressor = { b, sq, q -> com.example.chat.ui.profile.ProfileImageCompressor.compress(b, sq, q) },
             )
         },
     )
     fun dataSource(s: com.example.chat.ui.settings.ProfileMediaSource) =
         com.example.chat.data.services.ProfileMediaSource.valueOf(s.name)
-    suspend fun saveCurrent() {
-        val me = ServiceLocator.apiBackend.currentUser ?: throw Exception("Not authenticated")
-        ServiceLocator.apiBackend.updateProfile(
-            displayName = me.displayName, about = me.about, username = me.username, avatarUrl = me.avatarUrl,
-        )
-    }
     return RootProfilePhoto(
         avatar = { source ->
             val url = flow.avatar(dataSource(source))
@@ -1921,8 +1921,14 @@ private fun rememberRootProfilePhoto(): RootProfilePhoto {
             )
         },
         banner = { source ->
-            flow.banner(dataSource(source))
-            saveCurrent()
+            // The banner URL used to be uploaded but never sent (the backend
+            // had no field for it); PUT /profile/me accepts banner_url now.
+            val url = flow.banner(dataSource(source))
+            val me = ServiceLocator.apiBackend.currentUser ?: throw Exception("Not authenticated")
+            ServiceLocator.apiBackend.updateProfile(
+                displayName = me.displayName, about = me.about, username = me.username,
+                avatarUrl = me.avatarUrl, bannerUrl = url,
+            )
         },
     )
 }

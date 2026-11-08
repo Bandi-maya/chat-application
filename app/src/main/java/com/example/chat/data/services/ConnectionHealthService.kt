@@ -211,7 +211,7 @@ class ConnectionHealthService(
                 return state
             }
 
-            // 3. Backend (Supabase) reachability + latency, 3s timeout.
+            // 3. Chaty backend reachability + latency, 3s timeout.
             var backendReachable = false
             var sampleLatency: Duration? = null
             val ping = backendPing

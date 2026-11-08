@@ -1,18 +1,17 @@
 package com.example.chat.data.services
 
-import com.example.chat.data.remote.PostgrestQueryClient
 import com.example.chat.domain.models.PresenceState
-import java.time.Instant
 
 /**
- * Exact port of backend_service.dart setPresence + _effectivePublishedPresence
- * (+ _currentPrivacy / _presenceToDatabase). Privacy preferences are not yet
- * ported (M7/M8 ChatyPreferencesController); the [privacy] seam supplies a
- * snapshot. Dart behavior when the controller is unregistered: privacy == null
- * publishes presence unchanged and always bumps last_seen_at.
+ * Presence publishing rides the Chaty backend: POST /presence/heartbeat is
+ * the transport (the retired Supabase `profiles` write is gone). The server
+ * only believes online for 90s (ONLINE_TTL), so the app heartbeats while
+ * foregrounded; a clean offline is the same endpoint with online=false.
+ * The privacy mapping of backend_service.dart's _effectivePublishedPresence
+ * is preserved: a user who hides online from everyone publishes offline.
  */
 class PresenceService(
-    private val queryClient: PostgrestQueryClient,
+    private val heartbeat: suspend (online: Boolean) -> Boolean,
     private val currentUserId: () -> String?,
     /** Snapshot of the privacy fields setPresence reads; null when the
      *  preferences controller is unavailable (matches Dart's null path). */
@@ -25,19 +24,20 @@ class PresenceService(
         val hideOnlineAudience: String,
     )
 
-    /** Exact port of setPresence's non-demo path. */
+    /** Publish a presence state. away/typing count as active (the user is
+     *  in the app); the privacy snapshot can still force offline. */
     suspend fun setPresence(presence: PresenceState) {
         // Offline demo: presence is never published from a demo session.
         if (com.example.chat.data.demo.DemoMode.active) return
-        val userId = currentUserId() ?: return
+        currentUserId() ?: return
         val snap = privacy()
-        val update = mutableMapOf<String, Any?>(
-            "presence" to presenceToDatabase(effectivePublishedPresence(presence, snap)),
-        )
-        if (snap == null || !snap.freezeLastSeen) {
-            update["last_seen_at"] = Instant.now().toString()
-        }
-        queryClient.from("profiles").eq("id", userId).update(update)
+        val effective = effectivePublishedPresence(presence, snap)
+        // freezeLastSeen: the heartbeat endpoint always refreshes the
+        // last-seen stamp, and the server has no frozen-stamp mode. Fail
+        // closed: a frozen user publishes nothing and stays invisible
+        // rather than leaking a fresh stamp they asked to freeze.
+        if (snap != null && snap.freezeLastSeen) return
+        heartbeat(effective != PresenceState.offline)
     }
 
     companion object {

@@ -252,17 +252,20 @@ fun ContactInfoScreen(
             Spacer(Modifier.height(20.dp))
 
             // GB row order: per-contact privacy sits right under the identity card (GB "Custom Privacy" row).
-            Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
-                InfoTile(
-                    icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.tune, semanticLabel = null, color = colors.primary) },
-                    title = "Individual Privacy Controls",
-                    titleColor = colors.foreground,
-                    subtitle = "Read receipts, typing indicator, recording & online presence",
-                    trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) },
-                    onClick = onOpenPrivacy,
-                )
+            // Hidden until the backend enforces overrides server-side (ReleaseFeatures.CONTACT_PRIVACY_OVERRIDES).
+            if (com.example.chat.ReleaseFeatures.CONTACT_PRIVACY_OVERRIDES) {
+                Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
+                    InfoTile(
+                        icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.tune, semanticLabel = null, color = colors.primary) },
+                        title = "Individual Privacy Controls",
+                        titleColor = colors.foreground,
+                        subtitle = "Read receipts, typing indicator, recording & online presence",
+                        trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) },
+                        onClick = onOpenPrivacy,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
             }
-            Spacer(Modifier.height(12.dp))
 
             // Connection & Calls.
             SectionTitle("Connection & Calls", colors)

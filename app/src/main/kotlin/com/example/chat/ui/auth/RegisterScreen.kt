@@ -68,7 +68,7 @@ data class OrgCheckResult(val name: String, val allowUserRegistration: Boolean)
 /** Port of lib/features/auth/register_screen.dart.
  *
  *  Injected seams (wired by AppRoot):
- *  - [register]: default-tenant sign-up (AuthRepository.registerUser).
+ *  - [register]: default-tenant sign-up (ApiBackendService.register).
  *  - [checkOrganization]: workspace probe. The ApiBackendService slice has not
  *    landed yet; AppRoot wires a seam that surfaces the workspace-not-found
  *    banner for organization mode until then. Default-mode registration is

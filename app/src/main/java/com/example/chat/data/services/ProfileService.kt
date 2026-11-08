@@ -4,7 +4,7 @@ import com.example.chat.core.validators.ChatyValidators
 import com.example.chat.data.e2ee.MlsE2eeService
 import com.example.chat.data.messaging.ConversationsRepository
 import com.example.chat.data.messaging.TasksRepository
-import com.example.chat.data.remote.PostgrestQueryClient
+import com.example.chat.data.api.ApiBackendService
 import com.example.chat.domain.models.PresenceState
 import com.example.chat.domain.models.UserProfile
 import java.time.Instant
@@ -23,19 +23,21 @@ data class AuthUserSnapshot(
 )
 
 /**
- * Exact port of backend_service.dart _loadCurrentProfile / updateCurrentUser
- * / _hydrateAuthenticatedState / _refreshLoadedMessageTimelines / _initials.
+ * Backend migration: the current-user profile now reads/writes the API
+ * backend (session profile + PUT /profile/me) instead of the Supabase
+ * `profiles` table. Port of backend_service.dart _loadCurrentProfile /
+ * updateCurrentUser / _hydrateAuthenticatedState /
+ * _refreshLoadedMessageTimelines / _initials.
  * The unawaited setPresence(online) kick after each profile load routes
  * through [PresenceService] on [scope] (the ported
  * _effectivePublishedPresence rules apply identically).
  */
 class ProfileService(
-    private val queryClient: PostgrestQueryClient,
+    private val apiBackend: ApiBackendService,
     private val conversationsRepository: ConversationsRepository,
     private val tasksRepository: TasksRepository?,
     private val presenceService: PresenceService,
     private val currentAuthUser: () -> AuthUserSnapshot?,
-    private val privacy: () -> PresenceService.PrivacySnapshot?,
     private val scope: CoroutineScope,
     private val mls: MlsE2eeService? = null,
     private val notifyChanged: () -> Unit = {},
@@ -70,11 +72,22 @@ class ProfileService(
         )
 
         try {
-            val rows = queryClient.from("profiles").select().eq("id", user.id).limit(1).execute()
-            val row = rows.firstOrNull()
-            val profile = if (row != null) {
-                ConversationsRepository.profileFromRow(
-                    row, email = user.email, phone = user.phone,
+            val apiUser = apiBackend.currentUser
+            val profile = if (apiUser != null && apiUser.id == user.id) {
+                UserProfile(
+                    id = apiUser.id,
+                    displayName = apiUser.displayName,
+                    username = apiUser.username,
+                    avatarInitials = apiUser.avatarInitials,
+                    avatarColorHex = apiUser.avatarColorHex,
+                    about = apiUser.about,
+                    presence = PresenceState.online,
+                    lastSeenAt = Instant.now(),
+                    isVerified = apiUser.emailVerified,
+                    email = apiUser.email.ifEmpty { user.email },
+                    phone = apiUser.phone.ifEmpty { user.phone },
+                    safetyNumber = "",
+                    avatarUrl = apiUser.avatarUrl,
                 )
             } else {
                 fallback()
@@ -99,24 +112,16 @@ class ProfileService(
         if (authUser == null || authUser.id != updated.id) {
             throw IllegalStateException("You can only update the signed-in profile.")
         }
-        val snap = privacy()
-        val update = mutableMapOf<String, Any?>(
-            "username" to ChatyValidators.normalizeUsername(updated.username),
-            "display_name" to updated.displayName.trim(),
-            "about" to updated.about.trim(),
-            "phone" to updated.phone.trim(),
-            "avatar_initials" to updated.avatarInitials,
-            "avatar_color_hex" to updated.avatarColorHex,
+        apiBackend.updateProfile(
+            displayName = updated.displayName.trim(),
+            about = updated.about.trim(),
+            username = ChatyValidators.normalizeUsername(updated.username),
+            avatarUrl = updated.avatarUrl,
+            phone = updated.phone.trim(),
+            avatarColorHex = updated.avatarColorHex,
+            avatarInitials = updated.avatarInitials,
+            bannerUrl = updated.bannerUrl,
         )
-        updated.avatarUrl?.let { update["avatar_url"] = it }
-        updated.bannerUrl?.let { update["banner_url"] = it }
-        update["presence"] = PresenceService.presenceToDatabase(
-            PresenceService.effectivePublishedPresence(updated.presence, snap),
-        )
-        if (snap == null || !snap.freezeLastSeen) {
-            update["last_seen_at"] = Instant.now().toString()
-        }
-        queryClient.from("profiles").eq("id", authUser.id).update(update)
         loadCurrentProfile()
         notifyChanged()
     }

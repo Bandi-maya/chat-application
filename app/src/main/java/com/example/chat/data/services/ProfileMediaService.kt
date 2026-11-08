@@ -1,6 +1,6 @@
 package com.example.chat.data.services
 
-import com.example.chat.data.remote.SupabaseStorageClient
+import com.example.chat.data.remote.MediaStorageBackend
 import java.util.UUID
 
 /** Source of the media: device camera or the system gallery. */
@@ -19,7 +19,7 @@ class ProfileMediaCancelledException : Exception("cancelled")
  * original file, exactly like the Dart `compressed != null ? ... : workingFile`.
  */
 class ProfileMediaService(
-    private val storage: SupabaseStorageClient,
+    private val storage: MediaStorageBackend,
     private val currentUserId: () -> String?,
     /** jpeg compression seam: (bytes, square, quality) -> bytes or null. */
     private val imageCompressor: suspend (bytes: ByteArray, square: Int, quality: Int) -> ByteArray? = { _, _, _ -> null },

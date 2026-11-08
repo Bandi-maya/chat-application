@@ -24,9 +24,9 @@ class SupabaseStorageClient(
     private val publishableKey: String,
     private val accessToken: suspend () -> String?,
     private val client: OkHttpClient = OkHttpClient(),
-) {
+) : MediaStorageBackend {
     /** Mirrors storage.from(bucket).upload(path, file, FileOptions(cacheControl: '3600', upsert: false, contentType: mime)). */
-    suspend fun upload(
+    override suspend fun upload(
         bucket: String,
         path: String,
         bytes: ByteArray,
@@ -194,7 +194,7 @@ class SupabaseStorageClient(
     }
 
     /** Mirrors storage.from(bucket).remove(paths) (bulk delete). */
-    suspend fun remove(bucket: String, paths: List<String>): Unit = withContext(Dispatchers.IO) {
+    override suspend fun remove(bucket: String, paths: List<String>): Unit = withContext(Dispatchers.IO) {
         com.example.chat.data.demo.DemoMode.requireRealBackend()
         val body = JSONObject().put("prefixes", JSONArray(paths)).toString()
         val request = Request.Builder()
@@ -215,11 +215,11 @@ class SupabaseStorageClient(
 
     /** Mirrors storage.from(bucket).getPublicUrl(path) for public buckets
      *  (pure URL construction, no request). */
-    fun getPublicUrl(bucket: String, path: String): String =
+    override fun getPublicUrl(bucket: String, path: String): String =
         "$supabaseUrl/storage/v1/object/public/$bucket/$path"
 
     /** Mirrors storage.from(bucket).createSignedUrl(path, expiresIn). */
-    suspend fun createSignedUrl(
+    override suspend fun createSignedUrl(
         bucket: String,
         path: String,
         expiresInSeconds: Int,

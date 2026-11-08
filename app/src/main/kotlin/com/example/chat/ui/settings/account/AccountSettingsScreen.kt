@@ -233,7 +233,12 @@ fun AccountSettingsScreen(
                 // Subscription & Plans tile hidden: there is no order backend
                 // yet (the create-order route does not exist), so the plan
                 // flow is unreachable until payments are built.
-                ChatySettingsSection(title = "Workspace & Registration") {
+                // Member Self-Registration tile hidden (cross-check 2026-11-08):
+                // the backend has no org-check PATCH route and no admin role
+                // model, so the switch could never succeed. The org-admin
+                // plane (check + registration toggle + admin authz) is queued
+                // with the later backend pieces.
+                if (false) ChatySettingsSection(title = "Workspace & Registration") {
                     WorkspaceRegistrationToggle(
                         organization = organization,
                         checkOrganization = checkOrganization,

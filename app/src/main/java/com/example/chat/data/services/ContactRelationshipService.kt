@@ -1,14 +1,14 @@
 package com.example.chat.data.services
 
-import com.example.chat.core.util.parseIsoToInstant
-import com.example.chat.data.messaging.SupabaseRpc
-import com.example.chat.data.remote.PostgrestQueryClient
+import com.example.chat.data.api.ApiContactsClient
 import com.example.chat.domain.models.ContactConnectionStatus
 import com.example.chat.domain.models.ContactPrivacyOverride
 import java.time.Instant
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** Ported LinkedDevice (other_models.dart). */
 data class LinkedDevice(
@@ -28,15 +28,18 @@ interface SecureValueStore {
 }
 
 /**
- * Exact port of lib/data/services/contact_relationship_service.dart:
- * per-contact privacy overrides, block/unblock, connection status, and the
- * linked-device registry (installation device id, register, list, revoke).
- * Platform is always "Android" in the Kotlin port (Dart's _platformLabel
- * switch has exactly one mobile target here).
+ * Contact relationships ride the Chaty backend contacts plane
+ * (/contacts, /contacts/requests[+outgoing], /contacts/respond,
+ * /block[s]). The retired Supabase contact_privacy_overrides and
+ * linked_devices tables are gone:
+ *  - Per-contact privacy overrides have no backend plane yet, so the
+ *    entry point is hidden (ReleaseFeatures.CONTACT_PRIVACY_OVERRIDES)
+ *    and these methods fail closed instead of pretending to persist.
+ *  - Linked devices stay dormant behind ReleaseFeatures.LINKED_DEVICES;
+ *    registration is a no-op rather than a write to a dead table.
  */
 class ContactRelationshipService(
-    private val queryClient: PostgrestQueryClient,
-    private val rpc: SupabaseRpc,
+    private val contacts: () -> ApiContactsClient,
     private val currentUserId: () -> String?,
     private val secureStore: SecureValueStore,
 ) {
@@ -46,89 +49,64 @@ class ContactRelationshipService(
     private fun userId(): String = currentUserId()
         ?: throw IllegalStateException("Authentication required.")
 
-    /** Exact port of privacyFor (default override when no row). */
-    suspend fun privacyFor(targetUserId: String): ContactPrivacyOverride {
-        val rows = queryClient.from("contact_privacy_overrides")
-            .select()
-            .eq("owner_user_id", userId())
-            .eq("target_user_id", targetUserId)
-            .limit(1)
-            .execute()
-        val row = rows.firstOrNull()
-            ?: return ContactPrivacyOverride(
-                ownerUserId = userId(),
-                targetUserId = targetUserId,
-            )
-        return ContactPrivacyOverride.fromDatabaseMap(row)
-    }
+    /** No backend plane for per-contact overrides yet: return the
+     *  nothing-hidden default. The screen that edits these is hidden, so
+     *  this default is never user-editable state. */
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun privacyFor(targetUserId: String): ContactPrivacyOverride =
+        ContactPrivacyOverride(ownerUserId = userId(), targetUserId = targetUserId)
 
-    /** Exact port of savePrivacy (owner guard + upsert on the pair key). */
+    /** Fail closed: never pretend a privacy choice persisted when no
+     *  server-side enforcement exists. */
     suspend fun savePrivacy(value: ContactPrivacyOverride) {
-        if (value.ownerUserId != userId()) {
-            throw IllegalStateException("Cannot change another user's privacy settings.")
-        }
-        queryClient.from("contact_privacy_overrides")
-            .upsert(value.toDatabaseMap(), onConflict = "owner_user_id,target_user_id")
-    }
-
-    /** Exact port of isBlocked. */
-    suspend fun isBlocked(targetUserId: String): Boolean {
-        val rows = queryClient.from("blocked_users")
-            .select("blocked_id")
-            .eq("blocker_id", userId())
-            .eq("blocked_id", targetUserId)
-            .limit(1)
-            .execute()
-        return rows.isNotEmpty()
-    }
-
-    /** Exact port of setBlocked (block_user / unblock_user RPCs). */
-    suspend fun setBlocked(targetUserId: String, blocked: Boolean) {
-        rpc.rpc(
-            if (blocked) "block_user" else "unblock_user",
-            mapOf("p_user_id" to targetUserId),
+        throw IllegalStateException(
+            "Individual privacy controls are not available on this server yet.",
         )
     }
 
-    /** Exact port of connectionStatus (fail-open default on error/empty). */
-    suspend fun connectionStatus(otherUserId: String): ContactConnectionStatus {
-        val raw = try {
-            rpc.rpc(
-                "get_contact_connection_status",
-                mapOf("p_other_user_id" to otherUserId),
-            )
-        } catch (error: Throwable) {
-            return ContactConnectionStatus(myAccepted = true, otherAccepted = true)
-        }
-        val rows = raw as? List<*>
-        if (!rows.isNullOrEmpty() && rows.first() is Map<*, *>) {
-            @Suppress("UNCHECKED_CAST")
-            return ContactConnectionStatus.fromDatabaseMap(
-                (rows.first() as Map<String, Any?>),
-            )
-        }
-        if (raw is Map<*, *>) {
-            @Suppress("UNCHECKED_CAST")
-            return ContactConnectionStatus.fromDatabaseMap(raw as Map<String, Any?>)
-        }
-        return ContactConnectionStatus(myAccepted = true, otherAccepted = true)
+    suspend fun isBlocked(targetUserId: String): Boolean = withContext(Dispatchers.IO) {
+        contacts().blocks().any { it.userId == targetUserId }
     }
 
-    /** Exact port of acceptConnection. */
-    suspend fun acceptConnection(otherUserId: String): String {
-        val raw = rpc.rpc(
-            "accept_contact_connection",
-            mapOf("p_other_user_id" to otherUserId),
-        )
-        val id = raw?.toString() ?: ""
-        if (id.isEmpty()) {
-            throw IllegalStateException("Unable to create or accept the contact connection.")
-        }
-        return id
+    /** Silent both ways, exactly like the backend /block semantics. */
+    suspend fun setBlocked(targetUserId: String, blocked: Boolean) = withContext(Dispatchers.IO) {
+        if (blocked) contacts().blockUser(targetUserId) else contacts().unblock(targetUserId)
     }
 
-    /** Exact port of currentDeviceId/_performCurrentDeviceId (cached,
-     *  single-flight via mutex, persisted in secure storage). */
+    /** Derive the connection state from the contacts plane. Errors
+     *  propagate (callers keep their previous state); a pre-plane server
+     *  (no outgoing route) reads as not-connected, never as accepted. */
+    suspend fun connectionStatus(otherUserId: String): ContactConnectionStatus = withContext(Dispatchers.IO) {
+        val plane = contacts()
+        if (plane.contacts().any { it.userId == otherUserId }) {
+            return@withContext ContactConnectionStatus(myAccepted = true, otherAccepted = true)
+        }
+        if (plane.inbox().any { it.from.userId == otherUserId }) {
+            return@withContext ContactConnectionStatus(myAccepted = false, otherAccepted = true)
+        }
+        val outgoing = try {
+            plane.outgoing()
+        } catch (e: ApiContactsClient.PlaneUnavailable) {
+            return@withContext ContactConnectionStatus()
+        }
+        if (outgoing.any { it.from.userId == otherUserId }) {
+            return@withContext ContactConnectionStatus(myAccepted = true, otherAccepted = false)
+        }
+        ContactConnectionStatus()
+    }
+
+    /** Accept their pending incoming request. Throws when none exists -
+     *  the old path created connections out of thin air; the backend
+     *  contact model requires their request first. */
+    suspend fun acceptConnection(otherUserId: String): String = withContext(Dispatchers.IO) {
+        val plane = contacts()
+        val incoming = plane.inbox().firstOrNull { it.from.userId == otherUserId }
+            ?: throw IllegalStateException("Unable to create or accept the contact connection.")
+        plane.respond(incoming.requestId, "accept")
+        incoming.requestId
+    }
+
+    /** Cached, single-flight installation device id (local only). */
     suspend fun currentDeviceId(): String {
         cachedDeviceId?.takeIf { it.isNotEmpty() }?.let { return it }
         return deviceIdMutex.withLock {
@@ -143,66 +121,18 @@ class ContactRelationshipService(
         }
     }
 
-    /** Exact port of registerCurrentDevice (platform label "Android"). */
+    /** Linked devices are dormant (ReleaseFeatures.LINKED_DEVICES = false):
+     *  no registration write to any backend. */
     suspend fun registerCurrentDevice() {
-        val deviceId = currentDeviceId()
-        queryClient.from("linked_devices").upsert(
-            mapOf(
-                "user_id" to userId(),
-                "device_id" to deviceId,
-                "device_name" to "Android Chaty device",
-                "platform" to "Android",
-                "location" to "",
-                "last_active_at" to Instant.now().toString(),
-                "revoked_at" to null,
-            ),
-            onConflict = "user_id,device_id",
-        )
+        currentDeviceId() // keep the id warm for when the feature ships
     }
 
-    /** Exact port of linkedDevices (active rows, newest activity first). */
-    suspend fun linkedDevices(): List<LinkedDevice> {
-        val current = currentDeviceId()
-        val rows = queryClient.from("linked_devices")
-            .select()
-            .eq("user_id", userId())
-            .isNull("revoked_at")
-            .order("last_active_at", ascending = false)
-            .execute()
-        return rows.map { row ->
-            val id = row["device_id"]?.toString() ?: ""
-            LinkedDevice(
-                id = id,
-                deviceName = row["device_name"]?.toString() ?: "Chaty device",
-                platform = row["platform"]?.toString() ?: "Unknown",
-                location = row["location"]?.toString() ?: "",
-                lastActiveAt = parseIsoToInstant(row["last_active_at"]?.toString())
-                    ?: Instant.now(),
-                isCurrentDevice = id == current,
-            )
-        }
-    }
+    /** Dormant feature: no rows exist server-side. */
+    suspend fun linkedDevices(): List<LinkedDevice> = emptyList()
 
-    /** Exact port of revokeDevice, including the zero-affected-rows guard:
-     *  never report revocation as successful unless this authenticated
-     *  user's active device row changed. */
+    /** Dormant feature: fail closed rather than pretend a revocation. */
     suspend fun revokeDevice(deviceId: String) {
-        val current = currentDeviceId()
-        if (deviceId == current) {
-            throw IllegalStateException(
-                "The current device cannot revoke itself from this screen.",
-            )
-        }
-        val revoked = queryClient.from("linked_devices")
-            .eq("user_id", userId())
-            .eq("device_id", deviceId)
-            .isNull("revoked_at")
-            .updateReturning(mapOf("revoked_at" to Instant.now().toString()))
-        if (revoked.isEmpty()) {
-            throw IllegalStateException(
-                "This linked device is no longer active or cannot be revoked.",
-            )
-        }
+        throw IllegalStateException("Linked devices are not available on this server yet.")
     }
 
     companion object {

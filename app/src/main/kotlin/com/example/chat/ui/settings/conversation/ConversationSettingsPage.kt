@@ -2,9 +2,21 @@ package com.example.chat.ui.settings.conversation
 
 import com.example.chat.ReleaseFeatures
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.FormatSize
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.sp
+import com.example.chat.ui.theme.LocalAppColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
@@ -86,6 +98,48 @@ fun ConversationSettingsPage(
             GbSubpageRow(Icons.Rounded.EditNote, "Conversation Entry style") { openSub(onOpenEntryStyle) }
             GbRowDivider()
             GbSubpageRow(Icons.Rounded.MoreHoriz, "More options") { openSub(onOpenMoreOptions) }
+        }
+        Spacer(Modifier.height(16.dp))
+        // R5 in-app chat font size (approved responsive plan 8 Nov 2026):
+        // Small/Default/Large with a live preview bubble. Applies to chat
+        // message text and timestamps only; instant, stored locally.
+        GbPanelCard {
+            GbSectionLabel("Font size")
+            val scale = com.example.chat.ServiceLocator.chatFontScale.value
+            val options = listOf("Small" to 0.85f, "Default" to 1.0f, "Large" to 1.15f)
+            for ((label, value) in options) {
+                GbChevronRow(
+                    Icons.Rounded.FormatSize, label,
+                    if (kotlin.math.abs(scale - value) < 0.01f) "Selected" else "",
+                ) {
+                    com.example.chat.ServiceLocator.setChatFontScale(value)
+                }
+                if (label != "Large") GbRowDivider()
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Column(
+                    Modifier
+                        .widthIn(max = 260.dp)
+                        .background(
+                            LocalAppColors.current.selected.copy(alpha = 0.18f),
+                            RoundedCornerShape(12.dp),
+                        )
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    Text(
+                        "Preview: your chat messages scale with this setting.",
+                        color = LocalAppColors.current.foreground,
+                        fontSize = (15f * scale).sp,
+                    )
+                    Text(
+                        "now",
+                        color = LocalAppColors.current.foregroundSecondary,
+                        fontSize = (10f * scale).sp,
+                    )
+                }
+            }
         }
         Spacer(Modifier.height(16.dp))
         GbPanelCard {

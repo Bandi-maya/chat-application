@@ -3,7 +3,6 @@ package com.example.chat.data.realtime
 import com.example.chat.data.remote.PostgresChange
 import com.example.chat.data.remote.PostgresChangeSubscription
 import com.example.chat.data.remote.RealtimeChannel
-import com.example.chat.data.remote.SupabaseRealtimeChannel
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -29,9 +28,16 @@ import kotlinx.coroutines.launch
  * fail-closed), so the invalidation is a no-op seam here.
  */
 class RealtimeReconciliationService(
-    private val supabaseUrl: String,
-    private val publishableKey: String,
-    private val accessToken: suspend () -> String?,
+    /** Backend migration: the postgres-changes channel is injected; the
+     *  production wiring is an inert fail-closed channel (no backend
+     *  postgres-changes equivalent; catch-up rides ApiBackendService's
+     *  websocket + background sync). */
+    private val channelFactory: (
+        topic: String,
+        tables: List<PostgresChangeSubscription>,
+        onChange: (PostgresChange) -> Unit,
+        onStatus: (com.example.chat.data.remote.RealtimeSubscribeStatus) -> Unit,
+    ) -> RealtimeChannel,
     private val currentUserId: () -> String?,
     /** Mirrors reads of _conversationsById / _messagesByChatId. */
     private val hasConversation: (String) -> Boolean,
@@ -82,16 +88,12 @@ class RealtimeReconciliationService(
             "mls_control_messages",
             "mls_welcomes",
         )
-        val newChannel = SupabaseRealtimeChannel(
-            supabaseUrl = supabaseUrl,
-            publishableKey = publishableKey,
-            accessToken = accessToken,
-            topic = "chaty-user-$userId",
-            subscriptions = tables.map { PostgresChangeSubscription(table = it) },
-            onChange = { change -> handleChange(change) },
-            onStatus = onStatus,
+        val newChannel = channelFactory(
+            "chaty-user-$userId",
+            tables.map { PostgresChangeSubscription(table = it) },
+            { change -> handleChange(change) },
+            onStatus,
         )
-        newChannel.start()
         synchronized(lock) { channel = newChannel }
     }
 

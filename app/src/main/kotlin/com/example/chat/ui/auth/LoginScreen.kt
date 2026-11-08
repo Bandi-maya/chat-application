@@ -62,7 +62,7 @@ private const val STORAGE_FAILURE_ACTION_LABEL = "Share error report"
 
 /** Port of lib/features/auth/login_screen.dart. The login call is injected so
  *  the screen never touches the service locator directly (testable seam);
- *  AppRoot wires ServiceLocator.authRepository.login plus
+ *  AppRoot wires ServiceLocator.apiBackend login plus
  *  LocalPreferencesStorage.setStoredUserId, mirroring the Dart call sequence. */
 @Composable
 fun LoginScreen(

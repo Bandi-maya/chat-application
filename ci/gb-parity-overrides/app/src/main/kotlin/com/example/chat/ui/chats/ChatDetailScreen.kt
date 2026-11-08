@@ -1818,7 +1818,8 @@ private fun ConversationHeader(
                     Text(
                         conversation.title,
                         color = Color(theme.primaryTextColor),
-                        fontSize = (15.5 * theme.fontScale).sp,
+                        // R4: fixed header - system font scales up to 1.3x, then clamps.
+                        fontSize = com.example.chat.ui.kit.clampedLabelSp((15.5 * theme.fontScale).toFloat()),
                         fontWeight = FontWeight.W800,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

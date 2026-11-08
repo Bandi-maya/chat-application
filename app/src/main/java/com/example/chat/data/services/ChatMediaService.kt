@@ -1,6 +1,6 @@
 package com.example.chat.data.services
 
-import com.example.chat.data.remote.SupabaseStorageClient
+import com.example.chat.data.remote.MediaStorageBackend
 import com.example.chat.data.network.TransferDirection
 import com.example.chat.data.network.TransferKind
 import com.example.chat.data.network.TransferMonitor
@@ -23,7 +23,7 @@ import kotlinx.coroutines.CancellationException
  * the production path).
  */
 class ChatMediaService(
-    private val storage: SupabaseStorageClient,
+    private val storage: MediaStorageBackend,
     private val currentUserId: () -> String?,
     /** universal.sendImagesFullResolutionMb (clamped 1..6 upstream). */
     private val sendImagesFullResolutionMb: () -> Int = { 6 },

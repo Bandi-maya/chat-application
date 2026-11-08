@@ -32,6 +32,11 @@ object ReleaseFeatures {
     /** Blocking contacts. Needs a block-list API. */
     const val BLOCK_CONTACTS = true
 
+    /** Per-contact privacy overrides (ContactInfo > Individual Privacy
+     *  Controls): hidden until the backend enforces them server-side -
+     *  a local-only toggle would leak receipts/typing the user hid. */
+    const val CONTACT_PRIVACY_OVERRIDES = false
+
     /** Client available; server receipt required, unavailable backend surfaces honest failure. */
     const val UGC_REPORTING = true
 

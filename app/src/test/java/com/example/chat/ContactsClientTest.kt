@@ -127,6 +127,40 @@ class ContactsClientTest {
     }
 
     @Test
+    fun outgoingParsesRecipients() {
+        val t = FakeTransport { call ->
+            assertTrue(call.url.endsWith("/contacts/requests/outgoing"))
+            200 to """{"data":[{"request_id":"r9","to":{"id":"u9","username":"arjun","display_name":"Arjun","about":"","avatar_url":null}}]}"""
+        }
+        val outgoing = client(t).outgoing()
+        assertEquals(1, outgoing.size)
+        assertEquals("r9", outgoing[0].requestId)
+        assertEquals("arjun", outgoing[0].from.username)
+        assertEquals("u9", outgoing[0].from.userId)
+    }
+
+    @Test
+    fun outgoingOldServerThrowsPlaneUnavailable() {
+        val t = FakeTransport { 404 to """{"detail":"Not Found"}""" }
+        try {
+            client(t).outgoing()
+            org.junit.Assert.fail("expected PlaneUnavailable")
+        } catch (e: com.example.chat.data.api.ApiContactsClient.PlaneUnavailable) {
+            // expected: fail closed on a pre-plane server
+        }
+    }
+
+    @Test
+    fun blockUserPostsUserId() {
+        val t = FakeTransport { call ->
+            assertTrue(call.method == "POST" && call.url.endsWith("/block"))
+            assertTrue(call.body!!.contains("\"user_id\":\"u1\""))
+            200 to """{"data":{"blocked":true}}"""
+        }
+        client(t).blockUser("u1")
+    }
+
+    @Test
     fun callPolicyGetAndPut() {
         var policy = "everyone"
         val t = FakeTransport { call ->

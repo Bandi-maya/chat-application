@@ -50,6 +50,27 @@ class PresenceClientTest {
     }
 
     @Test
+    fun heartbeatPostsOnlineTrue() {
+        var seenBody: String? = null
+        val c = ApiPresenceClient({ "http://10.0.2.2:8000" }, { "chat-application" }, object : ApiHttpTransport {
+            override fun execute(method: String, url: String, headers: Map<String, String>, body: String?): Pair<Int, String> {
+                seenBody = body
+                return 200 to """{"data":{"online":true}}"""
+            }
+        }, token = { "tok" })
+        assertTrue(c.heartbeat(true))
+        assertTrue(seenBody!!.contains("\"online\":true"))
+    }
+
+    @Test
+    fun heartbeatFailClosedOnError() {
+        val t500 = FakeTransport { _, _ -> 500 to "oops" }
+        assertTrue(!client(t500).heartbeat(true))
+        val throwing = FakeTransport { _, _ -> throw Exception("no net") }
+        assertTrue(!client(throwing).heartbeat(false))
+    }
+
+    @Test
     fun apiV1FallbackUsed() {
         val t = FakeTransport { _, url ->
             if (url.contains("/api/v1/presence/")) 200 to """{"data":{"user_id":"u1","online":true}}"""

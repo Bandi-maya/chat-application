@@ -147,10 +147,15 @@ val chatyRemoteImage: RemoteImageSlot = { url, modifier, contentDescription ->
 
 private val bubbleMetaTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
-/** Dart: MediaQuery.sizeOf(context).width * theme.bubbleMaxWidthFactor. */
+/** Dart: MediaQuery.sizeOf(context).width * theme.bubbleMaxWidthFactor.
+ *  Responsive plan (8 Nov 2026): never wider than 78% of the pane and a
+ *  hard 520dp ceiling so ultra-wide windows stay readable. */
 @Composable
-private fun bubbleMaxWidth(theme: ThemeConfig) =
-    (LocalConfiguration.current.screenWidthDp * theme.bubbleMaxWidthFactor).toFloat().dp
+private fun bubbleMaxWidth(theme: ThemeConfig): androidx.compose.ui.unit.Dp {
+    val pane = LocalConfiguration.current.screenWidthDp.toFloat()
+    val factor = theme.bubbleMaxWidthFactor.toFloat().coerceAtMost(0.78f)
+    return (pane * factor).coerceAtMost(520f).dp
+}
 
 /** Exact port of lib/features/messages/message_bubble.dart against the
  *  current model/theme surface. Flutter-plugin-dependent renderers keep the
@@ -326,7 +331,7 @@ fun ChatMessageBubble(
             if (enableAnimatedEmojis) {
                 AnimatedEmojiText(
                     text = message.text,
-                    fontSize = emojiInfo.fontSize(messageTextSize * theme.fontScale).toFloat(),
+                    fontSize = emojiInfo.fontSize(messageTextSize * theme.fontScale * com.example.chat.ui.kit.LocalChatFontScale.current).toFloat(),
                     height = 1.25f,
                     messageId = message.id,
                     emojiStyle = emojiStyle,
@@ -335,8 +340,8 @@ fun ChatMessageBubble(
                 Text(
                     message.text,
                     modifier = Modifier.testTag("message_emoji_only_text"),
-                    fontSize = emojiInfo.fontSize(messageTextSize * theme.fontScale).sp,
-                    lineHeight = (emojiInfo.fontSize(messageTextSize * theme.fontScale) * 1.25).sp,
+                    fontSize = emojiInfo.fontSize(messageTextSize * theme.fontScale * com.example.chat.ui.kit.LocalChatFontScale.current).sp,
+                    lineHeight = (emojiInfo.fontSize(messageTextSize * theme.fontScale * com.example.chat.ui.kit.LocalChatFontScale.current) * 1.25).sp,
                 )
             }
             Box(Modifier.height(3.dp))
@@ -353,7 +358,7 @@ fun ChatMessageBubble(
                     bubbleMetaTimeFormatter.format(message.createdAt.atZone(ZoneId.systemDefault())),
                     modifier = Modifier.testTag("message_timestamp"),
                     color = Color(timestampColor),
-                    fontSize = (10 * theme.fontScale).sp,
+                    fontSize = (10 * theme.fontScale * com.example.chat.ui.kit.LocalChatFontScale.current).sp,
                 )
                 Box(Modifier.width(4.dp))
                 DeliveryStatusIcon(
@@ -765,7 +770,7 @@ fun ChatMessageBubble(
                                 if (enableAnimatedEmojis) {
                                     AnimatedEmojiText(
                                         text = message.text,
-                                        fontSize = (messageTextSize * theme.fontScale).toFloat(),
+                                        fontSize = (messageTextSize * theme.fontScale * com.example.chat.ui.kit.LocalChatFontScale.current).toFloat(),
                                         color = Color(textColor),
                                         height = 1.35f,
                                         messageId = message.id,
@@ -781,8 +786,8 @@ fun ChatMessageBubble(
                                     }
                                     val bodyStyle = TextStyle(
                                         color = Color(textColor),
-                                        fontSize = (messageTextSize * theme.fontScale).sp,
-                                        lineHeight = (messageTextSize * theme.fontScale * 1.35).sp,
+                                        fontSize = (messageTextSize * theme.fontScale * com.example.chat.ui.kit.LocalChatFontScale.current).sp,
+                                        lineHeight = (messageTextSize * theme.fontScale * com.example.chat.ui.kit.LocalChatFontScale.current * 1.35).sp,
                                     )
                                     if (linkSpans.isEmpty()) {
                                         BasicText(
