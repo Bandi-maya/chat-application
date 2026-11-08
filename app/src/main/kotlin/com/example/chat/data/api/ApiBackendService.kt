@@ -1726,6 +1726,14 @@ class ApiBackendService(
      *  unverified-email banner disappears without a fresh login. */
     fun markEmailVerified() = session.markEmailVerified()
 
+    /** Live username availability for the edit-profile field (report 5.1). */
+    suspend fun usernameAvailability(username: String): ApiAuthClient.UsernameAvailability =
+        withContext(Dispatchers.IO) { auth.usernameAvailability(username) }
+
+    /** Exact-match public profile by username (contacts plane). */
+    suspend fun profileByUsername(username: String): Map<String, Any?> =
+        withContext(Dispatchers.IO) { auth.profileByUsername(username) }
+
     /** ApiBackendService.registerOrganization: on success applies the new
      *  tenant (Dart setTenantId) and adopts the returned admin session. */
     suspend fun registerOrganization(

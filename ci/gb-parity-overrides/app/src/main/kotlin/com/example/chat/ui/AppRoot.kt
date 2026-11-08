@@ -1426,10 +1426,24 @@ fun AppRoot() {
                                 onSave = { name, username, about, avatarUrl, _ ->
                                     // Dart updateUser -> api.updateProfile(name, about, username, updated.avatarUrl);
                                     // bannerUrl is not sent by the api-branch backend either.
+                                    // Goes through PUT /profile/me (research 5.1) so username
+                                    // changes persist; the client falls back to the legacy route
+                                    // on servers that predate the profile plane.
                                     ServiceLocator.apiBackend.updateProfile(
                                         displayName = name, about = about, username = username,
                                         avatarUrl = avatarUrl ?: editUser.avatarUrl,
                                     )
+                                },
+                                // Live username availability (research 5.1). Servers predating
+                                // the profile plane answer "available" and the save surfaces any
+                                // conflict as a 409 instead.
+                                checkUsernameAvailable = { candidate ->
+                                    try {
+                                        val r = ServiceLocator.apiBackend.usernameAvailability(candidate)
+                                        r.valid && r.available
+                                    } catch (_: Exception) {
+                                        true
+                                    }
                                 },
                             )
                         }

@@ -21,10 +21,16 @@ object ChatyValidators {
     fun validateUsername(value: String?, forRegistration: Boolean = true): String? {
         if (value == null || value.trim().isEmpty()) return "Username is required"
         val normalized = normalizeUsername(value)
+        // WhatsApp's username rules (research 5.1): 3-30 chars, a-z 0-9 . _,
+        // at least one letter, no leading or trailing dot.
         if (normalized.length < 3) return "Username must be at least 3 characters"
-        if (normalized.length > 24) return "Username must not exceed 24 characters"
-        if (!Regex("^[a-z0-9_]+$").matches(normalized)) {
-            return "Only letters, numbers, and underscores are allowed"
+        if (normalized.length > 30) return "Username must not exceed 30 characters"
+        if (!Regex("^[a-z0-9._]+$").matches(normalized)) {
+            return "Only letters, numbers, dots and underscores are allowed"
+        }
+        if (normalized.none { it.isLetter() }) return "Username must contain at least one letter"
+        if (normalized.startsWith(".") || normalized.endsWith(".")) {
+            return "Username can't start or end with a dot"
         }
         if (forRegistration && reservedUsernames.contains(normalized)) {
             return "This username is reserved and cannot be registered"

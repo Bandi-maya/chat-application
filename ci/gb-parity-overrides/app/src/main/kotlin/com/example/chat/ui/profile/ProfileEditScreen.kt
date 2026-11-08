@@ -43,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -107,6 +108,27 @@ fun ProfileEditScreen(
 
     var displayName by remember { mutableStateOf(user.displayName) }
     var username by remember { mutableStateOf(user.username) }
+    var usernameCheckLoading by remember { mutableStateOf(false) }
+    // Live availability check, debounced (report 5.1); the save path re-checks
+    // against the server too, so a stale result here never decides alone.
+    LaunchedEffect(username) {
+        val normalized = ChatyValidators.normalizeUsername(username)
+        val unchanged = normalized == ChatyValidators.normalizeUsername(user.username)
+        if (unchanged || checkUsernameAvailable == null ||
+            ChatyValidators.validateUsername(normalized, forRegistration = false) != null
+        ) {
+            usernameCheckLoading = false
+            return@LaunchedEffect
+        }
+        usernameCheckLoading = true
+        kotlinx.coroutines.delay(500)
+        usernameTaken = try {
+            checkUsernameAvailable(normalized) == false
+        } catch (_: Exception) {
+            false  // network hiccup: leave the field neutral, save re-checks
+        }
+        usernameCheckLoading = false
+    }
     var about by remember { mutableStateOf(user.about) }
     var isSaving by remember { mutableStateOf(false) }
     var usernameTaken by remember { mutableStateOf(false) }
@@ -387,6 +409,7 @@ fun ProfileEditScreen(
                     supportingText = {
                         Text(
                             if (usernameTaken) "This username is already taken"
+                            else if (usernameCheckLoading) "Checking availability..."
                             else "${username.length}/30",
                         )
                     },

@@ -58,9 +58,29 @@ class ParityBehaviorTest {
             ChatyValidators.validateUsername("ab"),
         )
         assertEquals(
-            "Only letters, numbers, and underscores are allowed",
+            "Only letters, numbers, dots and underscores are allowed",
             ChatyValidators.validateUsername("bad-name"),
         )
+        // WhatsApp's rules (research 5.1): dots allowed, a letter required,
+        // no leading/trailing dot, 30-char cap.
+        assertNull(ChatyValidators.validateUsername("bandi.maya_2"))
+        assertEquals(
+            "Username must contain at least one letter",
+            ChatyValidators.validateUsername("123_45"),
+        )
+        assertEquals(
+            "Username can't start or end with a dot",
+            ChatyValidators.validateUsername(".bandi"),
+        )
+        assertEquals(
+            "Username can't start or end with a dot",
+            ChatyValidators.validateUsername("bandi."),
+        )
+        assertEquals(
+            "Username must not exceed 30 characters",
+            ChatyValidators.validateUsername("a".repeat(31)),
+        )
+        assertNull(ChatyValidators.validateUsername("a".repeat(30)))
     }
 
     @Test fun `validatePassword enforces the Dart rule chain`() {

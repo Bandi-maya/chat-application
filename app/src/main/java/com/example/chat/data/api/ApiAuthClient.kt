@@ -104,38 +104,69 @@ class ApiAuthClient(
         displayName: String?, about: String?, username: String?, avatarUrl: String?,
         check: () -> Unit,
     ): Pair<Boolean, String> {
-        val payload = JSONObject()
-        if (displayName != null) payload.put("full_name", displayName.trim())
-        if (about != null) payload.put("about", about.trim())
-        if (username != null) payload.put("username", username.trim())
-        val publicProfile = JSONObject()
-        if (about != null) publicProfile.put("about", about.trim())
-        if (avatarUrl != null) publicProfile.put("avatarUrl", avatarUrl.trim())
-        payload.put("publicProfile", publicProfile)
-
         val headers = mapOf(
             "Authorization" to "Bearer $authToken",
             "Content-Type" to "application/json",
             "x-tenant-id" to tenant,
         )
+
+        // Preferred plane (research 5.1): PUT /profile/me persists username
+        // changes; the legacy /app-users/profile drops them. Old servers 404
+        // the new route, so fall back in that case only.
+        val newPayload = JSONObject()
+        if (displayName != null) newPayload.put("display_name", displayName.trim())
+        if (about != null) newPayload.put("about", about.trim())
+        if (avatarUrl != null) newPayload.put("avatar", avatarUrl.trim())
+        if (username != null) newPayload.put("username", username.trim())
+
+        val legacyPayload = JSONObject()
+        if (displayName != null) legacyPayload.put("full_name", displayName.trim())
+        if (about != null) legacyPayload.put("about", about.trim())
+        if (username != null) legacyPayload.put("username", username.trim())
+        val publicProfile = JSONObject()
+        if (about != null) publicProfile.put("about", about.trim())
+        if (avatarUrl != null) publicProfile.put("avatarUrl", avatarUrl.trim())
+        legacyPayload.put("publicProfile", publicProfile)
+
         check()
-        val response = try {
-            transport.execute("PUT", "$base/app-users/profile", headers, payload.toString())
+        var response = try {
+            transport.execute("PUT", "$base/profile/me", headers, newPayload.toString())
         } catch (e: Exception) {
             throw Exception("Unable to reach server to update profile: $e")
         }
         check()   // switch while in flight: no retry under a stale account
-        val finalResponse = if (response.first == 404) {
-            try {
-                transport.execute("PUT", "$base/api/v1/app-users/profile", headers, payload.toString())
+        if (response.first == 404) {
+            response = try {
+                transport.execute("PUT", "$base/api/v1/profile/me", headers, newPayload.toString())
             } catch (e: Exception) {
                 throw Exception("Unable to reach server to update profile: $e")
             }
+            check()
+        }
+        val finalResponse = if (response.first == 404) {
+            // Server predates the profile plane: legacy route, which silently
+            // drops username (the gap the new plane closes).
+            val legacy = try {
+                transport.execute("PUT", "$base/app-users/profile", headers, legacyPayload.toString())
+            } catch (e: Exception) {
+                throw Exception("Unable to reach server to update profile: $e")
+            }
+            check()
+            if (legacy.first == 404) {
+                val legacyV1 = try {
+                    transport.execute("PUT", "$base/api/v1/app-users/profile", headers, legacyPayload.toString())
+                } catch (e: Exception) {
+                    throw Exception("Unable to reach server to update profile: $e")
+                }
+                check()
+                legacyV1
+            } else legacy
         } else response
         check()   // never release a result into a replaced account
 
         if (finalResponse.first == 200) return true to ""
         var detail = "Failed to update profile (${finalResponse.first})"
+        if (finalResponse.first == 409) detail = "That username is taken."
         try {
             val body = JSONObject(finalResponse.second)
             val d = if (body.has("detail") && !body.isNull("detail")) body.get("detail").toString()
@@ -270,6 +301,96 @@ class ApiAuthClient(
         } catch (_: Exception) {
         }
         throw Exception(errorMsg)
+    }
+
+    /** Username availability verdict (report 5.1: yes/no only, no taken
+     *  suggestions). [reason] carries the inline rule error when valid=false. */
+    data class UsernameAvailability(val valid: Boolean, val available: Boolean, val reason: String? = null)
+
+    /** GET /profile/username-availability?u= (+ /api/v1 fallback). */
+    fun usernameAvailability(username: String): UsernameAvailability {
+        val tok = token() ?: throw Exception("Not authenticated")
+        val base = baseUrl()
+        val headers = mapOf(
+            "Authorization" to "Bearer $tok",
+            "Content-Type" to "application/json",
+            "x-tenant-id" to tenantId(),
+        )
+        val encoded = java.net.URLEncoder.encode(username.trim(), "UTF-8")
+        var response = try {
+            transport.execute("GET", "$base/profile/username-availability?u=$encoded", headers, null)
+        } catch (e: Exception) {
+            throw Exception("Unable to reach server. Please check your internet connection.")
+        }
+        if (response.first == 404) {
+            response = try {
+                transport.execute("GET", "$base/api/v1/profile/username-availability?u=$encoded", headers, null)
+            } catch (e: Exception) {
+                throw Exception("Unable to reach server. Please check your internet connection.")
+            }
+        }
+        if (response.first == 404) {
+            // Server predates the profile plane: no live check, let the save
+            // attempt surface any conflict instead.
+            return UsernameAvailability(valid = true, available = true)
+        }
+        if (response.first != 200) {
+            var errorMsg = "Request failed (${response.first})"
+            try {
+                val parsed = JSONObject(response.second)
+                errorMsg = parsed.optString("detail").ifEmpty { parsed.optString("message").ifEmpty { errorMsg } }
+            } catch (_: Exception) {
+            }
+            throw Exception(errorMsg)
+        }
+        val parsed = JSONObject(response.second)
+        val data = parsed.optJSONObject("data") ?: parsed
+        return UsernameAvailability(
+            valid = data.optBoolean("valid", true),
+            available = data.optBoolean("available", false),
+            reason = if (data.has("reason") && !data.isNull("reason")) data.get("reason").toString() else null,
+        )
+    }
+
+    /** GET /profile/{username} (+ /api/v1 fallback): exact-match public-safe
+     *  profile for the contacts plane. 404 surfaces "No account with that
+     *  username."; servers predating the profile plane get the same message. */
+    fun profileByUsername(username: String): Map<String, Any?> {
+        val tok = token() ?: throw Exception("Not authenticated")
+        val base = baseUrl()
+        val headers = mapOf(
+            "Authorization" to "Bearer $tok",
+            "Content-Type" to "application/json",
+            "x-tenant-id" to tenantId(),
+        )
+        val encoded = java.net.URLEncoder.encode(username.trim(), "UTF-8")
+        var response = try {
+            transport.execute("GET", "$base/profile/$encoded", headers, null)
+        } catch (e: Exception) {
+            throw Exception("Unable to reach server. Please check your internet connection.")
+        }
+        if (response.first == 404) {
+            response = try {
+                transport.execute("GET", "$base/api/v1/profile/$encoded", headers, null)
+            } catch (e: Exception) {
+                throw Exception("Unable to reach server. Please check your internet connection.")
+            }
+        }
+        if (response.first != 200) {
+            var errorMsg = "No account with that username."
+            if (response.first != 404) {
+                errorMsg = "Request failed (${response.first})"
+                try {
+                    val parsed = JSONObject(response.second)
+                    errorMsg = parsed.optString("detail").ifEmpty { parsed.optString("message").ifEmpty { errorMsg } }
+                } catch (_: Exception) {
+                }
+            }
+            throw Exception(errorMsg)
+        }
+        val parsed = JSONObject(response.second)
+        val data = parsed.optJSONObject("data") ?: parsed
+        return jsonToMap(data)
     }
 
     /** POST auth/email/verification/send: asks the server to email a fresh
