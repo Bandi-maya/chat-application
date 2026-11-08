@@ -1517,6 +1517,22 @@ fun AppRoot() {
                         route = AuthRoute.ChatDetail
                     },
                     onBack = { navigation.goBack() },
+                    loadContactRelations = {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val plane = ServiceLocator.apiBackend.contactsPlane()
+                            plane.contacts() to plane.inbox()
+                        }
+                    },
+                    sendContactRequest = { username ->
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            ServiceLocator.apiBackend.contactsPlane().sendRequest(username)
+                        }
+                    },
+                    respondContactRequest = { requestId, accept ->
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            ServiceLocator.apiBackend.contactsPlane().respond(requestId, if (accept) "accept" else "decline")
+                        }
+                    },
                 )
             }
             AuthRoute.GlobalSearch -> {

@@ -89,6 +89,11 @@ fun NewChatScreen(
     deleteUser: suspend (String) -> Unit,
     onOpenConversation: (Conversation) -> Unit,
     onBack: () -> Unit,
+    // Contacts plane (research 5.3): username search -> request -> inbox.
+    // Null = pre-plane server: the screen keeps its legacy tap-to-chat flow.
+    loadContactRelations: (suspend () -> Pair<List<com.example.chat.data.api.ApiContactsClient.ContactEntry>, List<com.example.chat.data.api.ApiContactsClient.ContactRequestItem>>)? = null,
+    sendContactRequest: (suspend (String) -> Unit)? = null,
+    respondContactRequest: (suspend (String, Boolean) -> Unit)? = null,
 ) {
     val colors = LocalAppColors.current
     val scope = rememberCoroutineScope()
@@ -109,6 +114,15 @@ fun NewChatScreen(
     fun errorText(error: Throwable): String =
         (error.message ?: error.toString()).removePrefix("Exception: ")
 
+    // Contacts plane state (research 5.3). Empty/absent on pre-plane servers.
+    var contactIds by remember { mutableStateOf(setOf<String>()) }
+    var contactUsernames by remember { mutableStateOf(setOf<String>()) }
+    var contactRequests by remember { mutableStateOf(listOf<com.example.chat.data.api.ApiContactsClient.ContactRequestItem>()) }
+    var requestedUsernames by remember { mutableStateOf(setOf<String>()) }
+
+    fun isContact(user: UserProfile): Boolean =
+        user.id in contactIds || user.username.lowercase() in contactUsernames
+
     // _loadInitialUsers: remote directory load; failure only clears loading.
     LaunchedEffect(Unit) {
         isLoading = true
@@ -117,6 +131,32 @@ fun NewChatScreen(
         } catch (_: Exception) {
         } finally {
             isLoading = false
+        }
+        if (loadContactRelations != null) {
+            try {
+                val (contacts, inbox) = loadContactRelations()
+                contactIds = contacts.map { it.userId }.toSet()
+                contactUsernames = contacts.map { it.username.lowercase() }.toSet()
+                contactRequests = inbox
+            } catch (_: Exception) {
+                // Plane unavailable: legacy flow, no requests section.
+            }
+        }
+    }
+
+    fun respondToRequest(req: com.example.chat.data.api.ApiContactsClient.ContactRequestItem, accept: Boolean) {
+        scope.launch {
+            try {
+                respondContactRequest?.invoke(req.requestId, accept)
+                contactRequests = contactRequests.filterNot { it.requestId == req.requestId }
+                if (accept) {
+                    contactIds = contactIds + req.from.userId
+                    contactUsernames = contactUsernames + req.from.username.lowercase()
+                }
+                snackbar.showSnackbar(if (accept) "${req.from.displayName} added to your contacts" else "Request declined")
+            } catch (error: Exception) {
+                snackbar.showSnackbar(errorText(error))
+            }
         }
     }
 
@@ -311,6 +351,44 @@ fun NewChatScreen(
                 )
                 Spacer(Modifier.height(4.dp))
             }
+            // Incoming contact requests inbox (research 5.3: Signal's
+            // message-request pattern applied to contacts).
+            if (!isCreatingGroup && contactRequests.isNotEmpty()) {
+                Column(Modifier.padding(horizontal = 16.dp)) {
+                    Text(
+                        "Contact requests",
+                        color = colors.primary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 6.dp),
+                    )
+                    contactRequests.forEach { req ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    req.from.displayName,
+                                    color = colors.foreground,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text("@${req.from.username}", color = colors.foregroundSecondary, fontSize = 12.sp)
+                            }
+                            TextButton(onClick = { respondToRequest(req, true) }) {
+                                Text("Accept", color = colors.primary, fontWeight = FontWeight.Bold)
+                            }
+                            TextButton(onClick = { respondToRequest(req, false) }) {
+                                Text("Decline", color = colors.error)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
             when {
                 isLoading && results.isEmpty() -> {
                     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
@@ -378,6 +456,10 @@ fun NewChatScreen(
                                     .clickable {
                                         if (isCreatingGroup) {
                                             selectedMembers = NewChatRules.toggleMember(selectedMembers, user.id)
+                                        } else if (loadContactRelations != null && !isContact(user)) {
+                                            // Contacts plane: non-contacts go
+                                            // through the request flow first.
+                                            sheetUser = user
                                         } else {
                                             openDirectChat(user)
                                         }
@@ -398,7 +480,9 @@ fun NewChatScreen(
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                     Text(
-                                        "@${user.username}${if (user.about.isNotEmpty()) " • ${user.about}" else ""}",
+                                        "@${user.username}" +
+                                            (if (isContact(user)) " • contact" else if (user.username.lowercase() in requestedUsernames) " • requested" else "") +
+                                            (if (user.about.isNotEmpty()) " • ${user.about}" else ""),
                                         color = colors.foregroundSecondary,
                                         fontSize = 12.sp,
                                         maxLines = 1,
@@ -455,6 +539,29 @@ fun NewChatScreen(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(16.dp),
                 )
+                if (sendContactRequest != null && !isContact(sheetTarget)) {
+                    if (sheetTarget.username.lowercase() in requestedUsernames) {
+                        SheetAction(label = "Contact request pending", tint = colors.foregroundTertiary, onClick = {})
+                    } else {
+                        SheetAction(
+                            label = "Send Contact Request",
+                            tint = colors.primary,
+                            onClick = {
+                                val target = sheetTarget
+                                sheetUser = null
+                                scope.launch {
+                                    try {
+                                        sendContactRequest(target.username)
+                                        requestedUsernames = requestedUsernames + target.username.lowercase()
+                                        snackbar.showSnackbar("Request sent to ${target.displayName}")
+                                    } catch (error: Exception) {
+                                        snackbar.showSnackbar(errorText(error))
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
                 SheetAction(
                     label = "Start Chat",
                     tint = colors.primary,
