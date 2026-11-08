@@ -646,6 +646,70 @@ jobs:
             [ -f "$t" ] && { echo "TIMING-BEGIN $k"; cat "$t"; echo; echo "TIMING-END $k"; } || echo "TIMING-MISSING $k"
           done
 
+  # Live-backend login reproduction probe (Bandi 2026-11-08, phase-gated
+  # debugging isolation phase): registers a throwaway account through the live
+  # API, drives the real login UI on the emulator against
+  # https://api.chat.logybyte.in and records whether the reported post-login
+  # bounce (Home -> Welcome, no error message) reproduces. Workflow-only
+  # addition; no app code is touched. Uses the prod-routed debug APK from the
+  # build job (built before the synthetic .env override is written).
+  # Dispatch-gated like the rest of the emulator tier. The throwaway account
+  # is created per-run with a random name; credentials never appear in logs.
+  prod-auth-repro:
+    needs: [build, gate]
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-emulator]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: chaty-kotlin-debug-apk
+          path: runtime-apks
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Register throwaway account on the live backend
+        run: |
+          set -e
+          SUFFIX="$(date +%s)$RANDOM"
+          CHATY_PROD_USER="cirepro${SUFFIX}"
+          CHATY_PROD_PASS="CiRepro${SUFFIX}X"
+          echo "::add-mask::${CHATY_PROD_PASS}"
+          echo "CHATY_PROD_USER=${CHATY_PROD_USER}" >> "$GITHUB_ENV"
+          echo "CHATY_PROD_PASS=${CHATY_PROD_PASS}" >> "$GITHUB_ENV"
+          echo "registering throwaway ${CHATY_PROD_USER}"
+          CODE=$(curl -sS -o /tmp/register-response.json -w '%{http_code}' \
+            -X POST "https://api.chat.logybyte.in/auth/register" \
+            -H 'Content-Type: application/json' \
+            -H 'x-tenant-id: chat-application' \
+            --data "{\"email\":\"${CHATY_PROD_USER}@example.com\",\"username\":\"${CHATY_PROD_USER}\",\"password\":\"${CHATY_PROD_PASS}\"}")
+          echo "register HTTP $CODE"
+          if [ "$CODE" != "200" ] && [ "$CODE" != "201" ]; then
+            echo "REGISTRATION FAILED - response body:"
+            cat /tmp/register-response.json
+            exit 1
+          fi
+      - name: Live-backend login reproduction (emulator)
+        uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 18
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
+          script: bash ci/prod-auth-repro.sh runtime-apks/app-debug.apk
+      - name: Upload reproduction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-auth-repro-evidence
+          path: prod-auth-evidence/
+          if-no-files-found: warn
+
   # Bounded infrastructure experiment (authorized 19:23): re-run ONLY the two
   # 175 lost shards (media, emoji-real) serially on one runner - one emulator
   # at a time - plus one targeted capture session for the core-ui diagnostic
