@@ -1,7 +1,4 @@
 {
-  "source_run": 42345261390,
-  "source_commit": "729d041cf49a1cbf04321d714f2029b344a72fb7",
-  "kotlin_parent": "82d14cfddbdc76ea8206579bac5aae7df89f3ce6",
   "files": {
     "app/src/androidTest/java/com/example/chat/ApprovedLoginCapsuleProofTest.kt": "a88bd210e55a0eb922f2c9c85b84c74ea0602e99d5e1ae49b6c0cc2799eadbb3",
     "app/src/debug/java/com/example/chat/SwipeRowFixtureActivity.kt": "9cb26c593b61cdeaf0a5542e6bf02799841ed2c109dd6de180adbccca1320fc2",
@@ -14,7 +11,7 @@
     "app/src/main/assets/icon-packs/original-supplemental-provenance.json": "a0b0d5bacced4be540a3e7c5bab2b084064599de486fa7a7e33d56072179089e",
     "app/src/main/assets/icon-packs/phos_77_map.json": "465628a2571b78b8c012b5347a4029c2c4c8c51d7e9f35b36aef3b713e3e63e6",
     "app/src/main/assets/icon-packs/pika_77_map.json": "a8576e08644fae51655feaf8811d24517ed70cdfe5e4cd6543d6102e3890dde4",
-    "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "4eab26e6a75b6e3a14e1fe675a65862fef3753313f3ee6e4d2f76b7376dd70f4",
+    "app/src/main/kotlin/com/example/chat/ui/AppRoot.kt": "d54345b86b868cfd15979f1ee05058216c2882b0019d3e3fc9e2857308435eb5",
     "app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt": "c3946324da71127025e4d3556e1ef071249dfe01a449e384c3b923941f28ec65",
     "app/src/main/kotlin/com/example/chat/ui/ChatPollUi.kt": "c95fa619cb742a1d6d13c0d12f3b413873ff71b676fcc9a49d311a0595044541",
     "app/src/main/kotlin/com/example/chat/ui/ChatVoiceBinding.kt": "a9ea78434edc936662a8cd0140fc1d0ea5995465642c15005967faaf8ae03295",
@@ -135,7 +132,7 @@
     "app/src/main/kotlin/com/example/chat/ui/settings/SettingsRootScreen.kt": "2e949563e74c2b36fa0f56f528693cca05d9d30395b151c7ce18291be4b8774a",
     "app/src/main/kotlin/com/example/chat/ui/settings/SettingsScreen.kt": "5c70fae95a17a14e721b3f8b858fb103f8aa9f8384934afd8b3ff25323ef045a",
     "app/src/main/kotlin/com/example/chat/ui/settings/StorageMediaScreen.kt": "9396a19d3997356a70e6b840daea81c8f9dce5a8d4569a9e9f24e9f4b19e0867",
-    "app/src/main/kotlin/com/example/chat/ui/settings/account/AccountSettingsScreen.kt": "b8b38b4b0f27d4a779e9eb72848f8a519cad0cb0375838a4554e47a4866a366f",
+    "app/src/main/kotlin/com/example/chat/ui/settings/account/AccountSettingsScreen.kt": "02f3ab1ec9ff80ef6a99109e14b765326982f6d89922836e940eec9f2abf6640",
     "app/src/main/kotlin/com/example/chat/ui/settings/appearance/ComponentStylesScreen.kt": "efab3890b6c79f2c0a54e38507cb8524fefaf162d528238e8add55230ee9c34a",
     "app/src/main/kotlin/com/example/chat/ui/settings/appearance/UniversalAppearanceScreen.kt": "8b8408454a3725f8cb6fba9b1f147208e0814b4468fcc2d1d350f64ac2fbd317",
     "app/src/main/kotlin/com/example/chat/ui/settings/appicon/AppIconSettingsScreen.kt": "40f1dafb0fee823245667ac6b800a841ba3e6e205ed00f43172b03a40d8ed7f3",
@@ -3159,5 +3156,8 @@
     "app/src/test/java/com/example/chat/PeerIconSelectionContractTest.kt": "ba7091e834c2996a3c7190cc079f941878b032a13fb30693d60d5db150b7f6cd",
     "app/src/test/java/com/example/chat/SupplementalIconResourceContractTest.kt": "6b821763a55120b874d94b75ca083f152e7c1e3259c0b111f45f7b673d01aed3",
     "app/src/test/java/com/example/chat/ui/kit/ApprovedCompactMenuPolicyTest.kt": "49bcf87ac18257c5feb436114331361c2d37f7a69afa006cd4375721579f391f"
-  }
+  },
+  "kotlin_parent": "82d14cfddbdc76ea8206579bac5aae7df89f3ce6",
+  "source_commit": "7cf14fb30068c18cbef9fff241427062f7e3dc06",
+  "source_run": 42345261390
 }
