@@ -37,6 +37,7 @@ migrate_working_dir/
 # Local runtime state and Gradle cache
 .chaty_data/
 .gradle/
+**/build/
 build-artifacts/
 
 # Symbolication related
@@ -55,6 +56,7 @@ app.*.map.json
 **/target_android/
 third_party/**/target/
 third_party/**/target_android/
+mls-native/Cargo.lock
 
 # Docs and specifications
 specs/
