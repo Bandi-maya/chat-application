@@ -231,7 +231,7 @@ private fun AnchoredContextSurface(
                 SurfaceRect(anchorRect.left.toDp().value, anchorRect.top.toDp().value, anchorRect.width.toDp().value, anchorRect.height.toDp().value)
             }
             val res = ContextSurfaceResolver.resolve(
-                ContextSurfaceRequest(anchor, SurfaceSize(maxWidthDp = maxWidth), insets, screen, keyboard, anchorType),
+                ContextSurfaceRequest(anchor, SurfaceSize(maxWidth, estimatedHeight), insets, screen, keyboard, anchorType),
             )
         val transition = updateTransition(state, label = "contextSurface")
         val curved by transition.animateFloat(
@@ -283,6 +283,7 @@ private fun AnchoredContextSurface(
     }
 }
 
+}
 /** Dart _ReactionRailWidget: spaceAround, emoji 22sp padding 5, 32dp add circle (surfaceContainerHighest @0.6). */
 @Composable
 private fun ReactionRailRow(rail: ReactionRail, onDismiss: () -> Unit) {

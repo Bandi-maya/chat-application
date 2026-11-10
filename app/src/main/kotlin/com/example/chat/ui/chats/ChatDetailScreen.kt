@@ -2158,7 +2158,6 @@ private fun AnchoredMessageContextMenu(
     }
 }
 
-}
 
 @Composable
 private fun SelectionHeader(theme: ThemeConfig, count: Int, onCancel: () -> Unit) {
