@@ -20,10 +20,11 @@ fun ReferenceRootActions(
     user: UserProfile?,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
+    onAccountSwitcher: () -> Unit = onSettings,
 ) {
     Row {
         IconButton(onClick = onSearch) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search, semanticLabel = "Search chats and messages", color = colors.foreground) }
-        IconButton(onClick = onSettings) {
+        IconButton(onClick = onAccountSwitcher) {
             HomeAvatar(initials = user?.avatarInitials.orEmpty(),
                 color = parseAvatarColorHex(user?.avatarColorHex, colors.primary),
                 size = 28f, shape = "circle", url = user?.avatarUrl)

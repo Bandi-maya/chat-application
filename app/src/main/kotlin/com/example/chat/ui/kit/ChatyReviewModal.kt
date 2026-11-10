@@ -22,9 +22,11 @@ import com.example.chat.ui.theme.LocalAppColors
 @Composable
 fun ChatyReviewModal(title: String, subtitle: String, onDismiss: () -> Unit, body: @Composable ColumnScope.() -> Unit) {
     val colors = LocalAppColors.current
+    val windowSize = rememberAdaptiveWindowSize()
+    val maxHeight = adaptiveSheetHeight(windowSize.heightDp, fraction = 0.8f)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.padding(horizontal = 16.dp).widthIn(max = 480.dp).fillMaxWidth()
-            .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.8f).dp)
+            .heightIn(max = maxHeight)
             .shadow(12.dp, ChatyModalShape).clip(ChatyModalShape).background(colors.surface)) {
             Column(Modifier.fillMaxWidth().padding(20.dp)) {
                 Text(title, color = colors.foreground, fontSize = 21.sp, fontWeight = FontWeight.Bold)

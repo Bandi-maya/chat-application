@@ -697,8 +697,8 @@ fun ChatDetailScreen(
     // Dart _onMessageLongPress: a rect-less long press synthesizes a 100x40
     // anchor at screen center (logical px -> window px here).
     fun syntheticCenterRect(): Rect {
-        val wPx = with(menuDensity) { menuConfig.screenWidthDp.dp.toPx() }
-        val hPx = with(menuDensity) { menuConfig.screenHeightDp.dp.toPx() }
+        val wPx = with(menuDensity) { (com.example.chat.ui.kit.LocalChatPaneWidthDp.current ?: 360.dp).toPx() }
+        val hPx = with(menuDensity) { 400.dp.toPx() }
         val rw = with(menuDensity) { 100.dp.toPx() }
         val rh = with(menuDensity) { 40.dp.toPx() }
         return Rect(
@@ -714,7 +714,6 @@ fun ChatDetailScreen(
     // screen has no bottom-sheet branch).
     fun openMessageMenu(message: ChatMessage, rect: Rect?) {
         ChatyHapticsPort.selection(menuView)
-        selectedIds = selectedIds + selectionUnit(message.id)
         contextMenuMessage = message
         contextMenuAnchor = rect ?: syntheticCenterRect()
     }
@@ -828,7 +827,7 @@ fun ChatDetailScreen(
     // custom color unless unset (0xFF000000), where it falls back to the surface
     // color at sidebarOpacity.
     val showQuickRail = convPrefs.enableQuickContactSidebar &&
-        LocalConfiguration.current.screenWidthDp >= 720
+        (com.example.chat.ui.kit.LocalChatPaneWidthDp.current ?: com.example.chat.ui.kit.rememberAdaptiveWindowSize().widthDp) >= 720.dp
     val railBg = if (convPrefs.quickContactBgColor != 0xFF000000L) {
         Color(convPrefs.quickContactBgColor)
     } else {
@@ -999,6 +998,16 @@ fun ChatDetailScreen(
                         }
                         val message = row.anchor
                         val isMine = message.senderId == currentUserId
+                        val isHighlighted = message.id in selectedIds ||
+                            contextMenuMessage?.id == message.id ||
+                            highlightedMessageId == message.id
+                        val highlightColor = if (message.id in selectedIds) {
+                            Color(0x447F7F7F)
+                        } else if (contextMenuMessage?.id == message.id) {
+                            Color(theme.accentColor).copy(alpha = if (theme.isDark) 0.24f else 0.16f)
+                        } else {
+                            Color.Transparent
+                        }
                         val localText = remember(message, localOverrideAccountKey, conversation.id, localMessageRevision) { localMessageStore.text(message) }
                         if (localText != null) Text("Modified locally - only on this device", color = Color(theme.secondaryTextColor), fontSize = 10.sp, modifier = Modifier.padding(horizontal = 16.dp))
                         val bubble: @Composable () -> Unit = { ChatMessageBubble(
@@ -1041,9 +1050,7 @@ fun ChatDetailScreen(
                                 transfer.transferId == message.attachment?.id ||
                                     transfer.transferId == message.attachment?.url?.substringAfterLast('/')
                             },
-                            isSelected = selectedIds.contains(message.id) ||
-                                contextMenuMessage?.id == message.id ||
-                                highlightedMessageId == message.id,
+                            isSelected = isHighlighted,
                             showDeletedContent = showDeletedContent,
                             retainViewOnce = retainViewOnce,
                             viewOnceOpened = openedViewOnceIds.contains(message.id),
@@ -1087,12 +1094,6 @@ fun ChatDetailScreen(
                                 }
                             },
                             onViewOncePlaybackCompleted = {
-                                // Consumed in memory immediately (card expires
-                                // now). The durable append is best-effort:
-                                // playback already revealed the content, so
-                                // the write cannot be a precondition; if it
-                                // fails, expiry holds for this session but may
-                                // not survive process death.
                                 completedViewOnceIds = completedViewOnceIds + message.id
                                 scope.launch {
                                     viewOnceOpenController.consumeAfterPlayback(message.id)
@@ -1105,8 +1106,6 @@ fun ChatDetailScreen(
                             },
                             task = resolveTask(message),
                             onTaskTap = {
-                                // Dart onTaskTap: resolved task -> details; otherwise create
-                                // modal seeded with message text/id (source :2985-3003).
                                 val currentTask = resolveTask(message)
                                 if (currentTask != null) {
                                     onOpenTaskDetails(currentTask)
@@ -1120,15 +1119,17 @@ fun ChatDetailScreen(
                             },
                         ) }
                         if (isSelectionMode) {
-                            Box(Modifier.fillMaxWidth().background(
-                                if (message.id in selectedIds) Color(0x447F7F7F) else Color.Transparent,
-                            )) {
+                            Box(Modifier.fillMaxWidth().background(highlightColor)) {
                                 bubble()
                                 Box(Modifier.matchParentSize().pointerInput(message.id, selectedIds) {
                                     detectTapGestures(onTap = {
                                         toggleSelectionUnit(message.id)
                                     })
                                 })
+                            }
+                        } else if (contextMenuMessage?.id == message.id) {
+                            Box(Modifier.fillMaxWidth().background(highlightColor)) {
+                                bubble()
                             }
                         } else {
                             bubble()
@@ -2007,61 +2008,155 @@ private fun AnchoredMessageContextMenu(
         val available = MessageActionRegistry.getAvailableActions(
             message = menuMessage, isMe = menuMessage.senderId == currentUserId,
         )
-        val order = listOf(MessageActionType.reply, MessageActionType.forward, MessageActionType.copy,
-            MessageActionType.edit, MessageActionType.deleteForMe, MessageActionType.info, MessageActionType.report, MessageActionType.blockUser)
+        val order = listOf(
+            MessageActionType.reply,
+            MessageActionType.select,
+            MessageActionType.forward,
+            MessageActionType.copy,
+            MessageActionType.edit,
+            MessageActionType.deleteForMe,
+            MessageActionType.info,
+            MessageActionType.report,
+            MessageActionType.blockUser,
+        )
         val primary = order.mapNotNull { type -> available.firstOrNull { it.type == type } }
         val secondary = available.filter { it.type !in order }
         val actions = if (extraActions) secondary else primary
         androidx.activity.compose.BackHandler { messageState.value = null }
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
             val colors = com.example.chat.ui.theme.LocalAppColors.current
+            val density = androidx.compose.ui.platform.LocalDensity.current.density
             val surface = androidx.compose.ui.graphics.lerp(colors.surface, colors.primary, 0.035f)
-            Box(Modifier.fillMaxSize().background(colors.foreground.copy(alpha = 0.25f))
-                .clickable { messageState.value = null })
-            val anchorY = with(androidx.compose.ui.platform.LocalDensity.current) { ((anchorRect?.top ?: regionTop) - regionTop).toDp() }
-            // Bound the anchor from the live viewport, not a fixed menu-height guess.
-            // Leave at least three quarters of available height for scaled actions/footer.
-            val menuOffset = anchorY.coerceIn(12.dp, (maxHeight * 0.25f).coerceAtLeast(12.dp))
-            Column(Modifier.align(Alignment.TopStart).padding(horizontal = 12.dp).offset(y = menuOffset).widthIn(max = 280.dp)
-                .heightIn(max = (maxHeight - menuOffset - 12.dp).coerceAtLeast(1.dp))) {
-                if (ReleaseFeatures.MESSAGE_REACTIONS) {
-                    Row(Modifier.fillMaxWidth().background(surface, CircleShape).horizontalScroll(rememberScrollState()).padding(4.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly) {
-                        listOf("👍", "❤️", "😂", "😮", "😢", "🙏").forEach { emoji ->
-                            Box(Modifier.size(48.dp).clickable {
-                                onToggleReaction(menuMessage.id, emoji); messageState.value = null
-                            }, contentAlignment = Alignment.Center) { com.example.chat.ui.chats.detail.AnimatedEmojiView(unicode = emoji, size = 23f, animate = false, mode = com.example.chat.ui.chats.detail.EmojiDisplayMode.reaction) }
-                        }
-                        IconButton(onClick = { reactionTargetState.value = menuMessage; messageState.value = null }, modifier = Modifier.size(48.dp)) {
-                            com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.add, color = colors.foreground, semanticLabel = "More reactions")
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-                Column(Modifier.fillMaxWidth().weight(1f, fill = false)
-                    .clip(com.example.chat.ui.kit.ChatyModalShape).background(surface)) {
-                    Text("Message options", Modifier.padding(16.dp), fontWeight = FontWeight.Bold, color = colors.foreground)
-                    Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
-                        if (extraActions) com.example.chat.ui.kit.ChatyDropdownMenuItem(text = { Text("Back") }, onClick = { extraActions = false })
-                        actions.forEach { act ->
-                            com.example.chat.ui.kit.ChatyDropdownMenuItem(
-                                text = { Text(if (act.type == MessageActionType.deleteForMe) "Delete for me" else act.label,
-                                    color = if (act.isDestructive) Color(theme.dangerColor) else colors.foreground) },
-                                leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.chats.detail.actionIconId(act, menuMessage), color = if (act.isDestructive) Color(theme.dangerColor) else colors.foreground) },
-                                onClick = { messageState.value = null; onAction(menuMessage, act.type) },
+            Box(
+                Modifier.fillMaxSize()
+                    .background(colors.foreground.copy(alpha = 0.25f))
+                    .clickable { messageState.value = null },
+            )
+
+            // Adjust anchorRect relative to message region top
+            val adjustedAnchor = anchorRect?.let {
+                Rect(
+                    left = it.left,
+                    top = (it.top - regionTop).coerceAtLeast(0f),
+                    right = it.right,
+                    bottom = (it.bottom - regionTop).coerceAtLeast(0f),
+                )
+            }
+
+            val placement = com.example.chat.ui.chats.detail.MessageInteractionAnchorPolicy.computePlacement(
+                bubbleBounds = adjustedAnchor,
+                viewportWidthDp = maxWidth,
+                viewportHeightDp = maxHeight,
+                density = density,
+                isOutgoing = menuMessage.senderId == currentUserId,
+            )
+
+            // 1. WhatsApp/Telegram-style Reaction Rail (Anchored above bubble or fallback below)
+            if (ReleaseFeatures.MESSAGE_REACTIONS) {
+                Row(
+                    Modifier
+                        .offset(x = placement.reactionRailLeftDp, y = placement.reactionRailTopDp)
+                        .background(surface, CircleShape)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .shadow(elevation = 6.dp, shape = CircleShape)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    listOf("👍", "❤️", "😂", "😮", "😢", "🙏").forEach { emoji ->
+                        Box(
+                            Modifier.size(42.dp).clickable {
+                                onToggleReaction(menuMessage.id, emoji)
+                                messageState.value = null
+                            },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            com.example.chat.ui.chats.detail.AnimatedEmojiView(
+                                unicode = emoji,
+                                size = 22f,
+                                animate = false,
+                                mode = com.example.chat.ui.chats.detail.EmojiDisplayMode.reaction,
                             )
                         }
                     }
-                    // Navigation to the second action page stays outside the scrolling viewport,
-                    // so a short display or larger font cannot hide half of its row behind Close.
-                    if (!extraActions && secondary.isNotEmpty()) com.example.chat.ui.kit.ChatyDropdownMenuItem(
-                        text = { Text("More") }, trailingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight) }, onClick = { extraActions = true })
-                    androidx.compose.material3.Button(onClick = { messageState.value = null }, shape = CircleShape,
-                        modifier = Modifier.padding(12.dp).fillMaxWidth().heightIn(min = 48.dp)) { Text("Close") }
+                    IconButton(
+                        onClick = {
+                            reactionTargetState.value = menuMessage
+                            messageState.value = null
+                        },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        com.example.chat.ui.icons.ChatyIcon(
+                            com.example.chat.ui.icons.ChatyIconId.add,
+                            color = colors.foreground,
+                            semanticLabel = "More reactions",
+                        )
+                    }
+                }
+            }
+
+            // 2. Contextual Action Menu (Anchored below bubble)
+            Column(
+                Modifier
+                    .offset(x = placement.menuLeftDp, y = placement.menuTopDp)
+                    .widthIn(max = 260.dp)
+                    .heightIn(max = placement.menuMaxHeightDp)
+                    .shadow(elevation = 12.dp, shape = com.example.chat.ui.kit.ChatyModalShape)
+                    .clip(com.example.chat.ui.kit.ChatyModalShape)
+                    .background(surface),
+            ) {
+                Text(
+                    "Message options",
+                    Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    fontWeight = FontWeight.Bold,
+                    color = colors.foreground,
+                )
+                Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    if (extraActions) {
+                        com.example.chat.ui.kit.ChatyDropdownMenuItem(
+                            text = { Text("Back") },
+                            onClick = { extraActions = false },
+                        )
+                    }
+                    actions.forEach { act ->
+                        com.example.chat.ui.kit.ChatyDropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (act.type == MessageActionType.deleteForMe) "Delete for me" else act.label,
+                                    color = if (act.isDestructive) Color(theme.dangerColor) else colors.foreground,
+                                )
+                            },
+                            leadingIcon = {
+                                com.example.chat.ui.icons.ChatyIcon(
+                                    com.example.chat.ui.chats.detail.actionIconId(act, menuMessage),
+                                    color = if (act.isDestructive) Color(theme.dangerColor) else colors.foreground,
+                                )
+                            },
+                            onClick = {
+                                messageState.value = null
+                                onAction(menuMessage, act.type)
+                            },
+                        )
+                    }
+                }
+                if (!extraActions && secondary.isNotEmpty()) {
+                    com.example.chat.ui.kit.ChatyDropdownMenuItem(
+                        text = { Text("More") },
+                        trailingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight) },
+                        onClick = { extraActions = true },
+                    )
+                }
+                androidx.compose.material3.Button(
+                    onClick = { messageState.value = null },
+                    shape = CircleShape,
+                    modifier = Modifier.padding(10.dp).fillMaxWidth().heightIn(min = 44.dp),
+                ) {
+                    Text("Close")
                 }
             }
         }
     }
+}
 
 }
 

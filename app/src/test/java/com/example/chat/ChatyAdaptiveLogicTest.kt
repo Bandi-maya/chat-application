@@ -1,6 +1,7 @@
 package com.example.chat
 
 import com.example.chat.ui.kit.ChatyAdaptiveLogic
+import com.example.chat.ui.kit.ChatyHeightBucket
 import com.example.chat.ui.kit.ChatyWidthBucket
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -48,5 +49,18 @@ class ChatyAdaptiveLogicTest {
         assertTrue(ChatyAdaptiveLogic.isListDetail(840))
         assertEquals(360, ChatyAdaptiveLogic.homePaneWidth(320))
         assertEquals(400, ChatyAdaptiveLogic.homePaneWidth(840))
+    }
+
+    @Test
+    fun `height buckets and modal dimensions adapt cleanly for compact split and tablet windows`() {
+        assertEquals(ChatyHeightBucket.Compact, ChatyAdaptiveLogic.heightBucketOf(400))
+        assertEquals(ChatyHeightBucket.Medium, ChatyAdaptiveLogic.heightBucketOf(640))
+        assertEquals(ChatyHeightBucket.Expanded, ChatyAdaptiveLogic.heightBucketOf(960))
+
+        assertEquals(320, ChatyAdaptiveLogic.effectiveDimension(320, 412))
+        assertEquals(412, ChatyAdaptiveLogic.effectiveDimension(0, 412))
+
+        assertEquals(296, ChatyAdaptiveLogic.adaptiveModalWidth(320, desiredMaxDp = 520, marginDp = 24))
+        assertEquals(520, ChatyAdaptiveLogic.adaptiveModalWidth(900, desiredMaxDp = 520, marginDp = 24))
     }
 }

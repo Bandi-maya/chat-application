@@ -29,6 +29,11 @@ class TasksRepository(
 ) {
     val tasks = mutableListOf<ChatTask>()
 
+    fun clearLocalForSwitch() {
+        tasks.clear()
+        notifyChanged()
+    }
+
     /** GET /tasks. A fetch failure keeps the previous cache (nothing
      *  user-facing reads it mid-hydration; the Tasks tab owns its own
      *  plane-backed state). */

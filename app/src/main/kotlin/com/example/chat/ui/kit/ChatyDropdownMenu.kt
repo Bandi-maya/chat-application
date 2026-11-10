@@ -86,11 +86,11 @@ fun ChatyDropdownMenu(
     // An explicit custom shape remains the caller's choice.
     val effectiveShape = if (shape == ChatyModalShape)
         androidx.compose.foundation.shape.RoundedCornerShape(presentation.menuCornerDp.dp) else shape
-    val configuration = LocalConfiguration.current
-    val maxMenuWidth = (configuration.screenWidthDp.dp - 16.dp).coerceAtLeast(1.dp)
+    val (adaptiveWidthDp, adaptiveHeightDp) = rememberAdaptiveWindowSize()
+    val maxMenuWidth = (adaptiveWidthDp.dp - 16.dp).coerceAtLeast(1.dp)
     var availableBelowPx by remember { androidx.compose.runtime.mutableIntStateOf(Int.MAX_VALUE) }
     val density = LocalDensity.current
-    val maxMenuHeight = minOf((configuration.screenHeightDp.dp * 0.8f), with(density) { availableBelowPx.toDp() }).coerceAtLeast(1.dp)
+    val maxMenuHeight = minOf((adaptiveHeightDp.dp * 0.8f), with(density) { availableBelowPx.toDp() }).coerceAtLeast(1.dp)
     val margin = with(LocalDensity.current) { 8.dp.roundToPx() }
     // User directive: the menu scales/fades out from the tapped anchor, not a
     // fixed corner. The position provider reports where the anchor's centre falls

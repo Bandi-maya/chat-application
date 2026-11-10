@@ -1,6 +1,8 @@
 package com.example.chat.data.api
 
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.withLock
 
 import android.content.Context
 import com.example.chat.data.demo.DemoMode
@@ -35,7 +37,9 @@ class ApiBackendService(
     val config = ApiBackendConfig(context, authScopeLock, ::notifyAuthScopeTransition)
 
     private val sessionStore: ApiSessionStore = EncryptedApiSessionStore(context.applicationContext)
-    // Non-secret account-local preferences and outbox only; credentials live in sessionStore.
+    val multiAccountStore: ApiMultiAccountStore = EncryptedMultiAccountStore(context.applicationContext)
+    val multiAccount = MultiAccountRegistryCoordinator(multiAccountStore)
+    // Non-secret account-local preferences only; credentials, outbox, and drafts live in encrypted storage.
     private val prefs = context.applicationContext.getSharedPreferences("chaty_api_backend", Context.MODE_PRIVATE)
 
     private val auth = ApiAuthClient(
@@ -393,7 +397,9 @@ class ApiBackendService(
                 realtime.sendDelivered(message.conversationId)
             }
             typingUntil.remove("${message.conversationId}|${message.senderId}")
-            if (message.conversationId == activeConversationId && message.senderId != session.currentUser?.id) {
+            if ((message.conversationId == activeConversationId || message.conversationId in activeConversationIds) &&
+                message.senderId != session.currentUser?.id
+            ) {
                 markConversationRead(message.conversationId)
             }
             notifyChatListeners()
@@ -739,6 +745,20 @@ class ApiBackendService(
      *  unbound sessions (still accepted by the server). */
     @Volatile var deviceIdentity: DeviceIdentityManager? = null
 
+    /** Optional quarantine hooks wired by ServiceLocator for non-API stores (ConversationsRepository, MLS, SQLCipher, Vault). */
+    @Volatile var onBeforeAccountSwitch: (suspend (oldHash: String?, newHash: String?) -> Unit)? = null
+    @Volatile var onAfterAccountSwitch: (suspend (oldHash: String?, newHash: String?) -> Unit)? = null
+    @Volatile var isConversationProtectedHook: (String) -> Boolean = { false }
+
+    fun currentAccountKey(): String? {
+        val snap = authSnapshot()
+        val uid = snap.userId?.takeIf { it.isNotBlank() } ?: return null
+        if (DemoMode.isDemoUser(uid)) return null
+        return ApiAccountRoutingCanonicalizer.accountKey(snap.tenantId, snap.baseUrl, uid)
+    }
+
+    fun currentAccountHash(): String? = currentAccountKey()?.let { ApiAccountRoutingCanonicalizer.accountHash(it) }
+
     /** Server security notifications (currently: new device signed in and
      *  awaiting confirmation). Collected by the UI layer to prompt the user
      *  to confirm or kill the session (48h auto-confirm server-side). */
@@ -749,7 +769,14 @@ class ApiBackendService(
         if (refs.isNotEmpty()) runCatching { onAttachmentsGone(refs) }
     }
 
-    private val chatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile private var _chatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val chatScope: CoroutineScope get() = _chatScope
+
+    private fun resetSessionCoroutineScope() {
+        val prev = _chatScope
+        _chatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        runCatching { prev.cancel() }
+    }
     private val chatLock = Any()
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
 
@@ -773,25 +800,60 @@ class ApiBackendService(
     val tasks: List<ChatTask>
         get() = synchronized(chatLock) { _tasks.toList() }
 
-    /** Active-conversation id drives the 4s poll (Dart setActiveConversation). */
+    /** Active-conversation id(s) drive the 4s poll and auto-read across single or split panes. */
     @Volatile private var activeConversationId: String? = null
+    private val activeConversationIds = java.util.concurrent.CopyOnWriteArraySet<String>()
     val activeConversation: String? get() = activeConversationId
+    fun setSplitActiveConversations(ids: Set<String>) {
+        val cleaned = ids.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        activeConversationIds.clear()
+        activeConversationIds.addAll(cleaned)
+        if (cleaned.isNotEmpty()) {
+            realtime.connect()
+            startBackgroundSync()
+            cleaned.forEach { roomId ->
+                chatScope.launch {
+                    loadMessages(roomId)
+                    markConversationRead(roomId)
+                }
+            }
+        }
+    }
     /** Incoming (not own) realtime message: (message, conversation title, muted). Invoked outside chatLock. */
     @Volatile var onIncomingMessage: ((ChatMessage, String?, Boolean) -> Unit)? = null
     @Volatile private var syncRunning = false
+    @Volatile private var activeSyncJob: kotlinx.coroutines.Job? = null
 
     val conversations: List<Conversation> get() {
         val list = synchronized(chatLock) { _conversations.toList() }
         val state = localState("conv")
-        if (state.length() == 0) return list
+        val drafts = currentAccountKey()?.let { multiAccount.allDraftsFor(it) }.orEmpty()
+        if (state.length() == 0 && drafts.isEmpty()) return list
         return list.map { c ->
-            val o = state.optJSONObject(c.id) ?: return@map c
-            c.copy(
-                isPinned = o.optBoolean("pinned", c.isPinned),
-                isMuted = o.optBoolean("muted", c.isMuted),
-                isArchived = o.optBoolean("archived", c.isArchived),
+            val o = state.optJSONObject(c.id)
+            val draft = drafts[c.id] ?: c.draftText
+            if (o == null && draft == c.draftText) c
+            else c.copy(
+                isPinned = o?.optBoolean("pinned", c.isPinned) ?: c.isPinned,
+                isMuted = o?.optBoolean("muted", c.isMuted) ?: c.isMuted,
+                isArchived = o?.optBoolean("archived", c.isArchived) ?: c.isArchived,
+                draftText = draft,
             )
         }
+    }
+
+    fun getDraft(conversationId: String): String =
+        currentAccountKey()?.let { multiAccount.draftFor(it, conversationId) } ?: ""
+
+    fun setDraft(conversationId: String, draft: String) {
+        val key = currentAccountKey() ?: return
+        multiAccount.saveDraft(key, conversationId, draft)
+        synchronized(chatLock) {
+            val idx = _conversations.indexOfFirst { it.id == conversationId }
+            if (idx != -1) _conversations[idx] = _conversations[idx].copy(draftText = draft)
+        }
+        persistAccountConversationSnapshot()
+        notifyChatListeners()
     }
     val users: List<UserProfile> get() = synchronized(chatLock) { _users.toList() }
     fun getMessages(chatId: String): List<ChatMessage> {
@@ -810,12 +872,31 @@ class ApiBackendService(
     private val localStateLock = Any()
     private val localStateCache = HashMap<String, org.json.JSONObject>()
 
-    private fun localStateKey(kind: String) = "api_local_${kind}_" + (session.currentUser?.id ?: "anon")
+    private fun localStateKey(kind: String): String {
+        val ns = currentAccountHash() ?: session.currentUser?.id ?: "anon"
+        return "api_local_${kind}_$ns"
+    }
 
     private fun localState(kind: String): org.json.JSONObject = synchronized(localStateLock) {
         val key = localStateKey(kind)
         localStateCache.getOrPut(key) {
-            try { org.json.JSONObject(prefs.getString(key, "{}") ?: "{}") } catch (_: Exception) { org.json.JSONObject() }
+            val stored = prefs.getString(key, null)
+            if (stored != null) {
+                try { org.json.JSONObject(stored) } catch (_: Exception) { org.json.JSONObject() }
+            } else {
+                // One-time read migration from legacy userId-keyed state when single-account upgraded.
+                val legacyUid = session.currentUser?.id
+                val legacyKey = if (!legacyUid.isNullOrBlank()) "api_local_${kind}_$legacyUid" else null
+                val legacyRaw = if (legacyKey != null && legacyKey != key && multiAccount.accounts().size <= 1) {
+                    prefs.getString(legacyKey, null)
+                } else null
+                if (legacyRaw != null) {
+                    try { org.json.JSONObject(legacyRaw).also { prefs.edit().putString(key, legacyRaw).apply() } }
+                    catch (_: Exception) { org.json.JSONObject() }
+                } else {
+                    org.json.JSONObject()
+                }
+            }
         }
     }
 
@@ -953,12 +1034,14 @@ class ApiBackendService(
             publish = { result ->
                 when (result) {
                     is ApiChatClient.RoomsResult.Ok -> {
+                        val filtered = result.conversations.filter { !it.isTask }
                         synchronized(chatLock) {
                             _conversations.clear()
-                            _conversations.addAll(result.conversations.filter { !it.isTask })
+                            _conversations.addAll(filtered)
                         }
                         requiresSubscription = false
                         subscriptionErrorMessage = null
+                        persistAccountConversationSnapshot()
                         changed = true
                     }
                     ApiChatClient.RoomsResult.SubscriptionRequired -> {
@@ -1063,24 +1146,27 @@ class ApiBackendService(
     }
 
     suspend fun loadUsers(query: String? = null) {
-        val fetched = withContext(Dispatchers.IO) { chat.listUsers(query) } ?: return
-        // Seed "last seen" from the directory (last_seen) for offline users. Online state itself
-        // comes from the WebSocket (initial_presence / user_presence), which is always fresher.
-        // The directory's legacy last_seen is unfiltered (pre-plane leak),
-        // so it is NOT used to seed presence: the privacy-filtered presence
-        // plane (GET /presence/{id} + presence.changed) is the only source.
-        synchronized(chatLock) {
-            if (query.isNullOrBlank()) {
-                _users.clear()
-                _users.addAll(fetched)
-            } else {
-                for (u in fetched) {
-                    val idx = _users.indexOfFirst { it.id == u.id }
-                    if (idx == -1) _users.add(u) else _users[idx] = u
+        val expected = authSnapshot()
+        var changed = false
+        val applied = com.example.chat.data.api.publishScopedApiResult(expected, ::withAuthScope,
+            fetch = { withContext(Dispatchers.IO) { chat.listUsers(query) } },
+            publish = { fetched ->
+                if (fetched != null) {
+                    synchronized(chatLock) {
+                        if (query.isNullOrBlank()) {
+                            _users.clear()
+                            _users.addAll(fetched)
+                        } else {
+                            for (u in fetched) {
+                                val idx = _users.indexOfFirst { it.id == u.id }
+                                if (idx == -1) _users.add(u) else _users[idx] = u
+                            }
+                        }
+                    }
+                    changed = true
                 }
-            }
-        }
-        notifyChatListeners()
+            })
+        if (applied && changed) notifyChatListeners()
     }
 
     /** Dart ApiBackendService.searchUsers: loadUsers(query) over GET /chat/users?search=
@@ -1105,29 +1191,37 @@ class ApiBackendService(
         }
     }
 
-    /** _startBackgroundSync: every 4s poll the active room; every 3rd tick
-     *  refresh the conversation list; stops when the session ends. */
+    /** _startBackgroundSync: every 4s poll active room(s); every 3rd tick
+     *  refresh the conversation list; stops cleanly when the session scope cancels or signs out. */
     fun startBackgroundSync() {
-        if (syncRunning) return
+        if (syncRunning && activeSyncJob?.isActive == true) return
         syncRunning = true
-        chatScope.launch {
-            var ticks = 0
-            while (true) {
-                delay(4000)
-                if (session.token == null) break
-                ensureFreshToken()
-                if (session.token == null) break
-                ticks++
-                callCoordinator.tick()
-                // Flutter's sync loop also recovers an absent WebSocket. connect()
-                // is idempotent while connecting/connected and retains the configured URL.
-                if (!realtime.isConnected) realtime.connect()
-                flushOutbox() // messages typed while offline
-                activeConversationId?.takeIf { it.isNotEmpty() }?.let { syncActiveRoomMessages(it) }
-                if (ticks % 3 == 0) loadConversations()
+        val scope = chatScope
+        lateinit var job: kotlinx.coroutines.Job
+        job = scope.launch {
+            try {
+                var ticks = 0
+                while (true) {
+                    delay(4000)
+                    if (session.token == null || DemoMode.active) break
+                    ensureFreshToken()
+                    if (session.token == null) break
+                    ticks++
+                    callCoordinator.tick()
+                    if (!realtime.isConnected) realtime.connect()
+                    flushOutbox() // messages typed while offline
+                    val targets = buildSet {
+                        activeConversationId?.takeIf { it.isNotEmpty() }?.let { add(it) }
+                        addAll(activeConversationIds)
+                    }
+                    targets.forEach { syncActiveRoomMessages(it) }
+                    if (ticks % 3 == 0) loadConversations()
+                }
+            } finally {
+                if (activeSyncJob === job) syncRunning = false
             }
-            syncRunning = false
         }
+        activeSyncJob = job
     }
 
     /** Dart editMessage: local update first (preview if latest), then PUT. */
@@ -1367,15 +1461,26 @@ class ApiBackendService(
     private val confirmedSends = HashMap<String, ChatMessage>()
     private val rejectedSends = HashMap<String, String>()
 
-    private fun outboxKey(userId: String) = "api_outbox_$userId"
+    private fun legacyOutboxKey(userId: String) = "api_outbox_$userId"
 
-    /** Loads the signed-in user's queued messages once and puts them back in their chats. */
+    /** Loads the signed-in account's encrypted queued messages once and puts them back in their chats. */
     private fun ensureOutboxLoaded() {
-        val userId = session.currentUser?.id ?: return
-        if (outboxLoadedFor == userId) return
+        val snap = authSnapshot()
+        val userId = snap.userId?.takeIf { it.isNotBlank() } ?: return
+        val accountHash = currentAccountHash() ?: userId
+        if (outboxLoadedFor == accountHash) return
         val restored = mutableListOf<OutboxEntry>()
         try {
-            val arr = org.json.JSONArray(prefs.getString(outboxKey(userId), "[]") ?: "[]")
+            var rawJson = multiAccountStore.loadEncryptedOutboxJson(accountHash)
+            if (rawJson.isNullOrBlank()) {
+                val legacyRaw = prefs.getString(legacyOutboxKey(userId), null)
+                if (!legacyRaw.isNullOrBlank() && legacyRaw != "[]") {
+                    rawJson = legacyRaw
+                    multiAccountStore.saveEncryptedOutboxJson(accountHash, legacyRaw)
+                }
+                prefs.edit().remove(legacyOutboxKey(userId)).apply()
+            }
+            val arr = org.json.JSONArray(rawJson ?: "[]")
             for (i in 0 until arr.length()) {
                 val o = arr.optJSONObject(i) ?: continue
                 val att = o.optJSONObject("attachment")?.let { a ->
@@ -1408,22 +1513,24 @@ class ApiBackendService(
         synchronized(outboxLock) {
             outbox.clear()
             outbox.addAll(restored)
-            outboxLoadedFor = userId
+            outboxLoadedFor = accountHash
         }
         if (restored.isNotEmpty()) {
-            synchronized(chatLock) {
-                for (e in restored) {
-                    val list = _messages.getOrPut(e.conversationId) { mutableListOf() }
-                    if (list.none { it.id == e.tempId }) list.add(e.message)
-                    list.sortBy { it.createdAt }
+            val shouldPublish = withAuthScope(snap) {
+                synchronized(chatLock) {
+                    for (e in restored) {
+                        val list = _messages.getOrPut(e.conversationId) { mutableListOf() }
+                        if (list.none { it.id == e.tempId }) list.add(e.message)
+                        list.sortBy { it.createdAt }
+                    }
                 }
             }
-            notifyChatListeners()
+            if (shouldPublish) notifyChatListeners()
         }
     }
 
     private fun persistOutboxLocked() {
-        val userId = outboxLoadedFor ?: return
+        val accountHash = outboxLoadedFor ?: return
         val arr = org.json.JSONArray()
         for (e in outbox) {
             val o = org.json.JSONObject()
@@ -1440,7 +1547,9 @@ class ApiBackendService(
             }
             arr.put(o)
         }
-        try { prefs.edit().putString(outboxKey(userId), arr.toString()).apply() } catch (_: Exception) {}
+        try {
+            multiAccountStore.saveEncryptedOutboxJson(accountHash, if (arr.length() == 0) null else arr.toString())
+        } catch (_: Exception) {}
     }
 
     private fun enqueueOutbox(entry: OutboxEntry) {
@@ -1460,8 +1569,12 @@ class ApiBackendService(
     /** True while [tempId] is still waiting in the outbox. */
     private fun isQueued(tempId: String) = synchronized(outboxLock) { outbox.any { it.tempId == tempId } }
 
-    /** One HTTP attempt for a queued message; updates the chat and the outbox from the result. */
-    private suspend fun sendOutboxEntry(entry: OutboxEntry): ApiChatClient.SendResult {
+    /** One HTTP attempt for a queued message; binds tightly to [expectedScope] to eliminate cross-account sends. */
+    private suspend fun sendOutboxEntry(
+        entry: OutboxEntry,
+        expectedScope: ApiAccountScope = authSnapshot(),
+    ): ApiChatClient.SendResult {
+        if (authSnapshot() !== expectedScope) return ApiChatClient.SendResult.Offline
         val payloadBytes = entry.content.toByteArray(Charsets.UTF_8).size.toLong()
         val ledger = transferMonitor
         val transferId = ledger?.begin(
@@ -1472,11 +1585,16 @@ class ApiBackendService(
         )
         val result = try {
             withContext(Dispatchers.IO) {
-                chat.sendMessageResult(entry.conversationId, entry.content, clientId = entry.tempId)
+                if (authSnapshot() !== expectedScope) ApiChatClient.SendResult.Offline
+                else chat.sendMessageResult(entry.conversationId, entry.content, clientId = entry.tempId)
             }
         } catch (error: Throwable) {
             if (transferId != null) ledger?.finish(transferId, com.example.chat.data.network.TransferStatus.failed)
             throw error
+        }
+        if (authSnapshot() !== expectedScope) {
+            if (transferId != null) ledger?.finish(transferId, com.example.chat.data.network.TransferStatus.paused)
+            return ApiChatClient.SendResult.Offline
         }
         if (transferId != null) {
             when (result) {
@@ -1494,50 +1612,54 @@ class ApiBackendService(
         }
         when (result) {
             is ApiChatClient.SendResult.Ok -> {
-                removeFromOutbox(entry.tempId)
                 val confirmed = result.message
-                synchronized(outboxLock) {
-                    confirmedSends[entry.tempId] = confirmed
-                    if (confirmedSends.size > 50) confirmedSends.keys.firstOrNull()?.let { confirmedSends.remove(it) }
-                }
-                synchronized(chatLock) {
-                    val list = _messages.getOrPut(entry.conversationId) { mutableListOf() }
-                    // The WebSocket echo may already have added the confirmed message: never keep two.
-                    list.removeAll { it.id == entry.tempId }
-                    val idx = list.indexOfFirst { it.id == confirmed.id }
-                    if (idx != -1) {
-                        // Keep whichever tick is further along (the echo/receipts may have arrived first).
-                        if (list[idx].deliveryState.ordinal < confirmed.deliveryState.ordinal) list[idx] = confirmed
-                    } else {
-                        list.add(confirmed)
+                val updated = withAuthScope(expectedScope) {
+                    removeFromOutbox(entry.tempId)
+                    synchronized(outboxLock) {
+                        confirmedSends[entry.tempId] = confirmed
+                        if (confirmedSends.size > 50) confirmedSends.keys.firstOrNull()?.let { confirmedSends.remove(it) }
                     }
-                    list.sortBy { it.createdAt }
-                    touchConversationPreview(entry.conversationId, confirmed)
+                    synchronized(chatLock) {
+                        val list = _messages.getOrPut(entry.conversationId) { mutableListOf() }
+                        list.removeAll { it.id == entry.tempId }
+                        val idx = list.indexOfFirst { it.id == confirmed.id }
+                        if (idx != -1) {
+                            if (list[idx].deliveryState.ordinal < confirmed.deliveryState.ordinal) list[idx] = confirmed
+                        } else {
+                            list.add(confirmed)
+                        }
+                        list.sortBy { it.createdAt }
+                        touchConversationPreview(entry.conversationId, confirmed)
+                    }
                 }
-                notifyChatListeners()
+                if (updated) notifyChatListeners()
             }
             is ApiChatClient.SendResult.Rejected -> {
-                removeFromOutbox(entry.tempId)
-                synchronized(outboxLock) {
-                    rejectedSends[entry.tempId] = result.detail ?: "Message could not be sent (${result.code})."
-                    if (rejectedSends.size > 50) rejectedSends.keys.firstOrNull()?.let { rejectedSends.remove(it) }
+                val updated = withAuthScope(expectedScope) {
+                    removeFromOutbox(entry.tempId)
+                    synchronized(outboxLock) {
+                        rejectedSends[entry.tempId] = result.detail ?: "Message could not be sent (${result.code})."
+                        if (rejectedSends.size > 50) rejectedSends.keys.firstOrNull()?.let { rejectedSends.remove(it) }
+                    }
+                    setLocalDeliveryState(entry.conversationId, entry.tempId, DeliveryState.failed)
                 }
-                setLocalDeliveryState(entry.conversationId, entry.tempId, DeliveryState.failed)
+                if (updated) notifyChatListeners()
             }
             ApiChatClient.SendResult.Offline -> Unit // stays queued (clock)
         }
         return result
     }
 
-    /** Sends everything queued, oldest first. Stops at the first "still offline" so order is kept. */
+    /** Sends everything queued for the captured scope, oldest first. */
     suspend fun flushOutbox() {
-        if (session.token == null) return
+        val expectedScope = authSnapshot()
+        if (expectedScope.token.isNullOrBlank()) return
         ensureOutboxLoaded()
         if (!flushMutex.tryLock()) return
         try {
-            while (session.token != null) {
+            while (authSnapshot() === expectedScope && session.token != null) {
                 val next = synchronized(outboxLock) { outbox.firstOrNull() } ?: break
-                val r = sendOutboxEntry(next)
+                val r = sendOutboxEntry(next, expectedScope)
                 if (r == ApiChatClient.SendResult.Offline) break
             }
         } finally {
@@ -1683,6 +1805,35 @@ class ApiBackendService(
         } catch (_: Exception) {
         }
         session.restore()
+        // Losslessly migrate legacy single-account installs into the encrypted multi-account registry
+        // without clearing the legacy store or logging the user out.
+        if (session.isAuthenticated && !isDemoSession) {
+            runCatching {
+                multiAccount.migrateLegacyIfNeeded(sessionStore, config.snapshot(), config.isUsingDefaultTenant)
+            }
+        }
+        // If multi-account registry has an active session while legacy sessionStore didn't hydrate (or mismatch on cold start), restore from registry.
+        if (!session.isAuthenticated && !DemoMode.active && !sessionStore.wasExplicitlyCleared()) {
+            val activeMeta = multiAccount.activeAccountMeta()
+            val creds = activeMeta?.let { multiAccount.credentialsFor(it.accountKey) }
+            if (activeMeta != null && creds != null && !activeMeta.sessionExpired) {
+                val userObj = runCatching { apiUserFromJson(creds.userJson) }.getOrNull()
+                if (userObj != null) {
+                    config.setRouting(
+                        tenant = activeMeta.tenantId,
+                        useDefault = activeMeta.isDefaultTenant,
+                        restBaseUrl = activeMeta.baseUrl,
+                        webSocketTemplate = activeMeta.webSocketTemplate,
+                        notify = false,
+                    )
+                    session.adoptForSwitch(
+                        ApiAuthResult(creds.accessToken, userObj, refreshToken = creds.refreshToken),
+                        suppressTransitionCallback = true,
+                    )
+                    notifyAuthScopeTransition()
+                }
+            }
+        }
         // Dart initialize(): restore _currentOrg from the persisted org payload.
         try {
             prefs.getString("api_hub_org", null)?.let { currentOrg = ApiChatClient.deepMap(org.json.JSONObject(it)) }
@@ -1761,6 +1912,7 @@ class ApiBackendService(
             val result = auth.login(value, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
+            runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
             afterAuthAdopted()
             result.user
         }
@@ -1785,6 +1937,7 @@ class ApiBackendService(
             val result = auth.register(email, username, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
+            runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
             afterAuthAdopted()
             result.user
         }
@@ -1854,6 +2007,7 @@ class ApiBackendService(
         config.setTenantId(tenantId.trim())
         session.adopt(result)
         saveRefreshToken(result.refreshToken)
+        runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
         afterAuthAdopted()
         Triple(result.user, orgId, resolvedOrgName)
     }
@@ -1950,10 +2104,14 @@ class ApiBackendService(
     }
 
     fun signOut() {
+        val activeKey = currentAccountKey()
+        val oldHash = currentAccountHash()
         // Dart signOut: FirebaseNotificationService.unregisterOnLogout first.
         try { unregisterFcmHook?.invoke() } catch (_: Exception) {
         }
         realtime.disconnect()
+        resetSessionCoroutineScope()
+        syncRunning = false
         DemoMode.active = false
         // Preservation (peer mixed-store blocker): signing out a demo session
         // may only erase a STRICTLY-demo persisted pair; a mixed/corrupt store
@@ -1965,6 +2123,9 @@ class ApiBackendService(
                 sessionStore.loadUserJson(),
             )
         } catch (_: Exception) { false }
+        if (!signingOutDemo && activeKey != null) {
+            runCatching { multiAccount.removeAccount(activeKey) }
+        }
         if (signingOutDemo && !storedStrictDemo) {
             session.clearInMemoryOnly()
         } else {
@@ -1972,16 +2133,24 @@ class ApiBackendService(
         }
         saveRefreshToken(null)
         SessionRefreshWorker.cancel(appContext)
-        onlineIds.clear(); lastSeenById.clear(); typingUntil.clear()
+        onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
         // Queued messages stay saved for this account and are sent after its next login.
         synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
-        // Dart signOut: drop the active room and all in-memory chat state
-        // (tasks are intentionally untouched, as in Dart), then notify.
+        synchronized(localStateLock) { localStateCache.clear() }
         activeConversationId = null
+        activeConversationIds.clear()
+        requiresSubscription = false
+        subscriptionErrorMessage = null
         synchronized(chatLock) {
             _conversations.clear()
             _users.clear()
             _messages.clear()
+            _tasks.clear()
+        }
+        if (oldHash != null) {
+            CoroutineScope(Dispatchers.IO).launch {
+                runCatching { onBeforeAccountSwitch?.invoke(oldHash, null) }
+            }
         }
         notifyChatListeners()
     }
@@ -1994,6 +2163,284 @@ class ApiBackendService(
     // replaying a consumed token revokes the whole session (reuse detection).
 
     private val refreshMutex = kotlinx.coroutines.sync.Mutex()
+    private val accountSwitchMutex = kotlinx.coroutines.sync.Mutex()
+
+    sealed interface AccountSwitchResult {
+        data class Switched(val meta: ApiRegisteredAccountMeta, val selectedConversationId: String?) : AccountSwitchResult
+        data class AlreadyActive(val meta: ApiRegisteredAccountMeta) : AccountSwitchResult
+        data class SessionExpired(val meta: ApiRegisteredAccountMeta, val message: String) : AccountSwitchResult
+        data class Failed(val message: String) : AccountSwitchResult
+    }
+
+    fun persistAccountConversationSnapshot() {
+        val key = currentAccountKey() ?: return
+        val list = conversations
+        val drafts = multiAccount.allDraftsFor(key)
+        val summaries = MultiAccountRegistryCoordinator.summarizeConversations(
+            conversations = list,
+            drafts = drafts,
+            isHiddenOrLocked = isConversationProtectedHook,
+        )
+        multiAccount.saveRecentConversations(key, summaries)
+        val unreadChats = list.count { !it.isArchived && it.unreadCount > 0 && !isConversationProtectedHook(it.id) }
+        val unreadMsgs = list.filter { !it.isArchived && !isConversationProtectedHook(it.id) }.sumOf { it.unreadCount.coerceAtLeast(0) }
+        multiAccount.updateAccountProfileAndUnread(
+            accountKey = key,
+            user = session.currentUser,
+            unreadChatsCount = unreadChats,
+            unreadMessagesCount = unreadMsgs,
+        )
+    }
+
+    /** Atomically switches the active session to [targetAccountKey], quarantining in-flight
+     *  network/coroutines/realtime/DB/vault state before publishing the new identity. */
+    suspend fun switchToAccount(targetAccountKey: String): AccountSwitchResult = accountSwitchMutex.withLock {
+        val currentKey = currentAccountKey()
+        val targetMeta = multiAccount.accountByKey(targetAccountKey)
+            ?: return@withLock AccountSwitchResult.Failed("Account no longer available.")
+        if (currentKey == targetAccountKey && !targetMeta.sessionExpired && session.isAuthenticated) {
+            return@withLock AccountSwitchResult.AlreadyActive(targetMeta)
+        }
+
+        // Snapshot outgoing account state cleanly before teardown
+        persistAccountConversationSnapshot()
+        val oldHash = currentAccountHash()
+        val creds = multiAccount.credentialsFor(targetAccountKey)
+            ?: run {
+                multiAccount.markSessionExpired(targetAccountKey, true)
+                return@withLock AccountSwitchResult.SessionExpired(targetMeta.copy(sessionExpired = true), "Please sign in again.")
+            }
+        val targetUser = runCatching { apiUserFromJson(creds.userJson) }.getOrNull()
+            ?: run {
+                multiAccount.markSessionExpired(targetAccountKey, true)
+                return@withLock AccountSwitchResult.SessionExpired(targetMeta.copy(sessionExpired = true), "Stored profile is invalid. Please sign in again.")
+            }
+
+        var effectiveToken = creds.accessToken
+        var effectiveRefresh = creds.refreshToken
+        val expMs = creds.expiresAtEpochMs ?: JwtExpiryDecoder.decodeExpiryEpochMs(effectiveToken)
+        if (targetMeta.sessionExpired) {
+            return@withLock AccountSwitchResult.SessionExpired(targetMeta, "Session expired. Please sign in again.")
+        }
+        if (expMs != null && (expMs - System.currentTimeMillis()) < REFRESH_MARGIN_SECONDS * 1000L && !effectiveRefresh.isNullOrBlank()) {
+            val proof = deviceIdentity?.proofHeaders(effectiveRefresh) ?: emptyMap()
+            when (val r = withContext(Dispatchers.IO) {
+                auth.refreshForAccount(targetMeta.baseUrl, targetMeta.tenantId, effectiveRefresh, proof)
+            }) {
+                is ApiAuthClient.RefreshResult.Ok -> {
+                    effectiveToken = r.accessToken
+                    effectiveRefresh = r.refreshToken ?: effectiveRefresh
+                    val newExp = JwtExpiryDecoder.decodeExpiryEpochMs(effectiveToken)
+                    multiAccountStore.saveCredentials(
+                        targetMeta.accountHash,
+                        creds.copy(accessToken = effectiveToken, refreshToken = effectiveRefresh, expiresAtEpochMs = newExp),
+                    )
+                    multiAccount.markSessionExpired(targetAccountKey, false)
+                }
+                ApiAuthClient.RefreshResult.Rejected -> {
+                    multiAccount.markSessionExpired(targetAccountKey, true)
+                    notifyChatListeners()
+                    return@withLock AccountSwitchResult.SessionExpired(targetMeta.copy(sessionExpired = true), "Session expired. Please sign in again.")
+                }
+                ApiAuthClient.RefreshResult.Unavailable -> Unit // allow local cached entry offline
+            }
+        }
+
+        // Quarantine outgoing coroutines, realtime socket, and non-API stores outside/before atomic flip
+        realtime.disconnect()
+        resetSessionCoroutineScope()
+        syncRunning = false
+        DemoMode.active = false
+        runCatching { onBeforeAccountSwitch?.invoke(oldHash, targetMeta.accountHash) }
+
+        // Atomic routing + credential adoption under authScopeLock with a single transition signal
+        synchronized(authScopeLock) {
+            config.setRouting(
+                tenant = targetMeta.tenantId,
+                useDefault = targetMeta.isDefaultTenant,
+                restBaseUrl = targetMeta.baseUrl,
+                webSocketTemplate = targetMeta.webSocketTemplate,
+                notify = false,
+            )
+            session.adoptForSwitch(
+                ApiAuthResult(effectiveToken, targetUser, refreshToken = effectiveRefresh),
+                suppressTransitionCallback = true,
+            )
+            onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
+            synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
+            synchronized(localStateLock) { localStateCache.clear() }
+            activeConversationId = null
+            activeConversationIds.clear()
+            requiresSubscription = false
+            subscriptionErrorMessage = null
+            synchronized(chatLock) {
+                _conversations.clear()
+                _users.clear()
+                _messages.clear()
+                _tasks.clear()
+            }
+            notifyAuthScopeTransition()
+        }
+
+        multiAccount.markActive(targetAccountKey)
+        runCatching { onAfterAccountSwitch?.invoke(oldHash, targetMeta.accountHash) }
+
+        // Restart account-scoped realtime & background sync cleanly
+        realtime.connect()
+        startBackgroundSync()
+        chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
+        chatScope.launch { ensureOutboxLoaded(); flushOutbox() }
+        chatScope.launch { loadConversations() }
+        chatScope.launch { loadUsers() }
+        chatScope.launch { loadTasks() }
+        try { syncFcmTokenHook?.invoke() } catch (_: Exception) {}
+        notifyChatListeners()
+
+        AccountSwitchResult.Switched(
+            meta = targetMeta.copy(sessionExpired = false, lastActiveEpochMs = System.currentTimeMillis()),
+            selectedConversationId = multiAccount.selectedConversationFor(targetAccountKey),
+        )
+    }
+
+    /** Real Add-Account login: authenticates without mutating active routing if cancelled/failed,
+     *  then registers the new account and atomically switches to it. */
+    suspend fun loginForAddAccount(
+        identifier: String,
+        password: String,
+        tenant: String?,
+        isDefaultTenant: Boolean,
+    ): ApiRegisteredAccountMeta = accountSwitchMutex.withLock {
+        val value = identifier.trim().replace(Regex("^@+"), "")
+        val targetTenant = if (isDefaultTenant) config.defaultTenantId else (tenant?.trim().takeIf { !it.isNullOrEmpty() } ?: config.tenantId)
+        val baseUrl = config.restApiBaseUrl
+        val result = withContext(Dispatchers.IO) {
+            auth.login(
+                identifier = value,
+                password = password,
+                extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap(),
+                baseUrlOverride = baseUrl,
+                tenantOverride = targetTenant,
+            )
+        }
+        val oldHash = currentAccountHash()
+        persistAccountConversationSnapshot()
+        val routingSnapshot = ApiRoutingSnapshot(
+            tenantId = targetTenant,
+            restApiBaseUrl = baseUrl,
+            webSocketTemplate = config.snapshot().webSocketTemplate,
+            generation = config.snapshot().generation,
+        )
+        val registered = multiAccount.registerAuthenticatedAccount(result, routingSnapshot, isDefaultTenant)
+            ?: throw IllegalStateException("Maximum number of signed-in accounts (${MultiAccountRegistryCoordinator.DEFAULT_MAX_ACCOUNTS}) reached or demo session rejected.")
+
+        realtime.disconnect()
+        resetSessionCoroutineScope()
+        syncRunning = false
+        DemoMode.active = false
+        runCatching { onBeforeAccountSwitch?.invoke(oldHash, registered.accountHash) }
+
+        synchronized(authScopeLock) {
+            config.setRouting(
+                tenant = registered.tenantId,
+                useDefault = registered.isDefaultTenant,
+                restBaseUrl = registered.baseUrl,
+                webSocketTemplate = registered.webSocketTemplate,
+                notify = false,
+            )
+            session.adoptForSwitch(result, suppressTransitionCallback = true)
+            onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
+            synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
+            synchronized(localStateLock) { localStateCache.clear() }
+            activeConversationId = null
+            activeConversationIds.clear()
+            requiresSubscription = false
+            subscriptionErrorMessage = null
+            synchronized(chatLock) {
+                _conversations.clear()
+                _users.clear()
+                _messages.clear()
+                _tasks.clear()
+            }
+            notifyAuthScopeTransition()
+        }
+
+        runCatching { onAfterAccountSwitch?.invoke(oldHash, registered.accountHash) }
+        afterAuthAdopted()
+        notifyChatListeners()
+        registered
+    }
+
+    /** Independently signs out/removes [targetAccountKey]. If active and fallback accounts exist,
+     *  atomically switches to fallback; if last account removed, clears to pre-auth cleanly. */
+    suspend fun signOutAccount(targetAccountKey: String): AccountSwitchResult = accountSwitchMutex.withLock {
+        val currentKey = currentAccountKey()
+        val targetMeta = multiAccount.accountByKey(targetAccountKey)
+            ?: return@withLock AccountSwitchResult.Failed("Account not found.")
+        val remaining = multiAccount.removeAccount(targetAccountKey)
+        if (currentKey != targetAccountKey) {
+            notifyChatListeners()
+            return@withLock remaining?.let { AccountSwitchResult.AlreadyActive(it) }
+                ?: AccountSwitchResult.Failed("Removed inactive account.")
+        }
+        // Signing out the currently active account:
+        if (remaining != null && !remaining.sessionExpired) {
+            // Release lock before calling switch logic OR execute switch inline:
+            val creds = multiAccount.credentialsFor(remaining.accountKey)
+            val fallbackUser = creds?.let { runCatching { apiUserFromJson(it.userJson) }.getOrNull() }
+            if (creds != null && fallbackUser != null) {
+                realtime.disconnect()
+                resetSessionCoroutineScope()
+                syncRunning = false
+                runCatching { onBeforeAccountSwitch?.invoke(targetMeta.accountHash, remaining.accountHash) }
+                synchronized(authScopeLock) {
+                    config.setRouting(
+                        tenant = remaining.tenantId,
+                        useDefault = remaining.isDefaultTenant,
+                        restBaseUrl = remaining.baseUrl,
+                        webSocketTemplate = remaining.webSocketTemplate,
+                        notify = false,
+                    )
+                    session.adoptForSwitch(
+                        ApiAuthResult(creds.accessToken, fallbackUser, refreshToken = creds.refreshToken),
+                        suppressTransitionCallback = true,
+                    )
+                    onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
+                    synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
+                    synchronized(localStateLock) { localStateCache.clear() }
+                    activeConversationId = null
+                    activeConversationIds.clear()
+                    synchronized(chatLock) {
+                        _conversations.clear(); _users.clear(); _messages.clear(); _tasks.clear()
+                    }
+                    notifyAuthScopeTransition()
+                }
+                multiAccount.markActive(remaining.accountKey)
+                runCatching { onAfterAccountSwitch?.invoke(targetMeta.accountHash, remaining.accountHash) }
+                afterAuthAdopted()
+                notifyChatListeners()
+                return@withLock AccountSwitchResult.Switched(remaining, multiAccount.selectedConversationFor(remaining.accountKey))
+            }
+        }
+        withContext(Dispatchers.Main) { signOut() }
+        AccountSwitchResult.Failed("Signed out.")
+    }
+
+    /** Refreshes all stored non-expired accounts in background without mutating active session routing. */
+    suspend fun refreshAllRegisteredAccountsInBackground(): SessionRefreshOutcome {
+        val activeOutcome = refreshSessionInBackground()
+        val accounts = multiAccount.accounts()
+        val activeKey = currentAccountKey()
+        for (meta in accounts) {
+            if (meta.accountKey == activeKey || meta.sessionExpired) continue
+            val creds = multiAccount.credentialsFor(meta.accountKey) ?: continue
+            val rt = creds.refreshToken ?: continue
+            multiAccount.refreshAccountIfNeeded(meta.accountKey, force = true) { base, tenant, token ->
+                val proof = deviceIdentity?.proofHeaders(token) ?: emptyMap()
+                withContext(Dispatchers.IO) { auth.refreshForAccount(base, tenant, token, proof) }
+            }
+        }
+        return activeOutcome
+    }
 
     private fun saveRefreshToken(token: String?) {
         try {
@@ -2044,15 +2491,26 @@ class ApiBackendService(
                 is ApiAuthClient.RefreshResult.Ok -> {
                     val rotated = result.refreshToken ?: refreshToken
                     saveRefreshToken(rotated) // rotation: the old token is dead from here on
-                    session.adopt(ApiAuthResult(token = result.accessToken, user = user, refreshToken = rotated))
+                    val nextAuth = ApiAuthResult(token = result.accessToken, user = user, refreshToken = rotated)
+                    session.adopt(nextAuth)
+                    runCatching {
+                        multiAccount.registerAuthenticatedAccount(nextAuth, config.snapshot(), config.isUsingDefaultTenant)
+                    }
                     realtime.connect()
                     SessionRefreshOutcome.REFRESHED
                 }
                 ApiAuthClient.RefreshResult.Rejected -> {
-                    // The server states the session is dead (revoked, or a
-                    // replayed token tripped reuse detection). Only now sign out.
-                    withContext(Dispatchers.Main) { signOut() }
-                    SessionRefreshOutcome.NO_SESSION
+                    val key = currentAccountKey()
+                    if (key != null) {
+                        multiAccount.markSessionExpired(key, true)
+                    }
+                    if (multiAccount.accounts().size > 1) {
+                        notifyChatListeners()
+                        SessionRefreshOutcome.NO_SESSION
+                    } else {
+                        withContext(Dispatchers.Main) { signOut() }
+                        SessionRefreshOutcome.NO_SESSION
+                    }
                 }
                 ApiAuthClient.RefreshResult.Unavailable -> SessionRefreshOutcome.UNAVAILABLE // retry later
             }

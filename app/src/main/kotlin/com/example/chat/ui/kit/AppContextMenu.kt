@@ -220,19 +220,19 @@ private fun AnchoredContextSurface(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        val cfg = androidx.compose.ui.platform.LocalConfiguration.current
-        val safe = WindowInsets.safeDrawing
-        val ime = WindowInsets.ime
-        fun px(v: Int) = with(density) { v.toDp().value }
-        val screen = SurfaceSize(cfg.screenWidthDp.toFloat(), cfg.screenHeightDp.toFloat())
-        val insets = SurfaceInsets(px(safe.getLeft(density, dir)), px(safe.getTop(density)), px(safe.getRight(density, dir)), px(safe.getBottom(density)))
-        val keyboard = SurfaceInsets(bottom = px(ime.getBottom(density)))
-        val anchor = with(density) {
-            SurfaceRect(anchorRect.left.toDp().value, anchorRect.top.toDp().value, anchorRect.width.toDp().value, anchorRect.height.toDp().value)
-        }
-        val res = ContextSurfaceResolver.resolve(
-            ContextSurfaceRequest(anchor, SurfaceSize(maxWidth, estimatedHeight), insets, screen, keyboard, anchorType),
-        )
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+            val safe = WindowInsets.safeDrawing
+            val ime = WindowInsets.ime
+            fun px(v: Int) = with(density) { v.toDp().value }
+            val screen = SurfaceSize(maxWidth.value, maxHeight.value)
+            val insets = SurfaceInsets(px(safe.getLeft(density, dir)), px(safe.getTop(density)), px(safe.getRight(density, dir)), px(safe.getBottom(density)))
+            val keyboard = SurfaceInsets(bottom = px(ime.getBottom(density)))
+            val anchor = with(density) {
+                SurfaceRect(anchorRect.left.toDp().value, anchorRect.top.toDp().value, anchorRect.width.toDp().value, anchorRect.height.toDp().value)
+            }
+            val res = ContextSurfaceResolver.resolve(
+                ContextSurfaceRequest(anchor, SurfaceSize(maxWidthDp = maxWidth), insets, screen, keyboard, anchorType),
+            )
         val transition = updateTransition(state, label = "contextSurface")
         val curved by transition.animateFloat(
             transitionSpec = { tween(presentation.menuEnterMs, easing = CubicBezierEasing(0.215f, 0.61f, 0.355f, 1f)) }, label = "t",

@@ -114,6 +114,11 @@ class EncryptedApiSessionStore(context: Context) : ApiSessionStore {
         Unit
     }
 
+    override fun wasExplicitlyCleared(): Boolean = synchronized(this) {
+        migrate()
+        secure.getBoolean(CLEARED, false)
+    }
+
     override fun clear(): Unit = synchronized(this) {
         // Commit the tombstone with credential removal first. If deleting the
         // old plaintext copy fails, migrate() will still refuse to restore it.

@@ -34,6 +34,11 @@ interface SecureKeyValueStore {
     suspend fun deleteAll(keys: Set<String>) {
         keys.forEach { key -> delete(key) }
     }
+
+    /** Prefix-scoped deletion so removing one account never wipes another account's secrets. */
+    suspend fun deletePrefix(prefix: String) {
+        // Test/in-memory stores override when key enumeration is supported.
+    }
 }
 
 /**
@@ -55,6 +60,7 @@ class MlsE2eeService(
     private val currentAuthUserId: () -> String?,
     private val dbPathForUser: (String) -> String,
     private val notifyChanged: () -> Unit = {},
+    private val accountNamespaceProvider: (() -> String?)? = null,
 ) {
     companion object {
         const val protocolSuite = "mls-rfc9420-v1"
@@ -77,6 +83,7 @@ class MlsE2eeService(
     private var signerBytes: ByteArray? = null
     private var signerPublicKey: ByteArray? = null
     private var userId: String? = null
+    private var activeNamespace: String? = null
     private var deviceId: String? = null
     private var credentialIdentity: String? = null
     private var initializationMutex = Mutex()
@@ -112,18 +119,21 @@ class MlsE2eeService(
             close()
             return
         }
-        if (isReady && userId == user) return
+        val ns = accountNamespaceProvider?.invoke()?.takeIf { it.isNotBlank() } ?: user
+        if (isReady && userId == user && activeNamespace == ns) return
 
         try {
             close()
             val uid = user
-            val prefix = "chaty.mls.$uid"
+            val prefix = "chaty.mls.$ns"
             val did = loadOrCreateDeviceId(prefix)
             val dbKey = loadOrCreateSecret("$prefix.db_key.v1", 32)
             val signerMaterial = loadOrCreateSigner(prefix)
 
-            val safeUser = uid.replace(Regex("[^A-Za-z0-9_-]"), "_")
-            val dbPath = "${dbPathForUser(safeUser)}/chaty_mls_$safeUser.db"
+            val safeNs = ns.replace(Regex("[^A-Za-z0-9_-]"), "_")
+            val baseDir = dbPathForUser(safeNs)
+            runCatching { java.io.File(baseDir).mkdirs() }
+            val dbPath = "$baseDir/chaty_mls_$safeNs.db"
             val eng: MlsEngine = try {
                 MlsEngine.create(dbPath = dbPath, encryptionKey = dbKey)
             } catch (error: Throwable) {
@@ -140,6 +150,7 @@ class MlsE2eeService(
             signerBytes = signer
             signerPublicKey = signerMaterial.second.copyOf()
             userId = uid
+            activeNamespace = ns
             deviceId = did
             credentialIdentity = "$uid:$did"
 
@@ -158,10 +169,11 @@ class MlsE2eeService(
      *  currently ready or missing active server-side enrollment. */
     suspend fun retryDeviceEnrollment() {
         val user = currentAuthUserId() ?: return
-        if (!isReady || userId != user) {
+        val ns = accountNamespaceProvider?.invoke()?.takeIf { it.isNotBlank() } ?: user
+        if (!isReady || userId != user || activeNamespace != ns) {
             initializeForCurrentSession()
         }
-        if (isReady && userId == user) {
+        if (isReady && userId == user && activeNamespace == ns) {
             try {
                 registerAndReplenishDevice()
                 notifyChanged()
@@ -271,23 +283,29 @@ class MlsE2eeService(
         signerBytes = null
         signerPublicKey = null
         userId = null
+        activeNamespace = null
         deviceId = null
         credentialIdentity = null
         conversationGates.clear()
         notifyChanged()
     }
 
-    /** Irreversibly removes every local trace of [userId]'s MLS identity:
-     *  closes the engine, deletes the per-user SQLCipher database including
-     *  SQLite sidecar files, and erases derived secrets from secure storage.
-     *  Used by permanent account deletion; regular logout keeps identity data. */
-    suspend fun purgeLocalIdentityForUser(uid: String) {
-        val prefix = "chaty.mls.$uid"
+    /** Irreversibly removes every local trace of [uid]'s MLS identity (for legacy userId or
+     *  account namespace): closes the engine, deletes the SQLCipher DB + sidecars, and erases
+     *  only that namespace's derived secrets from secure storage. */
+    suspend fun purgeLocalIdentityForUser(uid: String) = purgeLocalIdentityForNamespace(uid)
+
+    suspend fun purgeLocalIdentityForNamespace(namespace: String) {
+        val prefix = "chaty.mls.$namespace"
         close()
 
-        val safeUser = uid.replace(Regex("[^A-Za-z0-9_-]"), "_")
-        val basePath = "${dbPathForUser(safeUser)}/chaty_mls_$safeUser"
-        for (path in listOf(basePath, "$basePath-wal", "$basePath-shm")) {
+        val safeNs = namespace.replace(Regex("[^A-Za-z0-9_-]"), "_")
+        val basePath = "${dbPathForUser(safeNs)}/chaty_mls_$safeNs"
+        val candidates = listOf(
+            "$basePath.db", "$basePath.db-wal", "$basePath.db-shm",
+            basePath, "$basePath-wal", "$basePath-shm",
+        )
+        for (path in candidates) {
             try {
                 val file = java.io.File(path)
                 if (file.exists()) file.delete()

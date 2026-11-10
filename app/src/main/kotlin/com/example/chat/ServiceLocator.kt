@@ -206,7 +206,43 @@ object ServiceLocator {
             service.unregisterFcmHook = { fcmRegistrar.unregisterOnLogout() }
             // Offline demo: fail-closed entry probe; a real GoTrue identity blocks demo mode.
             service.demoGoTruePresentHook = { sessionManager.hasAnySession() }
+            service.isConversationProtectedHook = { convId ->
+                preferencesController.isConversationHidden(convId) ||
+                    preferencesController.isConversationLocked(convId) ||
+                    hiddenVaultService.isConversationLocked(convId)
+            }
+            service.onBeforeAccountSwitch = { oldHash, newHash ->
+                conversationsRepository.resetForAccountSwitch()
+                tasksRepository.clearLocalForSwitch()
+                runCatching { mls.close() }
+                runCatching { mediaCache.purgeTransientTemps() }
+                localLockService.setAccountNamespace(newHash.orEmpty())
+                hiddenVaultService.resetForAccountSwitchSync(newHash.orEmpty())
+                if (!oldHash.isNullOrBlank()) {
+                    appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        runCatching { secureMessageStore.closeNamespace(oldHash) }
+                    }
+                }
+            }
+            service.onAfterAccountSwitch = { _, newHash ->
+                val isFirstOrSingle = service.multiAccount.accounts().size <= 1
+                if (!newHash.isNullOrBlank()) {
+                    runCatching { hiddenVaultService.switchAccountNamespace(newHash, migrateLegacyIfEmpty = isFirstOrSingle) }
+                }
+            }
             service.initialize()
+            service.currentAccountHash()?.takeIf { it.isNotBlank() }?.let { activeHash ->
+                localLockService.setAccountNamespace(activeHash)
+                hiddenVaultService.resetForAccountSwitchSync(activeHash)
+                appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching {
+                        hiddenVaultService.switchAccountNamespace(
+                            activeHash,
+                            migrateLegacyIfEmpty = service.multiAccount.accounts().size <= 1,
+                        )
+                    }
+                }
+            }
             startNetworkRecovery(service)
         }
     }
@@ -255,9 +291,13 @@ object ServiceLocator {
             }
     }
 
-    /** Matrices 11/18: Room + SQLCipher encrypted local message DB. */
+    /** Matrices 11/18: Room + SQLCipher encrypted local message DB, isolated per account namespace. */
     val secureMessageStore: com.example.chat.data.local.SecureMessageStore by lazy {
-        com.example.chat.data.local.SecureMessageStore(requireContext(), secureStore)
+        com.example.chat.data.local.SecureMessageStore(
+            context = requireContext(),
+            secureStore = secureStore,
+            activeNamespaceProvider = { apiBackend.currentAccountHash() },
+        )
     }
 
     /** Media matrix: per-network auto-download rules + per-chat overrides. */
@@ -434,22 +474,50 @@ object ServiceLocator {
             rpc = mlsRpcClient,
             secureStorage = secureStore,
             currentAuthUserId = currentUserId,
-            dbPathForUser = { safeUser -> requireContext().filesDir.absolutePath + "/mls" },
+            dbPathForUser = { safeNs -> requireContext().filesDir.absolutePath + "/mls/" + safeNs },
+            accountNamespaceProvider = { apiBackend.currentAccountHash() },
         )
     }
 
-    /** Dart purgeLocalDataForDeletedAccount (profile_actions.dart:217); see AccountDeletionPurge for the order. */
+    /** Dart purgeLocalDataForDeletedAccount (profile_actions.dart:217); deletes ONLY the target account's
+     *  secrets when other signed-in accounts exist in the multi-account registry. */
     suspend fun purgeLocalDataForDeletedAccount(userId: String) {
+        val currentHash = apiBackend.currentAccountHash()
+        val matchingAccounts = apiBackend.multiAccount.accounts().filter { it.userId == userId }
+        val targetNamespaces = buildSet {
+            add(userId)
+            currentHash?.let { add(it) }
+            matchingAccounts.forEach { add(it.accountHash) }
+        }
+        val otherAccountsRemain = apiBackend.multiAccount.accounts().any { it.userId != userId }
         com.example.chat.data.services.AccountDeletionPurge(
             clearOutbox = { pendingSends.clear(it) },
-            purgeMlsIdentity = { mls.purgeLocalIdentityForUser(it) },
+            purgeMlsIdentity = { uid ->
+                targetNamespaces.forEach { ns -> mls.purgeLocalIdentityForNamespace(ns) }
+            },
             purgeTemporaryFiles = {
                 com.example.chat.data.services.AccountDeletionPurge.purgeChatyTemporaryFiles(requireContext().cacheDir)
             },
-            deleteSnapshots = { snapshotCache.deleteUser(it) },
-            deleteAllSecureStorage = { secureStore.deleteAll() },
+            deleteSnapshots = { uid ->
+                snapshotCache.deleteUser(uid)
+                targetNamespaces.forEach { ns -> runCatching { snapshotCache.deleteUser(ns) } }
+            },
+            deleteAllSecureStorage = {
+                if (!otherAccountsRemain) {
+                    secureStore.deleteAll()
+                } else {
+                    targetNamespaces.forEach { ns ->
+                        secureStore.deletePrefix("chaty.mls.$ns.")
+                        secureStore.deletePrefix("chaty.hidden_vault.$ns.")
+                        secureStore.deletePrefix("chaty.local_lock.v2.$ns.")
+                    }
+                }
+            },
             purgeMediaCache = { mediaCache.deleteAccount(it) },
         ).purge(userId)
+        targetNamespaces.forEach { ns ->
+            runCatching { secureMessageStore.purgeNamespace(ns) }
+        }
     }
 
     private val pendingSends: PendingSecureSendStore by lazy { PendingSecureSendStore(snapshotCache) }
@@ -573,7 +641,8 @@ object ServiceLocator {
             // Matrices 11/18: mirror decrypted, user-visible messages into the
             // SQLCipher DB so global search works offline.
             repo.localMessageMirror = { conversationId, messages ->
-                val dao = secureMessageStore.database().messages()
+                val activeHash = apiBackend.currentAccountHash()
+                val dao = secureMessageStore.database(activeHash).messages()
                 dao.upsertAll(messages.map { m ->
                     com.example.chat.data.local.LocalMessageEntity(
                         id = m.id,

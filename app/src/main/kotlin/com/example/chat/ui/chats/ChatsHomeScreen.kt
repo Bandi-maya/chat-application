@@ -476,6 +476,10 @@ fun ChatsHomeScreen(
                             selectedIds = emptySet()
                         },
                         onSelectAll = { selectedIds = selectedIds + visibleConversations.map { it.id } },
+                        onSplitChat = {
+                            nav.onOpenSplitChat?.invoke(selectedIds.toList())
+                            selectedIds = emptySet()
+                        },
                     )
                 } else {
                     Box {

@@ -65,9 +65,22 @@ class ConversationsRepository(
         if (refs.isNotEmpty()) runCatching { onAttachmentsGone(refs) }
     }
 
+    private val stateLock = Any()
     val conversationsById = LinkedHashMap<String, Conversation>()
     val messagesByChatId = HashMap<String, MutableList<ChatMessage>>()
     val usersById = HashMap<String, UserProfile>()
+
+    /** Clears all in-memory repository state atomically on account switch/sign-out. */
+    fun resetForAccountSwitch() {
+        synchronized(stateLock) {
+            conversationsById.clear()
+            messagesByChatId.clear()
+            usersById.clear()
+            lastSeqByChatId.clear()
+            cursorsRestored = false
+        }
+        notifyChanged()
+    }
 
     private val transport = SecureMessageTransport(
         rpc = secureRpc ?: rpc,
@@ -111,33 +124,40 @@ class ConversationsRepository(
         }
 
         val applied = withScope(expectedScope) {
-            conversationsById.clear()
-            conversationsById.putAll(next)
-            messagesByChatId.keys.retainAll(next.keys)
+            synchronized(stateLock) {
+                conversationsById.clear()
+                conversationsById.putAll(next)
+                messagesByChatId.keys.retainAll(next.keys)
+            }
+            val capturedUser = currentUserId()
+            val snapshotRows = next.values.toList()
             // Dart: unawaited(_persistConversationSnapshot()) - failures logged,
             // never fatal.
-            snapshotScope?.launch { persistConversationSnapshot() }
+            snapshotScope?.launch { persistConversationSnapshot(expectedScope, capturedUser, snapshotRows) }
         }
         if (!applied) return
 
         if (loadMembers) {
             coroutineScope {
-                next.keys.map { id -> async { loadConversationMembers(id) } }
+                next.keys.map { id -> async { loadConversationMembers(id, expectedScope) } }
                     .forEach { it.await() }
             }
         }
     }
 
-    suspend fun loadConversationMembers(conversationId: String) {
+    suspend fun loadConversationMembers(conversationId: String, expectedScope: Any? = scopeSnapshot()) {
         val raw = rpc.rpc(
             "get_conversation_members",
             mapOf("p_conversation_id" to conversationId),
         )
         val rows = raw as? List<*> ?: return
-        for (item in rows) {
-            val row = item as? Map<String, Any?> ?: continue
-            val profile = profileFromRow(row)
-            usersById[profile.id] = profile
+        val profiles = rows.mapNotNull { item -> (item as? Map<String, Any?>)?.let { profileFromRow(it) } }
+        withScope(expectedScope) {
+            synchronized(stateLock) {
+                for (profile in profiles) {
+                    usersById[profile.id] = profile
+                }
+            }
         }
     }
 
@@ -200,8 +220,10 @@ class ConversationsRepository(
                     lastMessageSenderId = latest.senderId,
                 )
             }
+            val capturedUser = currentUserId()
+            val snapshotCopy = messages.toList()
             // Dart: unawaited(_persistMessageSnapshot(conversationId, ..)).
-            snapshotScope?.launch { persistMessageSnapshot(conversationId, messagesByChatId[conversationId]) }
+            snapshotScope?.launch { persistMessageSnapshot(conversationId, snapshotCopy, expectedScope, capturedUser) }
         }
         if (!applied) return
     }
@@ -215,17 +237,33 @@ class ConversationsRepository(
 
     private fun noteSeq(conversationId: String, row: Map<String, Any?>) {
         val seq = (row["seq"] as? Number)?.toLong() ?: return
-        val current = lastSeqByChatId[conversationId]
-        if (current == null || seq > current) {
-            lastSeqByChatId[conversationId] = seq
-            snapshotScope?.launch { persistSyncCursors() }
+        val expected = scopeSnapshot()
+        var capturedUser: String? = null
+        var snapshotCursors: Map<String, Long>? = null
+        synchronized(stateLock) {
+            val current = lastSeqByChatId[conversationId]
+            if (current == null || seq > current) {
+                lastSeqByChatId[conversationId] = seq
+                capturedUser = currentUserId()
+                snapshotCursors = lastSeqByChatId.toMap()
+            }
+        }
+        snapshotCursors?.let { cursors ->
+            snapshotScope?.launch { persistSyncCursors(expected, capturedUser, cursors) }
         }
     }
 
-    private suspend fun persistSyncCursors() {
-        val userId = currentUserId() ?: return
+    private suspend fun persistSyncCursors(
+        expectedScope: Any? = scopeSnapshot(),
+        capturedUserId: String? = currentUserId(),
+        cursors: Map<String, Long>? = null,
+    ) {
+        val userId = capturedUserId ?: return
         val cache = snapshotCache ?: return
-        runCatching { cache.writeJson(userId, "sync_cursors", lastSeqByChatId.toMap()) }
+        var stillCurrent = false
+        if (!withScope(expectedScope) { stillCurrent = true } || !stillCurrent) return
+        val payload = cursors ?: synchronized(stateLock) { lastSeqByChatId.toMap() }
+        runCatching { cache.writeJson(userId, "sync_cursors", payload) }
     }
 
     /** Restores persisted cursors at session start (called from the locator
@@ -312,7 +350,9 @@ class ConversationsRepository(
             if (list.none { it.id == message.id }) {
                 list.add(message)
                 list.sortBy { it.createdAt }
-                snapshotScope?.launch { persistMessageSnapshot(conversationId, list) }
+                val capturedUser = currentUserId()
+                val snapshotCopy = list.toList()
+                snapshotScope?.launch { persistMessageSnapshot(conversationId, snapshotCopy, expectedScope, capturedUser) }
             }
         }
         seq?.let { noteSeq(conversationId, mapOf("seq" to it)) }
@@ -347,7 +387,9 @@ class ConversationsRepository(
                     createdAt = list[index].createdAt,
                     editedAt = message.editedAt ?: java.time.Instant.now(),
                 )
-                snapshotScope?.launch { persistMessageSnapshot(conversationId, list) }
+                val capturedUser = currentUserId()
+                val snapshotCopy = list.toList()
+                snapshotScope?.launch { persistMessageSnapshot(conversationId, snapshotCopy, expectedScope, capturedUser) }
             }
         }
         notifyChanged()
@@ -359,7 +401,8 @@ class ConversationsRepository(
         val conversationId = data["room_id"]?.toString() ?: return
         val id = data["id"]?.toString() ?: return
         if (data["for_everyone"] != true) return
-        withScope(scopeSnapshot()) {
+        val expectedDeleteScope = scopeSnapshot()
+        withScope(expectedDeleteScope) {
             val list = messagesByChatId[conversationId] ?: return@withScope
             val index = list.indexOfFirst { it.id == id }
             if (index >= 0) {
@@ -368,21 +411,30 @@ class ConversationsRepository(
                     isDeletedForEveryone = true,
                     editedAt = null,
                 )
-                snapshotScope?.launch { persistMessageSnapshot(conversationId, list) }
+                val capturedUser = currentUserId()
+                val snapshotCopy = list.toList()
+                snapshotScope?.launch { persistMessageSnapshot(conversationId, snapshotCopy, expectedDeleteScope, capturedUser) }
             }
         }
         notifyChanged()
     }
 
     /** Exact port of _persistConversationSnapshot. */
-    private suspend fun persistConversationSnapshot() {
-        val userId = currentUserId() ?: return
+    private suspend fun persistConversationSnapshot(
+        expectedScope: Any? = scopeSnapshot(),
+        capturedUserId: String? = currentUserId(),
+        items: List<Conversation>? = null,
+    ) {
+        val userId = capturedUserId ?: return
         val cache = snapshotCache ?: return
+        var stillCurrent = false
+        if (!withScope(expectedScope) { stillCurrent = true } || !stillCurrent) return
+        val rows = items ?: synchronized(stateLock) { conversationsById.values.toList() }
         runCatching {
             cache.writeJson(
                 userId = userId,
                 scope = "conversations",
-                value = conversationsById.values.map { SnapshotCodec.conversationToJson(it) },
+                value = rows.map { SnapshotCodec.conversationToJson(it) },
             )
         }
     }
@@ -397,19 +449,25 @@ class ConversationsRepository(
     private suspend fun persistMessageSnapshot(
         conversationId: String,
         messages: List<ChatMessage>?,
+        expectedScope: Any? = scopeSnapshot(),
+        capturedUserId: String? = currentUserId(),
     ) {
-        val userId = currentUserId() ?: return
+        val userId = capturedUserId ?: return
         val cache = snapshotCache ?: return
         if (messages.isNullOrEmpty()) return
+        var stillCurrent = false
+        if (!withScope(expectedScope) { stillCurrent = true } || !stillCurrent) return
+        val snapshot = messages.toList()
         runCatching {
             cache.writeJson(
                 userId = userId,
                 scope = "messages_$conversationId",
-                value = messages.map { SnapshotCodec.chatMessageToJson(it) },
+                value = snapshot.map { SnapshotCodec.chatMessageToJson(it) },
             )
         }
+        if (!withScope(expectedScope) { stillCurrent = true } || !stillCurrent) return
         localMessageMirror?.let { mirror ->
-            runCatching { mirror(conversationId, messages) }
+            runCatching { mirror(conversationId, snapshot) }
         }
     }
 

@@ -36,45 +36,99 @@ class HiddenVaultService(
     fun removeListener(listener: () -> Unit) { listeners.remove(listener) }
     private fun notifyListeners() { listeners.toList().forEach { it() } }
 
-    private val _lockedConversationIds = mutableSetOf<String>()
-    private var _isUnlocked = false
-    private var _isDecoyMode = false
-    private var _lastActivityTime: Long? = null
+    @Volatile
+    private var accountNamespace: String = ""
+
+    private fun registryKey(): String =
+        if (accountNamespace.isEmpty()) REGISTRY_KEY else "$REGISTRY_KEY.$accountNamespace"
+
+    private fun decoyPinKey(): String =
+        if (accountNamespace.isEmpty()) DECOY_PIN_KEY else "$DECOY_PIN_KEY.$accountNamespace"
+
+    private val _lockedConversationIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    @Volatile private var _isUnlocked = false
+    @Volatile private var _isDecoyMode = false
+    @Volatile private var _lastActivityTime: Long? = null
 
     val isUnlocked: Boolean get() = _isUnlocked
     val isDecoyMode: Boolean get() = _isDecoyMode
     val lastActivityTime: Long? get() = _lastActivityTime
     val autoLockDurationMs: Long get() = AUTO_LOCK_DURATION_MS
     val lockedConversationIds: Set<String>
-        get() = if (_isDecoyMode) emptySet() else _lockedConversationIds.toSet()
+        get() = if (_isDecoyMode) emptySet() else synchronized(_lockedConversationIds) { _lockedConversationIds.toSet() }
+
+    /** Synchronously locks and clears in-memory vault state, then switches storage namespace and reloads. */
+    suspend fun switchAccountNamespace(namespaceHash: String, migrateLegacyIfEmpty: Boolean = false) {
+        val clean = namespaceHash.trim()
+        synchronized(_lockedConversationIds) {
+            _lockedConversationIds.clear()
+        }
+        _isUnlocked = false
+        _isDecoyMode = false
+        _lastActivityTime = null
+        accountNamespace = clean
+        notifyListeners()
+        if (migrateLegacyIfEmpty && clean.isNotEmpty()) {
+            try {
+                if (secureStorage.read(registryKey()) == null) {
+                    val legacyReg = secureStorage.read(REGISTRY_KEY)
+                    if (!legacyReg.isNullOrEmpty()) secureStorage.write(registryKey(), legacyReg)
+                }
+                if (secureStorage.read(decoyPinKey()) == null) {
+                    val legacyDecoy = secureStorage.read(DECOY_PIN_KEY)
+                    if (!legacyDecoy.isNullOrEmpty()) secureStorage.write(decoyPinKey(), legacyDecoy)
+                }
+            } catch (_: Exception) {
+            }
+        }
+        loadVaultRegistry()
+    }
+
+    /** Resets in-memory vault state synchronously without disk I/O (safe inside account switch barriers). */
+    fun resetForAccountSwitchSync(namespaceHash: String) {
+        synchronized(_lockedConversationIds) {
+            _lockedConversationIds.clear()
+        }
+        _isUnlocked = false
+        _isDecoyMode = false
+        _lastActivityTime = null
+        accountNamespace = namespaceHash.trim()
+        notifyListeners()
+    }
 
     /** Port of the Dart constructor's _loadVaultRegistry() kickoff. Call from
      *  a coroutine after construction. */
     suspend fun loadVaultRegistry() {
         try {
-            val raw = secureStorage.read(REGISTRY_KEY)
-            if (!raw.isNullOrEmpty()) {
-                _lockedConversationIds.addAll(raw.split(',').filter { it.isNotEmpty() })
-                notifyListeners()
+            val raw = secureStorage.read(registryKey())
+            synchronized(_lockedConversationIds) {
+                _lockedConversationIds.clear()
+                if (!raw.isNullOrEmpty()) {
+                    _lockedConversationIds.addAll(raw.split(',').filter { it.isNotEmpty() })
+                }
             }
+            notifyListeners()
         } catch (_: Exception) {
         }
     }
 
     private suspend fun persistRegistry() {
         try {
-            secureStorage.write(REGISTRY_KEY, _lockedConversationIds.joinToString(","))
+            val encoded = synchronized(_lockedConversationIds) { _lockedConversationIds.joinToString(",") }
+            secureStorage.write(registryKey(), encoded)
         } catch (_: Exception) {
         }
     }
 
     fun isConversationLocked(conversationId: String): Boolean {
-        return _lockedConversationIds.contains(conversationId)
+        return synchronized(_lockedConversationIds) { _lockedConversationIds.contains(conversationId) }
     }
 
     suspend fun toggleConversationLock(conversationId: String) {
-        if (!_lockedConversationIds.add(conversationId)) {
-            _lockedConversationIds.remove(conversationId)
+        synchronized(_lockedConversationIds) {
+            if (!_lockedConversationIds.add(conversationId)) {
+                _lockedConversationIds.remove(conversationId)
+            }
         }
         persistRegistry()
         notifyListeners()
@@ -100,7 +154,7 @@ class HiddenVaultService(
     /** Verifies PIN using PBKDF2-HMAC-SHA256 via LocalLockService. Also checks decoy PIN. */
     suspend fun verifyPin(pin: String): Boolean {
         // Check decoy mode PIN (stored in secure storage or default '0000')
-        val storedDecoy = secureStorage.read(DECOY_PIN_KEY)
+        val storedDecoy = secureStorage.read(decoyPinKey())
         if ((storedDecoy != null && storedDecoy == pin) || pin == "0000") {
             _isUnlocked = true
             _isDecoyMode = true
@@ -139,7 +193,7 @@ class HiddenVaultService(
 
     /** Sets a decoy mode PIN. */
     suspend fun setDecoyPin(decoyPin: String) {
-        secureStorage.write(DECOY_PIN_KEY, decoyPin)
+        secureStorage.write(decoyPinKey(), decoyPin)
     }
 
     fun forceUnlockForSession() {

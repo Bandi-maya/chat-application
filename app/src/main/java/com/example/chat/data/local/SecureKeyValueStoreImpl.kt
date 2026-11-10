@@ -45,6 +45,15 @@ class SecureKeyValueStoreImpl(context: Context) : SecureKeyValueStore {
         check(editor.commit()) { "Unable to delete encrypted secure values." }
     }
 
+    override suspend fun deletePrefix(prefix: String): Unit = withContext(Dispatchers.IO) {
+        if (prefix.isEmpty()) return@withContext
+        val matching = prefs.all.keys.filter { it.startsWith(prefix) }.toSet()
+        if (matching.isEmpty()) return@withContext
+        val editor = prefs.edit()
+        matching.forEach(editor::remove)
+        check(editor.commit()) { "Unable to delete scoped encrypted secure values." }
+    }
+
     /** FlutterSecureStorage().deleteAll(): erase every secret in the store. */
     suspend fun deleteAll(): Unit = withContext(Dispatchers.IO) {
         check(prefs.edit().clear().commit()) { "Unable to clear encrypted secure storage." }

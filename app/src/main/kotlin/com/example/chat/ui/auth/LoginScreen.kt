@@ -75,16 +75,18 @@ fun LoginScreen(
     demoLogin: (suspend () -> String)? = null,
     /** Dart initState: getSavedTenantId + isUsingDefaultTenant. */
     loadSavedTenant: suspend () -> Pair<String?, Boolean>,
+    initialIdentifier: String = "",
+    initialWorkspace: String? = null,
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
 
-    var identifier by remember { mutableStateOf("") }
+    var identifier by remember(initialIdentifier) { mutableStateOf(initialIdentifier) }
     var password by remember { mutableStateOf("") }
-    var workspace by remember { mutableStateOf("") }
+    var workspace by remember(initialWorkspace) { mutableStateOf(initialWorkspace.orEmpty()) }
     var obscurePassword by remember { mutableStateOf(true) }
     var isLoading by remember { mutableStateOf(false) }
-    var useOrganization by remember { mutableStateOf(false) }
+    var useOrganization by remember(initialWorkspace) { mutableStateOf(!initialWorkspace.isNullOrBlank()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var identifierError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }

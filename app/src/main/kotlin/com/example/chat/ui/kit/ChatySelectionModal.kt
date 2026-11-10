@@ -52,8 +52,8 @@ fun ChatySelectionModal(
 ) {
     val colors = LocalAppColors.current
     val layoutShape = androidx.compose.foundation.shape.RoundedCornerShape(LocalReferenceLayoutPresentation.current.menuCornerDp.dp)
-    val config = LocalConfiguration.current
-    val width = (config.screenWidthDp - 32).coerceIn(240, 600)
+    val windowSize = rememberAdaptiveWindowSize()
+    val width = adaptiveModalWidth(windowSize.widthDp, maxWidth = 600.dp)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(
         usePlatformDefaultWidth = false, decorFitsSystemWindows = false,
     )) {
@@ -73,11 +73,11 @@ fun ChatySelectionModal(
                 .safeDrawingPadding().imePadding().padding(16.dp),
             contentAlignment = Alignment.Center,
         ) {
-            val height = minOf(config.screenHeightDp * 0.80f, maxHeight.value).dp
+            val height = adaptiveSheetHeight(minOf(windowSize.heightDp, maxHeight), fraction = 0.80f)
             val compactChrome = maxHeight < 220.dp && maxWidth >= 480.dp
             Column(
                 Modifier.onGloballyPositioned { cardBounds[0] = it.boundsInWindow() }
-                    .sizeIn(maxWidth = width.dp, maxHeight = height)
+                    .sizeIn(maxWidth = width, maxHeight = height)
                     .fillMaxWidth().shadow(20.dp, layoutShape).clip(layoutShape)
                     .background(colors.surfaceElevated).border(1.dp, colors.border, layoutShape),
             ) {

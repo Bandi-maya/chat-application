@@ -19,11 +19,26 @@ data class ChatyWindowMetrics(
     val widthDp: Int,
     val heightDp: Int,
     val bucket: ChatyWidthBucket,
+    val heightBucket: ChatyHeightBucket = ChatyAdaptiveLogic.heightBucketOf(heightDp),
 )
 
 val LocalChatyWindowMetrics = compositionLocalOf {
-    ChatyWindowMetrics(0, 0, ChatyWidthBucket.Compact)
+    ChatyWindowMetrics(0, 0, ChatyWidthBucket.Compact, ChatyHeightBucket.Medium)
 }
+
+/** Provides actual window/pane dimensions from LocalChatyWindowMetrics with automatic fallback ONLY
+ *  when rendered inside a standalone test activity without ChatyWindowMetricsProvider. */
+@Composable
+fun rememberAdaptiveWindowSize(): Pair<Int, Int> {
+    val m = LocalChatyWindowMetrics.current
+    if (m.widthDp > 0 && m.heightDp > 0) return m.widthDp to m.heightDp
+    val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+    return ChatyAdaptiveLogic.effectiveDimension(m.widthDp, cfg.screenWidthDp) to
+        ChatyAdaptiveLogic.effectiveDimension(m.heightDp, cfg.screenHeightDp)
+}
+
+/** Container/pane width override for message bubbles when rendered inside split panes or detail columns. */
+val LocalChatPaneWidthDp = compositionLocalOf<Float?> { null }
 
 /** R5: in-app chat font size (Small 0.85 / Default 1.0 / Large 1.15),
  *  applied to message text and timestamps only. Stored locally; the rest

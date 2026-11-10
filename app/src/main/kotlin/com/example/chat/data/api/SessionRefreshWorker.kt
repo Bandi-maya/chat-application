@@ -28,7 +28,7 @@ class SessionRefreshWorker(
     override suspend fun doWork(): Result {
         val backend = ServiceLocator.apiBackend
         return try {
-            when (backend.refreshSessionInBackground()) {
+            when (backend.refreshAllRegisteredAccountsInBackground()) {
                 ApiBackendService.SessionRefreshOutcome.UNAVAILABLE ->
                     if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.success()
                 else -> Result.success()

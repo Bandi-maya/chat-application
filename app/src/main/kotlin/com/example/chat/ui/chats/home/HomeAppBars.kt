@@ -113,6 +113,7 @@ data class HomeIdentity(
  *  integrator wires each to a real route or an honest WIP stub. */
 data class ChatsHomeNav(
     val onOpenProfile: () -> Unit = {},
+    val onOpenAccountSwitcher: () -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     val onOpenNotifications: () -> Unit = {},
     val onOpenSecuritySettings: () -> Unit = {},
@@ -294,8 +295,9 @@ fun StandardHomeAppBar(
             headerExtras?.invoke()
         }
         // Keep every configured action reachable on narrow screens and large text.
+        val (adaptiveWidthDp, _) = com.example.chat.ui.kit.rememberAdaptiveWindowSize()
         Row(
-            Modifier.widthIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp * 0.65f - 48f).coerceAtLeast(0f).dp)
+            Modifier.widthIn(max = (adaptiveWidthDp * 0.65f - 48f).coerceAtLeast(0f).dp)
                 .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -323,15 +325,19 @@ fun StandardHomeAppBar(
                 Icon(Icons.Outlined.PersonAddAlt1, contentDescription = "Account settings", tint = Color(theme.primaryTextColor))
             }
         }
-        // Small profile avatar -> Settings (real photo when uploaded, via
+        // Small profile avatar -> Account Switcher (real photo when uploaded, via
         // the shared ChatyAsyncImage wrapper).
         if (!forcedTypeIsSet) {
             // 48dp touch target and TalkBack semantics around the unchanged ringed 28dp avatar.
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .semantics { contentDescription = "Settings" }
-                    .clickable(onClickLabel = "Open settings", role = androidx.compose.ui.semantics.Role.Button, onClick = nav.onOpenSettings),
+                    .semantics { contentDescription = "Account switcher" }
+                    .clickable(
+                        onClickLabel = "Open account switcher",
+                        role = androidx.compose.ui.semantics.Role.Button,
+                        onClick = nav.onOpenAccountSwitcher,
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -442,6 +448,7 @@ fun SelectionHomeAppBar(
     onMarkUnread: () -> Unit,
     onMarkRead: () -> Unit,
     onSelectAll: () -> Unit,
+    onSplitChat: (() -> Unit)? = null,
 ) {
     var overflowOpen by remember { mutableStateOf(false) }
     Row(
@@ -461,6 +468,11 @@ fun SelectionHomeAppBar(
             fontWeight = FontWeight.W800,
         )
         Spacer(Modifier.weight(1f))
+        if (onSplitChat != null && selectedCount in 1..4) {
+            IconButton(onClick = onSplitChat) {
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chat, semanticLabel = "Split chat", color = Color(theme.accentColor))
+            }
+        }
         IconButton(onClick = onTogglePin) {
             com.example.chat.ui.icons.ChatyIcon(
                 if (anyUnpinned) com.example.chat.ui.icons.ChatyIconId.pin else com.example.chat.ui.icons.ChatyIconId.unpin,

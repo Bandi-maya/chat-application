@@ -438,10 +438,16 @@ fun ChatDetailHost(
         if (api.anyoneTyping(conversation.id)) "someone is typing…" else "${live.participantIds.size} participants"
     }
 
+    val wallpaperKey = remember(conversation.id, localOverrideAccountKey) {
+        if (localOverrideAccountKey.isNotEmpty()) "${localOverrideAccountKey}:${conversation.id}" else conversation.id
+    }
     val wallpaperStore = remember { context.getSharedPreferences("chaty_chat_wallpapers", 0) }
-    val wallpaperInitial = remember(conversation.id) {
-        try { JSONObject(wallpaperStore.getString("chaty_chat_wallpapers_v1", "{}") ?: "{}").optString(conversation.id, "").ifEmpty { null } }
-        catch (_: Exception) { null }
+    val wallpaperInitial = remember(conversation.id, wallpaperKey) {
+        try {
+            val obj = JSONObject(wallpaperStore.getString("chaty_chat_wallpapers_v1", "{}") ?: "{}")
+            obj.optString(wallpaperKey, "").ifEmpty { null }
+                ?: if (wallpaperKey == conversation.id) null else obj.optString(conversation.id, "").ifEmpty { null }
+        } catch (_: Exception) { null }
     }
     val colorOverrides = com.example.chat.ui.chats.detail.BubbleColorOverrides(
         rightBubbleColor = conv.rightBubbleColor, leftBubbleColor = conv.leftBubbleColor,
@@ -557,7 +563,15 @@ fun ChatDetailHost(
         },
         liveTransfers = liveTransferItems,
         onProbeConnection = { try { ServiceLocator.connectionHealth.probeConnection() } catch (_: Exception) {} },
-        onDraftChanged = { text -> scope.launch { try { repo.setDraft(conversation.id, text) } catch (_: Exception) {} } },
+        onDraftChanged = { text ->
+            val captured = messageAccountScope
+            api.withAuthScope(captured) { api.setDraft(conversation.id, text) }
+            scope.launch {
+                if (api.authSnapshot() === captured) {
+                    try { repo.setDraft(conversation.id, text) } catch (_: Exception) {}
+                }
+            }
+        },
         onTypingChanged = { typing ->
             val allowed = privacy.typingIndicators && !prefs.home.ghostMode && !gbB("yo_want_ghostmode", false)
             if (allowed) api.sendTyping(conversation.id, typing)
@@ -571,7 +585,7 @@ fun ChatDetailHost(
         onWallpaperSelected = { id ->
             try {
                 val obj = JSONObject(wallpaperStore.getString("chaty_chat_wallpapers_v1", "{}") ?: "{}")
-                obj.put(conversation.id, id)
+                obj.put(wallpaperKey, id)
                 wallpaperStore.edit().putString("chaty_chat_wallpapers_v1", obj.toString()).apply()
             } catch (_: Exception) {}
         },
@@ -1199,12 +1213,13 @@ fun ChatDetailHost(
         if (forwardItems.isEmpty()) {
             LaunchedEffect(batch) { toast("No other chats to forward to."); forwardMessages = emptyList() }
         } else {
-            // User's centered forward chooser; existing sectioned targets and scoped send retained.
+            val forwardWindowSize = com.example.chat.ui.kit.rememberAdaptiveWindowSize()
+            val forwardMaxHeight = com.example.chat.ui.kit.adaptiveSheetHeight(forwardWindowSize.heightDp, fraction = 0.7f)
             androidx.compose.ui.window.Dialog(onDismissRequest = { forwardMessages = emptyList() }) {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.7f).dp)
+                        .heightIn(max = forwardMaxHeight)
                         .background(Color(theme.surfaceColor), com.example.chat.ui.kit.ChatyModalShape)
                         .padding(vertical = 10.dp),
                 ) {

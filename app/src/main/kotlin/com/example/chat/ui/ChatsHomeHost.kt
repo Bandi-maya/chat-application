@@ -46,6 +46,8 @@ fun ChatsHomeHost(
     onOpenSecurity: () -> Unit,
     onOpenLockedChats: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAccountSwitcher: () -> Unit = onOpenSettings,
+    onOpenSplitChat: (List<Conversation>) -> Unit = {},
     onOpenNotifications: () -> Unit = {},
     onOpenNewChat: (groupMode: Boolean, broadcastMode: Boolean) -> Unit = { _, _ -> },
     onNewCall: () -> Unit = {},
@@ -170,6 +172,11 @@ fun ChatsHomeHost(
             showUpdatesEntry = prefs.gbBool("nav_hide_updates", false) && com.example.chat.ReleaseFeatures.STATUS_UPDATES,
             onOpenTasks = { onOpenDestination(com.example.chat.core.templates.ChatyNavigationDestinationIds.tasks) },
             onOpenUpdates = { onOpenDestination(com.example.chat.core.templates.ChatyNavigationDestinationIds.updates) },
+            onOpenAccountSwitcher = onOpenAccountSwitcher,
+            onOpenSplitChat = { selectedChatIds ->
+                val chats = selectedChatIds.mapNotNull { id -> conversations.firstOrNull { it.id == id } }
+                if (chats.isNotEmpty()) onOpenSplitChat(chats)
+            },
             onOpenSettings = onOpenSettings,
             onOpenNotifications = onOpenNotifications,
             onOpenSecuritySettings = onOpenSecurity,

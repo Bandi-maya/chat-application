@@ -152,9 +152,11 @@ private val bubbleMetaTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPat
  *  hard 520dp ceiling so ultra-wide windows stay readable. */
 @Composable
 private fun bubbleMaxWidth(theme: ThemeConfig): androidx.compose.ui.unit.Dp {
-    val pane = LocalConfiguration.current.screenWidthDp.toFloat()
+    val paneOverride = com.example.chat.ui.kit.LocalChatPaneWidthDp.current
+    val (fallbackWidthDp, _) = com.example.chat.ui.kit.rememberAdaptiveWindowSize()
+    val pane = paneOverride ?: fallbackWidthDp.toFloat()
     val factor = theme.bubbleMaxWidthFactor.toFloat().coerceAtMost(0.78f)
-    return (pane * factor).coerceAtMost(520f).dp
+    return (pane * factor).coerceAtMost(520f).coerceAtLeast(120f).dp
 }
 
 /** Exact port of lib/features/messages/message_bubble.dart against the
@@ -319,10 +321,31 @@ fun ChatMessageBubble(
     val emojiInfo = if (isTextOnly) classifyEmojiOnly(message.text) else EmojiOnlyInfo(false, 0)
 
     if (emojiInfo.isEmojiOnly) {
+        var emojiBubbleRect by remember { mutableStateOf<Rect?>(null) }
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = (3 * theme.density).dp, horizontal = 12.dp),
+                .padding(vertical = (3 * theme.density).dp, horizontal = 12.dp)
+                .onGloballyPositioned { coords ->
+                    emojiBubbleRect = coords.boundsInWindow()
+                }
+                .pointerInput(message.id, isSelected) {
+                    detectTapGestures(
+                        onLongPress = {
+                            val rect = emojiBubbleRect
+                            if (rect != null && onLongPressWithRect != null) {
+                                onLongPressWithRect(rect)
+                            } else {
+                                onLongPress()
+                            }
+                        },
+                        onTap = {
+                            val rect = emojiBubbleRect
+                            if (rect != null) onBubbleTap(rect)
+                        },
+                        onDoubleTap = onDoubleTap?.let { action -> { action() } },
+                    )
+                },
             horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
         ) {
             // Dart message_bubble.dart:291-304: animated engine when the
@@ -1330,7 +1353,8 @@ private fun VoiceNoteCard(
     val progress = if (total <= 0) 0f else (positionMs.toFloat() / total).coerceIn(0f, 1f)
     Row(
         Modifier
-            .width(250.dp)
+            .widthIn(max = 250.dp)
+            .fillMaxWidth()
             .padding(vertical = 4.dp)
             .background(Color.Black.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
             .padding(horizontal = 9.dp, vertical = 7.dp),
@@ -1394,7 +1418,8 @@ private fun DocumentPreview(
     } else "FILE"
     Row(
         Modifier
-            .width(270.dp)
+            .widthIn(max = 270.dp)
+            .fillMaxWidth()
             .padding(vertical = 3.dp)
             .background(Color.Black.copy(alpha = 0.13f), RoundedCornerShape(12.dp))
             .pointerInput(attachment.id) { detectTapGestures(onTap = { onTap?.invoke() }) }
@@ -1455,7 +1480,8 @@ private fun LocationCard(message: ChatMessage, textColor: Color, accentColor: Co
         ?: message.metadata["longitude"]?.toString()?.toDoubleOrNull()
     Column(
         Modifier
-            .width(270.dp)
+            .widthIn(max = 270.dp)
+            .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(Color.Black.copy(alpha = 0.12f)),
     ) {
@@ -1513,7 +1539,8 @@ private fun ContactCard(message: ChatMessage, textColor: Color, accentColor: Col
         .take(2).joinToString("") { it[0].toString() }.uppercase()
     Column(
         Modifier
-            .width(270.dp)
+            .widthIn(max = 270.dp)
+            .fillMaxWidth()
             .background(Color.Black.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
             .padding(11.dp),
     ) {

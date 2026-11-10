@@ -671,6 +671,10 @@ fun AppRoot() {
                 var pushedSettingsSearch by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedNetworkUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedDataUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var accountSwitcherOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                var splitChatState by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = com.example.chat.ui.split.SplitChatSessionState.Saver) {
+                    mutableStateOf(com.example.chat.ui.split.SplitChatSessionState())
+                }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
                     if (dest == com.example.chat.ui.settings.SettingsDestination.NetworkUsage) {
                         pushedNetworkUsage = true
@@ -861,6 +865,7 @@ fun AppRoot() {
                             },
                             onSearch = { route = AuthRoute.GlobalSearch },
                             onSettings = { pushedSettings = true },
+                            onAccountSwitcher = { accountSwitcherOpen = true },
                         )
                     },
                     colors = shellColors,
@@ -1013,6 +1018,9 @@ fun AppRoot() {
                         }
                     },
                     onOpenConversation = { conversation ->
+                        ServiceLocator.apiBackend.currentAccountKey()?.let {
+                            ServiceLocator.apiBackend.multiAccount.setAccountNavigationState(it, selectedConversationId = conversation.id)
+                        }
                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
                         selectedConversation = conversation
                         if (!expandedListDetail) route = AuthRoute.ChatDetail
@@ -1036,6 +1044,21 @@ fun AppRoot() {
                     onOpenSecurity = { route = AuthRoute.Security },
                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
                     onOpenSettings = { pushedSettings = true },
+                    onOpenAccountSwitcher = { accountSwitcherOpen = true },
+                    onOpenSplitChat = { chats ->
+                        val items = chats.take(4).map { c ->
+                            com.example.chat.ui.split.SplitPaneItem(
+                                conversationId = c.id,
+                                title = c.title,
+                                accountNamespace = ServiceLocator.apiBackend.currentAccountKey(),
+                                isGroup = c.isGroup,
+                            )
+                        }
+                        splitChatState = com.example.chat.ui.split.SplitChatSessionState(
+                            paneItems = items,
+                            focusedConversationId = items.firstOrNull()?.conversationId,
+                        )
+                    },
                     onOpenNotifications = { route = AuthRoute.Notifications },
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
@@ -1079,6 +1102,21 @@ fun AppRoot() {
                                     onOpenSecurity = { route = AuthRoute.Security },
                                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
                                     onOpenSettings = { pushedSettings = true },
+                                    onOpenAccountSwitcher = { accountSwitcherOpen = true },
+                                    onOpenSplitChat = { chats ->
+                                        val items = chats.take(4).map { c ->
+                                            com.example.chat.ui.split.SplitPaneItem(
+                                                conversationId = c.id,
+                                                title = c.title,
+                                                accountNamespace = ServiceLocator.apiBackend.currentAccountKey(),
+                                                isGroup = c.isGroup,
+                                            )
+                                        }
+                                        splitChatState = com.example.chat.ui.split.SplitChatSessionState(
+                                            paneItems = items,
+                                            focusedConversationId = items.firstOrNull()?.conversationId,
+                                        )
+                                    },
                                     onOpenNotifications = { route = AuthRoute.Notifications },
                     onOpenNewChat = { g, b -> newChatGroup = g; newChatBroadcast = b; route = AuthRoute.NewChat },
                     onOpenGlobalSearch = { route = AuthRoute.GlobalSearch },
@@ -1548,6 +1586,95 @@ fun AppRoot() {
                         },
                     )
                 }
+                com.example.chat.ui.accounts.AccountSwitcherHost(
+                    open = accountSwitcherOpen,
+                    onDismiss = { accountSwitcherOpen = false },
+                    theme = resolvedTheme,
+                    gate = gate,
+                    refreshRevision = chatRevision + authRevision,
+                    onOpenSettings = {
+                        accountSwitcherOpen = false
+                        pushedSettings = true
+                    },
+                    onSwitchedAccount = {
+                        settingsSub = null
+                        pushedSettings = false
+                        pushedProfile = false
+                        pushedEditProfile = false
+                        pushedMessageManagement = false
+                        pushedScheduled = false
+                        pushedAutoReply = false
+                        pushedAccount = false
+                        pushedUniversalAppearance = false
+                        pushedComponentStyles = false
+                        pushedThemeStudio = false
+                        pushedTasks = false
+                        pushedUpdates = false
+                        pushedAppIcon = false
+                        pushedSettingsSearch = false
+                        pushedNetworkUsage = false
+                        pushedDataUsage = false
+                        selectedConversation = null
+                        selectedInitialMessageId = null
+                    },
+                    onOpenConversation = { conv ->
+                        ServiceLocator.apiBackend.setActiveConversation(conv.id)
+                        selectedConversation = conv
+                        if (!expandedListDetail) route = AuthRoute.ChatDetail
+                    },
+                    onToast = shellToast,
+                )
+                com.example.chat.ui.split.SplitChatWorkspace(
+                    sessionState = splitChatState,
+                    onUpdateSessionState = { splitChatState = it },
+                    onClosePane = { id ->
+                        val remaining = splitChatState.paneItems.filter { it.conversationId != id }
+                        splitChatState = splitChatState.copy(
+                            paneItems = remaining,
+                            focusedConversationId = if (splitChatState.focusedConversationId == id) remaining.firstOrNull()?.conversationId else splitChatState.focusedConversationId,
+                        )
+                    },
+                    onCloseWorkspace = {
+                        splitChatState = com.example.chat.ui.split.SplitChatSessionState()
+                    },
+                    onOpenFullChat = { id ->
+                        splitChatState = com.example.chat.ui.split.SplitChatSessionState()
+                        ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { conv ->
+                            ServiceLocator.apiBackend.setActiveConversation(conv.id)
+                            selectedConversation = conv
+                            if (!expandedListDetail) route = AuthRoute.ChatDetail
+                        }
+                    },
+                    paneContent = { paneItem, paneModifier ->
+                        val conv = ServiceLocator.apiBackend.conversations.firstOrNull { it.id == paneItem.conversationId }
+                            ?: com.example.chat.domain.models.Conversation(
+                                id = paneItem.conversationId,
+                                title = paneItem.title,
+                                isGroup = paneItem.isGroup,
+                                type = if (paneItem.isGroup) com.example.chat.domain.models.ConversationType.group else com.example.chat.domain.models.ConversationType.direct,
+                            )
+                        Box(paneModifier) {
+                            ChatDetailHost(
+                                conversation = conv,
+                                initialMessageId = null,
+                                localOverrideAccountKey = paneItem.accountNamespace,
+                                onBack = {
+                                    val remaining = splitChatState.paneItems.filter { it.conversationId != paneItem.conversationId }
+                                    splitChatState = splitChatState.copy(
+                                        paneItems = remaining,
+                                        focusedConversationId = remaining.firstOrNull()?.conversationId,
+                                    )
+                                },
+                                onOpenConversation = { next ->
+                                    val updated = splitChatState.paneItems.map {
+                                        if (it.conversationId == paneItem.conversationId) it.copy(conversationId = next.id, title = next.title) else it
+                                    }
+                                    splitChatState = splitChatState.copy(paneItems = updated)
+                                },
+                            )
+                        }
+                    },
+                )
             }
             } // Preserve Home's saved navigation state while a page is pushed.
             AuthRoute.Notifications -> com.example.chat.ui.notifications.NotificationsInboxScreen(

@@ -41,6 +41,23 @@ class LocalLockService(
 ) : LockCredentialStore {
 
     private val attemptMutex = Mutex()
+    @Volatile
+    private var accountNamespace: String = ""
+
+    fun setAccountNamespace(namespaceHash: String) {
+        accountNamespace = namespaceHash.trim()
+    }
+
+    private fun scopedPrefix(): String =
+        if (accountNamespace.isEmpty()) PREFIX else "$PREFIX.$accountNamespace"
+
+    private fun pinLengthKey() = "${scopedPrefix()}.pin_length"
+    private fun secretPhraseHashKey() = "${scopedPrefix()}.secret_phrase.hash"
+    private fun secretPhraseSaltKey() = "${scopedPrefix()}.secret_phrase.salt"
+    private fun failedAttemptsKey() = "${scopedPrefix()}.failed_attempts"
+    private fun lockoutUntilKey() = "${scopedPrefix()}.lockout_until"
+    private fun scopedHashKey(method: String) = "${scopedPrefix()}.${normalizeMethod(method)}.hash"
+    private fun scopedSaltKey(method: String) = "${scopedPrefix()}.${normalizeMethod(method)}.salt"
 
     companion object {
         private const val PREFIX = "chaty.local_lock.v2"
@@ -90,19 +107,19 @@ class LocalLockService(
     }
 
     override suspend fun hasCredential(method: String): Boolean = try {
-        !secureStorage.read(hashKey(method)).isNullOrEmpty() &&
-            !secureStorage.read(saltKey(method)).isNullOrEmpty()
+        !secureStorage.read(scopedHashKey(method)).isNullOrEmpty() &&
+            !secureStorage.read(scopedSaltKey(method)).isNullOrEmpty()
     } catch (_: Exception) {
         false
     }
 
     suspend fun setPinLength(length: Int) {
         val safeLength = if (length == 6) 6 else 4
-        secureStorage.write(PIN_LENGTH_KEY, safeLength.toString())
+        secureStorage.write(pinLengthKey(), safeLength.toString())
     }
 
     suspend fun getPinLength(): Int =
-        secureStorage.read(PIN_LENGTH_KEY)?.toIntOrNull()?.let { if (it == 6) 6 else 4 } ?: 4
+        secureStorage.read(pinLengthKey())?.toIntOrNull()?.let { if (it == 6) 6 else 4 } ?: 4
 
     /** Fail-safe overwrite rule lives in the caller (migration checks
      *  hasCredential first); this mirrors Dart setCredential exactly,
@@ -127,10 +144,10 @@ class LocalLockService(
         val salt = ByteArray(SALT_LENGTH).also { SecureRandom().nextBytes(it) }
         val derived = pbkdf2(secret, salt)
         val values = linkedMapOf(
-            saltKey(normalized) to b64.encodeToString(salt),
-            hashKey(normalized) to b64.encodeToString(derived),
+            scopedSaltKey(normalized) to b64.encodeToString(salt),
+            scopedHashKey(normalized) to b64.encodeToString(derived),
         )
-        if (normalized == "pin") values[PIN_LENGTH_KEY] = (if (pinLength == 6) 6 else 4).toString()
+        if (normalized == "pin") values[pinLengthKey()] = (if (pinLength == 6) 6 else 4).toString()
         try {
             secureStorage.writeAll(values)
         } finally {
@@ -144,8 +161,8 @@ class LocalLockService(
         if (getRemainingCooldownSeconds() > 0) return@withLock false
         val normalized = normalizeMethod(method)
         try {
-            val encodedHash = secureStorage.read(hashKey(normalized))
-            val encodedSalt = secureStorage.read(saltKey(normalized))
+            val encodedHash = secureStorage.read(scopedHashKey(normalized))
+            val encodedSalt = secureStorage.read(scopedSaltKey(normalized))
             if (encodedHash.isNullOrBlank() || encodedSalt.isNullOrBlank()) return@withLock false
             val salt = b64dec.decode(encodedSalt)
             val expected = b64dec.decode(encodedHash)
@@ -167,8 +184,8 @@ class LocalLockService(
     }
 
     suspend fun hasSecretPhrase(): Boolean = try {
-        !secureStorage.read(SECRET_PHRASE_HASH_KEY).isNullOrEmpty() &&
-            !secureStorage.read(SECRET_PHRASE_SALT_KEY).isNullOrEmpty()
+        !secureStorage.read(secretPhraseHashKey()).isNullOrEmpty() &&
+            !secureStorage.read(secretPhraseSaltKey()).isNullOrEmpty()
     } catch (_: Exception) {
         false
     }
@@ -181,8 +198,8 @@ class LocalLockService(
         try {
             secureStorage.writeAll(
                 mapOf(
-                    SECRET_PHRASE_SALT_KEY to b64.encodeToString(salt),
-                    SECRET_PHRASE_HASH_KEY to b64.encodeToString(bytes),
+                    secretPhraseSaltKey() to b64.encodeToString(salt),
+                    secretPhraseHashKey() to b64.encodeToString(bytes),
                 ),
             )
         } finally {
@@ -195,8 +212,8 @@ class LocalLockService(
         val normalized = normalizeSecretPhrase(rawQuery)
         if (normalized.isEmpty() || getRemainingCooldownSeconds() > 0) return@withLock false
         try {
-            val encodedHash = secureStorage.read(SECRET_PHRASE_HASH_KEY)
-            val encodedSalt = secureStorage.read(SECRET_PHRASE_SALT_KEY)
+            val encodedHash = secureStorage.read(secretPhraseHashKey())
+            val encodedSalt = secureStorage.read(secretPhraseSaltKey())
             if (encodedHash.isNullOrBlank() || encodedSalt.isNullOrBlank()) return@withLock false
             val salt = b64dec.decode(encodedSalt)
             val expected = b64dec.decode(encodedHash)
@@ -218,17 +235,17 @@ class LocalLockService(
     }
 
     suspend fun clearSecretPhrase() {
-        secureStorage.deleteAll(setOf(SECRET_PHRASE_HASH_KEY, SECRET_PHRASE_SALT_KEY))
+        secureStorage.deleteAll(setOf(secretPhraseHashKey(), secretPhraseSaltKey()))
     }
 
     suspend fun getFailedAttempts(): Int = try {
-        secureStorage.read(FAILED_ATTEMPTS_KEY)?.toIntOrNull() ?: 0
+        secureStorage.read(failedAttemptsKey())?.toIntOrNull() ?: 0
     } catch (_: Exception) {
         0
     }
 
     suspend fun getRemainingCooldownSeconds(): Int = try {
-        val lockoutTime = secureStorage.read(LOCKOUT_UNTIL_KEY)?.toLongOrNull() ?: 0L
+        val lockoutTime = secureStorage.read(lockoutUntilKey())?.toLongOrNull() ?: 0L
         val current = now()
         if (lockoutTime > current) Math.ceil((lockoutTime - current) / 1000.0).toInt() else 0
     } catch (_: Exception) {
@@ -239,21 +256,21 @@ class LocalLockService(
 
     private suspend fun recordFailedAttemptLocked() {
         val attempts = getFailedAttempts() + 1
-        val values = linkedMapOf(FAILED_ATTEMPTS_KEY to attempts.toString())
+        val values = linkedMapOf(failedAttemptsKey() to attempts.toString())
         val lockoutMs = when {
             attempts >= 15 -> 5 * 60_000L
             attempts >= 10 -> 60_000L
             attempts >= 5 -> 30_000L
             else -> null
         }
-        if (lockoutMs != null) values[LOCKOUT_UNTIL_KEY] = (now() + lockoutMs).toString()
+        if (lockoutMs != null) values[lockoutUntilKey()] = (now() + lockoutMs).toString()
         secureStorage.writeAll(values)
     }
 
     suspend fun resetFailedAttempts() = attemptMutex.withLock { resetFailedAttemptsLocked() }
 
     private suspend fun resetFailedAttemptsLocked() {
-        secureStorage.deleteAll(setOf(FAILED_ATTEMPTS_KEY, LOCKOUT_UNTIL_KEY))
+        secureStorage.deleteAll(setOf(failedAttemptsKey(), lockoutUntilKey()))
     }
 
     suspend fun canUseBiometrics(): Boolean = try {
@@ -290,7 +307,7 @@ class LocalLockService(
 
     suspend fun clearCredential(method: String) {
         val normalized = normalizeMethod(method)
-        secureStorage.deleteAll(setOf(hashKey(normalized), saltKey(normalized)))
+        secureStorage.deleteAll(setOf(scopedHashKey(normalized), scopedSaltKey(normalized)))
     }
 
     suspend fun clearAll() {
@@ -299,6 +316,6 @@ class LocalLockService(
         clearCredential("password")
         clearSecretPhrase()
         resetFailedAttempts()
-        secureStorage.delete(PIN_LENGTH_KEY)
+        secureStorage.delete(pinLengthKey())
     }
 }

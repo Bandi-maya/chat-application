@@ -175,7 +175,8 @@ class ApiBackendAuthPlane(
         () -> Unit,
         (com.example.chat.data.api.ApiAccountScope) -> Unit,
     >()
-    override fun currentUserId(): String? = apiBackend.authSnapshot().userId
+    override fun currentUserId(): String? =
+        apiBackend.currentAccountHash() ?: apiBackend.authSnapshot().userId
     override fun addPlaneListener(listener: () -> Unit) {
         val wrapper: (com.example.chat.data.api.ApiAccountScope) -> Unit = { listener() }
         wrappers[listener] = wrapper

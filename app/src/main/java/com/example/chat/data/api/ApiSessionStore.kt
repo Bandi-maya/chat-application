@@ -15,6 +15,7 @@ interface ApiSessionStore {
     }
     fun loadRefreshToken(): String? = null
     fun saveRefreshToken(token: String?) { }
+    fun wasExplicitlyCleared(): Boolean = false
     fun clear()
 }
 
@@ -193,15 +194,22 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
         updated
     }
 
-    /**
-     * Drops the active in-memory identity without touching persisted credentials.
-     * Used only when rejecting an ephemeral/demo session that must not revoke or
-     * erase a separate real account's stored session.
-     */
+    /** Clears active identity from memory only without deleting persisted credentials or setting cleared tombstone. */
     fun clearInMemoryOnly() = synchronized(scopeLock) {
         if (state.token == null && state.user == null) return@synchronized
         state = ApiAuthSnapshot(null, null, state.generation + 1)
         onTransition()
+    }
+
+    /** Atomically switches the active in-memory & persisted single-account mirror to [result]
+     *  without passing through an unauthenticated snapshot. Callers coordinating routing changes
+     *  simultaneously can supply [suppressTransitionCallback] = true and invoke the transition listener
+     *  once routing + session are both published under [scopeLock]. */
+    fun adoptForSwitch(result: ApiAuthResult, suppressTransitionCallback: Boolean = false) = synchronized(scopeLock) {
+        val userJson = apiUserToJson(result.user)
+        store.saveSession(result.token, userJson, result.refreshToken)
+        state = ApiAuthSnapshot(result.user, result.token, state.generation + 1)
+        if (!suppressTransitionCallback) onTransition()
     }
 
     fun signOut() = synchronized(scopeLock) {
