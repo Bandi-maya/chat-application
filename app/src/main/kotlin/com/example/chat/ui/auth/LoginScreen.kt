@@ -140,11 +140,11 @@ fun LoginScreen(
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val (saved, usingDefault) = loadSavedTenant()
-        if (!saved.isNullOrEmpty()) {
+        if (!saved.isNullOrEmpty() && !saved.equals(com.example.chat.data.api.BackendRoutingPolicy.DEFAULT_TENANT_ID, ignoreCase = true)) {
             workspace = saved
             useOrganization = true
         } else {
-            useOrganization = !usingDefault
+            useOrganization = false
         }
     }
 

@@ -22,7 +22,7 @@ class ApiBackendConfig(context: Context, private val scopeLock: Any = Any(), pri
     private var useDefault: Boolean = false
 
     val isUsingDefaultTenant: Boolean
-        get() = useDefault || customTenantId.isNullOrBlank()
+        get() = useDefault || customTenantId.isNullOrBlank() || customTenantId.equals(defaultTenantId, ignoreCase = true)
 
     /** Dart init(): restore the persisted tenant selection. */
     fun init() = synchronized(scopeLock) {
@@ -30,7 +30,17 @@ class ApiBackendConfig(context: Context, private val scopeLock: Any = Any(), pri
         try {
             useDefault = prefs.getBoolean(KEY_USE_DEFAULT_TENANT, false)
             val saved = prefs.getString(KEY_ACTIVE_TENANT_ID, null)
-            if (!saved.isNullOrBlank()) customTenantId = saved.trim()
+            if (!saved.isNullOrBlank()) {
+                if (saved.trim().equals(defaultTenantId, ignoreCase = true)) {
+                    useDefault = true
+                    customTenantId = null
+                } else {
+                    customTenantId = saved.trim()
+                }
+            } else if (customTenantId?.trim()?.equals(defaultTenantId, ignoreCase = true) == true) {
+                useDefault = true
+                customTenantId = null
+            }
         } catch (_: Exception) {
         }
         onTransition()
@@ -38,13 +48,14 @@ class ApiBackendConfig(context: Context, private val scopeLock: Any = Any(), pri
 
     fun setTenantId(tenant: String?, useDefault: Boolean = false) = synchronized(scopeLock) {
         generation++
-        this.useDefault = useDefault
-        prefs.edit().putBoolean(KEY_USE_DEFAULT_TENANT, useDefault).apply()
-        if (useDefault || tenant.isNullOrBlank()) {
+        val effectiveDefault = useDefault || tenant.isNullOrBlank() || tenant.trim().equals(defaultTenantId, ignoreCase = true)
+        this.useDefault = effectiveDefault
+        prefs.edit().putBoolean(KEY_USE_DEFAULT_TENANT, effectiveDefault).apply()
+        if (effectiveDefault) {
             customTenantId = null
             prefs.edit().remove(KEY_ACTIVE_TENANT_ID).apply()
         } else {
-            val clean = tenant.trim()
+            val clean = tenant!!.trim()
             customTenantId = clean
             prefs.edit().putString(KEY_ACTIVE_TENANT_ID, clean).apply()
         }

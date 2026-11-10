@@ -658,8 +658,12 @@ class ApiAuthClient(
             0 -> Unit
             else -> throw Exception("Illegal base64url string!")
         }
-        val decoded = Base64.getDecoder().decode(payload)
-        return JSONObject(String(decoded, Charsets.UTF_8))
+        val decodedBytes = try {
+            android.util.Base64.decode(payload, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
+        } catch (_: Throwable) {
+            Base64.getDecoder().decode(payload)
+        }
+        return JSONObject(String(decodedBytes, Charsets.UTF_8))
     }
 
     private fun JSONObject.str(key: String): String? =

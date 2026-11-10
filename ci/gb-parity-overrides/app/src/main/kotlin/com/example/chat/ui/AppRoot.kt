@@ -540,6 +540,7 @@ fun AppRoot() {
                     // Mirrors splash_screen.dart: backend.initialize() best-effort,
                     // then route on authentication state.
                     try {
+                        ServiceLocator.apiBackend.initialize()
                         ServiceLocator.sessionManager.restore()
                     } catch (_: Exception) {
                         // Authentication remains the source of truth.

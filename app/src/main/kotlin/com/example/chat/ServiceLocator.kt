@@ -76,6 +76,7 @@ object ServiceLocator {
         }
         // gotrue session restore, mirroring supabase_flutter's initializeAuth
         // which runs during Supabase.initialize before runApp.
+        apiBackend.initialize()
         appScope.launch { sessionManager.restore() }
         // Decrypted media temps never survive a process restart.
         appScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { mediaCache.purgeTransientTemps() } }
