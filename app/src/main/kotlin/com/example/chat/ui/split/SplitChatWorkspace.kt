@@ -75,7 +75,7 @@ fun SplitChatWorkspace(
                 onClosePane(singleItem.conversationId)
             },
         ) {
-            CompositionLocalProvider(LocalChatPaneWidthDp provides 320.dp) {
+            CompositionLocalProvider(LocalChatPaneWidthDp provides 320f) {
                 paneContent(singleItem, Modifier.fillMaxSize())
             }
         }
@@ -99,7 +99,7 @@ fun SplitChatWorkspace(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ChatyIcon(ChatyIconId.chat, color = colors.accent, semanticLabel = null)
+                ChatyIcon(ChatyIconId.chats, color = colors.accent, semanticLabel = null)
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "Split Chat (${sessionState.count})",
@@ -143,7 +143,7 @@ fun SplitChatWorkspace(
                     val activeItem = sessionState.paneItems.firstOrNull { it.conversationId == sessionState.focusedConversationId }
                         ?: sessionState.paneItems.first()
                     Box(Modifier.weight(1f).fillMaxWidth()) {
-                        CompositionLocalProvider(LocalChatPaneWidthDp provides windowSize.widthDp) {
+                        CompositionLocalProvider(LocalChatPaneWidthDp provides windowSize.widthDp.toFloat()) {
                             paneContent(activeItem, Modifier.fillMaxSize())
                         }
                     }
@@ -160,7 +160,7 @@ fun SplitChatWorkspace(
                             onClose = { onClosePane(first.conversationId) },
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                         ) {
-                            CompositionLocalProvider(LocalChatPaneWidthDp provides windowSize.widthDp) {
+                            CompositionLocalProvider(LocalChatPaneWidthDp provides windowSize.widthDp.toFloat()) {
                                 paneContent(first, Modifier.fillMaxSize())
                             }
                         }
@@ -172,7 +172,7 @@ fun SplitChatWorkspace(
                             onClose = { onClosePane(second.conversationId) },
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                         ) {
-                            CompositionLocalProvider(LocalChatPaneWidthDp provides windowSize.widthDp) {
+                            CompositionLocalProvider(LocalChatPaneWidthDp provides windowSize.widthDp.toFloat()) {
                                 paneContent(second, Modifier.fillMaxSize())
                             }
                         }
@@ -192,7 +192,7 @@ fun SplitChatWorkspace(
                                 onClose = { onClosePane(p1.conversationId) },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             ) {
-                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2)) {
+                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2f)) {
                                     paneContent(p1, Modifier.fillMaxSize())
                                 }
                             }
@@ -204,7 +204,7 @@ fun SplitChatWorkspace(
                                 onClose = { onClosePane(p2.conversationId) },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             ) {
-                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2)) {
+                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2f)) {
                                     paneContent(p2, Modifier.fillMaxSize())
                                 }
                             }
@@ -217,7 +217,7 @@ fun SplitChatWorkspace(
                             onClose = { onClosePane(p3.conversationId) },
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                         ) {
-                            CompositionLocalProvider(LocalChatPaneWidthDp provides windowSize.widthDp) {
+                            CompositionLocalProvider(LocalChatPaneWidthDp provides windowSize.widthDp.toFloat()) {
                                 paneContent(p3, Modifier.fillMaxSize())
                             }
                         }
@@ -238,7 +238,7 @@ fun SplitChatWorkspace(
                                 onClose = { onClosePane(p1.conversationId) },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             ) {
-                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2)) {
+                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2f)) {
                                     paneContent(p1, Modifier.fillMaxSize())
                                 }
                             }
@@ -250,7 +250,7 @@ fun SplitChatWorkspace(
                                 onClose = { onClosePane(p2.conversationId) },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             ) {
-                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2)) {
+                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2f)) {
                                     paneContent(p2, Modifier.fillMaxSize())
                                 }
                             }
@@ -264,7 +264,7 @@ fun SplitChatWorkspace(
                                 onClose = { onClosePane(p3.conversationId) },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             ) {
-                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2)) {
+                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2f)) {
                                     paneContent(p3, Modifier.fillMaxSize())
                                 }
                             }
@@ -276,7 +276,7 @@ fun SplitChatWorkspace(
                                 onClose = { onClosePane(p4.conversationId) },
                                 modifier = Modifier.weight(1f).fillMaxHeight(),
                             ) {
-                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2)) {
+                                CompositionLocalProvider(LocalChatPaneWidthDp provides (windowSize.widthDp / 2f)) {
                                     paneContent(p4, Modifier.fillMaxSize())
                                 }
                             }

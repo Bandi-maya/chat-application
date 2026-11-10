@@ -341,7 +341,7 @@ fun ChatMessageBubble(
                         },
                         onTap = {
                             val rect = emojiBubbleRect
-                            if (rect != null) onBubbleTap(rect)
+                            if (rect != null) onBubbleTap?.invoke(rect)
                         },
                         onDoubleTap = onDoubleTap?.let { action -> { action() } },
                     )

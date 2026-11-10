@@ -87,6 +87,7 @@ fun ChatDetailHost(
     onBack: () -> Unit,
     /** Dart quick-contact tap: Navigator.pushReplacement(ChatDetailScreen(next.id)). */
     onOpenConversation: (Conversation) -> Unit = {},
+    localOverrideAccountKey: String? = null,
 ) {
     val vaultProtection = ServiceLocator.hiddenVaultController
     var vaultPrivacyRevision by remember { mutableIntStateOf(0) }
@@ -204,8 +205,9 @@ fun ChatDetailHost(
     val me = api.currentUser
     val myId = me?.id ?: ""
     val messageAccountScope = api.authSnapshot()
-    val localOverrideAccountKey = com.example.chat.core.messages.LocalMessageOverridePolicy.accountKey(
+    val detectedLocalOverrideAccountKey = com.example.chat.core.messages.LocalMessageOverridePolicy.accountKey(
         messageAccountScope.tenantId, messageAccountScope.baseUrl, myId) ?: ""
+    val effectiveLocalOverrideAccountKey = localOverrideAccountKey ?: detectedLocalOverrideAccountKey
 
     val live = api.conversations.firstOrNull { it.id == conversation.id } ?: conversation
     val messages = api.getMessages(conversation.id)
@@ -438,8 +440,8 @@ fun ChatDetailHost(
         if (api.anyoneTyping(conversation.id)) "someone is typing…" else "${live.participantIds.size} participants"
     }
 
-    val wallpaperKey = remember(conversation.id, localOverrideAccountKey) {
-        if (localOverrideAccountKey.isNotEmpty()) "${localOverrideAccountKey}:${conversation.id}" else conversation.id
+    val wallpaperKey = remember(conversation.id, effectiveLocalOverrideAccountKey) {
+        if (effectiveLocalOverrideAccountKey.isNotEmpty()) "${effectiveLocalOverrideAccountKey}:${conversation.id}" else conversation.id
     }
     val wallpaperStore = remember { context.getSharedPreferences("chaty_chat_wallpapers", 0) }
     val wallpaperInitial = remember(conversation.id, wallpaperKey) {
@@ -511,7 +513,7 @@ fun ChatDetailHost(
         messages = messages,
         initialMessageId = initialMessageId,
         currentUserId = myId,
-        localOverrideAccountKey = localOverrideAccountKey,
+        localOverrideAccountKey = effectiveLocalOverrideAccountKey,
         messageSessionIdentity = messageAccountScope,
         isMessageSessionCurrent = { com.example.chat.core.messages.LocalMessageOverridePolicy.sessionCurrent(messageAccountScope, api.authSnapshot()) },
         onBack = onBack,

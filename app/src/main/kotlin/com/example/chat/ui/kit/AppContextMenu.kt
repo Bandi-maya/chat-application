@@ -205,7 +205,7 @@ private fun AnchoredContextSurface(
     title: String?,
     subtitle: String?,
     minWidth: Float,
-    maxWidth: Float,
+    menuMaxWidth: Float,
     rail: ReactionRail?,
 ) {
     val presentation = LocalReferenceLayoutPresentation.current
@@ -231,7 +231,7 @@ private fun AnchoredContextSurface(
                 SurfaceRect(anchorRect.left.toDp().value, anchorRect.top.toDp().value, anchorRect.width.toDp().value, anchorRect.height.toDp().value)
             }
             val res = ContextSurfaceResolver.resolve(
-                ContextSurfaceRequest(anchor, SurfaceSize(maxWidth, estimatedHeight), insets, screen, keyboard, anchorType),
+                ContextSurfaceRequest(anchor, SurfaceSize(menuMaxWidth, estimatedHeight), insets, screen, keyboard, anchorType),
             )
         val transition = updateTransition(state, label = "contextSurface")
         val curved by transition.animateFloat(

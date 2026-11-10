@@ -102,6 +102,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -694,10 +695,11 @@ fun ChatDetailScreen(
         }
     }
 
+    val chatPaneWidthDp = com.example.chat.ui.kit.LocalChatPaneWidthDp.current
     // Dart _onMessageLongPress: a rect-less long press synthesizes a 100x40
     // anchor at screen center (logical px -> window px here).
     fun syntheticCenterRect(): Rect {
-        val wPx = with(menuDensity) { (com.example.chat.ui.kit.LocalChatPaneWidthDp.current ?: 360.dp).toPx() }
+        val wPx = with(menuDensity) { (chatPaneWidthDp ?: 360f).dp.toPx() }
         val hPx = with(menuDensity) { 400.dp.toPx() }
         val rw = with(menuDensity) { 100.dp.toPx() }
         val rh = with(menuDensity) { 40.dp.toPx() }
@@ -827,7 +829,7 @@ fun ChatDetailScreen(
     // custom color unless unset (0xFF000000), where it falls back to the surface
     // color at sidebarOpacity.
     val showQuickRail = convPrefs.enableQuickContactSidebar &&
-        (com.example.chat.ui.kit.LocalChatPaneWidthDp.current ?: com.example.chat.ui.kit.rememberAdaptiveWindowSize().widthDp) >= 720.dp
+        (com.example.chat.ui.kit.LocalChatPaneWidthDp.current ?: com.example.chat.ui.kit.rememberAdaptiveWindowSize().widthDp.toFloat()) >= 720f
     val railBg = if (convPrefs.quickContactBgColor != 0xFF000000L) {
         Color(convPrefs.quickContactBgColor)
     } else {

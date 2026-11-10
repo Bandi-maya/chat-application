@@ -3,7 +3,7 @@ package com.example.chat.ui.split
 import android.os.Bundle
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.SaverScope
-import com.example.chat.data.model.Conversation
+import com.example.chat.domain.models.Conversation
 
 /**
  * Representation of an active pane inside the Split Chat Workspace.

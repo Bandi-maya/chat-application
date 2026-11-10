@@ -84,9 +84,12 @@ fun AccountSwitcherHost(
             id = summary.conversationId,
             type = if (summary.typeName == "group") ConversationType.group else ConversationType.direct,
             title = summary.title,
+            participantIds = emptyList(),
             avatarInitials = summary.avatarInitials,
             avatarColorHex = summary.avatarColorHex,
-            avatarUrl = summary.avatarUrl,
+            lastMessageText = "",
+            lastMessageTime = java.time.Instant.ofEpochMilli(summary.lastTimestampEpochMs),
+            lastMessageSenderId = "",
             unreadCount = summary.unreadCount,
             isMuted = summary.isMuted,
         )

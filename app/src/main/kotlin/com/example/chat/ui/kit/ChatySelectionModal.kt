@@ -73,7 +73,7 @@ fun ChatySelectionModal(
                 .safeDrawingPadding().imePadding().padding(16.dp),
             contentAlignment = Alignment.Center,
         ) {
-            val height = adaptiveSheetHeight(minOf(windowSize.heightDp, maxHeight), fraction = 0.80f)
+            val height = adaptiveSheetHeight(minOf(windowSize.heightDp, maxHeight.value.toInt()), fraction = 0.80f)
             val compactChrome = maxHeight < 220.dp && maxWidth >= 480.dp
             Column(
                 Modifier.onGloballyPositioned { cardBounds[0] = it.boundsInWindow() }

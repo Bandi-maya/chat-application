@@ -1650,7 +1650,10 @@ fun AppRoot() {
                             ?: com.example.chat.domain.models.Conversation(
                                 id = paneItem.conversationId,
                                 title = paneItem.title,
-                                isGroup = paneItem.isGroup,
+                                participantIds = emptyList(),
+                                lastMessageText = "",
+                                lastMessageTime = java.time.Instant.EPOCH,
+                                lastMessageSenderId = "",
                                 type = if (paneItem.isGroup) com.example.chat.domain.models.ConversationType.group else com.example.chat.domain.models.ConversationType.direct,
                             )
                         Box(paneModifier) {

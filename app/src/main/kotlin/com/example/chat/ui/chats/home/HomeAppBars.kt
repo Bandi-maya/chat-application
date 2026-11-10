@@ -114,6 +114,7 @@ data class HomeIdentity(
 data class ChatsHomeNav(
     val onOpenProfile: () -> Unit = {},
     val onOpenAccountSwitcher: () -> Unit = {},
+    val onOpenSplitChat: ((List<String>) -> Unit)? = null,
     val onOpenSettings: () -> Unit = {},
     val onOpenNotifications: () -> Unit = {},
     val onOpenSecuritySettings: () -> Unit = {},
@@ -470,7 +471,7 @@ fun SelectionHomeAppBar(
         Spacer(Modifier.weight(1f))
         if (onSplitChat != null && selectedCount in 1..4) {
             IconButton(onClick = onSplitChat) {
-                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chat, semanticLabel = "Split chat", color = Color(theme.accentColor))
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chats, semanticLabel = "Split chat", color = Color(theme.accentColor))
             }
         }
         IconButton(onClick = onTogglePin) {

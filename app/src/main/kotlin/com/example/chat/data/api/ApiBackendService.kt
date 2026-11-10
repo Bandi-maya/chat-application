@@ -49,6 +49,14 @@ class ApiBackendService(
         token = { session.token },
     )
 
+    /** Scoped auth requests for a registered account without mutating global routing. */
+    private fun scopedAuthClient(baseUrl: String, tenantId: String): ApiAuthClient = ApiAuthClient(
+        baseUrl = { baseUrl },
+        tenantId = { tenantId },
+        transport = OkHttpApiTransport(),
+        token = { session.token },
+    )
+
     private val session = ApiAuthSession(sessionStore, authScopeLock, ::notifyAuthScopeTransition)
 
     // Contacts / presence / call-history planes (research 5.2-5.4). All
@@ -2225,7 +2233,7 @@ class ApiBackendService(
         if (expMs != null && (expMs - System.currentTimeMillis()) < REFRESH_MARGIN_SECONDS * 1000L && !effectiveRefresh.isNullOrBlank()) {
             val proof = deviceIdentity?.proofHeaders(effectiveRefresh) ?: emptyMap()
             when (val r = withContext(Dispatchers.IO) {
-                auth.refreshForAccount(targetMeta.baseUrl, targetMeta.tenantId, effectiveRefresh, proof)
+                scopedAuthClient(targetMeta.baseUrl, targetMeta.tenantId).refresh(effectiveRefresh, proof)
             }) {
                 is ApiAuthClient.RefreshResult.Ok -> {
                     effectiveToken = r.accessToken
@@ -2314,19 +2322,17 @@ class ApiBackendService(
         val targetTenant = if (isDefaultTenant) config.defaultTenantId else (tenant?.trim().takeIf { !it.isNullOrEmpty() } ?: config.tenantId)
         val baseUrl = config.restApiBaseUrl
         val result = withContext(Dispatchers.IO) {
-            auth.login(
+            scopedAuthClient(baseUrl, targetTenant).login(
                 identifier = value,
                 password = password,
                 extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap(),
-                baseUrlOverride = baseUrl,
-                tenantOverride = targetTenant,
             )
         }
         val oldHash = currentAccountHash()
         persistAccountConversationSnapshot()
         val routingSnapshot = ApiRoutingSnapshot(
             tenantId = targetTenant,
-            restApiBaseUrl = baseUrl,
+            baseUrl = baseUrl,
             webSocketTemplate = config.snapshot().webSocketTemplate,
             generation = config.snapshot().generation,
         )
@@ -2436,7 +2442,7 @@ class ApiBackendService(
             val rt = creds.refreshToken ?: continue
             multiAccount.refreshAccountIfNeeded(meta.accountKey, force = true) { base, tenant, token ->
                 val proof = deviceIdentity?.proofHeaders(token) ?: emptyMap()
-                withContext(Dispatchers.IO) { auth.refreshForAccount(base, tenant, token, proof) }
+                withContext(Dispatchers.IO) { scopedAuthClient(base, tenant).refresh(token, proof) }
             }
         }
         return activeOutcome

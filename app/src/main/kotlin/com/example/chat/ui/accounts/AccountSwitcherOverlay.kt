@@ -501,6 +501,7 @@ private fun SwitcherTabPill(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccountCard(
     meta: ApiRegisteredAccountMeta,

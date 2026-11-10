@@ -94,7 +94,7 @@ fun MiniChatWindow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ChatyIcon(ChatyIconId.chat, color = colors.accent, semanticLabel = null)
+                ChatyIcon(ChatyIconId.chats, color = colors.accent, semanticLabel = null)
                 Text(
                     paneItem.title,
                     color = colors.foreground,
@@ -134,7 +134,7 @@ fun MiniChatWindow(
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ChatyIcon(ChatyIconId.chat, color = colors.accent, semanticLabel = null)
+                    ChatyIcon(ChatyIconId.chats, color = colors.accent, semanticLabel = null)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
                         Text(

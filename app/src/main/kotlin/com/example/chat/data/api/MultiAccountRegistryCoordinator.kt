@@ -53,7 +53,7 @@ class MultiAccountRegistryCoordinator(
         val userJson = legacyStore.loadUserJson()?.takeIf { it.isNotBlank() } ?: return@synchronized null
         if (DemoMode.isDemoRestSession(token, userJson)) return@synchronized null
         val user = runCatching { apiUserFromJson(userJson) }.getOrNull() ?: return@synchronized null
-        val key = ApiAccountRoutingCanonicalizer.accountKey(routing.tenantId, routing.restApiBaseUrl, user.id)
+        val key = ApiAccountRoutingCanonicalizer.accountKey(routing.tenantId, routing.baseUrl, user.id)
             ?: return@synchronized null
 
         val existing = store.loadRegistry()
@@ -87,7 +87,7 @@ class MultiAccountRegistryCoordinator(
         if (DemoMode.isDemoRestSession(authResult.token, userJson)) return@synchronized null
         val normTenant = ApiAccountRoutingCanonicalizer.normalizeTenant(routing.tenantId)
             .ifEmpty { BackendRoutingPolicy.DEFAULT_TENANT_ID }
-        val normBase = ApiAccountRoutingCanonicalizer.normalizeBaseUrl(routing.restApiBaseUrl)
+        val normBase = ApiAccountRoutingCanonicalizer.normalizeBaseUrl(routing.baseUrl)
         val key = ApiAccountRoutingCanonicalizer.accountKey(normTenant, normBase, authResult.user.id)
             ?: return@synchronized null
         val hash = ApiAccountRoutingCanonicalizer.accountHash(key)
@@ -351,7 +351,7 @@ class MultiAccountRegistryCoordinator(
         ): List<AccountRecentChatSummary> = conversations
             .asSequence()
             .filter { !it.isArchived && !isHiddenOrLocked(it.id) }
-            .sortedWith(compareByDescending<Conversation> { it.isPinned }.thenByDescending { it.lastMessageAt ?: java.time.Instant.EPOCH })
+            .sortedWith(compareByDescending<Conversation> { it.isPinned }.thenByDescending { it.lastMessageTime ?: java.time.Instant.EPOCH })
             .take(MAX_RECENT_CARDS_PER_ACCOUNT)
             .map { conv ->
                 AccountRecentChatSummary(
@@ -359,10 +359,10 @@ class MultiAccountRegistryCoordinator(
                     title = conv.title,
                     typeName = conv.type.name,
                     unreadCount = conv.unreadCount.coerceAtLeast(0),
-                    lastTimestampEpochMs = conv.lastMessageAt?.toEpochMilli() ?: 0L,
-                    avatarUrl = conv.avatarUrl,
-                    avatarInitials = conv.avatarInitials,
-                    avatarColorHex = conv.avatarColorHex,
+                    lastTimestampEpochMs = conv.lastMessageTime?.toEpochMilli() ?: 0L,
+                    avatarUrl = null,
+                    avatarInitials = conv.avatarInitials ?: "C",
+                    avatarColorHex = conv.avatarColorHex ?: "#00A884",
                     hasDraft = !drafts[conv.id].isNullOrBlank() || !conv.draftText.isNullOrBlank(),
                     isMuted = conv.isMuted,
                 )

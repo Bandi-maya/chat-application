@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,6 +23,9 @@ data class ChatyWindowMetrics(
     val heightBucket: ChatyHeightBucket = ChatyAdaptiveLogic.heightBucketOf(heightDp),
 )
 
+/** Width/height pair with named accessors while retaining Pair-style destructuring. */
+data class AdaptiveWindowSize(val widthDp: Int, val heightDp: Int)
+
 val LocalChatyWindowMetrics = compositionLocalOf {
     ChatyWindowMetrics(0, 0, ChatyWidthBucket.Compact, ChatyHeightBucket.Medium)
 }
@@ -29,13 +33,21 @@ val LocalChatyWindowMetrics = compositionLocalOf {
 /** Provides actual window/pane dimensions from LocalChatyWindowMetrics with automatic fallback ONLY
  *  when rendered inside a standalone test activity without ChatyWindowMetricsProvider. */
 @Composable
-fun rememberAdaptiveWindowSize(): Pair<Int, Int> {
+fun rememberAdaptiveWindowSize(): AdaptiveWindowSize {
     val m = LocalChatyWindowMetrics.current
-    if (m.widthDp > 0 && m.heightDp > 0) return m.widthDp to m.heightDp
+    if (m.widthDp > 0 && m.heightDp > 0) return AdaptiveWindowSize(m.widthDp, m.heightDp)
     val cfg = androidx.compose.ui.platform.LocalConfiguration.current
-    return ChatyAdaptiveLogic.effectiveDimension(m.widthDp, cfg.screenWidthDp) to
-        ChatyAdaptiveLogic.effectiveDimension(m.heightDp, cfg.screenHeightDp)
+    return AdaptiveWindowSize(
+        ChatyAdaptiveLogic.effectiveDimension(m.widthDp, cfg.screenWidthDp),
+        ChatyAdaptiveLogic.effectiveDimension(m.heightDp, cfg.screenHeightDp),
+    )
 }
+
+fun adaptiveModalWidth(windowWidthDp: Int, maxWidth: Dp = 520.dp): Dp =
+    ChatyAdaptiveLogic.adaptiveModalWidth(windowWidthDp, desiredMaxDp = maxWidth.value.toInt()).dp
+
+fun adaptiveSheetHeight(windowHeightDp: Int, fraction: Float = 0.8f, minDp: Dp = 180.dp): Dp =
+    ChatyAdaptiveLogic.adaptiveSheetHeight(windowHeightDp, fraction = fraction, minDp = minDp.value.toInt()).dp
 
 /** Container/pane width override for message bubbles when rendered inside split panes or detail columns. */
 val LocalChatPaneWidthDp = compositionLocalOf<Float?> { null }
