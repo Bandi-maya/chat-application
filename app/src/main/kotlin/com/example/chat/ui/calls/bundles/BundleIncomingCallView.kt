@@ -234,15 +234,34 @@ private fun ReferenceHorizontalPuck(twoWay: Boolean, background: Color, accept: 
     // Last LAID-OUT X translation of the moving puck (single writer: the
     // offset lambda below); used to measure drags in the unmoving rest frame.
     val appliedOffsetPx = remember { object { var x = 0 } }
-    BoxWithConstraints(modifier.heightIn(min = 80.dp).clip(RoundedCornerShape(40.dp)).background(background)) {
+
+    BoxWithConstraints(modifier.heightIn(min = 80.dp).clip(RoundedCornerShape(40.dp))) {
         val range = with(LocalDensity.current) { ((maxWidth - 76.dp).coerceAtLeast(24.dp) / (if (twoWay) 2 else 1)).toPx() }
+        val progress = (offset / range.coerceAtLeast(1f)).coerceIn(0f, 1f)
+        // Left-to-right fluid background color blend toward vibrant green (Apple UI #34C759 / accept)
+        val dynamicBackground = if (!twoWay) {
+            val targetGreen = accept.copy(alpha = 0.85f)
+            androidx.compose.ui.graphics.lerp(background, targetGreen, progress)
+        } else background
+
+        Box(Modifier.fillMaxSize().background(dynamicBackground))
         val home = if (twoWay) Alignment.Center else Alignment.CenterStart
         if (twoWay) {
             Row(Modifier.fillMaxWidth().align(Alignment.Center).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Decline", color = decline, fontSize = 14.sp)
                 Text("Answer", color = accept, fontSize = 14.sp)
             }
-        } else Text("slide to answer", color = callForeground(), modifier = Modifier.align(Alignment.Center).padding(start = 36.dp), fontSize = 16.sp)
+        } else {
+            // Apple style slide to answer text with shimmer opacity fade on drag
+            val textAlpha = (1f - progress * 1.5f).coerceIn(0f, 1f)
+            Text(
+                "slide to answer",
+                color = callForeground().copy(alpha = textAlpha),
+                modifier = Modifier.align(Alignment.Center).padding(start = 36.dp),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
         Box(Modifier.align(home).padding(horizontal = 6.dp).offset {
                 appliedOffsetPx.x = offset.roundToInt()
                 IntOffset(appliedOffsetPx.x, 0)
