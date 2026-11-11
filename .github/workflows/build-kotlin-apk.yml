@@ -443,7 +443,7 @@ jobs:
   # is not created: the user-approved Normal demo account is supplied through temporary secrets.
   prod-auth-repro:
     needs: [build, gate]
-    if: github.event_name == 'workflow_dispatch' && inputs.run_live_auth_probe
+    if: (github.event_name == 'workflow_dispatch' && inputs.run_live_auth_probe) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[chaty-auth-probe-20261111]'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
