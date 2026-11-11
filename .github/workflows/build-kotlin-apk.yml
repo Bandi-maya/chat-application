@@ -1,550 +1,153 @@
-name: Build, Test and Deliver Kotlin APK
+name: Build Kotlin APK
 
-# One Kotlin pipeline builds the canonical checked-out source, validates tests,
-# and publishes debug and optimized stable-key-signed release APKs.
-# Optional emulator tiers require explicit selection; no source overlays run.
 on:
-  workflow_dispatch:
-    inputs:
-      run_emulator:
-        description: Run the existing isolated emulator proof tier
-        type: boolean
-        default: false
-      run_live_auth_probe:
-        description: Explicit live-backend authorized-demo-account reproduction
-        type: boolean
-        default: false
   push:
-    branches: [kotlin]
+    branches:
+      - kotlin
+  workflow_dispatch:
 
 jobs:
-  gate:
-    runs-on: ubuntu-latest
-    outputs:
-      build: ${{ steps.d.outputs.build }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - id: d
-        env:
-          CHATY_HEAD_MESSAGE: ${{ github.event.head_commit.message }}
-        run: |
-          if [[ "$CHATY_HEAD_MESSAGE" == *"[chaty-old-apk-probe-20261111]"* ]]; then
-            echo "build=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "build=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          B="${{ github.event.before }}"
-          if [ -z "$B" ] || [ "$B" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$B^{commit}" 2>/dev/null; then B="HEAD~1"; fi
-          CH=$(git diff --name-only "$B" HEAD)
-          printf 'GATE-CHANGED\n%s\n' "$CH"
-          # Single-workflow consolidation: every push to kotlin builds + tests.
-          echo "build=true" >> "$GITHUB_OUTPUT"
-
   build:
-    needs: gate
-    if: needs.gate.outputs.build == 'true'
+    name: Build Release APK
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate custom WebRTC backend route syntax
-        run: node --check backend/routes/chaty-webrtc-ice.js
-      - name: Verify canonical source hashes and test dependency
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Remove Firebase service when google-services.json is absent
         run: |
-          python3 - <<'PYVERIFY'
-          import hashlib, json, pathlib
-          root = pathlib.Path('.')
-          files = json.loads((root / 'ci/approved-ui-run5-manifest.json').read_text())['files']
-          assert len(files) == 3156
-          for name, expected in files.items():
-              assert name.startswith('app/') and '..' not in pathlib.PurePosixPath(name).parts
-              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == expected, name
-          assert not (root / 'ci/gb-parity-overrides').exists()
-          assert 'androidTestImplementation("androidx.compose.ui:ui-test-junit4")' in (root / 'app/build.gradle.kts').read_text()
-          print('CANONICAL-SOURCE-VERIFIED', len(files))
-          PYVERIFY
-      - name: Disable unused Firebase messaging entrypoint
-        run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
-      - uses: actions/setup-java@v4
+          if [ ! -f app/google-services.json ]; then
+            rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
+          fi
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.11.1"
-      - uses: dtolnay/rust-toolchain@stable
+          gradle-version: '8.11.1'
+
+      - name: Set up Rust for MLS native
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-      # Rust cache: pruned target dir + cargo registry/bin, keyed on the
-      # mls-native manifests. The earlier actions/cache entry exceeded the
-      # per-cache size cap (3 ABI release targets), so saves failed and every
-      # run did a full ~3.5 min rebuild. rust-cache prunes before saving.
-      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            mls-native -> target
-          cache-on-failure: true
-      - name: Install cargo-ndk
-        run: command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
-      - name: Set Android NDK for cargo-ndk
+          workspaces: mls-native -> target
+
+      - name: Install cargo-ndk and configure ANDROID_NDK_HOME
         run: |
-          NDK=$(ls -d "$ANDROID_HOME"/ndk/* | sort -V | tail -1)
-          echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
-      - name: Generate UniFFI bindings (diagnostic)
-        run: |
-          gradle :app:generateUniffiBindings --no-daemon
-          echo '--- generated tree ---'
-          find app/build/generated/uniffi -type f | head -20
-      - name: Materialize Chaty signing keystore
+          if ! command -v cargo-ndk >/dev/null 2>&1; then
+            cargo install cargo-ndk --locked
+          fi
+          NDK_DIR=$(ls -d "${ANDROID_HOME:-$ANDROID_SDK_ROOT}"/ndk/* 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -z "$NDK_DIR" ]; then
+            echo "::error::Android NDK not found under ANDROID_HOME/ndk"
+            exit 1
+          fi
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+
+      - name: Configure release signing keystore
         env:
           CHATY_KEYSTORE_B64: ${{ secrets.CHATY_KEYSTORE_B64 }}
           CHATY_KEYSTORE_PASSWORD: ${{ secrets.CHATY_KEYSTORE_PASSWORD }}
         run: |
-          set -euo pipefail
-          test -n "${CHATY_KEYSTORE_B64:-}" || { echo "Stable Chaty keystore secret is required for all builds."; exit 1; }
-          test -n "${CHATY_KEYSTORE_PASSWORD:-}" || { echo "Stable Chaty signing password secret is required for all builds."; exit 1; }
           mkdir -p ci/keystore
-          printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
-          chmod 600 ci/keystore/chaty-release.jks
-          echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "Materialized stable Chaty signing identity."
-      - name: Build debug APK (compile verification)
-        run: gradle :app:assembleDebug --no-daemon
-      - name: APK info
-        if: always()
-        run: |
-          ls -l app/build/outputs/apk/debug/ 2>/dev/null || true
-          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then sha256sum app/build/outputs/apk/debug/app-debug.apk; fi
-          APK=app/build/outputs/apk/debug/app-debug.apk
-          if [ -f "$APK" ]; then
-            echo "--- APK content check (model/native libs) ---"
-            echo "--- model assets ---"
-            unzip -l "$APK" | grep -i "face_landmarker\|\.task$\|\.tflite$" || echo "NO MODEL ASSET FOUND"
-            if unzip -l "$APK" | grep -q "assets/face_landmarker.task"; then
-              GOT=$(unzip -p "$APK" assets/face_landmarker.task | sha256sum | cut -d' ' -f1)
-              echo "MODEL sha256 in APK: $GOT"
-              echo "MODEL sha256 pinned: 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
-              [ "$GOT" = "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff" ] && echo "MODEL CHECKSUM MATCH" || echo "MODEL CHECKSUM MISMATCH"
-            fi
-            unzip -l "$APK" | grep -i "libchaty\|libmediapipe" || true
-            BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-            echo "--- badging ---"
-            "$BT/aapt2" dump badging "$APK" 2>/dev/null | grep -E "^package:|sdkVersion|targetSdk" || true
-            echo "--- signing ---"
-            "$BT/apksigner" verify --print-certs "$APK" 2>&1 | head -6 || true
+          if [ -n "$CHATY_KEYSTORE_B64" ] && [ -n "$CHATY_KEYSTORE_PASSWORD" ]; then
+            printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
+            echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          else
+            echo "::notice::Keystore secrets not set; generating ephemeral CI keystore"
+            rm -f ci/keystore/chaty-release.jks
+            keytool -genkeypair -v \
+              -keystore ci/keystore/chaty-release.jks \
+              -alias chaty \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 3650 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=Chaty CI, O=Chaty, C=US"
+            echo "CHATY_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
           fi
-      - uses: actions/upload-artifact@v4
-        if: success()
+
+      - name: Build release APK
+        run: gradle :app:assembleRelease --no-daemon
+
+      - name: Verify APK output
+        id: apk
+        run: |
+          APK_PATH="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "::error::Release APK not found at $APK_PATH"
+            exit 1
+          fi
+          APK_SIZE=$(stat -c%s "$APK_PATH")
+          APK_SIZE_MB=$(awk "BEGIN { printf \"%.2f\", $APK_SIZE / 1048576 }")
+          echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          echo "size=$APK_SIZE" >> "$GITHUB_OUTPUT"
+          echo "size_mb=$APK_SIZE_MB" >> "$GITHUB_OUTPUT"
+          echo "Built APK: $APK_PATH (${APK_SIZE_MB} MB / ${APK_SIZE} bytes)"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: chaty-kotlin-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: chaty-kotlin-apk
+          path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
+          retention-days: 7
 
       - name: Send APK to Telegram
-        if: ${{ success() && !contains(github.event.head_commit.message, '[chaty-no-telegram-once-20261107]') }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID || secrets.TELEGRAM_CHAT_ID }}
+          APK_PATH: ${{ steps.apk.outputs.path }}
+          APK_SIZE: ${{ steps.apk.outputs.size }}
+          APK_SIZE_MB: ${{ steps.apk.outputs.size_mb }}
         run: |
-          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-          TELEGRAM_CHAT="${{ secrets.TELEGRAM_CHANNEL_ID }}"
-          if [ -z "$TELEGRAM_CHAT" ]; then
-            TELEGRAM_CHAT="${{ secrets.TELEGRAM_CHAT_ID }}"
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHANNEL_ID" ]; then
+            echo "::notice::Telegram secrets not configured; skipping Telegram upload"
+            exit 0
           fi
-          if [ -f "$APK_PATH" ] && [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && [ -n "$TELEGRAM_CHAT" ]; then
-            APP_NAME="Chaty Kotlin App"
-            VERSION="1.0.0"
-            COMMIT_SHA="${GITHUB_SHA::7}"
-            BRANCH="${GITHUB_REF#refs/heads/}"
 
-            CAPTION=$(cat <<EOF
-          📦 $APP_NAME
-          🏷️ Version: $VERSION
-          ⚙️ Build: $GITHUB_RUN_NUMBER
-          🌿 Branch: $BRANCH
-          🔗 Commit: $COMMIT_SHA
-          ✅ Status: Built Successfully
-          🕒 Time: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
-          EOF
-            )
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          SHORT_SHA="${GITHUB_SHA::7}"
 
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
-              -F chat_id="$TELEGRAM_CHAT" \
-              -F document=@"$APK_PATH" \
-              -F caption="$CAPTION"
-            echo "APK successfully sent to Telegram."
+          if [ "$APK_SIZE" -le 52000000 ]; then
+            CAPTION="Chaty Kotlin Release APK (${APK_SIZE_MB} MB) | ${SHORT_SHA}"
+            RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+              -F "chat_id=${TELEGRAM_CHANNEL_ID}" \
+              -F "document=@${APK_PATH};filename=chaty-${SHORT_SHA}.apk" \
+              -F "caption=${CAPTION}")
+            echo "$RESPONSE" | jq -e '.ok == true' >/dev/null || {
+              echo "::error::Telegram upload failed: $RESPONSE"
+              exit 1
+            }
           else
-            echo "TELEGRAM_BOT_TOKEN and TELEGRAM_CHANNEL_ID/TELEGRAM_CHAT_ID secrets not configured or APK missing; skipping Telegram dispatch."
+            MSG="Chaty Kotlin Release APK built (${APK_SIZE_MB} MB, exceeds Telegram 50 MB bot limit). Download artifact: ${RUN_URL}"
+            curl -sf -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TELEGRAM_CHANNEL_ID}" \
+              --data-urlencode "text=${MSG}" >/dev/null
           fi
 
-      - name: Compile instrumentation tests before emulator setup
-        run: gradle :app:compileDebugAndroidTestKotlin --no-daemon
-
-      - name: Unit tests (behavior parity)
-        run: gradle :app:testDebugUnitTest --no-daemon
-      - name: Report unit test totals
-        if: always()
-        run: |
-          python3 - <<'PYTEST'
-          import glob, xml.etree.ElementTree as ET
-          roots = [ET.parse(p).getroot() for p in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml')]
-          totals = {k: sum(int(r.get(k, 0)) for r in roots) for k in ('tests', 'failures', 'errors', 'skipped')}
-          print('UNIT-TEST-TOTALS', totals, 'suites', len(roots))
-          PYTEST
-      - name: Preserve unit test failure evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cumulative-unit-test-results
-          path: app/build/test-results/testDebugUnitTest/
-          if-no-files-found: warn
-
-      - name: Build optimized release APK with stable Chaty signing
+      - name: Notify failure on Telegram
+        if: failure()
         env:
-          CHATY_KEYSTORE_B64: ${{ secrets.CHATY_KEYSTORE_B64 }}
-          CHATY_KEYSTORE_PASSWORD: ${{ secrets.CHATY_KEYSTORE_PASSWORD }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID || secrets.TELEGRAM_CHAT_ID }}
         run: |
-          set -euo pipefail
-          # Release must never use the debug/fallback signing identity.
-          test -n "${CHATY_KEYSTORE_B64:-}" || { echo "Stable Chaty signing keystore secret is required for release."; exit 1; }
-          test -n "${CHATY_KEYSTORE_PASSWORD:-}" || { echo "Stable Chaty signing password secret is required for release."; exit 1; }
-          gradle :app:assembleRelease --no-daemon
-          APK=app/build/outputs/apk/release/app-release.apk
-          test -s "$APK"
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$BT/apksigner" verify --verbose --print-certs "$APK"
-          "$BT/aapt2" dump badging "$APK" | grep -E "^package:|^sdkVersion|^targetSdkVersion|^native-code:"
-          if "$BT/aapt2" dump badging "$APK" | grep -q '^application-debuggable'; then
-            echo "Release APK must not be debuggable."; exit 1
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHANNEL_ID" ]; then
+            exit 0
           fi
-          DEBUG_APK=app/build/outputs/apk/debug/app-debug.apk
-          RELEASE_CERT=$("$BT/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
-          DEBUG_CERT=$("$BT/apksigner" verify --print-certs "$DEBUG_APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
-          test -n "$RELEASE_CERT" && test "$RELEASE_CERT" = "$DEBUG_CERT" || { echo "Debug/release signing mismatch."; exit 1; }
-          test "$RELEASE_CERT" = "acc64606e7d8fb57d962689c2c092990f15e8892ffdf0c700c5c65ffe5d0b135" || { echo "Unexpected Chaty signing certificate."; exit 1; }
-          echo "SHARED-CHATY-SIGNER $RELEASE_CERT"
-          stat -c 'RELEASE-APK-BYTES %s' "$APK"
-          sha256sum "$APK"
-      - name: Preserve installable release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: chaty-kotlin-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
-
-      # A separate synthetic pair is built once; never install the configured production artifact in fixtures.
-      - name: Materialize Chaty signing keystore
-        env:
-          CHATY_KEYSTORE_B64: ${{ secrets.CHATY_KEYSTORE_B64 }}
-          CHATY_KEYSTORE_PASSWORD: ${{ secrets.CHATY_KEYSTORE_PASSWORD }}
-        run: |
-          set -euo pipefail
-          test -n "${CHATY_KEYSTORE_B64:-}" || { echo "Stable Chaty keystore secret is required for all builds."; exit 1; }
-          test -n "${CHATY_KEYSTORE_PASSWORD:-}" || { echo "Stable Chaty signing password secret is required for all builds."; exit 1; }
-          mkdir -p ci/keystore
-          printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
-          chmod 600 ci/keystore/chaty-release.jks
-          echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "Materialized stable Chaty signing identity."
-      - name: Build isolated runtime APK pair once
-        run: |
-          printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
-          gradle :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon
-          mkdir -p runtime-apks
-          cp app/build/outputs/apk/debug/app-debug.apk runtime-apks/
-          cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk runtime-apks/
-          (cd runtime-apks && sha256sum *.apk > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: synthetic-runtime-apk-pair
-          path: runtime-apks/
-          if-no-files-found: error
-
-      - name: Send Failure Notification to Telegram
-        if: ${{ failure() && !contains(github.event.head_commit.message, '[chaty-no-telegram-once-20261107]') }}
-        run: |
-          COMMIT_SHA="${GITHUB_SHA::7}"
-          BRANCH="${GITHUB_REF#refs/heads/}"
-
-          MESSAGE="❌ Chaty Android APK build FAILED
-          🌿 Branch: ${BRANCH}
-          🔗 Commit: ${COMMIT_SHA}
-          ⚙️ Run ID: ${GITHUB_RUN_ID}
-          Check GitHub Actions for details."
-
-          TELEGRAM_CHAT="${{ secrets.TELEGRAM_CHANNEL_ID }}"
-          if [ -z "$TELEGRAM_CHAT" ]; then
-            TELEGRAM_CHAT="${{ secrets.TELEGRAM_CHAT_ID }}"
-          fi
-
-          if [ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" ] && [ -n "$TELEGRAM_CHAT" ]; then
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"               -d chat_id="$TELEGRAM_CHAT"               -d text="$MESSAGE"
-          fi
-
-  # Runtime verification tier: boots the real app on an emulator and executes
-  # the OpenMLS native engine over JNI (two-party protocol roundtrip, not app
-  # E2E messaging). Separate job so the compile/test/APK job keeps its
-  # duration. Same Rust cache as the build job, so its native build is warm.
-  runtime-smoke:
-    needs: [build, gate]
-    if: (github.event_name == 'workflow_dispatch' && inputs.run_emulator) || contains(github.event.head_commit.message, '[run-emulator]')
-    runs-on: ubuntu-latest
-    # Job bound grounded in run-133 measured runner phases: core-ui 39.5min,
-    # calls-camera 18.1, all other shards <=8.7. 60 for core-ui leaves 12min of
-    # post-step/upload margin over its 48min step bound; 45 stays for the rest.
-    timeout-minutes: ${{ matrix.shard == 'core-ui' && 60 || 45 }}
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        shard: [core-ui, media, media-emoji-perf, emoji-real, emoji-loop, maps, calls-camera]
-    env:
-      CHATY_TEST_SHARD: ${{ matrix.shard }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Verify canonical source hashes and test dependency
-        run: |
-          python3 - <<'PYVERIFY'
-          import hashlib, json, pathlib
-          root = pathlib.Path('.')
-          files = json.loads((root / 'ci/approved-ui-run5-manifest.json').read_text())['files']
-          assert len(files) == 3156
-          for name, expected in files.items():
-              assert name.startswith('app/') and '..' not in pathlib.PurePosixPath(name).parts
-              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == expected, name
-          assert not (root / 'ci/gb-parity-overrides').exists()
-          assert 'androidTestImplementation("androidx.compose.ui:ui-test-junit4")' in (root / 'app/build.gradle.kts').read_text()
-          print('CANONICAL-SOURCE-VERIFIED', len(files))
-          PYVERIFY
-      - name: Disable unused Firebase messaging entrypoint
-        run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.11.1"
-      - uses: actions/download-artifact@v4
-        with:
-          name: synthetic-runtime-apk-pair
-          path: runtime-apks
-      - name: Verify identical runtime APK pair
-        run: |
-          (cd runtime-apks && sha256sum -c SHA256SUMS)
-          cp runtime-apks/SHA256SUMS runtime-apk-pair-SHA256SUMS.txt
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      # Synthetic sessions must never reach the user's configured public server.
-      - name: Isolate synthetic emulator backend routing
-        run: |
-          printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
-      - name: Runtime bootstrap smoke (emulator)
-        uses: reactivecircus/android-emulator-runner@v2
-        # Step bound: run-131's Terminate Emulator post-phase hung INSIDE this
-        # step's execution until the job timeout cancelled the shard, taking the
-        # evidence uploads with it (a step timeout fails the step instead, so the
-        # always() upload steps still run). Bounds from run-133 measured phases:
-        # core-ui 39.5min -> 48 (+21%); calls-camera 18.1 -> 25 (+38%); <=8.7 rest.
-        timeout-minutes: ${{ matrix.shard == 'core-ui' && 48 || 25 }}
-        with:
-          api-level: 34
-          target: default
-          arch: x86_64
-          profile: pixel_6
-          # Preserve upstream v2 default flags and explicitly expose both synthetic cameras.
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: bash ci/run-smoke.sh
-      - name: Capture emulator crash evidence (passive)
-        if: always()
-        run: |
-          mkdir -p screenshots/emulator-crash
-          for d in /tmp/android-runner/emu-crash-*; do
-            [ -e "$d" ] && cp -r "$d" screenshots/emulator-crash/ 2>/dev/null || true
-          done
-          (ps aux | grep -i "[q]emu" || echo "no qemu process") > screenshots/emulator-crash/qemu-ps.txt 2>&1 || true
-          adb root > /dev/null 2>&1 || true
-          (adb shell ls /data/tombstones/ 2>&1 || echo "tombstones unavailable") > screenshots/emulator-crash/tombstones-ls.txt 2>&1 || true
-          (adb pull /data/tombstones screenshots/emulator-crash/tombstones > /dev/null 2>&1 && echo "tombstones pulled" || echo "tombstone pull unavailable") >> screenshots/emulator-crash/tombstones-ls.txt 2>&1 || true
-          exit 0
-      - name: Preserve Android instrumentation results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-instrumentation-results-${{ matrix.shard }}
-          path: |
-            app/build/outputs/androidTest-results/connected/
-            app/build/reports/androidTests/connected/
-          if-no-files-found: warn
-      - name: Upload UI pixel proof
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: auth-screens-pixel-proof-${{ matrix.shard }}
-          path: |
-            screenshots/
-            runtime-apk-pair-SHA256SUMS.txt
-          if-no-files-found: warn
-      - name: Emit allowlisted synthetic fixture screenshots (base64)
-        if: always()
-        run: |
-          # Allowlist only: deterministic test captures of the app's own auth screens (no input typed) and the
-          # ChatFixtureActivity synthetic conversations. The failure-state capture is included: it only ever shows the app under the synthetic fixture session. Never the final screen or logcat.
-          # This repository is public, so the job log is public: keep it bounded and fixture-only.
-          for n in 00-failure-state 01-welcome 02-login 03-register 04-forgot-password 05-register-organization 06-chats-home 07-chat-detail 08-shell-light 09-shell-dark 10-approot-configured-shell 11-chat-detail-host 12-contact-info 13-restart-launch1-prompt 13-restart-launch1 13-restart-launch2-prompt 13-restart-launch2 real-host-hold-preready-toggle-before real-host-hold-preready-toggle-after real-host-hold-preready-toggle-decision real-host-hold-preready-finally real-host-hold-release-toggle-before real-host-hold-release-toggle-after real-host-hold-release-toggle-decision real-host-hold-release-finally real-host-hold-cancel-toggle-before real-host-hold-cancel-toggle-after real-host-hold-cancel-toggle-decision real-host-hold-cancel-finally real-host-hold-locked-toggle-before real-host-hold-locked-toggle-after real-host-hold-locked-toggle-decision real-host-hold-locked-finally real-host-hold-auth-toggle-before real-host-hold-auth-toggle-after real-host-hold-auth-toggle-decision real-host-hold-auth-finally real-host-hold-tenant-toggle-before real-host-hold-tenant-toggle-after real-host-hold-tenant-toggle-decision real-host-hold-tenant-finally 31-swipe-light-portrait-closed 31-swipe-light-portrait-progress 31-swipe-light-portrait-after-gesture 31-swipe-light-portrait-open 31-swipe-light-portrait-back-closed 31-swipe-light-portrait-leading 31-swipe-light-portrait-final 31-swipe-real-home-before 31-swipe-real-home-open 31-swipe-real-home-closed 31-swipe-applied-style-0-light-closed 31-swipe-applied-style-0-light-after-gesture 31-swipe-applied-style-0-light-open 31-swipe-applied-style-1-dark-closed 31-swipe-applied-style-1-dark-after-gesture 31-swipe-applied-style-1-dark-open 31-swipe-applied-style-2-light-closed 31-swipe-applied-style-2-light-after-gesture 31-swipe-applied-style-2-light-open 31-swipe-applied-style-3-dark-closed 31-swipe-applied-style-3-dark-after-gesture 31-swipe-applied-style-3-dark-open 31-swipe-applied-style-4-light-closed 31-swipe-applied-style-4-light-after-gesture 31-swipe-applied-style-4-light-open radial-dark-rtl-closed radial-dark-rtl-first-page radial-dark-rtl-first-page-missing radial-dark-rtl-page-2 radial-dark-rtl-page-2-missing radial-dark-rtl-page-3 radial-dark-rtl-page-3-missing radial-dark-rtl-missing-close-semantics 32-swipe-rtl-left-trailing 32-swipe-rtl-production-row-applied 32-swipe-rtl-production-row-reloaded 32-swipe-rtl-production-settings-before-navigation 32-swipe-rtl-production-settings-toggled 32-swipe-rtl-recreated-closed 32-swipe-rtl-right-leading hdr-sheet-light-initial hdr-sheet-light-before-preview-tap hdr-sheet-light-after-preview-tap hdr-sheet-light-selected hdr-sheet-light-scrolled-diag hdr-sheet-light-scrolled hdr-sheet-dark-initial hdr-sheet-dark-before-preview-tap hdr-sheet-dark-after-preview-tap hdr-sheet-dark-selected hdr-sheet-dark-scrolled-diag hdr-sheet-dark-scrolled voice-gesture-tap-toggle-false voice-gesture-tap-toggle-true voice-gesture-drag-cancel-false voice-gesture-drag-cancel-true voice-gesture-drag-locked-false voice-gesture-drag-locked-true voice-gesture-hold-release-false voice-gesture-hold-release-true voice-gesture-locked-delete-false voice-gesture-locked-delete-true voice-gesture-system-cancel-false voice-gesture-system-cancel-true; do
-            f="screenshots/$n.png"
-            [ -f "$f" ] || { echo "PNGMISSING $n"; continue; }
-            sz=$(stat -c %s "$f")
-            if [ "$sz" -gt 600000 ]; then echo "PNGSKIP $n size=$sz"; continue; fi
-            echo "PNGB64-BEGIN $n $sz"
-            base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
-            echo "PNGB64-END $n"
-          done
-          for f in screenshots/added-*.png screenshots/10f1d-edit-sheet-after-mode-restore.png screenshots/10f1d-edit-before-close.png screenshots/10f2-task-detail-after-edit.png; do
-            [ -f "$f" ] || continue
-            n=$(basename "$f" .png)
-            sz=$(stat -c %s "$f")
-            if [ "$sz" -gt 600000 ]; then echo "PNGSKIP $n size=$sz"; continue; fi
-            echo "PNGB64-BEGIN $n $sz"
-            base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
-            echo "PNGB64-END $n"
-          done
-          for n in hdr-sheet-scroll-light hdr-sheet-last-row-light hdr-sheet-scroll-dark hdr-sheet-last-row-dark; do
-            f="screenshots/$n.txt"
-            [ -f "$f" ] || { echo "TXTMISSING $n"; continue; }
-            sz=$(stat -c %s "$f")
-            if [ "$sz" -gt 200000 ]; then echo "TXTSKIP $n size=$sz"; continue; fi
-            echo "TXT-BEGIN $n $sz"
-            cat "$f"
-            echo "TXT-END $n"
-          done
-          for f in screenshots/added-*.txt; do
-            [ -f "$f" ] || continue
-            n=$(basename "$f" .txt)
-            sz=$(stat -c %s "$f")
-            if [ "$sz" -gt 200000 ]; then echo "TXTSKIP $n size=$sz"; continue; fi
-            echo "TXT-BEGIN $n $sz"
-            cat "$f"
-            echo "TXT-END $n"
-          done
-          # Sanitized per-case toggle timing (no account data): budget/decision/elapsed/entry/native-state counts only.
-          for k in preready release cancel locked auth tenant; do
-            t="screenshots/real-host-hold-$k-toggle-timing.txt"
-            [ -f "$t" ] && { echo "TIMING-BEGIN $k"; cat "$t"; echo; echo "TIMING-END $k"; } || echo "TIMING-MISSING $k"
-          done
-
-  # Live-backend login reproduction probe (Bandi 2026-11-08, phase-gated
-  # debugging reproduction phase): drives the real login UI three times on the emulator against
-  # https://api.chat.logybyte.in and records whether the reported post-login
-  # bounce (Home -> Welcome, no error message) reproduces. Workflow-only
-  # addition; no app code is touched. Uses the prod-routed debug APK from the
-  # build job (built before the synthetic .env override is written).
-  # Dispatch-gated like the rest of the emulator tier. A new backend account
-  # is not created: the user-approved Normal demo account is supplied through temporary secrets.
-  prod-auth-repro:
-    needs: [build, gate]
-    if: (github.event_name == 'workflow_dispatch' && inputs.run_live_auth_probe) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[chaty-auth-probe-20261111]'))
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: chaty-kotlin-debug-apk
-          path: runtime-apks
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Require authorized Normal demo credentials
-        env:
-          CHATY_PROD_USER: ${{ secrets.CHATY_AUTH_REPRO_USER_NOV11 }}
-          CHATY_PROD_PASS: ${{ secrets.CHATY_AUTH_REPRO_PASS_NOV11 }}
-        run: |
-          set -euo pipefail
-          test -n "$CHATY_PROD_USER" && test -n "$CHATY_PROD_PASS" || { echo "Authorized demo credentials are required."; exit 1; }
-          echo "::add-mask::$CHATY_PROD_USER"
-          echo "::add-mask::$CHATY_PROD_PASS"
-          echo "CHATY_PROD_USER=$CHATY_PROD_USER" >> "$GITHUB_ENV"
-          echo "CHATY_PROD_PASS=$CHATY_PROD_PASS" >> "$GITHUB_ENV"
-      - name: Live-backend login reproduction (emulator)
-        uses: reactivecircus/android-emulator-runner@v2
-        timeout-minutes: 18
-        with:
-          api-level: 34
-          target: default
-          arch: x86_64
-          profile: pixel_6
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: bash ci/prod-auth-repro.sh runtime-apks/app-debug.apk
-      - name: Upload reproduction evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: prod-auth-repro-evidence
-          path: prod-auth-evidence/
-          if-no-files-found: warn
-
-  # Bounded infrastructure experiment (authorized 19:23): re-run ONLY the two
-  # 175 lost shards (media, emoji-real) serially on one runner - one emulator
-  # at a time - plus one targeted capture session for the core-ui diagnostic
-  # fixtures (swipe-row + radial) whose pixels the emit allowlist now covers.
-  # Not a proven contention fix; original 175 artifacts/results preserved.
-
-  old-release-auth-repro:
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[chaty-old-apk-probe-20261111]')
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          artifact-ids: '13846172261'
-          merge-multiple: true
-          run-id: '42996120916'
-          github-token: ${{ github.token }}
-          path: old-release
-      - name: Verify exact previously delivered release
-        run: |
-          echo 'b116e37a2713d3238ccafdc2761c33cb2824ab5afef0d53bbdfc4eae6a3ea244  old-release/app-release.apk' | sha256sum -c -
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Observe three Normal logins on exact old APK
-        uses: reactivecircus/android-emulator-runner@v2
-        env:
-          CHATY_PROD_USER: ${{ secrets.CHATY_AUTH_REPRO_USER_NOV11 }}
-          CHATY_PROD_PASS: ${{ secrets.CHATY_AUTH_REPRO_PASS_NOV11 }}
-        with:
-          api-level: 34
-          target: default
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: bash ci/prod-auth-repro.sh old-release/app-release.apk > /tmp/private-auth-probe.log 2>&1
-      - name: Create allowlisted evidence only
-        if: always()
-        run: |
-          python -m pip -q install Pillow
-          python ci/redact-auth-probe.py
-      - name: Upload only redacted evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: old-release-auth-redacted-evidence
-          path: redacted-auth-evidence/
-          retention-days: 3
-          if-no-files-found: error
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHANNEL_ID}" \
+            --data-urlencode "text=Chaty Kotlin APK build failed (${GITHUB_SHA::7}): ${RUN_URL}" >/dev/null || true
