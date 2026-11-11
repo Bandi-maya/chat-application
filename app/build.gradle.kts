@@ -39,6 +39,9 @@ val routingDotenv = rootProject.file(".env").takeIf { it.isFile }?.readLines()?.
 }?.toMap().orEmpty()
 fun javaString(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\""
 
+// Defined before android {} so sourceSets can swap the stub when native MLS is skipped.
+val skipMlsNative = providers.gradleProperty("skipMlsNative").orElse("false").map { it == "true" }
+
 android {
     namespace = "com.example.chat"
     compileSdk = 36
@@ -107,8 +110,12 @@ android {
 
     sourceSets {
         getByName("main") {
-            java.srcDir(layout.buildDirectory.dir("generated/uniffi"))
-            jniLibs.srcDir(layout.buildDirectory.dir("jniLibs"))
+            if (skipMlsNative.get()) {
+                java.srcDir("src/uniffiStub/java")
+            } else {
+                java.srcDir(layout.buildDirectory.dir("generated/uniffi"))
+                jniLibs.srcDir(layout.buildDirectory.dir("jniLibs"))
+            }
             assets.srcDir(layout.buildDirectory.dir("generated/faceModel/assets"))
             assets.srcDir(layout.buildDirectory.dir("generated/selfieModel/assets"))
             res.srcDir(layout.buildDirectory.dir("generated/launcherIcons/res"))
@@ -208,7 +215,6 @@ dependencies {
 // Rust crate in third_party/openmls_android/rust). Requires cargo-ndk and the
 // Android NDK; the CI workflow installs both. Local builds without Rust can
 // skip with -PskipMlsNative (the app then fails closed at runtime, by design).
-val skipMlsNative = providers.gradleProperty("skipMlsNative").orElse("false").map { it == "true" }
 val mlsJniLibsDir = layout.buildDirectory.dir("jniLibs")
 val uniffiOutDir = layout.buildDirectory.dir("generated/uniffi")
 
