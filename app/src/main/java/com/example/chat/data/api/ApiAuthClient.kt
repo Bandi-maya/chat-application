@@ -264,7 +264,7 @@ class ApiAuthClient(
     fun refresh(refreshToken: String, extraHeaders: Map<String, String> = emptyMap()): RefreshResult {
         val body = JSONObject().put("refreshToken", refreshToken).toString()
         val response = try {
-            postWithFallback("auth/refresh", body)
+            postWithFallback("auth/refresh", body, extraHeaders = extraHeaders)
         } catch (_: Exception) {
             return RefreshResult.Unavailable
         }

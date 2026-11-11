@@ -54,4 +54,21 @@ class ApiAuthRefreshRotationTest {
         val client = clientReturning(500, """{"detail":"boom"}""")
         assertEquals(ApiAuthClient.RefreshResult.Unavailable, client.refresh("rt1"))
     }
+
+    @Test fun `refresh forwards device proof headers`() {
+        var capturedHeaders: Map<String, String> = emptyMap()
+        val transport = ApiHttpTransport { _, _, headers, _ ->
+            capturedHeaders = headers
+            200 to refreshBody("at2", "rt2")
+        }
+        val client = ApiAuthClient(baseUrl = { "https://example.test" }, tenantId = { "t" }, transport = transport)
+        val result = client.refresh(
+            "rt1",
+            extraHeaders = mapOf("x-device-id" to "dev-1", "x-device-proof" to "sig-1"),
+        )
+        assertTrue(result is ApiAuthClient.RefreshResult.Ok)
+        assertEquals("dev-1", capturedHeaders["x-device-id"])
+        assertEquals("sig-1", capturedHeaders["x-device-proof"])
+        assertEquals("t", capturedHeaders["x-tenant-id"])
+    }
 }

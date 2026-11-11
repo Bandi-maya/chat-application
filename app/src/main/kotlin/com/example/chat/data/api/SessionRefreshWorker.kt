@@ -54,6 +54,7 @@ class SessionRefreshWorker(
                         .setRequiredNetworkType(NetworkType.CONNECTED)
                         .build()
                 )
+                .setInitialDelay(INTERVAL_DAYS, TimeUnit.DAYS)
                 .setBackoffCriteria(BackoffPolicy.LINEAR, 12, TimeUnit.HOURS)
                 .build()
             WorkManager.getInstance(context.applicationContext)
