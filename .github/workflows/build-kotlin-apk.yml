@@ -510,6 +510,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           artifact-ids: '13846172261'
+          merge-multiple: true
           run-id: '42996120916'
           github-token: ${{ github.token }}
           path: old-release
