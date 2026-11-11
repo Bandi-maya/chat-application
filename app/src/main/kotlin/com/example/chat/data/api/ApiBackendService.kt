@@ -632,6 +632,7 @@ class ApiBackendService(
 
     /** A chat was opened / read here: its notification can go. */
     @Volatile var onConversationRead: (String) -> Unit = {}
+    @Volatile private var lastAdoptEpochMs: Long = 0L
 
     fun activeConversationIdOrNull(): String? = activeConversationId
 
@@ -1838,6 +1839,7 @@ class ApiBackendService(
                         ApiAuthResult(creds.accessToken, userObj, refreshToken = creds.refreshToken),
                         suppressTransitionCallback = true,
                     )
+                    lastAdoptEpochMs = System.currentTimeMillis()
                     notifyAuthScopeTransition()
                 }
             }
@@ -1918,6 +1920,7 @@ class ApiBackendService(
                 config.setTenantId(tenant.trim(), useDefault = false)
             }
             val result = auth.login(value, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
+            lastAdoptEpochMs = System.currentTimeMillis()
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
             runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
@@ -1943,6 +1946,7 @@ class ApiBackendService(
     suspend fun register(email: String, username: String, password: String): ApiUserProfile =
         withContext(Dispatchers.IO) {
             val result = auth.register(email, username, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
+            lastAdoptEpochMs = System.currentTimeMillis()
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
             runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
@@ -2274,6 +2278,7 @@ class ApiBackendService(
                 ApiAuthResult(effectiveToken, targetUser, refreshToken = effectiveRefresh),
                 suppressTransitionCallback = true,
             )
+            lastAdoptEpochMs = System.currentTimeMillis()
             onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
             synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
             synchronized(localStateLock) { localStateCache.clear() }
@@ -2354,6 +2359,7 @@ class ApiBackendService(
                 notify = false,
             )
             session.adoptForSwitch(result, suppressTransitionCallback = true)
+            lastAdoptEpochMs = System.currentTimeMillis()
             onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
             synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
             synchronized(localStateLock) { localStateCache.clear() }
@@ -2410,6 +2416,7 @@ class ApiBackendService(
                         ApiAuthResult(creds.accessToken, fallbackUser, refreshToken = creds.refreshToken),
                         suppressTransitionCallback = true,
                     )
+                    lastAdoptEpochMs = System.currentTimeMillis()
                     onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
                     synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
                     synchronized(localStateLock) { localStateCache.clear() }
@@ -2463,6 +2470,9 @@ class ApiBackendService(
      *  user out when the token is already expired and cannot be renewed. */
     suspend fun ensureFreshToken() {
         val current = session.token ?: return
+        // Give newly adopted sessions at least a 60-second stabilization window before attempting
+        // proactive background refresh to prevent initial sync race conditions / false clock skew.
+        if (System.currentTimeMillis() - lastAdoptEpochMs < 60_000L) return
         val remaining = auth.secondsUntilExpiry(current) ?: return
         if (remaining > REFRESH_MARGIN_SECONDS) return
         if (remaining > 0 && isCallActive()) return
