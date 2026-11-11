@@ -92,7 +92,8 @@ android {
         }
         debug {
             isMinifyEnabled = false
-            // Debug uses Android default debug keystore; release signing remains unchanged.
+            // Share the stable Chaty identity so debug/release installs can update in place.
+            signingConfig = signingConfigs["chaty"]
         }
     }
 

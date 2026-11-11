@@ -11,7 +11,7 @@ on:
         type: boolean
         default: false
       run_live_auth_probe:
-        description: Explicit live-backend throwaway-account reproduction
+        description: Explicit live-backend authorized-demo-account reproduction
         type: boolean
         default: false
   push:
@@ -100,20 +100,14 @@ jobs:
           CHATY_KEYSTORE_B64: ${{ secrets.CHATY_KEYSTORE_B64 }}
           CHATY_KEYSTORE_PASSWORD: ${{ secrets.CHATY_KEYSTORE_PASSWORD }}
         run: |
+          set -euo pipefail
+          test -n "${CHATY_KEYSTORE_B64:-}" || { echo "Stable Chaty keystore secret is required for all builds."; exit 1; }
+          test -n "${CHATY_KEYSTORE_PASSWORD:-}" || { echo "Stable Chaty signing password secret is required for all builds."; exit 1; }
           mkdir -p ci/keystore
-          if [ -n "${CHATY_KEYSTORE_B64:-}" ] && [ -n "${CHATY_KEYSTORE_PASSWORD:-}" ]; then
-            printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
-            chmod 600 ci/keystore/chaty-release.jks
-            echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-            echo "Materialized Chaty release keystore from secrets."
-          else
-            keytool -genkeypair -v -keystore ci/keystore/chaty-release.jks \
-              -alias chaty -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass android -keypass android \
-              -dname "CN=Chaty, OU=Dev, O=Chaty, L=Unknown, S=Unknown, C=US"
-            echo "CHATY_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
-            echo "Generated fallback debug keystore for Chaty build."
-          fi
+          printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
+          chmod 600 ci/keystore/chaty-release.jks
+          echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "Materialized stable Chaty signing identity."
       - name: Build debug APK (compile verification)
         run: gradle :app:assembleDebug --no-daemon
       - name: APK info
@@ -220,6 +214,12 @@ jobs:
           if "$BT/aapt2" dump badging "$APK" | grep -q '^application-debuggable'; then
             echo "Release APK must not be debuggable."; exit 1
           fi
+          DEBUG_APK=app/build/outputs/apk/debug/app-debug.apk
+          RELEASE_CERT=$("$BT/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          DEBUG_CERT=$("$BT/apksigner" verify --print-certs "$DEBUG_APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')
+          test -n "$RELEASE_CERT" && test "$RELEASE_CERT" = "$DEBUG_CERT" || { echo "Debug/release signing mismatch."; exit 1; }
+          test "$RELEASE_CERT" = "acc64606e7d8fb57d962689c2c092990f15e8892ffdf0c700c5c65ffe5d0b135" || { echo "Unexpected Chaty signing certificate."; exit 1; }
+          echo "SHARED-CHATY-SIGNER $RELEASE_CERT"
           stat -c 'RELEASE-APK-BYTES %s' "$APK"
           sha256sum "$APK"
       - name: Preserve installable release APK
@@ -235,20 +235,14 @@ jobs:
           CHATY_KEYSTORE_B64: ${{ secrets.CHATY_KEYSTORE_B64 }}
           CHATY_KEYSTORE_PASSWORD: ${{ secrets.CHATY_KEYSTORE_PASSWORD }}
         run: |
+          set -euo pipefail
+          test -n "${CHATY_KEYSTORE_B64:-}" || { echo "Stable Chaty keystore secret is required for all builds."; exit 1; }
+          test -n "${CHATY_KEYSTORE_PASSWORD:-}" || { echo "Stable Chaty signing password secret is required for all builds."; exit 1; }
           mkdir -p ci/keystore
-          if [ -n "${CHATY_KEYSTORE_B64:-}" ] && [ -n "${CHATY_KEYSTORE_PASSWORD:-}" ]; then
-            printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
-            chmod 600 ci/keystore/chaty-release.jks
-            echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-            echo "Materialized Chaty release keystore from secrets."
-          else
-            keytool -genkeypair -v -keystore ci/keystore/chaty-release.jks \
-              -alias chaty -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass android -keypass android \
-              -dname "CN=Chaty, OU=Dev, O=Chaty, L=Unknown, S=Unknown, C=US"
-            echo "CHATY_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
-            echo "Generated fallback debug keystore for Chaty build."
-          fi
+          printf '%s' "$CHATY_KEYSTORE_B64" | base64 -d > ci/keystore/chaty-release.jks
+          chmod 600 ci/keystore/chaty-release.jks
+          echo "CHATY_KEYSTORE_PASSWORD=$CHATY_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "Materialized stable Chaty signing identity."
       - name: Build isolated runtime APK pair once
         run: |
           printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
@@ -440,14 +434,13 @@ jobs:
           done
 
   # Live-backend login reproduction probe (Bandi 2026-11-08, phase-gated
-  # debugging isolation phase): registers a throwaway account through the live
-  # API, drives the real login UI on the emulator against
+  # debugging reproduction phase): drives the real login UI three times on the emulator against
   # https://api.chat.logybyte.in and records whether the reported post-login
   # bounce (Home -> Welcome, no error message) reproduces. Workflow-only
   # addition; no app code is touched. Uses the prod-routed debug APK from the
   # build job (built before the synthetic .env override is written).
-  # Dispatch-gated like the rest of the emulator tier. The throwaway account
-  # is created per-run with a random name; credentials never appear in logs.
+  # Dispatch-gated like the rest of the emulator tier. A new backend account
+  # is not created: the user-approved Normal demo account is supplied through temporary secrets.
   prod-auth-repro:
     needs: [build, gate]
     if: github.event_name == 'workflow_dispatch' && inputs.run_live_auth_probe
@@ -464,27 +457,17 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Register throwaway account on the live backend
+      - name: Require authorized Normal demo credentials
+        env:
+          CHATY_PROD_USER: ${{ secrets.CHATY_AUTH_REPRO_USER_NOV11 }}
+          CHATY_PROD_PASS: ${{ secrets.CHATY_AUTH_REPRO_PASS_NOV11 }}
         run: |
-          set -e
-          SUFFIX="$(date +%s)$RANDOM"
-          CHATY_PROD_USER="cirepro${SUFFIX}"
-          CHATY_PROD_PASS="CiRepro${SUFFIX}X"
-          echo "::add-mask::${CHATY_PROD_PASS}"
-          echo "CHATY_PROD_USER=${CHATY_PROD_USER}" >> "$GITHUB_ENV"
-          echo "CHATY_PROD_PASS=${CHATY_PROD_PASS}" >> "$GITHUB_ENV"
-          echo "registering throwaway ${CHATY_PROD_USER}"
-          CODE=$(curl -sS -o /tmp/register-response.json -w '%{http_code}' \
-            -X POST "https://api.chat.logybyte.in/auth/register" \
-            -H 'Content-Type: application/json' \
-            -H 'x-tenant-id: chat-application' \
-            --data "{\"email\":\"${CHATY_PROD_USER}@example.com\",\"username\":\"${CHATY_PROD_USER}\",\"password\":\"${CHATY_PROD_PASS}\"}")
-          echo "register HTTP $CODE"
-          if [ "$CODE" != "200" ] && [ "$CODE" != "201" ]; then
-            echo "REGISTRATION FAILED - response body:"
-            cat /tmp/register-response.json
-            exit 1
-          fi
+          set -euo pipefail
+          test -n "$CHATY_PROD_USER" && test -n "$CHATY_PROD_PASS" || { echo "Authorized demo credentials are required."; exit 1; }
+          echo "::add-mask::$CHATY_PROD_USER"
+          echo "::add-mask::$CHATY_PROD_PASS"
+          echo "CHATY_PROD_USER=$CHATY_PROD_USER" >> "$GITHUB_ENV"
+          echo "CHATY_PROD_PASS=$CHATY_PROD_PASS" >> "$GITHUB_ENV"
       - name: Live-backend login reproduction (emulator)
         uses: reactivecircus/android-emulator-runner@v2
         timeout-minutes: 18

@@ -2,10 +2,10 @@
 # prod-auth-repro.sh - dispatch-gated live-backend login reproduction probe.
 #
 # Isolation phase of the phase-gated debugging process (Bandi, 2026-11-08):
-# drives a REAL login with a freshly registered throwaway account against the
-# LIVE backend (https://api.chat.logybyte.in) on the emulator and records
+# drives a REAL login with a user-authorized Normal demo account against the
+# LIVE backend (https://api.chat.logybyte.in) three times on the emulator and records
 # whether the reported post-login bounce (Home -> Welcome, no error message)
-# reproduces. The account is registered via the API in the workflow job so the
+# reproduces. Credentials come from temporary masked CI secrets, so the
 # UI path under test is exactly the login flow Bandi uses. No app code is
 # changed; this script only installs, drives and observes.
 #
@@ -15,7 +15,7 @@
 #   *.png                 screenshots on every state change
 #   prod-auth-repro.mp4   full screen recording
 #   logcat.txt            complete device log (crash stacks, keystore errors)
-set -u
+set -euo pipefail
 
 PKG="com.logybyte.chaty"
 ACTIVITY="com.example.chat.MainActivity"
@@ -28,6 +28,12 @@ TIMELINE="$OUT/timeline.log"
 : > "$TIMELINE"
 
 log() { echo "$*" | tee -a "$TIMELINE"; }
+cleanup() {
+  adb shell pkill -2 screenrecord >/dev/null 2>&1 || true
+  adb logcat -d > "$OUT/logcat-final.txt" 2>&1 || true
+  adb exec-out screencap -p > "$OUT/final.png" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 shot() { adb exec-out screencap -p > "$OUT/$1.png" 2>/dev/null && log "screenshot $1.png"; }
 
@@ -37,10 +43,11 @@ ui_dump() { adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r'; }
 # matches exactly; substring match as fallback.
 tap_text() {
   local want="$1"
-  ui_dump | python3 - "$want" <<'PY'
+  ui_dump > "$OUT/current.xml"
+  python3 - "$want" "$OUT/current.xml" <<'PY'
 import sys, re, subprocess
 want = sys.argv[1]
-xml = sys.stdin.read()
+xml = open(sys.argv[2]).read()
 def attr(n, a):
     m = re.search(a + '="([^"]*)"', n)
     return m.group(1) if m else ''
@@ -56,12 +63,13 @@ for n in re.findall(r'<node[^>]*>', xml):
     if not b:
         continue
     if t == want or d == want:
-        exact.append(b)
+        rank = 0 if attr(n, "class") == "android.widget.EditText" else (1 if d == want else (2 if attr(n, "clickable") == "true" else 3))
+        exact.append((rank, b))
     elif want in t or want in d:
-        partial.append(b)
+        partial.append((4, b))
 for cand in (exact, partial):
     if cand:
-        c = center(cand[0])
+        c = center(sorted(cand)[0][1])
         if c:
             subprocess.run(['adb', 'shell', 'input', 'tap', str(c[0]), str(c[1])])
             print(f"TAPPED '{want}' at {c}")
@@ -73,16 +81,31 @@ PY
 
 ui_state() {
   local dump="$1"
-  if printf '%s' "$dump" | grep -q "Welcome to Chaty"; then echo "WELCOME"; return; fi
-  if printf '%s' "$dump" | grep -q "Welcome back"; then echo "LOGIN"; return; fi
-  if printf '%s' "$dump" | grep -q "Chaty changelog"; then echo "HOME_CHANGELOG"; return; fi
-  if printf '%s' "$dump" | grep -q "Confirm your email"; then echo "HOME_BANNER"; return; fi
-  if printf '%s' "$dump" | grep -q "Tasks" && printf '%s' "$dump" | grep -q "Settings"; then echo "HOME"; return; fi
+  if grep -q "Welcome to Chaty" <<< "$dump"; then echo "WELCOME"; return; fi
+  if grep -q "Welcome back" <<< "$dump"; then echo "LOGIN"; return; fi
+  if grep -q "Chaty changelog" <<< "$dump"; then echo "HOME_CHANGELOG"; return; fi
+  if grep -q "Confirm your email" <<< "$dump"; then echo "HOME_BANNER"; return; fi
+  if grep -q "Tasks" <<< "$dump" && grep -q "Settings" <<< "$dump"; then echo "HOME"; return; fi
   echo "OTHER"
 }
 
-log "=== install $APK"
-adb install -r "$APK" 2>&1 | tail -2 | tee -a "$TIMELINE"
+# Each iteration is a deliberate fresh local login of the same user-authorized demo account.
+# Never clear data inside the observation window: a reset is not a bounce.
+: > "$OUT/summary.txt"
+adb install -r "$APK" > "$OUT/install.log" 2>&1
+cat "$OUT/install.log" >> "$TIMELINE"
+grep -q Success "$OUT/install.log" || { log "APK install failed"; exit 1; }
+for RUN in 1 2 3; do
+OUT="prod-auth-evidence/run-$RUN"
+mkdir -p "$OUT"
+TIMELINE="$OUT/timeline.log"
+: > "$TIMELINE"
+log "=== deliberate fixture-only local reset before login $RUN"
+adb shell am force-stop "$PKG"
+adb shell pm clear "$PKG" >> "$TIMELINE"
+adb logcat -c
+log "=== installed APK $APK"
+
 
 log "=== start screen recording"
 adb shell 'screenrecord --time-limit 150 /sdcard/prod-auth-repro.mp4' >/dev/null 2>&1 &
@@ -101,7 +124,7 @@ log "initial state: $state"
 shot 01-welcome
 
 log "=== tap Log In (Welcome)"
-tap_text "Log In" | tee -a "$TIMELINE" || true
+tap_text "Log In" | tee -a "$TIMELINE"
 for i in $(seq 1 10); do
   d=$(ui_dump); state=$(ui_state "$d")
   [ "$state" = "LOGIN" ] && break
@@ -110,36 +133,37 @@ done
 log "after tap: $state"
 shot 02-login-screen
 
-log "=== select Normal capsule (fresh install defaults to Organization)"
-tap_text "Normal" | tee -a "$TIMELINE" || true
+log "=== select Normal capsule explicitly"
+tap_text "Normal" | tee -a "$TIMELINE"
 sleep 1
 
 log "=== type identifier"
-tap_text "Email or username" | tee -a "$TIMELINE" || true
+tap_text "Email or username" | tee -a "$TIMELINE"
 sleep 1
 adb shell input text "$USER_NAME"
+adb shell input keyevent 4
 sleep 1
 
 log "=== type password"
-tap_text "Enter your password" | tee -a "$TIMELINE" || tap_text "Password" | tee -a "$TIMELINE" || true
+tap_text "Password" | tee -a "$TIMELINE"
 sleep 1
 adb shell input text "$PASS"
 sleep 1
-shot 03-filled
-adb shell input keyevent 111
+
+adb shell input keyevent 4
 sleep 1
 
 log "=== tap Log In (submit)"
-tap_text "Log In" | tee -a "$TIMELINE" || true
+tap_text "Log In" | tee -a "$TIMELINE"
 
 log "=== observe 50s"
-BASE_PID=""
+BASE_PID="$(adb shell pidof "$PKG" | tr -d '\r' || true)"
 REACHED_HOME=0
 BOUNCED=0
 DIED=0
 LAST=""
 for i in $(seq 1 25); do
-  PID=$(adb shell pidof "$PKG" | tr -d '\r')
+  PID=$(adb shell pidof "$PKG" | tr -d '\r' || true)
   d=$(ui_dump)
   state=$(ui_state "$d")
   [ -z "$BASE_PID" ] && BASE_PID="$PID"
@@ -168,7 +192,7 @@ if [ "$DIED" = "1" ]; then
   state=""
   for i in $(seq 1 12); do
     d=$(ui_dump); state=$(ui_state "$d")
-    echo "relaunch t=$((i*2))s pid=$(adb shell pidof "$PKG" | tr -d '\r') state=$state" >> "$TIMELINE"
+    echo "relaunch t=$((i*2))s pid=$(adb shell pidof "$PKG" | tr -d '\r' || true) state=$state" >> "$TIMELINE"
     case "$state" in WELCOME|HOME|HOME_CHANGELOG|HOME_BANNER) break;; esac
     sleep 2
   done
@@ -177,11 +201,11 @@ if [ "$DIED" = "1" ]; then
   case "$state" in HOME|HOME_CHANGELOG|HOME_BANNER) log "RELAUNCH LANDED ON HOME: session survived (crash-only)";; esac
 fi
 
-if [ "$BOUNCED" = "0" ] && [ "$DIED" = "0" ]; then
+if [ "$REACHED_HOME" = "1" ] && [ "$BOUNCED" = "0" ] && [ "$DIED" = "0" ]; then
   log "=== secondary: close changelog if present, watch 15s more"
   tap_text "Close" | tee -a "$TIMELINE" || true
   for i in $(seq 1 7); do
-    PID=$(adb shell pidof "$PKG" | tr -d '\r')
+    PID=$(adb shell pidof "$PKG" | tr -d '\r' || true)
     d=$(ui_dump); state=$(ui_state "$d")
     echo "post-close t=$((i*2))s pid=${PID:-none} state=$state" >> "$TIMELINE"
     [ -z "$PID" ] && { DIED=1; log "PROCESS DEATH after changelog close"; break; }
@@ -196,11 +220,20 @@ fi
   echo "BOUNCE_REPRODUCED=$BOUNCED"
   echo "PROCESS_DIED=$DIED"
 } | tee "$OUT/verdict.txt" | tee -a "$TIMELINE"
+{ echo "RUN=$RUN"; cat "$OUT/verdict.txt"; } >> prod-auth-evidence/summary.txt
+if [ "$REACHED_HOME" != "1" ]; then
+  log "INCONCLUSIVE: login never reached Home; not a passing bounce test"
+  echo "INCONCLUSIVE_LOGIN=$RUN" >> prod-auth-evidence/summary.txt
+fi
 
 log "=== stop recording + collect evidence"
 adb shell pkill -2 screenrecord >/dev/null 2>&1 || true
 sleep 3
 adb pull /sdcard/prod-auth-repro.mp4 "$OUT/prod-auth-repro.mp4" 2>&1 | tail -1 | tee -a "$TIMELINE" || true
 adb logcat -d > "$OUT/logcat.txt" 2>&1 || true
-log "=== done"
+log "=== login $RUN complete"
+done
+# Preserve all evidence even for a reproduced bounce; fail only incomplete coverage.
+if grep -q INCONCLUSIVE_LOGIN prod-auth-evidence/summary.txt; then exit 1; fi
+log "=== all three login observations complete"
 exit 0
