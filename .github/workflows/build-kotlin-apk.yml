@@ -390,6 +390,33 @@ jobs:
           path: app/build/test-results/testDebugUnitTest/
           if-no-files-found: warn
 
+      - name: Build optimized release APK with stable Chaty signing
+        env:
+          CHATY_KEYSTORE_B64: ${{ secrets.CHATY_KEYSTORE_B64 }}
+          CHATY_KEYSTORE_PASSWORD: ${{ secrets.CHATY_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # Release must never use the debug/fallback signing identity.
+          test -n "${CHATY_KEYSTORE_B64:-}" || { echo "Stable Chaty signing keystore secret is required for release."; exit 1; }
+          test -n "${CHATY_KEYSTORE_PASSWORD:-}" || { echo "Stable Chaty signing password secret is required for release."; exit 1; }
+          gradle :app:assembleRelease --no-daemon
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --verbose --print-certs "$APK"
+          "$BT/aapt2" dump badging "$APK" | grep -E "^package:|^sdkVersion|^targetSdkVersion|^native-code:"
+          if "$BT/aapt2" dump badging "$APK" | grep -q '^application-debuggable'; then
+            echo "Release APK must not be debuggable."; exit 1
+          fi
+          stat -c 'RELEASE-APK-BYTES %s' "$APK"
+          sha256sum "$APK"
+      - name: Preserve installable release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaty-kotlin-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
       # A separate synthetic pair is built once; never install the configured production artifact in fixtures.
       - name: Materialize Chaty signing keystore
         env:

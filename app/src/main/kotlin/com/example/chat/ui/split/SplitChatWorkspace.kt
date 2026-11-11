@@ -46,8 +46,8 @@ fun SplitChatWorkspace(
 
     val presentationMode = SplitChatLayoutPolicy.resolvePresentationMode(
         paneCount = sessionState.count,
-        windowWidthDp = windowSize.widthDp,
-        windowHeightDp = windowSize.heightDp,
+        windowWidthDp = windowSize.widthDp.dp,
+        windowHeightDp = windowSize.heightDp.dp,
         isImeVisible = isImeVisible,
     )
 
