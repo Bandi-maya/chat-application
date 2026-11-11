@@ -27,7 +27,13 @@ jobs:
         with:
           fetch-depth: 0
       - id: d
+        env:
+          CHATY_HEAD_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
+          if [[ "$CHATY_HEAD_MESSAGE" == *"[chaty-old-apk-probe-20261111]"* ]]; then
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "build=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -491,3 +497,53 @@ jobs:
   # at a time - plus one targeted capture session for the core-ui diagnostic
   # fixtures (swipe-row + radial) whose pixels the emit allowlist now covers.
   # Not a proven contention fix; original 175 artifacts/results preserved.
+
+  old-release-auth-repro:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[chaty-old-apk-probe-20261111]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '13846172261'
+          run-id: '42996120916'
+          github-token: ${{ github.token }}
+          path: old-release
+      - name: Verify exact previously delivered release
+        run: |
+          echo 'b116e37a2713d3238ccafdc2761c33cb2824ab5afef0d53bbdfc4eae6a3ea244  old-release/app-release.apk' | sha256sum -c -
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Observe three Normal logins on exact old APK
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CHATY_PROD_USER: ${{ secrets.CHATY_AUTH_REPRO_USER_NOV11 }}
+          CHATY_PROD_PASS: ${{ secrets.CHATY_AUTH_REPRO_PASS_NOV11 }}
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
+          script: bash ci/prod-auth-repro.sh old-release/app-release.apk > /tmp/private-auth-probe.log 2>&1
+      - name: Create allowlisted evidence only
+        if: always()
+        run: |
+          python -m pip -q install Pillow
+          python ci/redact-auth-probe.py
+      - name: Upload only redacted evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: old-release-auth-redacted-evidence
+          path: redacted-auth-evidence/
+          retention-days: 3
+          if-no-files-found: error

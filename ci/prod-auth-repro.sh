@@ -35,7 +35,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-shot() { adb exec-out screencap -p > "$OUT/$1.png" 2>/dev/null && log "screenshot $1.png"; }
+shot() {
+  adb exec-out screencap -p > "$OUT/$1.png" 2>/dev/null
+  ui_dump > "$OUT/$1.xml" || true
+  log "screenshot $1.png"
+}
 
 ui_dump() { adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr -d '\r'; }
 
