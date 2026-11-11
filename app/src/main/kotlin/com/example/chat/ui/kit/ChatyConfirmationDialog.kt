@@ -54,8 +54,7 @@ fun ChatyConfirmationDialog(
     val colors = LocalAppColors.current
     val effectiveShape = if (shape == ChatyModalShape)
         androidx.compose.foundation.shape.RoundedCornerShape(LocalReferenceLayoutPresentation.current.menuCornerDp.dp) else shape
-    val windowSize = rememberAdaptiveWindowSize()
-    val maxHeight = adaptiveSheetHeight(windowSize.heightDp, fraction = 0.85f)
+    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.85f).dp
     Dialog(onDismissRequest = onDismissRequest, properties = properties) {
         Column(
             modifier.widthIn(max = 480.dp).fillMaxWidth().imePadding()

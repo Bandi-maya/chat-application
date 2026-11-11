@@ -24,8 +24,7 @@ class CallBundleSettingsContract(unittest.TestCase):
 
 class CallBundleRuntimeContract(unittest.TestCase):
     def test_hosts_use_global_resolver_not_independent_template(self):
-        for rel in ['app/src/main/kotlin/com/example/chat/ui/calls/GlobalCallHost.kt',
-                    'ci/gb-parity-overrides/app/src/main/kotlin/com/example/chat/ui/calls/GlobalCallHost.kt']:
+        for rel in ['app/src/main/kotlin/com/example/chat/ui/calls/GlobalCallHost.kt']:
             source = (ROOT / rel).read_text()
             self.assertIn('resolveCallBundlePresentation(prefs.callExperienceBundleId, session.state)', source)
             self.assertIn('template = bundlePresentation.template', source)
@@ -37,9 +36,10 @@ class CallBundleRuntimeContract(unittest.TestCase):
         for symbol in ['RemoteVideoSurface(session, videoSurfaces', 'LocalVideoSurface(videoSurfaces',
                        'onToggleScreenShare', 'onToggleAudioRoute', 'onEnterNativePip', 'statusLabel(session, callDurationSeconds)']:
             self.assertIn(symbol, source)
-        for name in ['testref-candidate-build', 'build-kotlin-apk', 'deploy-telegram']:
-            workflow = (ROOT / ('.github/workflows/' + name + '.yml')).read_text()
-            self.assertIn('            app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt', workflow)
+        workflow = (ROOT / '.github/workflows/build-kotlin-apk.yml').read_text()
+        self.assertIn('Verify canonical source hashes and test dependency', workflow)
+        self.assertNotIn('git checkout HEAD --', workflow)
+        self.assertFalse((ROOT / 'ci/gb-parity-overrides').exists())
 
 class GoogleLatestIncomingContract(unittest.TestCase):
     def test_actions_are_distinct_semantic_and_token_colored(self):

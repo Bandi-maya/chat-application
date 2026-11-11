@@ -49,46 +49,21 @@ class ApiAuthClient(
     private val token: () -> String? = { null },
 ) {
     /** ApiBackendService.login — identifier is sent verbatim as `username`. */
-    fun login(
-        identifier: String,
-        password: String,
-        extraHeaders: Map<String, String> = emptyMap(),
-        baseUrlOverride: String? = null,
-        tenantOverride: String? = null,
-    ): ApiAuthResult {
+    fun login(identifier: String, password: String, extraHeaders: Map<String, String> = emptyMap()): ApiAuthResult {
         val body = JSONObject().put("username", identifier).put("password", password).toString()
-        val response = postWithFallback(
-            path = "auth/token",
-            body = body,
-            tenant = tenantOverride ?: tenantId(),
-            baseUrlOverride = baseUrlOverride,
-            extraHeaders = extraHeaders,
-        )
+        val response = postWithFallback("auth/token", body, extraHeaders = extraHeaders)
         return parseAuthResponse(response.first, response.second)
     }
 
     /** ApiBackendService.register — no displayName is sent; the display name
      *  comes back from the server response (see parseAuthResponse). */
-    fun register(
-        email: String,
-        username: String,
-        password: String,
-        extraHeaders: Map<String, String> = emptyMap(),
-        baseUrlOverride: String? = null,
-        tenantOverride: String? = null,
-    ): ApiAuthResult {
+    fun register(email: String, username: String, password: String, extraHeaders: Map<String, String> = emptyMap()): ApiAuthResult {
         val body = JSONObject()
             .put("email", email)
             .put("username", username)
             .put("password", password)
             .toString()
-        val response = postWithFallback(
-            path = "auth/register",
-            body = body,
-            tenant = tenantOverride ?: tenantId(),
-            baseUrlOverride = baseUrlOverride,
-            extraHeaders = extraHeaders,
-        )
+        val response = postWithFallback("auth/register", body, extraHeaders = extraHeaders)
         return parseAuthResponse(response.first, response.second)
     }
 
@@ -286,25 +261,10 @@ class ApiAuthClient(
 
     /** POST /auth/refresh {refreshToken} -> new access token (data.token) plus
      *  the rotated refresh token (data.refreshToken / data.refresh_token). */
-    fun refresh(refreshToken: String, extraHeaders: Map<String, String> = emptyMap()): RefreshResult =
-        refreshForAccount(baseUrl = baseUrl(), tenantId = tenantId(), refreshToken = refreshToken, extraHeaders = extraHeaders)
-
-    /** Scoped POST /auth/refresh targeting an explicit account [baseUrl] and [tenantId] without mutating global routing. */
-    fun refreshForAccount(
-        baseUrl: String,
-        tenantId: String,
-        refreshToken: String,
-        extraHeaders: Map<String, String> = emptyMap(),
-    ): RefreshResult {
+    fun refresh(refreshToken: String, extraHeaders: Map<String, String> = emptyMap()): RefreshResult {
         val body = JSONObject().put("refreshToken", refreshToken).toString()
         val response = try {
-            postWithFallback(
-                path = "auth/refresh",
-                body = body,
-                tenant = tenantId.trim().ifBlank { null },
-                baseUrlOverride = baseUrl.trim(),
-                extraHeaders = extraHeaders,
-            )
+            postWithFallback("auth/refresh", body)
         } catch (_: Exception) {
             return RefreshResult.Unavailable
         }
@@ -579,25 +539,18 @@ class ApiAuthClient(
     private fun postWithFallback(
         path: String,
         body: String,
-        tenant: String? = tenantId(),
-        baseUrlOverride: String? = null,
+        tenant: String = tenantId(),
         extraHeaders: Map<String, String> = emptyMap(),
     ): Pair<Int, String> {
-        val effectiveBase = (baseUrlOverride ?: baseUrl()).trimEnd('/')
-        val cleanTenant = tenant?.trim().orEmpty()
-        val headers = LinkedHashMap<String, String>().apply {
-            put("Content-Type", "application/json")
-            if (cleanTenant.isNotEmpty()) put("x-tenant-id", cleanTenant)
-            putAll(extraHeaders)
-        }
+        val headers = mapOf("Content-Type" to "application/json", "x-tenant-id" to tenant) + extraHeaders
         val response = try {
-            transport.execute("POST", "$effectiveBase/$path", headers, body)
+            transport.execute("POST", "${baseUrl()}/$path", headers, body)
         } catch (e: Exception) {
             throw serverUnreachable(e)
         }
         if (response.first == 404) {
             return try {
-                transport.execute("POST", "$effectiveBase/api/v1/$path", headers, body)
+                transport.execute("POST", "${baseUrl()}/api/v1/$path", headers, body)
             } catch (e: Exception) {
                 throw serverUnreachable(e)
             }

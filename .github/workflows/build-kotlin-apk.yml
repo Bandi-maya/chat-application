@@ -1,13 +1,19 @@
 name: Build, Test and Deliver Kotlin APK
 
-# Single CI workflow for the kotlin branch (consolidated 2026-11-08,
-# user-approved): every push compiles the app, runs the full JVM unit-test
-# tier, compiles the instrumentation tests, uploads the debug APK artifact
-# and delivers it to Telegram. Emulator tiers stay disabled per the 2026-11-03
-# user directive. The old candidate-overlay zip store was retired: the tree
-# is the single source of truth.
+# One Kotlin pipeline builds the canonical checked-out source, validates tests,
+# and publishes debug and optimized stable-key-signed release APKs.
+# Optional emulator tiers require explicit selection; no source overlays run.
 on:
   workflow_dispatch:
+    inputs:
+      run_emulator:
+        description: Run the existing isolated emulator proof tier
+        type: boolean
+        default: false
+      run_live_auth_probe:
+        description: Explicit live-backend throwaway-account reproduction
+        type: boolean
+        default: false
   push:
     branches: [kotlin]
 
@@ -16,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.d.outputs.build }}
-      retry: ${{ steps.d.outputs.retry }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,7 +30,6 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "build=true" >> "$GITHUB_OUTPUT"
-            echo "retry=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           B="${{ github.event.before }}"
@@ -34,7 +38,6 @@ jobs:
           printf 'GATE-CHANGED\n%s\n' "$CH"
           # Single-workflow consolidation: every push to kotlin builds + tests.
           echo "build=true" >> "$GITHUB_OUTPUT"
-          if printf '%s\n' "$CH" | grep -qx 'ci/kotlin-retry-trigger.txt'; then echo "retry=true" >> "$GITHUB_OUTPUT"; else echo "retry=false" >> "$GITHUB_OUTPUT"; fi
 
   build:
     needs: gate
@@ -45,211 +48,20 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate custom WebRTC backend route syntax
         run: node --check backend/routes/chaty-webrtc-ice.js
-      - name: Patch pinned candidate sources for com.logybyte.chaty
+      - name: Verify canonical source hashes and test dependency
         run: |
-          python3 - <<'PYLOGYPATCH'
-          import pathlib
-          subs = {
-              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chaty.test/')],
-              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chaty'")],
-              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chaty')],
-              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [
-                  ('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),
-                  ('        device.findObject(By.desc("Clear number")).click()\n        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))',
-                   '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
-              ],
-              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chaty"')],
-              'build.gradle.kts': [('    id("com.google.gms.google-services") version "4.4.2" apply false\\n', '')],
-          }
-          for rel, pairs in subs.items():
-              p = pathlib.Path(rel)
-              if not p.exists():
-                  continue
-              s = p.read_text()
-              for old, new in pairs:
-                  if old in s:
-                      s = s.replace(old, new)
-              p.write_text(s)
-          PYLOGYPATCH
-      - name: Apply Chaty Kotlin GB feature overrides
-        run: |
-          python3 - <<'PYOVERRIDES'
-          from pathlib import Path
-          import shutil
-
-          root = Path("ci/gb-parity-overrides")
-          applied = 0
-          for source in sorted(root.rglob("*")):
-              if not source.is_file():
-                  continue
-              relative = source.relative_to(root)
-              allowed_ci = {"ci/test-shards.py", "ci/run-smoke.sh"}
-              if not relative.parts or (relative.parts[0] != "app" and str(relative) not in allowed_ci):
-                  raise SystemExit(f"Unexpected override path: {relative}")
-              target = Path(*relative.parts)
-              target.parent.mkdir(parents=True, exist_ok=True)
-              shutil.copy2(source, target)
-              print(f"Applied {target}")
-              applied += 1
-          if applied != 137:
-              raise SystemExit(f"Expected 137 override files, applied {applied}")
-          PYOVERRIDES
-      - name: Patch debug-only proof fixtures to current Kotlin ports
-        run: |
-          python3 - <<'PY'
-          import pathlib, re
-          p = pathlib.Path('app/src/debug/java/com/example/chat/LockBadgeProofActivity.kt')
-          if p.exists():
-              source = p.read_text()
-              # The old fixture used unsupported animated-icon parameters. Keep a visible
-              # lock glyph so the pixel proof still exercises the actual row badge state.
-              start = source.find('ChatyIcon(')
-              if start >= 0:
-                  depth = 0
-                  quote = None
-                  escaped = False
-                  end = None
-                  for i in range(start + len('ChatyIcon'), len(source)):
-                      ch = source[i]
-                      if quote:
-                          if escaped:
-                              escaped = False
-                          elif ord(ch) == 92:
-                              escaped = True
-                          elif ch == quote:
-                              quote = None
-                          continue
-                      if ch in ('"', "'"):
-                          quote = ch
-                      elif ch == '(':
-                          depth += 1
-                      elif ch == ')':
-                          depth -= 1
-                          if depth == 0:
-                              end = i + 1
-                              break
-                  if end is not None:
-                      source = source[:start] + 'Text("🔒", fontSize = 14.sp)' + source[end:]
-              source_lines = source.splitlines()
-              package_index = next(
-                  (i for i, line in enumerate(source_lines) if line.strip().startswith('package ')),
-                  None,
-              )
-              if package_index is None:
-                  raise SystemExit('LockBadgeProofActivity has no package declaration')
-              for import_line in (
-                  'import androidx.compose.material3.Text',
-                  'import androidx.compose.ui.unit.sp',
-              ):
-                  if import_line not in source_lines:
-                      source_lines.insert(package_index + 1, import_line)
-                      package_index += 1
-              source = chr(10).join(source_lines) + (chr(10) if source.endswith(chr(10)) else '')
-              if 'import androidx.compose.material3.Text' not in source or 'import androidx.compose.ui.unit.sp' not in source:
-                  raise SystemExit('Compose imports were not injected into LockBadgeProofActivity')
-              p.write_text(source)
-          voice = pathlib.Path('app/src/debug/java/com/example/chat/VoiceGestureFixtureActivity.kt')
-          if voice.exists():
-              source = voice.read_text()
-              for name in ('pause', 'resume'):
-                  source = re.sub(
-                      rf'(?ms)^\s*override\s+(?:suspend\s+)?fun\s+{name}\s*\([^)]*\)\s*(?:\{{[^{{}}]*\}}|=\s*[^\n]+)\s*\n?',
-                      '',
-                      source,
-                  )
-              voice.write_text(source)
-          PY
-      - name: Restore branch-owned adaptive network sources after candidate overlay
-        run: |
-          git checkout HEAD -- \
-            app/src/main/kotlin/com/example/chat/ui/vault/HiddenVaultScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/media/ChatyVideoPlayerWidget.kt \
-            app/src/main/kotlin/com/example/chat/ui/updates/UpdatesScreenParts.kt \
-            app/src/main/java/com/example/chat/data/services/AndroidVoiceNoteAdapters.kt \
-            app/src/main/java/com/example/chat/data/network/NetworkStatusMonitor.kt \
-            app/src/main/java/com/example/chat/data/network/TransferMonitor.kt \
-            app/src/main/java/com/example/chat/data/network/AppTrafficMonitor.kt \
-            app/src/main/java/com/example/chat/data/api/ApiMediaUploadClient.kt \
-            app/src/main/java/com/example/chat/data/remote/SupabaseStorageClient.kt \
-            app/src/main/java/com/example/chat/data/media/BoundedMediaDownloader.kt \
-            app/src/main/java/com/example/chat/data/services/ChatMediaService.kt \
-            app/src/main/java/com/example/chat/data/services/CallSignalingService.kt \
-            app/src/main/java/com/example/chat/data/services/SessionLifecycleService.kt \
-            app/src/main/kotlin/com/example/chat/ui/chats/home/ConversationRow.kt \
-            app/src/main/java/com/example/chat/data/services/WebRtcCallMediaController.kt \
-            app/src/main/java/com/example/chat/data/transfer/NativeP2pTransferProtocol.kt \
-            app/src/main/java/com/example/chat/data/transfer/ChunkReceiptLedger.kt \
-            app/src/main/java/com/example/chat/data/transfer/P2pFileTransferService.kt \
-            app/src/test/java/com/example/chat/data/transfer/NativeP2pTransferProtocolTest.kt \
-            app/src/main/kotlin/com/example/chat/ui/chats/detail/ConnectionDetailSheet.kt \
-            app/src/main/res/xml/file_paths.xml \
-            app/src/main/kotlin/com/example/chat/data/api/ApiBackendService.kt \
-            app/src/main/java/com/example/chat/data/api/ApiRealtimeClient.kt \
-            app/src/main/java/com/example/chat/data/messaging/ConversationsRepository.kt \
-            app/src/main/kotlin/com/example/chat/ui/ChatVoiceBinding.kt \
-            app/src/main/kotlin/com/example/chat/ui/chats/detail/VoiceNoteController.kt \
-            app/src/main/kotlin/com/example/chat/ServiceLocator.kt \
-            app/src/main/kotlin/com/example/chat/ui/AppRoot.kt \
-            app/src/debug/AndroidManifest.xml \
-            app/src/main/kotlin/com/example/chat/ui/GlobalLayersHost.kt \
-            app/src/main/kotlin/com/example/chat/ui/kit/ReferenceLayoutPresentation.kt \
-            app/src/main/kotlin/com/example/chat/ui/theme/ChatyTheme.kt \
-            app/src/main/java/com/example/chat/domain/models/ChatMessage.kt \
-            app/src/main/kotlin/com/example/chat/ui/ChatDetailHost.kt \
-            app/src/main/kotlin/com/example/chat/ui/chats/ChatDetailScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/chats/detail/MessageBubble.kt \
-            app/src/main/kotlin/com/example/chat/ui/updates/ReleaseNotesPolicy.kt \
-            app/src/main/kotlin/com/example/chat/ui/navigation/NavigationShells3.kt \
-            app/src/main/kotlin/com/example/chat/ui/navigation/MainNavigationShell.kt \
-            app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/calls/InAppCallPip.kt \
-            app/src/main/kotlin/com/example/chat/ui/kit/SpringInteractiveScale.kt \
-            app/src/main/kotlin/com/example/chat/ui/auth/RegisterOrganizationScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/auth/RegisterScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/auth/CreateNewPasswordScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/auth/AuthComponents.kt \
-            app/src/main/kotlin/com/example/chat/ui/auth/ForgotPasswordScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/auth/LoginScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/chats/detail/AnimatedEmojiAsset.kt \
-            app/src/main/kotlin/com/example/chat/ui/chats/home/HomeAppBars.kt \
-            app/src/main/kotlin/com/example/chat/ui/chats/detail/AlbumSelectionPolicy.kt \
-            app/src/test/java/com/example/chat/AlbumSelectionPolicyTest.kt \
-            app/src/main/kotlin/com/example/chat/ui/settings/SettingsRootScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/settings/NetworkDataUsageScreen.kt \
-            app/src/main/java/com/example/chat/data/services/ProtectedResourceGate.kt \
-            app/src/main/java/com/example/chat/data/services/LocalLockService.kt \
-            app/src/main/java/com/example/chat/data/services/CallForegroundService.kt \
-            app/src/main/AndroidManifest.xml \
-            app/src/main/kotlin/com/example/chat/ui/ChatsHomeHost.kt \
-            app/src/main/kotlin/com/example/chat/ui/settings/notifications/NotificationSettingsPage.kt \
-            app/src/main/kotlin/com/example/chat/ui/kit/GbDesignSystem.kt \
-            app/src/debug/java/com/example/chat/LockBadgeProofActivity.kt \
-            app/src/main/kotlin/com/example/chat/data/api/EncryptedApiSessionStore.kt \
-            app/src/main/kotlin/com/example/chat/data/auth/EncryptedGoTrueSessionStorage.kt \
-            app/src/main/kotlin/com/example/chat/data/auth/SessionStore.kt \
-            app/src/main/java/com/example/chat/data/api/ApiSessionStore.kt \
-            app/src/main/java/com/example/chat/data/services/AacPcmVoiceRecorder.kt \
-            app/src/main/kotlin/com/example/chat/ui/chats/detail/VoiceSessionController.kt \
-            app/src/main/kotlin/com/example/chat/ui/ChatAttachmentsBinding.kt \
-            app/src/main/kotlin/com/example/chat/ui/media/MediaLibraryService.kt \
-            app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/media/PdfWorkspaceScreen.kt \
-            app/src/main/kotlin/com/example/chat/ui/media/MediaWorkspaceHost.kt \
-            app/src/test/java/com/example/chat/LocalLockServiceFullTest.kt \
-            app/src/test/java/com/example/chat/ProtectedResourceGateParityTest.kt \
-            app/src/test/java/com/example/chat/ui/media/MediaLibraryServiceHardeningTest.kt
-      - name: Restore hash-reviewed run5 UI sources after all overlays
-        run: |
-          python3 - <<'PYRUN5'
-          import hashlib,json,pathlib,subprocess
-          m=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())
-          paths=list(m['files'])
-          assert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts for n in paths)
-          subprocess.run(['git','checkout','HEAD','--',*paths],check=True)
-          for n,expected in m['files'].items():
-              assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n
-          print('RUN5-UI-RESTORED',len(paths),m['source_commit'])
-          PYRUN5
+          python3 - <<'PYVERIFY'
+          import hashlib, json, pathlib
+          root = pathlib.Path('.')
+          files = json.loads((root / 'ci/approved-ui-run5-manifest.json').read_text())['files']
+          assert len(files) == 3156
+          for name, expected in files.items():
+              assert name.startswith('app/') and '..' not in pathlib.PurePosixPath(name).parts
+              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == expected, name
+          assert not (root / 'ci/gb-parity-overrides').exists()
+          assert 'androidTestImplementation("androidx.compose.ui:ui-test-junit4")' in (root / 'app/build.gradle.kts').read_text()
+          print('CANONICAL-SOURCE-VERIFIED', len(files))
+          PYVERIFY
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
       - uses: actions/setup-java@v4
@@ -478,7 +290,7 @@ jobs:
   # duration. Same Rust cache as the build job, so its native build is warm.
   runtime-smoke:
     needs: [build, gate]
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-emulator]') # emulator tier: manual dispatch or an explicit [run-emulator] commit (Bandi 2026-11-08); ordinary pushes stay emulator-free per the 2026-11-03 directive
+    if: (github.event_name == 'workflow_dispatch' && inputs.run_emulator) || contains(github.event.head_commit.message, '[run-emulator]')
     runs-on: ubuntu-latest
     # Job bound grounded in run-133 measured runner phases: core-ui 39.5min,
     # calls-camera 18.1, all other shards <=8.7. 60 for core-ui leaves 12min of
@@ -493,66 +305,20 @@ jobs:
       CHATY_TEST_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v4
-      - name: Patch pinned candidate sources for com.logybyte.chaty
+      - name: Verify canonical source hashes and test dependency
         run: |
-          python3 - <<'PYLOGYPATCH'
-          import pathlib
-          subs = {
-              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chaty.test/')],
-              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chaty'")],
-              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chaty')],
-              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [
-                  ('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),
-                  ('        device.findObject(By.desc("Clear number")).click()\n        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))',
-                   '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
-              ],
-              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chaty"')],
-          }
-          for rel, pairs in subs.items():
-              p = pathlib.Path(rel)
-              if not p.exists():
-                  continue
-              s = p.read_text()
-              for old, new in pairs:
-                  if old in s:
-                      s = s.replace(old, new)
-              p.write_text(s)
-          PYLOGYPATCH
-      - name: Apply Chaty Kotlin GB feature overrides (discovery parity with compiled test APK)
-        run: |
-          python3 - <<'PYOVERRIDES'
-          from pathlib import Path
-          import shutil
-
-          root = Path("ci/gb-parity-overrides")
-          applied = 0
-          for source in sorted(root.rglob("*")):
-              if not source.is_file():
-                  continue
-              relative = source.relative_to(root)
-              allowed_ci = {"ci/test-shards.py", "ci/run-smoke.sh"}
-              if not relative.parts or (relative.parts[0] != "app" and str(relative) not in allowed_ci):
-                  raise SystemExit(f"Unexpected override path: {relative}")
-              target = Path(*relative.parts)
-              target.parent.mkdir(parents=True, exist_ok=True)
-              shutil.copy2(source, target)
-              print(f"Applied {target}")
-              applied += 1
-          if applied != 137:
-              raise SystemExit(f"Expected 137 override files, applied {applied}")
-          PYOVERRIDES
-      - name: Restore hash-reviewed run5 UI sources after all overlays
-        run: |
-          python3 - <<'PYRUN5'
-          import hashlib,json,pathlib,subprocess
-          m=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())
-          paths=list(m['files'])
-          assert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts for n in paths)
-          subprocess.run(['git','checkout','HEAD','--',*paths],check=True)
-          for n,expected in m['files'].items():
-              assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n
-          print('RUN5-UI-RESTORED',len(paths),m['source_commit'])
-          PYRUN5
+          python3 - <<'PYVERIFY'
+          import hashlib, json, pathlib
+          root = pathlib.Path('.')
+          files = json.loads((root / 'ci/approved-ui-run5-manifest.json').read_text())['files']
+          assert len(files) == 3156
+          for name, expected in files.items():
+              assert name.startswith('app/') and '..' not in pathlib.PurePosixPath(name).parts
+              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == expected, name
+          assert not (root / 'ci/gb-parity-overrides').exists()
+          assert 'androidTestImplementation("androidx.compose.ui:ui-test-junit4")' in (root / 'app/build.gradle.kts').read_text()
+          print('CANONICAL-SOURCE-VERIFIED', len(files))
+          PYVERIFY
       - name: Disable unused Firebase messaging entrypoint
         run: rm -f app/src/main/java/com/example/chat/notifications/ChatyFirebaseMessagingService.kt
       - uses: actions/setup-java@v4
@@ -684,7 +450,7 @@ jobs:
   # is created per-run with a random name; credentials never appear in logs.
   prod-auth-repro:
     needs: [build, gate]
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-emulator]')
+    if: github.event_name == 'workflow_dispatch' && inputs.run_live_auth_probe
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -742,371 +508,3 @@ jobs:
   # at a time - plus one targeted capture session for the core-ui diagnostic
   # fixtures (swipe-row + radial) whose pixels the emit allowlist now covers.
   # Not a proven contention fix; original 175 artifacts/results preserved.
-  retry-media-emoji:
-    needs: gate
-    if: needs.gate.outputs.retry == 'true' && false # EMULATOR TIER DISABLED 2026-11-03 (user directive): no emulator runs; remove '&& false' to re-enable
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-      - name: Read pinned retry source
-        id: pin
-        run: |
-          # ci/kotlin-retry-trigger.txt: "retry <source-run-id> <archive_sha256>"
-          read -r TAG RUN_ID ARCH < ci/kotlin-retry-trigger.txt
-          { [ "$TAG" = "retry" ] || [ "$TAG" = "capture-only" ] || [ "$TAG" = "diag-single" ]; } && [ -n "$RUN_ID" ] && [ -n "$ARCH" ] || { echo "Bad retry trigger pin"; exit 1; }
-          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
-          echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
-          echo "mode=$TAG" >> "$GITHUB_OUTPUT"
-          if [ "$TAG" = "diag-single" ]; then
-            # D1 reproduction targets: the four classes carrying the 5 remaining 93 core
-            # failures (original assertions/timing untouched; whole classes preserve
-            # intra-class setup/navigation state). calib INCLUDED: pressHome cleanup on
-            # the pinned 93 pair makes it runner-safe (validated by 93's full completion).
-            echo "capture_classes=com.example.chat.AddedStylesProofTest,com.example.chat.HomeHeaderTabsResponsiveProofTest,com.example.chat.LockBadgeMotionProofTest,com.example.chat.RadialVariantsProofTest" >> "$GITHUB_OUTPUT"
-            echo "select_want=com.example.chat.AddedStylesProofTest,com.example.chat.HomeHeaderTabsResponsiveProofTest,com.example.chat.LockBadgeMotionProofTest,com.example.chat.RadialVariantsProofTest" >> "$GITHUB_OUTPUT"
-            echo "select_excluded=" >> "$GITHUB_OUTPUT"
-          else
-            echo "capture_classes=com.example.chat.DemoModeProofTest,com.example.chat.SystemBarThemeProofTest,com.example.chat.AppRootConfiguredProofTest,com.example.chat.ChatScreensPixelProofTest,com.example.chat.HeaderTabStyleSheetProofTest,com.example.chat.AccountDraftIsolationProofTest,com.example.chat.SystemThemeFollowProofTest,com.example.chat.AddedStylesProofTest" >> "$GITHUB_OUTPUT"
-            echo "select_want=com.example.chat.DemoModeProofTest,com.example.chat.SystemBarThemeProofTest,com.example.chat.AppRootConfiguredProofTest,com.example.chat.ChatScreensPixelProofTest,com.example.chat.HeaderTabStyleSheetProofTest,com.example.chat.AccountDraftIsolationProofTest,com.example.chat.SystemThemeFollowProofTest" >> "$GITHUB_OUTPUT"
-            echo "select_excluded=com.example.chat.LockBadgeMotionProofTest#animationFrameCalibrationDiag" >> "$GITHUB_OUTPUT"
-          fi
-          echo "RETRY-PIN mode=$TAG run=$RUN_ID archive=$ARCH"
-          PIN_ARCH: ${{ steps.pin.outputs.arch }}
-      - name: Patch pinned candidate sources for com.logybyte.chaty
-        run: |
-          python3 - <<'PYLOGYPATCH'
-          import pathlib
-          subs = {
-              'ci/run-instrumentation-shard.py': [('com.example.chat.test/', 'com.logybyte.chaty.test/')],
-              'ci/collect-runtime-resources.py': [("meminfo','com.example.chat'", "meminfo','com.logybyte.chaty'")],
-              'ci/run-smoke.sh': [('com.example.chat', 'com.logybyte.chaty')],
-              'app/src/androidTest/java/com/example/chat/DialerUiAssertions.kt': [
-                  ('By.pkg("com.example.chat")', 'By.pkg(InstrumentationRegistry.getInstrumentation().targetContext.packageName)'),
-                  ('        device.findObject(By.desc("Clear number")).click()\n        assertTrue("Clear number removes query", device.wait(Until.gone(By.desc("Clear number")), 5000))',
-                   '        // Clear-number (X) affordance removed per product direction: number centered, no trailing X.\n        assertTrue("Clear number affordance removed", device.wait(Until.gone(By.desc("Clear number")), 5000))'),
-              ],
-              'app/src/main/res/xml/shortcuts.xml': [('android:targetPackage="com.example.chat"', 'android:targetPackage="com.logybyte.chaty"')],
-          }
-          for rel, pairs in subs.items():
-              p = pathlib.Path(rel)
-              if not p.exists():
-                  continue
-              s = p.read_text()
-              for old, new in pairs:
-                  if old in s:
-                      s = s.replace(old, new)
-              p.write_text(s)
-          PYLOGYPATCH
-        env:
-          PIN_ARCH: ${{ steps.pin.outputs.arch }}
-      - name: Restore hash-reviewed run5 UI sources after all overlays
-        run: |
-          python3 - <<'PYRUN5'
-          import hashlib,json,pathlib,subprocess
-          m=json.loads(pathlib.Path('ci/approved-ui-run5-manifest.json').read_text())
-          paths=list(m['files'])
-          assert len(paths)==3156 and all(n.startswith('app/') and '..' not in pathlib.PurePosixPath(n).parts for n in paths)
-          subprocess.run(['git','checkout','HEAD','--',*paths],check=True)
-          for n,expected in m['files'].items():
-              assert hashlib.sha256(pathlib.Path(n).read_bytes()).hexdigest()==expected,n
-          print('RUN5-UI-RESTORED',len(paths),m['source_commit'])
-          PYRUN5
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.11.1"
-      - uses: actions/download-artifact@v4
-        with:
-          name: synthetic-runtime-apk-pair
-          path: runtime-apks
-          repository: Bandi-maya/chat-application
-          run-id: ${{ steps.pin.outputs.run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Verify identical runtime APK pair
-        run: |
-          (cd runtime-apks && sha256sum -c SHA256SUMS)
-          cp runtime-apks/SHA256SUMS runtime-apk-pair-SHA256SUMS.txt
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Isolate synthetic emulator backend routing
-        run: |
-          printf '%s\n' 'REST_API_BASE_URL=http://10.0.2.2:8000' 'WEBSOCKET_URL=ws://10.0.2.2:8000/chat/ws/{userId}' 'TENANT_ID=chat-application' > .env
-      # D1 (authorized once, 2026-10-30): media's peak-memory test ALONE on the pinned 93
-      # pair, stock RAM and emulator build 16740729 (37.2.13.0) matching 93's death
-      # conditions; selection-only, no app/test/baseline change. D2: passive host-side
-      # evidence (qemu RSS + MemAvailable sampler, dmesg tail, cgroup/pressure memory) to
-      # discriminate host OOM-kill vs qemu-internal exit; crashpad capture step stays.
-      # Survival alone supports cumulative-pressure only as a lead; death alone shows the
-      # 34 preceding tests aren't required under this run's conditions.
-      - name: Single memory-test diagnostic + passive host capture (serial emulator 1)
-        id: single
-        if: steps.pin.outputs.mode == 'diag-single'
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: default
-          arch: x86_64
-          profile: pixel_6
-          emulator-build: "16740729"
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: mkdir -p screenshots && while :; do p=$(pgrep -f qemu-system | head -1); if [ -n "$p" ]; then echo "{\"t\":$(date +%s),\"pid\":$p,\"rss_kb\":\"$(awk '/VmRSS/{print $2}' /proc/$p/status 2>/dev/null)\",\"memavail_kb\":\"$(awk '/MemAvailable/{print $2}' /proc/meminfo)\"}"; fi; sleep 5; done > screenshots/host-watch.jsonl & echo $! > /tmp/hostwatch.pid ; (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "com.example.chat.EmojiPackAssetsAndPerfTest#microsoftGridVisibleScrollOffAndBackMemory" ; rc=$? ; kill $(cat /tmp/hostwatch.pid) 2>/dev/null ; ( sudo dmesg 2>/dev/null | tail -60 || echo "dmesg unavailable" ) > screenshots/host-dmesg-tail.txt 2>&1 ; ( cat /sys/fs/cgroup/memory.events 2>/dev/null ; cat /proc/pressure/memory 2>/dev/null ; free -m ) > screenshots/host-memory-evidence.txt 2>&1 ; cp app/build/outputs/androidTest-results/connected/TEST-shard-runner-derived.xml screenshots/single-shard-derived.xml 2>/dev/null || true ; adb logcat -d -v threadtime > screenshots/logcat-single.txt 2>/dev/null || true ; exit $rc
-      - name: Retry media shard (serial emulator 1)
-        id: media
-        if: steps.pin.outputs.mode == 'retry'
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        env:
-          CHATY_TEST_SHARD: media
-        with:
-          api-level: 34
-          target: default
-          arch: x86_64
-          profile: pixel_6
-          # CONTROLLED DIAGNOSTIC (run 40942544305 mid-run qemu deaths): treatment = AVD RAM
-          # 2GB -> 4GB (-memory 4096). Emulator build pinned to the exact build that died in 91
-          # (37.2.13.0 / build_id 16740729) so RAM is the only changed variable vs that death.
-          # Original 91 partial records retained untouched; retried shard reruns ALL its tests.
-          emulator-build: "16740729"
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated -memory 4096
-          script: bash ci/run-smoke.sh
-      - name: Capture emulator crash evidence (passive)
-        if: always()
-        run: |
-          mkdir -p screenshots/emulator-crash
-          for d in /tmp/android-runner/emu-crash-*; do
-            [ -e "$d" ] && cp -r "$d" screenshots/emulator-crash/ 2>/dev/null || true
-          done
-          (ps aux | grep -i "[q]emu" || echo "no qemu process") > screenshots/emulator-crash/qemu-ps.txt 2>&1 || true
-          adb root > /dev/null 2>&1 || true
-          (adb shell ls /data/tombstones/ 2>&1 || echo "tombstones unavailable") > screenshots/emulator-crash/tombstones-ls.txt 2>&1 || true
-          (adb pull /data/tombstones screenshots/emulator-crash/tombstones > /dev/null 2>&1 && echo "tombstones pulled" || echo "tombstone pull unavailable") >> screenshots/emulator-crash/tombstones-ls.txt 2>&1 || true
-          exit 0
-      - name: Preserve media retry results
-        if: always() && steps.pin.outputs.mode == 'retry'
-
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-instrumentation-results-media-retry
-          path: |
-            app/build/outputs/androidTest-results/connected/
-            app/build/reports/androidTests/connected/
-          if-no-files-found: warn
-      - name: Retry emoji-real shard (serial emulator 2)
-        id: emoji
-        if: steps.pin.outputs.mode == 'retry'
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        env:
-          CHATY_TEST_SHARD: emoji-real
-        with:
-          api-level: 34
-          target: default
-          arch: x86_64
-          profile: pixel_6
-          # CONTROL for the RAM diagnostic: byte-identical config to the shard that died in run
-          # 40942544305 (stock ~2GB RAM), emulator build pinned to the same 37.2.13.0 / 16740729.
-          emulator-build: "16740729"
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: bash ci/run-smoke.sh
-      - name: Capture emulator crash evidence (passive)
-        if: always()
-        run: |
-          mkdir -p screenshots/emulator-crash
-          for d in /tmp/android-runner/emu-crash-*; do
-            [ -e "$d" ] && cp -r "$d" screenshots/emulator-crash/ 2>/dev/null || true
-          done
-          (ps aux | grep -i "[q]emu" || echo "no qemu process") > screenshots/emulator-crash/qemu-ps.txt 2>&1 || true
-          adb root > /dev/null 2>&1 || true
-          (adb shell ls /data/tombstones/ 2>&1 || echo "tombstones unavailable") > screenshots/emulator-crash/tombstones-ls.txt 2>&1 || true
-          (adb pull /data/tombstones screenshots/emulator-crash/tombstones > /dev/null 2>&1 && echo "tombstones pulled" || echo "tombstone pull unavailable") >> screenshots/emulator-crash/tombstones-ls.txt 2>&1 || true
-          exit 0
-      - name: Preserve emoji-real retry results
-        if: always() && steps.pin.outputs.mode == 'retry'
-
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-instrumentation-results-emoji-real-retry
-          path: |
-            app/build/outputs/androidTest-results/connected/
-            app/build/reports/androidTests/connected/
-          if-no-files-found: warn
-      # animationFrameCalibrationDiag EXCLUDED from real acceptance: diagnostic-only; the runner
-      # process crash during it is UNRESOLVED (run 40594913440). It stays failed/unresolved,
-      # not waived; LockBadgeMotionProofTest contributes its 6 real methods by name.
-      # Targeted diagnostic captures: five core-ui proof classes whose fixture
-      # PNGs the emit allowlist covers (swipe/rtl/radial + the retained header
-      # and voice failures; diagnostics are emitted by the tests before their
-      # asserts, so failures stay failures). Uses the pinned verified APK pair
-      # and the same am-instrument process/component/args/result collection as
-      # ci/run-smoke.sh; NO gradle invocation (a rebuild needs cargo-ndk, which
-      # this job does not have). Inline one-liner keeps the exit code
-      # (emulator-runner splits multi-line scripts). Originals retained.
-      - name: Targeted swipe/radial/header/voice/system-bar/app-root diagnostic captures (serial emulator 3)
-        id: captures
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: default
-          arch: x86_64
-          profile: pixel_6
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back emulated
-          script: mkdir -p screenshots && classes="${{ steps.pin.outputs.capture_classes }}" && printf '%s\n' "$classes" > screenshots/instrumentation-class-filter.txt && (cd runtime-apks && sha256sum -c SHA256SUMS) && adb install -r -t runtime-apks/app-debug.apk && adb install -r -t runtime-apks/app-debug-androidTest.apk && python3 ci/run-instrumentation-shard.py "$classes" ; rc=$? ; adb pull /sdcard/Android/data/com.logybyte.chaty/files/screenshots/. screenshots/ || true ; adb pull /sdcard/Android/data/com.logybyte.chaty/files/grid-Microsoft.txt screenshots/ || true ; adb logcat -d -v threadtime > screenshots/logcat.txt || true ; bash ci/demo-probe.sh || true ; exit $rc
-      - name: Capture emulator crash evidence (passive)
-        if: always()
-        run: |
-          mkdir -p screenshots/emulator-crash
-          for d in /tmp/android-runner/emu-crash-*; do
-            [ -e "$d" ] && cp -r "$d" screenshots/emulator-crash/ 2>/dev/null || true
-          done
-          (ps aux | grep -i "[q]emu" || echo "no qemu process") > screenshots/emulator-crash/qemu-ps.txt 2>&1 || true
-          adb root > /dev/null 2>&1 || true
-          (adb shell ls /data/tombstones/ 2>&1 || echo "tombstones unavailable") > screenshots/emulator-crash/tombstones-ls.txt 2>&1 || true
-          (adb pull /data/tombstones screenshots/emulator-crash/tombstones > /dev/null 2>&1 && echo "tombstones pulled" || echo "tombstone pull unavailable") >> screenshots/emulator-crash/tombstones-ls.txt 2>&1 || true
-          exit 0
-      - name: Preserve diagnostic capture results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-instrumentation-results-capture-diag-retry
-          path: |
-            app/build/outputs/androidTest-results/connected/
-            app/build/reports/androidTests/connected/
-            screenshots/
-          if-no-files-found: warn
-      - name: Verify targeted capture selection (nonzero cases)
-        id: select
-        if: always()
-        env:
-          SELECT_WANT: ${{ steps.pin.outputs.select_want }}
-          SELECT_EXCLUDED: ${{ steps.pin.outputs.select_excluded }}
-        run: |
-          python3 - <<'PYSEL'
-          import glob, os, sys, xml.etree.ElementTree as ET, re, pathlib
-          want = set(x for x in os.environ.get('SELECT_WANT', '').split(',') if x)
-          # Expected method counts come from the restored pinned source, not from
-          # the runner: a crashed runner must not shrink the expectation.
-          excluded = set(x for x in os.environ.get('SELECT_EXCLUDED', '').split(',') if x)
-          for e in sorted(excluded):
-              print('CAPTURE-EXCLUSION diagnostic-not-accepted: ' + e)
-          # Exact method identities from pinned source; count alone must not hide a swapped method.
-          expected = {}
-          for c in sorted(want):
-              rel = 'app/src/androidTest/java/com/example/chat/' + c.rsplit('.', 1)[-1] + '.kt'
-              p = pathlib.Path(rel)
-              if not p.exists():
-                  # Override-only (gb-parity shadow) classes are absent from the restored
-                  # overlay tree; the overlay manifest carries zero gb-parity entries, so the
-                  # branch checkout's override dir is the authoritative compiled source.
-                  p = pathlib.Path('ci/gb-parity-overrides') / rel
-              names = re.findall(r'@Test\s+fun\s+(\w+)', p.read_text())
-              assert len(names) == len(re.findall(r'@Test\b', p.read_text())), c
-              expected[c] = sorted(n for n in names if c + '#' + n not in excluded)
-          seen = {}; seen_methods = {}; failures = []; errors = []; integrity = []
-          for f in glob.glob('app/build/outputs/androidTest-results/connected/TEST-*.xml'):
-              r = ET.parse(f).getroot()
-              for tc in r.findall('testcase'):
-                  cn = tc.get('classname')
-                  if cn == 'shard.integrity':
-                      e = tc.find('error')
-                      integrity.append(e.text if e is not None and e.text else '')
-                      continue
-                  seen[cn] = seen.get(cn, 0) + 1
-                  seen_methods.setdefault(cn, []).append(tc.get('name'))
-                  if tc.find('failure') is not None: failures.append(cn + '#' + tc.get('name'))
-                  if tc.find('error') is not None: errors.append(cn + '#' + tc.get('name'))
-          print('CAPTURE-SELECTION completed=%s expected=%s' % (seen, expected))
-          print('CAPTURE-TESTFAILURES retained-not-repaired: %s' % failures)
-          print('CAPTURE-ERRORS %s' % errors)
-          print('CAPTURE-INTEGRITY %s' % integrity)
-          hard = []
-          missing = sorted(want - set(seen))
-          if missing: hard.append('missing classes: %s' % missing)
-          for c in sorted(want):
-              if c in seen:
-                  missing = sorted(set(expected[c]) - set(seen_methods.get(c, [])))
-                  extra = sorted(set(seen_methods.get(c, [])) - set(expected[c]))
-                  if missing: hard.append('missing methods %s: %s' % (c, missing))
-                  if extra: hard.append('unexpected methods %s: %s' % (c, extra))
-          itext = '\n'.join(integrity)
-          for marker in ('INCOMPLETE', 'Runner failed', 'adb exit', 'count-mismatched', 'coverage differs', 'Duplicate'):
-              if marker in itext: hard.append('integrity marker: ' + marker)
-          if errors: hard.append('test errors (not plain assertions): %s' % errors)
-          if hard:
-              print('CAPTURE-SELECTION-FAIL ' + '; '.join(hard))
-              sys.exit(1)
-          print('CAPTURE-SELECTION-OK classes=%d methods-completed=all ordinary-assert-failures=%d (retained, still TEST FAILURE in report)' % (len(want), len(failures)))
-          PYSEL
-      - name: Upload retry pixel proof
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: auth-screens-pixel-proof-retry
-          path: |
-            screenshots/
-            runtime-apk-pair-SHA256SUMS.txt
-          if-no-files-found: warn
-      - name: Emit allowlisted synthetic fixture screenshots (base64)
-        if: always()
-        run: |
-          for n in 31-swipe-light-portrait-closed 31-swipe-light-portrait-progress 31-swipe-light-portrait-after-gesture 31-swipe-light-portrait-open 31-swipe-light-portrait-back-closed 31-swipe-light-portrait-leading 31-swipe-light-portrait-final 31-swipe-real-home-before 31-swipe-real-home-open 31-swipe-real-home-closed 31-swipe-applied-style-0-light-closed 31-swipe-applied-style-0-light-after-gesture 31-swipe-applied-style-0-light-open 31-swipe-applied-style-1-dark-closed 31-swipe-applied-style-1-dark-after-gesture 31-swipe-applied-style-1-dark-open 31-swipe-applied-style-2-light-closed 31-swipe-applied-style-2-light-after-gesture 31-swipe-applied-style-2-light-open 31-swipe-applied-style-3-dark-closed 31-swipe-applied-style-3-dark-after-gesture 31-swipe-applied-style-3-dark-open 31-swipe-applied-style-4-light-closed 31-swipe-applied-style-4-light-after-gesture 31-swipe-applied-style-4-light-open radial-dark-rtl-closed radial-dark-rtl-first-page radial-dark-rtl-first-page-missing radial-dark-rtl-page-2 radial-dark-rtl-page-2-missing radial-dark-rtl-page-3 radial-dark-rtl-page-3-missing radial-dark-rtl-missing-close-semantics 32-swipe-rtl-left-trailing 32-swipe-rtl-production-row-applied 32-swipe-rtl-production-row-reloaded 32-swipe-rtl-production-settings-before-navigation 32-swipe-rtl-production-settings-toggled 32-swipe-rtl-recreated-closed 32-swipe-rtl-right-leading hdr-sheet-light-initial hdr-sheet-light-before-preview-tap hdr-sheet-light-after-preview-tap hdr-sheet-light-selected hdr-sheet-light-scrolled-diag hdr-sheet-light-scrolled hdr-sheet-dark-initial hdr-sheet-dark-before-preview-tap hdr-sheet-dark-after-preview-tap hdr-sheet-dark-selected hdr-sheet-dark-scrolled-diag hdr-sheet-dark-scrolled voice-gesture-tap-toggle-false voice-gesture-tap-toggle-true voice-gesture-drag-cancel-false voice-gesture-drag-cancel-true voice-gesture-drag-locked-false voice-gesture-drag-locked-true voice-gesture-hold-release-false voice-gesture-hold-release-true voice-gesture-locked-delete-false voice-gesture-locked-delete-true voice-gesture-system-cancel-false voice-gesture-system-cancel-true system-bars-follow-dark system-bars-follow-light system-bars-follow-app-override; do
-            f="screenshots/$n.png"
-            [ -f "$f" ] || { echo "PNGMISSING $n"; continue; }
-            sz=$(stat -c %s "$f")
-            if [ "$sz" -gt 600000 ]; then echo "PNGSKIP $n size=$sz"; continue; fi
-            echo "PNGB64-BEGIN $n $sz"
-            base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
-            echo "PNGB64-END $n"
-          done
-          for f in screenshots/added-*.png screenshots/10f1d-edit-sheet-after-mode-restore.png screenshots/10f1d-edit-before-close.png screenshots/10f2-task-detail-after-edit.png; do
-            [ -f "$f" ] || continue
-            n=$(basename "$f" .png)
-            sz=$(stat -c %s "$f")
-            if [ "$sz" -gt 600000 ]; then echo "PNGSKIP $n size=$sz"; continue; fi
-            echo "PNGB64-BEGIN $n $sz"
-            base64 -w 0 "$f" | fold -w 4000 | sed 's/^/PNGB64 /'
-            echo "PNGB64-END $n"
-          done
-          for n in hdr-sheet-scroll-light hdr-sheet-last-row-light hdr-sheet-scroll-dark hdr-sheet-last-row-dark; do
-            f="screenshots/$n.txt"
-            [ -f "$f" ] || { echo "TXTMISSING $n"; continue; }
-            sz=$(stat -c %s "$f")
-            if [ "$sz" -gt 200000 ]; then echo "TXTSKIP $n size=$sz"; continue; fi
-            echo "TXT-BEGIN $n $sz"
-            cat "$f"
-            echo "TXT-END $n"
-          done
-          for f in screenshots/added-*.txt; do
-            [ -f "$f" ] || continue
-            n=$(basename "$f" .txt)
-            sz=$(stat -c %s "$f")
-            if [ "$sz" -gt 200000 ]; then echo "TXTSKIP $n size=$sz"; continue; fi
-            echo "TXT-BEGIN $n $sz"
-            cat "$f"
-            echo "TXT-END $n"
-          done
-      - name: Retry verdict (media failure never hides emoji)
-        if: always()
-        run: |
-          echo "RETRY-OUTCOMES mode=${{ steps.pin.outputs.mode }} media=${{ steps.media.outcome }} emoji-real=${{ steps.emoji.outcome }} single=${{ steps.single.outcome }} captures=${{ steps.captures.outcome }} selection=${{ steps.select.outcome }}"
-          if [ "${{ steps.pin.outputs.mode }}" = "diag-single" ]; then
-            # Evidence run: the single-test outcome (survival / assertion failure /
-            # emulator loss) and the reproduction failures are data, not gates;
-            # selection completeness and evidence preservation gate the job.
-            [ "${{ steps.select.outcome }}" = "success" ] && [ "${{ steps.single.outcome }}" != "cancelled" ]
-          elif [ "${{ steps.pin.outputs.mode }}" = "capture-only" ]; then
-            # Evidence recovery only: retained failures in the five targeted classes
-            # are expected and preserved in the derived XML/raw status; selection
-            # completeness (5 classes, nonzero cases) is the gate.
-            [ "${{ steps.select.outcome }}" = "success" ]
-          else
-            [ "${{ steps.media.outcome }}" = "success" ] && [ "${{ steps.emoji.outcome }}" = "success" ] && [ "${{ steps.captures.outcome }}" = "success" ] && [ "${{ steps.select.outcome }}" = "success" ]
-          fi

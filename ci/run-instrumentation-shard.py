@@ -40,7 +40,7 @@ def main():
     out=pathlib.Path('screenshots');out.mkdir(exist_ok=True)
     began=time.time()
     # Stream/flush raw evidence: an emulator/runner crash must not erase already emitted statuses.
-    proc=subprocess.Popen(['adb','shell','am','instrument','-w','-r','-e','class',','.join(classes),'com.example.chat.test/androidx.test.runner.AndroidJUnitRunner'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
+    proc=subprocess.Popen(['adb','shell','am','instrument','-w','-r','-e','class',','.join(classes),'com.logybyte.chaty.test/androidx.test.runner.AndroidJUnitRunner'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1)
     lines=[]; previous_class=None
     with (out/'instrumentation-raw-status.txt').open('w') as raw, (out/'class-boundaries.txt').open('w') as boundaries:
         for line in proc.stdout:

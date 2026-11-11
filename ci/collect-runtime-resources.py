@@ -24,7 +24,7 @@ with (out/'host-emulator-resources.jsonl').open('w') as log:
         row['adb_devices']=cmd(['adb','devices','-l'])
         row['host_loadavg']=pathlib.Path('/proc/loadavg').read_text().strip()
         row['device_meminfo']=cmd(['adb','shell','cat','/proc/meminfo'])
-        row['app_meminfo']=cmd(['adb','shell','dumpsys','meminfo','com.example.chat'])
+        row['app_meminfo']=cmd(['adb','shell','dumpsys','meminfo','com.logybyte.chaty'])
         has_qemu='qemu-system' in row['emulator_processes']['text']
         seen_qemu=seen_qemu or has_qemu
         if seen_qemu and not has_qemu and not gone_logged:
