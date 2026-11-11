@@ -40,6 +40,8 @@ object SnapshotCodec {
         disappearingDuration = json["disappearing_seconds"]?.let {
             Duration.ofSeconds(it.toString().toLongOrNull() ?: 0)
         },
+        roomType = json["room_type"]?.toString(),
+        taskId = json["task_id"]?.toString(),
         encryptionStatus = encryptionStatus(json["encryption_status"]?.toString()),
         draftText = json["draft_text"]?.toString() ?: "",
     )
@@ -64,6 +66,8 @@ object SnapshotCodec {
             conversation.disappearingDuration?.let {
                 put("disappearing_seconds", it.seconds.toString())
             }
+            conversation.roomType?.let { put("room_type", it) }
+            conversation.taskId?.let { put("task_id", it) }
             put("encryption_status", conversation.encryptionStatus.name)
             put("draft_text", conversation.draftText)
         }

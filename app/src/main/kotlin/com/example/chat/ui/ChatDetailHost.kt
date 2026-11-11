@@ -133,7 +133,7 @@ fun ChatDetailHost(
         loadError = null
         loadingMessages = api.getMessages(conversation.id).isEmpty()
         try {
-            if (api.isAuthenticated) api.loadMessages(conversation.id)
+            if (api.isAuthenticated) api.loadMessagesIfNeeded(conversation.id, force = loadNonce > 0)
             rt.trackConversation(conversation.id)
             rt.markConversationDelivered(conversation.id)
             loadingMessages = false

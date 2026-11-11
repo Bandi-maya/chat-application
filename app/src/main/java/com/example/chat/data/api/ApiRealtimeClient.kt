@@ -71,6 +71,10 @@ class ApiRealtimeClient(
      *  (optimistic replace, conversation bump, preview recompute) is the
      *  service owner's job, matching the Dart split. */
     interface Listener {
+        /** WebSocket connection opened cleanly for the active account scope. */
+        fun onConnected() {}
+        /** WebSocket connection dropped unexpectedly and will attempt reconnect. */
+        fun onDisconnected() {}
         /** new_message: payload['data'] ?? payload['message'] parsed with
          *  ChatMessage.fromApi. */
         fun onNewMessage(message: ChatMessage) {}
@@ -189,6 +193,7 @@ class ApiRealtimeClient(
         socket = created
         connecting = false
         schedulePingLocked()
+        listener?.onConnected()
     }
 
     /** Dart signOut path: cancel the reconnect timer and clean up without
@@ -311,12 +316,14 @@ class ApiRealtimeClient(
         override fun onFailure(socket: Socket, error: Throwable) = post {
             if (socket !== this@ApiRealtimeClient.socket) return@post
             cleanupLocked()
+            listener?.onDisconnected()
             scheduleReconnectLocked()
         }
 
         override fun onClosed(socket: Socket) = post {
             if (socket !== this@ApiRealtimeClient.socket) return@post
             cleanupLocked()
+            listener?.onDisconnected()
             scheduleReconnectLocked()
         }
     }
@@ -367,6 +374,7 @@ class ApiRealtimeClient(
         if (lastInboundAt > 0 && nowMs() - lastInboundAt > PONG_TIMEOUT_MS) {
             pingCancel = null
             cleanupLocked()
+            listener?.onDisconnected()
             scheduleReconnectLocked()
             return
         }
@@ -378,6 +386,7 @@ class ApiRealtimeClient(
         if (!ok) {
             pingCancel = null
             cleanupLocked()
+            listener?.onDisconnected()
             scheduleReconnectLocked()
             return
         }

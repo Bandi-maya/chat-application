@@ -7,6 +7,7 @@ import kotlinx.coroutines.sync.withLock
 import android.content.Context
 import com.example.chat.data.demo.DemoMode
 import com.example.chat.data.demo.DemoSampleData
+import com.example.chat.data.messaging.SnapshotCacheStore
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.domain.models.ChatTask
 import com.example.chat.domain.models.Conversation
@@ -21,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Android holder for the REST backend: ApiBackendConfig (tenant + base URL),
  *  ApiAuthClient (endpoints), ApiAuthSession (api_hub_token/api_hub_user
@@ -334,6 +336,32 @@ class ApiBackendService(
     }
 
     private val realtimeListener: ApiRealtimeClient.Listener = object : ApiRealtimeClient.Listener {
+        override fun onConnected() {
+            val wasDown = socketWasDisconnected
+            socketWasDisconnected = false
+            if (wasDown) {
+                conversationsDirty = true
+                chatScope.launch {
+                    loadConversationsIfNeeded(force = false)
+                    val activeTargets = buildSet {
+                        activeConversationId?.takeIf { it.isNotEmpty() }?.let { add(it) }
+                        addAll(activeConversationIds)
+                    }
+                    activeTargets.forEach { loadMessagesIfNeeded(it, force = false) }
+                }
+            }
+        }
+
+        override fun onDisconnected() {
+            socketWasDisconnected = true
+            conversationsDirty = true
+            synchronized(chatLock) {
+                dirtyRooms.addAll(_messages.keys)
+            }
+            activeConversationId?.takeIf { it.isNotEmpty() }?.let { dirtyRooms.add(it) }
+            dirtyRooms.addAll(activeConversationIds)
+        }
+
         override fun onSecurityNewDevice(payload: org.json.JSONObject) {
             securityEvents.tryEmit(payload)
         }
@@ -353,32 +381,46 @@ class ApiBackendService(
         }
 
         override fun onNewMessage(message: ChatMessage) {
+            val expected = authSnapshot()
+            val myId = session.currentUser?.id
+            val normalized = ApiMessageDeliveryMerge.normalizeRealtimeMessage(message, myId)
             var unknownRoom = false
             var isNewToList = false
             var convoTitle: String? = null
             var convoMuted = false
+            val roomId = normalized.conversationId
             synchronized(chatLock) {
-                val roomId = message.conversationId
+                val hadRoomInMemory = _messages.containsKey(roomId)
                 val list = _messages.getOrPut(roomId) { mutableListOf() }
                 // Dart: replace the optimistic sending/temp message matching
                 // text + sender; otherwise append if the id is new.
                 // Already confirmed over HTTP: never let the echo claim another queued message.
                 // Only our own messages can replace a pending one (an incoming "ok" must not
                 // swallow the "ok" we are still sending).
-                val myId = session.currentUser?.id
-                val optIdx = if (list.any { it.id == message.id } || message.senderId != myId) -1
+                val optIdx = if (list.any { it.id == normalized.id } || normalized.senderId != myId) -1
                 else list.indexOfFirst { m ->
                     m.deliveryState == DeliveryState.sending && m.id.startsWith("temp_") &&
-                        m.text == message.text && m.senderId == myId
+                        m.text == normalized.text && m.senderId == myId
                 }
                 if (optIdx != -1) {
                     // Our own queued message came back from the server: it is sent (one tick).
                     removeFromOutbox(list[optIdx].id)
-                    list[optIdx] = message
-                    list.removeAll { it !== message && it.id == message.id }
-                } else if (list.none { it.id == message.id }) {
-                    list.add(message)
-                    isNewToList = true
+                    list[optIdx] = normalized
+                    list.removeAll { it !== normalized && it.id == normalized.id }
+                } else {
+                    val existingIdx = list.indexOfFirst { it.id == normalized.id }
+                    if (existingIdx != -1) {
+                        list[existingIdx] = ApiMessageDeliveryMerge.preserveMonotonicDelivery(
+                            list[existingIdx],
+                            normalized,
+                        )
+                    } else {
+                        list.add(normalized)
+                        isNewToList = true
+                    }
+                }
+                if (!hadRoomInMemory && !syncedRooms.containsKey(roomId)) {
+                    dirtyRooms.add(roomId)
                 }
                 list.sortBy { it.createdAt }
                 val convIdx = _conversations.indexOfFirst { it.id == roomId }
@@ -389,32 +431,38 @@ class ApiBackendService(
                     _conversations.add(
                         0,
                         old.copy(
-                            lastMessageText = if (message.text.isNotEmpty()) message.text
-                            else if (message.type == MessageType.image) "📷 Photo" else "📎 Attachment",
-                            lastMessageTime = message.createdAt,
-                            lastMessageSenderId = message.senderId,
+                            lastMessageText = if (normalized.text.isNotEmpty()) normalized.text
+                            else if (normalized.type == MessageType.image) "📷 Photo" else "📎 Attachment",
+                            lastMessageTime = normalized.createdAt,
+                            lastMessageSenderId = normalized.senderId,
                         ),
                     )
                 } else {
                     unknownRoom = true
                 }
             }
-            if (unknownRoom) chatScope.launch { loadConversations() }
+            if (unknownRoom) {
+                conversationsDirty = true
+                chatScope.launch { loadConversationsIfNeeded(force = false) }
+            }
             // Tell the sender it reached this phone (their second grey tick).
-            if (message.senderId.isNotEmpty() && message.senderId != session.currentUser?.id) {
-                realtime.sendDelivered(message.conversationId)
+            if (normalized.senderId.isNotEmpty() && normalized.senderId != session.currentUser?.id) {
+                realtime.sendDelivered(normalized.conversationId)
             }
-            typingUntil.remove("${message.conversationId}|${message.senderId}")
-            if ((message.conversationId == activeConversationId || message.conversationId in activeConversationIds) &&
-                message.senderId != session.currentUser?.id
+            typingUntil.remove("${normalized.conversationId}|${normalized.senderId}")
+            if ((normalized.conversationId == activeConversationId || normalized.conversationId in activeConversationIds) &&
+                normalized.senderId != session.currentUser?.id
             ) {
-                markConversationRead(message.conversationId)
+                markConversationRead(normalized.conversationId)
             }
+            schedulePersistRoomMessages(roomId, expected)
+            schedulePersistConversations(expected)
             notifyChatListeners()
-            if (isNewToList) runCatching { onIncomingMessage?.invoke(message, convoTitle, convoMuted) }
+            if (isNewToList) runCatching { onIncomingMessage?.invoke(normalized, convoTitle, convoMuted) }
         }
 
         override fun onMessageEdited(roomId: String, messageId: String, newContent: String, editedAt: Instant) {
+            val expected = authSnapshot()
             synchronized(chatLock) {
                 val list = _messages[roomId] ?: return@synchronized
                 val idx = list.indexOfFirst { it.id == messageId }
@@ -428,10 +476,13 @@ class ApiBackendService(
                     }
                 }
             }
+            schedulePersistRoomMessages(roomId, expected)
+            schedulePersistConversations(expected)
             notifyChatListeners()
         }
 
         override fun onMessageDeleted(roomId: String, messageId: String) {
+            val expected = authSnapshot()
             secureMessageDeleteIngest?.invoke(mapOf("room_id" to roomId, "id" to messageId, "for_everyone" to true))
             var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
             synchronized(chatLock) {
@@ -451,10 +502,13 @@ class ApiBackendService(
                 }
             }
             notifyGone(gone)
+            schedulePersistRoomMessages(roomId, expected)
+            schedulePersistConversations(expected)
             notifyChatListeners()
         }
 
         override fun onMessagesCleared(roomId: String) {
+            val expected = authSnapshot()
             var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
             synchronized(chatLock) {
                 gone = com.example.chat.data.media.AttachmentRefs.refsOf(roomId, _messages[roomId] ?: emptyList())
@@ -465,6 +519,8 @@ class ApiBackendService(
                 }
             }
             notifyGone(gone)
+            schedulePersistRoomMessages(roomId, expected)
+            schedulePersistConversations(expected)
             notifyChatListeners()
         }
 
@@ -474,6 +530,7 @@ class ApiBackendService(
         }
 
         override fun onMessagesRead(roomId: String, messageIds: List<String>, readerId: String) {
+            val expected = authSnapshot()
             val myId = session.currentUser?.id
             if (readerId.isNotEmpty() && readerId == myId) return
             // Live backend sends no message_ids when a reader marks the whole
@@ -492,7 +549,10 @@ class ApiBackendService(
                     }
                 }
             }
-            if (changed) notifyChatListeners()
+            if (changed) {
+                schedulePersistRoomMessages(roomId, expected)
+                notifyChatListeners()
+            }
         }
 
         override fun onInitialPresence(onlineUserIds: List<String>) {
@@ -520,6 +580,7 @@ class ApiBackendService(
         }
 
         override fun onMessagesDelivered(roomId: String, deliveredUpTo: String) {
+            val expected = authSnapshot()
             val upTo = parseIsoOrNull(deliveredUpTo) ?: return
             val myId = session.currentUser?.id ?: return
             var changed = false
@@ -533,7 +594,10 @@ class ApiBackendService(
                     }
                 }
             }
-            if (changed) notifyChatListeners()
+            if (changed) {
+                schedulePersistRoomMessages(roomId, expected)
+                notifyChatListeners()
+            }
         }
 
         override fun onTyping(roomId: String, userId: String, isTyping: Boolean) {
@@ -647,9 +711,13 @@ class ApiBackendService(
         realtime.connect()
         startBackgroundSync()
         chatScope.launch {
-            if (!roomId.isNullOrEmpty()) chat.markRoomDelivered(roomId)
-            loadConversations()
-            if (!roomId.isNullOrEmpty() && roomId == activeConversationId) loadMessages(roomId)
+            if (!roomId.isNullOrEmpty()) {
+                chat.markRoomDelivered(roomId)
+                dirtyRooms.add(roomId)
+            }
+            conversationsDirty = true
+            loadConversationsIfNeeded(force = true)
+            if (!roomId.isNullOrEmpty() && roomId == activeConversationId) loadMessagesIfNeeded(roomId, force = true)
         }
     }
 
@@ -721,7 +789,8 @@ class ApiBackendService(
                 ensureFreshToken()
                 ensureOutboxLoaded()
                 flushOutbox()
-                loadConversations()
+                conversationsDirty = true
+                loadConversationsIfNeeded(force = true)
             } finally {
                 pushSyncRunning = false
             }
@@ -804,6 +873,150 @@ class ApiBackendService(
     private val _users = mutableListOf<UserProfile>()
     private val _messages = mutableMapOf<String, MutableList<ChatMessage>>()
 
+    @Volatile private var snapshotCoordinator: ApiSnapshotCacheCoordinator? = null
+    private val conversationsSyncMutex = kotlinx.coroutines.sync.Mutex()
+    @Volatile private var conversationsSyncedFromServer = false
+    @Volatile private var conversationsDirty = true
+    @Volatile private var lastConversationsSyncMs = 0L
+    @Volatile private var socketWasDisconnected = false
+    private val syncedRooms = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val dirtyRooms = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val hydratedRoomSnapshots = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    fun configureSnapshotCache(store: SnapshotCacheStore) {
+        snapshotCoordinator = ApiSnapshotCacheCoordinator(store)
+    }
+
+    private fun resetSyncTracking() {
+        conversationsSyncedFromServer = false
+        conversationsDirty = true
+        lastConversationsSyncMs = 0L
+        socketWasDisconnected = false
+        syncedRooms.clear()
+        dirtyRooms.clear()
+        hydratedRoomSnapshots.clear()
+    }
+
+    private fun snapshotNamespaceFor(expected: ApiAccountScope): String? {
+        val uid = expected.userId?.takeIf { it.isNotBlank() } ?: return null
+        if (DemoMode.isDemoUser(uid)) return null
+        val key = ApiAccountRoutingCanonicalizer.accountKey(expected.tenantId, expected.baseUrl, uid) ?: return null
+        return ApiAccountRoutingCanonicalizer.accountHash(key)
+    }
+
+    private fun schedulePersistConversations(expected: ApiAccountScope = authSnapshot()) {
+        val coord = snapshotCoordinator ?: return
+        val ns = snapshotNamespaceFor(expected) ?: return
+        val snapshot = synchronized(chatLock) { _conversations.toList() }
+        chatScope.launch(Dispatchers.IO) {
+            if (authSnapshot() !== expected) return@launch
+            coord.persistConversations(ns, snapshot)
+        }
+    }
+
+    private fun schedulePersistUsers(expected: ApiAccountScope = authSnapshot()) {
+        val coord = snapshotCoordinator ?: return
+        val ns = snapshotNamespaceFor(expected) ?: return
+        val snapshot = synchronized(chatLock) { _users.toList() }
+        chatScope.launch(Dispatchers.IO) {
+            if (authSnapshot() !== expected) return@launch
+            coord.persistUsers(ns, snapshot)
+        }
+    }
+
+    private fun schedulePersistRoomMessages(roomId: String, expected: ApiAccountScope = authSnapshot()) {
+        val coord = snapshotCoordinator ?: return
+        val ns = snapshotNamespaceFor(expected) ?: return
+        if (roomId.isBlank()) return
+        val snapshot = synchronized(chatLock) { _messages[roomId]?.toList() } ?: return
+        chatScope.launch(Dispatchers.IO) {
+            if (authSnapshot() !== expected) return@launch
+            coord.persistMessages(ns, roomId, snapshot)
+        }
+    }
+
+    private fun mergeCachedMessagesIntoRoomLocked(roomId: String, cached: List<ChatMessage>): Boolean {
+        if (cached.isEmpty()) return false
+        val existing = _messages[roomId]
+        if (existing == null || existing.isEmpty()) {
+            _messages[roomId] = cached.toMutableList()
+            return true
+        }
+        val byId = existing.associateBy { it.id }
+        val merged = cached.map { c ->
+            ApiMessageDeliveryMerge.preserveMonotonicDelivery(byId[c.id], c)
+        }
+        val extra = existing.filter { e -> merged.none { it.id == e.id } }
+        val combined = (merged + extra).sortedBy { it.createdAt }
+        if (combined == existing) return false
+        _messages[roomId] = combined.toMutableList()
+        return true
+    }
+
+    private suspend fun hydrateLocalStateForScope(expected: ApiAccountScope) {
+        val coord = snapshotCoordinator ?: return
+        val ns = snapshotNamespaceFor(expected) ?: return
+        if (authSnapshot() !== expected) return
+        val cachedConversations = withContext(Dispatchers.IO) { coord.readConversations(ns) }
+        val cachedUsers = withContext(Dispatchers.IO) { coord.readUsers(ns) }
+        if (authSnapshot() !== expected) return
+
+        var hydratedHeader = false
+        withAuthScope(expected) {
+            synchronized(chatLock) {
+                if (_conversations.isEmpty() && !cachedConversations.isNullOrEmpty()) {
+                    _conversations.addAll(cachedConversations)
+                    hydratedHeader = true
+                }
+                if (_users.isEmpty() && !cachedUsers.isNullOrEmpty()) {
+                    _users.addAll(cachedUsers)
+                    hydratedHeader = true
+                }
+            }
+        }
+        if (hydratedHeader) notifyChatListeners()
+
+        val roomIds = synchronized(chatLock) { _conversations.map { it.id } }
+        var hydratedMessages = false
+        for (roomId in roomIds) {
+            if (authSnapshot() !== expected) return
+            if (hydratedRoomSnapshots.contains(roomId)) continue
+            val cachedMsgs = withContext(Dispatchers.IO) { coord.readMessages(ns, roomId) }
+            if (authSnapshot() !== expected) return
+            withAuthScope(expected) {
+                if (!cachedMsgs.isNullOrEmpty()) {
+                    synchronized(chatLock) {
+                        if (mergeCachedMessagesIntoRoomLocked(roomId, cachedMsgs)) hydratedMessages = true
+                    }
+                }
+                hydratedRoomSnapshots.add(roomId)
+            }
+        }
+        if (hydratedMessages) notifyChatListeners()
+    }
+
+    private suspend fun hydrateRoomMessagesFromCacheIfNeeded(roomId: String) {
+        if (roomId.isBlank() || hydratedRoomSnapshots.contains(roomId)) return
+        val expected = authSnapshot()
+        val coord = snapshotCoordinator ?: run {
+            hydratedRoomSnapshots.add(roomId)
+            return
+        }
+        val ns = snapshotNamespaceFor(expected) ?: return
+        val cached = withContext(Dispatchers.IO) { coord.readMessages(ns, roomId) }
+        if (authSnapshot() !== expected) return
+        var changed = false
+        withAuthScope(expected) {
+            if (!cached.isNullOrEmpty()) {
+                synchronized(chatLock) {
+                    if (mergeCachedMessagesIntoRoomLocked(roomId, cached)) changed = true
+                }
+            }
+            hydratedRoomSnapshots.add(roomId)
+        }
+        if (changed) notifyChatListeners()
+    }
+
     /** Dart _tasks / tasks getter. */
     private val _tasks = mutableListOf<ChatTask>()
     val tasks: List<ChatTask>
@@ -822,7 +1035,7 @@ class ApiBackendService(
             startBackgroundSync()
             cleaned.forEach { roomId ->
                 chatScope.launch {
-                    loadMessages(roomId)
+                    loadMessagesIfNeeded(roomId)
                     markConversationRead(roomId)
                 }
             }
@@ -1047,10 +1260,24 @@ class ApiBackendService(
                         synchronized(chatLock) {
                             _conversations.clear()
                             _conversations.addAll(filtered)
+                            for (c in filtered) {
+                                val cachedMsgs = _messages[c.id]
+                                val latestCached = cachedMsgs?.lastOrNull()?.createdAt ?: Instant.EPOCH
+                                if (c.unreadCount > 0 ||
+                                    (cachedMsgs.isNullOrEmpty() && c.lastMessageText.isNotEmpty()) ||
+                                    ( !cachedMsgs.isNullOrEmpty() && c.lastMessageTime.isAfter(latestCached) )
+                                ) {
+                                    dirtyRooms.add(c.id)
+                                }
+                            }
                         }
+                        conversationsSyncedFromServer = true
+                        conversationsDirty = false
+                        lastConversationsSyncMs = System.currentTimeMillis()
                         requiresSubscription = false
                         subscriptionErrorMessage = null
                         persistAccountConversationSnapshot()
+                        schedulePersistConversations(expected)
                         changed = true
                     }
                     ApiChatClient.RoomsResult.SubscriptionRequired -> {
@@ -1066,6 +1293,36 @@ class ApiBackendService(
 
     /** loadMessages with Dart merge semantics: pending (sending/temp) messages
      *  whose text is absent from the remote list survive; merged + sorted. */
+    /** Loads the conversation list from the backend only when dirty or not yet synced in this session. */
+    suspend fun loadConversationsIfNeeded(force: Boolean = false) {
+        if (session.token == null || DemoMode.active) return
+        if (!force && conversationsSyncedFromServer && !conversationsDirty) return
+        conversationsSyncMutex.withLock {
+            if (session.token == null || DemoMode.active) return
+            if (!force && conversationsSyncedFromServer && !conversationsDirty) return
+            loadConversations()
+        }
+    }
+
+    /**
+     * Ensures cached chats are hydrated immediately and triggers one catch-up fetch
+     * (with one quick retry if initial login/restore fetch failed transiently).
+     */
+    suspend fun ensureInitialSyncIfNeeded() {
+        if (!isAuthenticated || DemoMode.active) return
+        val expected = authSnapshot()
+        val needsHydrate = synchronized(chatLock) { _conversations.isEmpty() }
+        if (needsHydrate) hydrateLocalStateForScope(expected)
+        if (!conversationsSyncedFromServer || conversationsDirty) {
+            loadConversationsIfNeeded(force = false)
+            if (!conversationsSyncedFromServer && session.token != null && !DemoMode.active) {
+                delay(500)
+                loadConversationsIfNeeded(force = false)
+            }
+        }
+    }
+
+    /** loadMessages with monotonic delivery ticks and pending-message merge. */
     suspend fun loadMessages(chatId: String) {
         val expected = authSnapshot()
         val remote = withContext(Dispatchers.IO) { chat.listMessages(chatId) } ?: return
@@ -1073,18 +1330,46 @@ class ApiBackendService(
         val applied = withAuthScope(expected) {
             synchronized(chatLock) {
                 val current = _messages[chatId] ?: mutableListOf()
-                val pending = current.filter { m ->
+                val merged = ApiMessageDeliveryMerge.mergeRemoteMessages(current, remote) { m ->
                     (m.deliveryState == DeliveryState.sending || m.id.startsWith("temp_")) &&
                         (isQueued(m.id) || remote.none { it.text == m.text })
-                }
-                val merged = (remote + pending).sortedBy { it.createdAt }.toMutableList()
+                }.toMutableList()
                 gone = com.example.chat.data.media.AttachmentRefs.refsGone(chatId, current.toList(), merged)
                 _messages[chatId] = merged
             }
+            syncedRooms[chatId] = System.currentTimeMillis()
+            dirtyRooms.remove(chatId)
+            hydratedRoomSnapshots.add(chatId)
         }
         if (!applied) return
+        schedulePersistRoomMessages(chatId, expected)
         notifyGone(gone)
         notifyChatListeners()
+    }
+
+    /**
+     * Serves messages from local storage + live WebSocket updates continuously,
+     * fetching from the backend only when the room has not been synced yet,
+     * is marked dirty/stale, the socket is disconnected, or server preview leads cache.
+     */
+    suspend fun loadMessagesIfNeeded(chatId: String, force: Boolean = false) {
+        if (chatId.isBlank() || session.token == null || DemoMode.active) return
+        hydrateRoomMessagesFromCacheIfNeeded(chatId)
+        val needsFetch = if (force) {
+            true
+        } else {
+            val conv = synchronized(chatLock) { _conversations.firstOrNull { it.id == chatId } }
+            val msgs = synchronized(chatLock) { _messages[chatId].orEmpty() }
+            ApiMessageDeliveryMerge.shouldFetchRoomMessages(
+                hasSyncedThisSession = syncedRooms.containsKey(chatId),
+                isDirty = chatId in dirtyRooms,
+                socketConnected = realtime.isConnected,
+                conversation = conv,
+                currentMessages = msgs,
+            )
+        }
+        if (!needsFetch) return
+        loadMessages(chatId)
     }
 
     /** startDirectChat: POST /chat/rooms/direct (no fallback), upsert at
@@ -1098,6 +1383,7 @@ class ApiBackendService(
                 if (idx != -1) _conversations.removeAt(idx)
                 _conversations.add(0, conversation)
             }
+            schedulePersistConversations()
             notifyChatListeners()
             return conversation
         } catch (e: ApiChatClient.SubscriptionRequiredException) {
@@ -1117,6 +1403,7 @@ class ApiBackendService(
             if (idx != -1) _conversations.removeAt(idx)
             _conversations.add(0, conversation)
         }
+        schedulePersistConversations()
         notifyChatListeners()
         return conversation
     }
@@ -1133,6 +1420,8 @@ class ApiBackendService(
                 _conversations.removeAll { it.type == ConversationType.direct && it.participantIds.contains(userId) }
             }
         }) { "Account changed. Local deletion was not applied." }
+        schedulePersistUsers(expected)
+        schedulePersistConversations(expected)
         notifyChatListeners()
         // UI owns purge and logout after this verified completion; do not sign out
         // before its account-local purge or destroy the scope it needs.
@@ -1150,6 +1439,7 @@ class ApiBackendService(
             if (activeConversationId == chatId) activeConversationId = null
         }
         notifyGone(gone)
+        schedulePersistConversations()
         notifyChatListeners()
         withContext(Dispatchers.IO) { chat.deleteRoom(chatId) }
     }
@@ -1172,6 +1462,7 @@ class ApiBackendService(
                             }
                         }
                     }
+                    schedulePersistUsers(expected)
                     changed = true
                 }
             })
@@ -1187,21 +1478,24 @@ class ApiBackendService(
         return com.example.chat.ui.chats.newchat.NewChatRules.filterUsers(users, q, session.currentUser?.id, includeSelf)
     }
 
-    /** Dart setActiveConversation: track the room, start sync, load messages. */
+    /** Dart setActiveConversation: track the room, start sync, hydrate/load messages only when needed. */
     fun setActiveConversation(conversationId: String?) {
         activeConversationId = conversationId
         if (!conversationId.isNullOrEmpty()) {
             realtime.connect()
             startBackgroundSync()
             chatScope.launch {
-                loadMessages(conversationId)
+                loadMessagesIfNeeded(conversationId)
                 markConversationRead(conversationId)
             }
         }
     }
 
-    /** _startBackgroundSync: every 4s poll active room(s); every 3rd tick
-     *  refresh the conversation list; stops cleanly when the session scope cancels or signs out. */
+    /**
+     * Background catch-up loop: maintains token freshness, reconnects dropped sockets,
+     * flushes the offline outbox, and fetches rooms/messages only when dirty, uncached,
+     * or while WebSocket realtime is disconnected.
+     */
     fun startBackgroundSync() {
         if (syncRunning && activeSyncJob?.isActive == true) return
         syncRunning = true
@@ -1223,8 +1517,14 @@ class ApiBackendService(
                         activeConversationId?.takeIf { it.isNotEmpty() }?.let { add(it) }
                         addAll(activeConversationIds)
                     }
-                    targets.forEach { syncActiveRoomMessages(it) }
-                    if (ticks % 3 == 0) loadConversations()
+                    targets.forEach { target ->
+                        if (!realtime.isConnected || target in dirtyRooms || !syncedRooms.containsKey(target)) {
+                            syncActiveRoomMessages(target)
+                        }
+                    }
+                    if (!conversationsSyncedFromServer || conversationsDirty || (!realtime.isConnected && ticks % 3 == 0)) {
+                        loadConversationsIfNeeded(force = conversationsDirty)
+                    }
                 }
             } finally {
                 if (activeSyncJob === job) syncRunning = false
@@ -1250,6 +1550,8 @@ class ApiBackendService(
                 }
             }
         }
+        schedulePersistRoomMessages(chatId)
+        schedulePersistConversations()
         notifyChatListeners()
         withContext(Dispatchers.IO) { chat.editMessage(chatId, messageId, newText) }
     }
@@ -1276,6 +1578,8 @@ class ApiBackendService(
             }
         }
         notifyGone(gone)
+        schedulePersistRoomMessages(chatId)
+        schedulePersistConversations()
         notifyChatListeners()
         withContext(Dispatchers.IO) { chat.deleteMessage(chatId, messageId) }
     }
@@ -1292,41 +1596,49 @@ class ApiBackendService(
             }
         }
         notifyGone(gone)
+        schedulePersistRoomMessages(chatId)
+        schedulePersistConversations()
         notifyChatListeners()
         withContext(Dispatchers.IO) { chat.clearMessages(chatId) }
     }
 
     private suspend fun syncActiveRoomMessages(chatId: String) {
+        val expected = authSnapshot()
         val remote = withContext(Dispatchers.IO) { chat.listMessages(chatId) } ?: return
         var changed = false
-        synchronized(chatLock) {
-            val current = _messages[chatId] ?: mutableListOf()
-            val pending = current.filter {
-                it.deliveryState == DeliveryState.sending || it.id.startsWith("temp_")
-            }
-            val hasChanges = remote != current.filterNot { it in pending }
-            if (hasChanges) {
-                val merged = remote.toMutableList()
-                for (p in pending) {
-                    if (isQueued(p.id) || remote.none { it.text == p.text }) merged.add(p)
-                }
-                merged.sortBy { it.createdAt }
-                _messages[chatId] = merged
-                remote.lastOrNull()?.let { lastMsg ->
-                    val idx = _conversations.indexOfFirst { it.id == chatId }
-                    if (idx != -1) {
-                        _conversations[idx] = _conversations[idx].copy(
-                            lastMessageText = if (lastMsg.text.isNotEmpty()) lastMsg.text
-                            else if (lastMsg.type == MessageType.image) "📷 Photo" else "📎 Attachment",
-                            lastMessageTime = lastMsg.createdAt,
-                            lastMessageSenderId = lastMsg.senderId,
-                        )
+        val applied = withAuthScope(expected) {
+            synchronized(chatLock) {
+                val current = _messages[chatId] ?: mutableListOf()
+                val merged = ApiMessageDeliveryMerge.mergeRemoteMessages(current, remote) {
+                    (it.deliveryState == DeliveryState.sending || it.id.startsWith("temp_")) &&
+                        (isQueued(it.id) || remote.none { r -> r.text == it.text })
+                }.toMutableList()
+                val hasChanges = merged != current
+                if (hasChanges) {
+                    _messages[chatId] = merged
+                    remote.lastOrNull()?.let { lastMsg ->
+                        val idx = _conversations.indexOfFirst { it.id == chatId }
+                        if (idx != -1) {
+                            _conversations[idx] = _conversations[idx].copy(
+                                lastMessageText = if (lastMsg.text.isNotEmpty()) lastMsg.text
+                                else if (lastMsg.type == MessageType.image) "📷 Photo" else "📎 Attachment",
+                                lastMessageTime = lastMsg.createdAt,
+                                lastMessageSenderId = lastMsg.senderId,
+                            )
+                        }
                     }
+                    changed = true
                 }
-                changed = true
             }
+            syncedRooms[chatId] = System.currentTimeMillis()
+            dirtyRooms.remove(chatId)
+            hydratedRoomSnapshots.add(chatId)
         }
-        if (changed) notifyChatListeners()
+        if (applied && changed) {
+            schedulePersistRoomMessages(chatId, expected)
+            schedulePersistConversations(expected)
+            notifyChatListeners()
+        }
     }
 
     /**
@@ -1345,12 +1657,26 @@ class ApiBackendService(
                 merged = true
                 synchronized(chatLock) {
                     val list = _messages.getOrPut(conversationId) { mutableListOf() }
-                    if (list.none { it.id == confirmed.id }) { list.add(confirmed); list.sortBy { it.createdAt } }
+                    val existingIdx = list.indexOfFirst { it.id == confirmed.id }
+                    if (existingIdx != -1) {
+                        list[existingIdx] = ApiMessageDeliveryMerge.preserveMonotonicDelivery(
+                            list[existingIdx],
+                            confirmed,
+                        )
+                    } else {
+                        list.add(confirmed)
+                    }
+                    list.sortBy { it.createdAt }
+                    touchConversationPreview(conversationId, confirmed)
                 }
             },
         )
         val ok = withContext(Dispatchers.IO) { sender.send(expected, conversationId, text) }
-        if (merged) notifyChatListeners()
+        if (merged) {
+            schedulePersistRoomMessages(conversationId, expected)
+            schedulePersistConversations(expected)
+            notifyChatListeners()
+        }
         return ok && merged
     }
 
@@ -1633,7 +1959,7 @@ class ApiBackendService(
                         list.removeAll { it.id == entry.tempId }
                         val idx = list.indexOfFirst { it.id == confirmed.id }
                         if (idx != -1) {
-                            if (list[idx].deliveryState.ordinal < confirmed.deliveryState.ordinal) list[idx] = confirmed
+                            list[idx] = ApiMessageDeliveryMerge.preserveMonotonicDelivery(list[idx], confirmed)
                         } else {
                             list.add(confirmed)
                         }
@@ -1641,7 +1967,11 @@ class ApiBackendService(
                         touchConversationPreview(entry.conversationId, confirmed)
                     }
                 }
-                if (updated) notifyChatListeners()
+                if (updated) {
+                    schedulePersistRoomMessages(entry.conversationId, expectedScope)
+                    schedulePersistConversations(expectedScope)
+                    notifyChatListeners()
+                }
             }
             is ApiChatClient.SendResult.Rejected -> {
                 val updated = withAuthScope(expectedScope) {
@@ -1710,6 +2040,7 @@ class ApiBackendService(
             val i = list.indexOfFirst { it.id == messageId }
             if (i != -1) list[i] = list[i].copy(deliveryState = state)
         }
+        schedulePersistRoomMessages(conversationId)
         notifyChatListeners()
     }
 
@@ -1858,13 +2189,18 @@ class ApiBackendService(
                 seedDemoState()
                 DemoMode.active = true
             } else {
+                resetSyncTracking()
+                val expected = authSnapshot()
                 SessionRefreshWorker.schedule(appContext) // keep the session alive between app opens
                 chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
                 chatScope.launch { ensureFreshToken() }
                 realtime.connect()
                 startBackgroundSync()
                 chatScope.launch { ensureOutboxLoaded(); flushOutbox() }
-                chatScope.launch { loadConversations() }
+                chatScope.launch {
+                    hydrateLocalStateForScope(expected)
+                    ensureInitialSyncIfNeeded()
+                }
                 chatScope.launch { loadUsers() }
                 chatScope.launch { loadTasks() }
                 // Dart _syncFcmToken() (api_backend_service.dart:119).
@@ -1924,23 +2260,42 @@ class ApiBackendService(
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
             runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
-            afterAuthAdopted()
+            afterAuthAdoptedAndSync()
             result.user
         }
 
     /** Dart _parseAuthResponse tail (api_backend_service.dart:565-572), shared by login, register,
      *  registerOrganization and oauth: connect the socket, load conversations/users/tasks, sync FCM. */
-    private fun afterAuthAdopted() {
+    private fun afterAuthAdopted(launchInitialSync: Boolean = true) {
+        resetSyncTracking()
+        val expected = authSnapshot()
         chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
         SessionRefreshWorker.schedule(appContext) // 30-day background renewal; survives app not being opened
         purgeDemoResidueForRealAdopt()
         realtime.connect()
         startBackgroundSync()
-        chatScope.launch { loadConversations() }
+        if (launchInitialSync) {
+            chatScope.launch {
+                hydrateLocalStateForScope(expected)
+                ensureInitialSyncIfNeeded()
+            }
+        }
         chatScope.launch { loadUsers() }
         chatScope.launch { loadTasks() }
         try { syncFcmTokenHook?.invoke() } catch (_: Exception) {
         }
+    }
+
+    /**
+     * Hydrates any encrypted local cache for the newly adopted account immediately and awaits the
+     * initial conversation sync up to [INITIAL_LOGIN_SYNC_TIMEOUT_MS] so Home opens populated on login.
+     */
+    private suspend fun afterAuthAdoptedAndSync() {
+        val expected = authSnapshot()
+        afterAuthAdopted(launchInitialSync = false)
+        hydrateLocalStateForScope(expected)
+        val syncJob = chatScope.launch { ensureInitialSyncIfNeeded() }
+        withTimeoutOrNull(INITIAL_LOGIN_SYNC_TIMEOUT_MS) { syncJob.join() }
     }
 
     suspend fun register(email: String, username: String, password: String): ApiUserProfile =
@@ -1950,7 +2305,7 @@ class ApiBackendService(
             session.adopt(result)
             saveRefreshToken(result.refreshToken)
             runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
-            afterAuthAdopted()
+            afterAuthAdoptedAndSync()
             result.user
         }
 
@@ -2020,7 +2375,7 @@ class ApiBackendService(
         session.adopt(result)
         saveRefreshToken(result.refreshToken)
         runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
-        afterAuthAdopted()
+        afterAuthAdoptedAndSync()
         Triple(result.user, orgId, resolvedOrgName)
     }
 
@@ -2084,17 +2439,26 @@ class ApiBackendService(
         auth.checkOrganization(workspace)
     }
 
-    /** Dart ApiBackendService.onAppResumed (api_backend_service.dart:914):
-     *  reconnect the realtime socket if down, reload conversations, and
-     *  refresh the active conversation's messages. */
+    /**
+     * Reconnects realtime socket when returning from background and fetches
+     * conversations/messages only if dirty, stale, or while WebSocket was offline.
+     */
     fun onAppResumed() {
         if (session.token == null) return
         chatScope.launch { ensureFreshToken() }
         realtime.connect()
         chatScope.launch { flushOutbox() }
-        chatScope.launch { loadConversations() }
+        val now = System.currentTimeMillis()
+        val stale = !conversationsSyncedFromServer || conversationsDirty ||
+            !realtime.isConnected || (now - lastConversationsSyncMs >= RESUME_STALE_MS)
+        if (stale) {
+            conversationsDirty = true
+            chatScope.launch { loadConversationsIfNeeded(force = false) }
+        }
         activeConversationId?.takeIf { it.isNotEmpty() }?.let { id ->
-            chatScope.launch { loadMessages(id) }
+            if (!realtime.isConnected || id in dirtyRooms || !syncedRooms.containsKey(id)) {
+                chatScope.launch { loadMessagesIfNeeded(id, force = true) }
+            }
         }
     }
 
@@ -2104,6 +2468,7 @@ class ApiBackendService(
      *  is wiped) or fails its identity check after. Lock order everywhere:
      *  scope-owner lock -> chatLock. */
     fun clearChatCachesForAccountSwitch() {
+        resetSyncTracking()
         val applied = withAuthScope(authSnapshot()) {
             synchronized(chatLock) {
                 _messages.clear()
@@ -2116,6 +2481,7 @@ class ApiBackendService(
     }
 
     fun signOut() {
+        resetSyncTracking()
         val activeKey = currentAccountKey()
         val oldHash = currentAccountHash()
         // Dart signOut: FirebaseNotificationService.unregisterOnLogout first.
@@ -2299,11 +2665,16 @@ class ApiBackendService(
         runCatching { onAfterAccountSwitch?.invoke(oldHash, targetMeta.accountHash) }
 
         // Restart account-scoped realtime & background sync cleanly
+        resetSyncTracking()
+        val nextExpected = authSnapshot()
         realtime.connect()
         startBackgroundSync()
         chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
         chatScope.launch { ensureOutboxLoaded(); flushOutbox() }
-        chatScope.launch { loadConversations() }
+        chatScope.launch {
+            hydrateLocalStateForScope(nextExpected)
+            loadConversationsIfNeeded(force = true)
+        }
         chatScope.launch { loadUsers() }
         chatScope.launch { loadTasks() }
         try { syncFcmTokenHook?.invoke() } catch (_: Exception) {}
@@ -2377,7 +2748,7 @@ class ApiBackendService(
         }
 
         runCatching { onAfterAccountSwitch?.invoke(oldHash, registered.accountHash) }
-        afterAuthAdopted()
+        afterAuthAdoptedAndSync()
         notifyChatListeners()
         registered
     }
@@ -2429,7 +2800,7 @@ class ApiBackendService(
                 }
                 multiAccount.markActive(remaining.accountKey)
                 runCatching { onAfterAccountSwitch?.invoke(targetMeta.accountHash, remaining.accountHash) }
-                afterAuthAdopted()
+                afterAuthAdoptedAndSync()
                 notifyChatListeners()
                 return@withLock AccountSwitchResult.Switched(remaining, multiAccount.selectedConversationFor(remaining.accountKey))
             }
@@ -2550,5 +2921,7 @@ class ApiBackendService(
         // refresh is skipped while a call is active (unless already expired).
         const val REFRESH_MARGIN_SECONDS = 5 * 60L
         const val TYPING_TTL_MS = 6_000L
+        const val RESUME_STALE_MS = 60_000L
+        const val INITIAL_LOGIN_SYNC_TIMEOUT_MS = 2_500L
     }
 }

@@ -182,6 +182,7 @@ object ServiceLocator {
         com.example.chat.data.api.ApiBackendService(requireContext()).also { service ->
             apiBackendUnderConstruction = service
             service.deviceIdentity = com.example.chat.data.api.DeviceIdentityManager(secureStore)
+            service.configureSnapshotCache(snapshotCache)
             service.transferMonitor = transferMonitor
             // Dart locator wiring for _syncFcmToken / unregisterOnLogout:
             // deferred lambdas so the registrar's lazy init cannot cycle

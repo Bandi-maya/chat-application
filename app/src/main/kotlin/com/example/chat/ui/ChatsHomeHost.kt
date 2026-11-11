@@ -76,11 +76,19 @@ fun ChatsHomeHost(
     var connectionSheetOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
     var connectionTesting by remember { androidx.compose.runtime.mutableStateOf(false) }
     val templateController = ServiceLocator.templateController
-    DisposableEffect(prefs, templateController) {
+    DisposableEffect(api, prefs, templateController) {
         val l: () -> Unit = { rev++ }
+        api.addListener(l)
         prefs.addListener(l)
         templateController.addListener(l)
-        onDispose { prefs.removeListener(l); templateController.removeListener(l) }
+        onDispose {
+            api.removeListener(l)
+            prefs.removeListener(l)
+            templateController.removeListener(l)
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(api.isAuthenticated, api.currentUser?.id) {
+        if (api.isAuthenticated) api.ensureInitialSyncIfNeeded()
     }
     @Suppress("UNUSED_EXPRESSION") rev
     val me = api.currentUser
