@@ -32,7 +32,7 @@
     "app/src/main/kotlin/com/example/chat/ui/calls/OngoingCallScreen.kt": "e3068bd4ab202b6ea9b9d10b779646ec69d5a2b88892ee7c6b4d39e78ef920a1",
     "app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleCompactCallCard.kt": "d8412122dd82cab501295831816b8217802af9c69be223cb74fa20d6f93a19fc",
     "app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleGroupMeetingView.kt": "490c54229d47f43a88fe6cf5a31fd067dabb3de71f4142b523ee50a4a4824737",
-    "app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt": "b51e99fde49fdb742b3575550060ea84488886fd25b060246fadeda88f778863",
+    "app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleIncomingCallView.kt": "053bbd85205d1f862e1d4f2d77b00495b62a8878dcddd779da6af590922ac839",
     "app/src/main/kotlin/com/example/chat/ui/calls/bundles/BundleOngoingCallView.kt": "10a10e3390bbafafe834a3ef2dfd4e46f2d8902405228a8907bab02262ff2b7b",
     "app/src/main/kotlin/com/example/chat/ui/calls/bundles/CallExperienceBundlePickerScreen.kt": "cee880e5fb5d7d099bcafcb25f264d7f1e8ea4c039c26eeb1b616b5e0d2ba8e6",
     "app/src/main/kotlin/com/example/chat/ui/camera/CameraCaptureWidgets.kt": "56a5cda1eb0ee87affd64859a9834ac58edb7e049268e0c7a7af4d3877876392",
