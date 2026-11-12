@@ -1,7 +1,7 @@
 package com.example.chat.ui.island
 
 import android.content.Context
-import com.example.chat.IslandOverlay
+import com.example.chat.island.engine.IslandController
 import java.lang.ref.WeakReference
 
 /** Local-only bridge between the Android listener and the in-app island.
@@ -25,7 +25,10 @@ class ChatyIslandNativeBridge(context: Context) : IslandNativeBridge {
     }
 
     override fun clearAll() {
-        IslandOverlay.clearAllNotifications()
+        // Pop-ups, live activities and downloads clear; an active call stays (never auto-dismissed).
+        IslandController.clearAll()
+        IslandController.clearLive()
+        IslandController.clearDownload()
     }
 
     override suspend fun setHideSystemNotifications(hide: Boolean): Boolean {

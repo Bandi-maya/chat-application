@@ -104,7 +104,7 @@ import kotlinx.coroutines.launch
 enum class SettingsDestination {
     LinkedDevices, Privacy, Security, ThemeEngine, TemplateStudio, HomeScreen,
     Conversation, Effects, Universal, HomeShortcuts, Notifications, Automation,
-    Calls, StorageMedia, Permissions, BackupRestore, WasteCleaning, About,
+    Calls, StorageMedia, Permissions, BackupRestore, WasteCleaning, About, DynamicIsland,
     PrivacyPolicy, ShareChaty,
     EditProfile, SearchSettings, QrCode, NetworkUsage, DataUsage,
 }
@@ -150,6 +150,7 @@ private val allRootGroups: List<RootGroup> = listOf(
         RootRow(SettingsDestination.Notifications, Icons.Outlined.NotificationsNone, { LocalAppColors.current.warning }, "Notifications & Alerts", "Heads-up popups, notification sounds, LED & vibration"),
         RootRow(SettingsDestination.Automation, Icons.Outlined.SmartToy, { LocalAppColors.current.info }, "Message Automation & Scheduler", "Auto-reply rules, auto-responder bot & message scheduler"),
         RootRow(SettingsDestination.Calls, Icons.Outlined.Call, { LocalAppColors.current.warning }, "Call Settings", "Call privacy, incoming call controls & call appearance"),
+        RootRow(SettingsDestination.DynamicIsland, Icons.Outlined.Widgets, { LocalAppColors.current.info }, "Dynamic Island", "Floating island for notifications, music, calls, timers & more"),
     )),
     RootGroup("Storage and system", listOf(
         RootRow(SettingsDestination.NetworkUsage, Icons.Rounded.Wifi, { LocalAppColors.current.info }, "Network", "Connection status, transport and link speed estimates"),

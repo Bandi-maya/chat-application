@@ -6,8 +6,11 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import com.example.chat.IslandOverlay
 import com.example.chat.DynamicIslandNotificationListener
+import com.example.chat.island.core.IslandControl
+import com.example.chat.island.core.IslandSettings
+import com.example.chat.island.engine.IslandController
+import com.example.chat.island.engine.IslandMode
 import com.example.chat.ui.settings.notifications.DynamicIslandBridge
 import com.example.chat.ui.settings.notifications.DynamicIslandException
 
@@ -39,16 +42,21 @@ class AndroidDynamicIslandBridge(context: Context) : DynamicIslandBridge {
         return enabled.split(':').any { ComponentName.unflattenFromString(it) == expected }
     }
 
-    /** Disable immediately removes the window and clears cached content. */
+    /** Disable immediately stops the island engine and clears cached content. */
     override suspend fun setEnabled(enabled: Boolean) {
         prefs().edit().putBoolean(ChatyIslandPrefs.KEY_ENABLED, enabled).apply()
+        IslandSettings.init(appContext)
         if (!enabled) {
-            IslandOverlay.remove()
+            // Stops the foreground service and hides the accessibility-hosted island.
+            IslandControl.stop(appContext)
             ChatyIslandNativeBridge.deliverNativeEvent(IslandNativeEvent.ClearAll)
-        } else if (hasNotificationAccess()) {
-            android.service.notification.NotificationListenerService.requestRebind(
-                ComponentName(appContext, DynamicIslandNotificationListener::class.java),
-            )
+        } else {
+            IslandControl.start(appContext)
+            if (hasNotificationAccess()) {
+                android.service.notification.NotificationListenerService.requestRebind(
+                    ComponentName(appContext, DynamicIslandNotificationListener::class.java),
+                )
+            }
         }
     }
 
@@ -94,17 +102,22 @@ class AndroidDynamicIslandBridge(context: Context) : DynamicIslandBridge {
         }
     }
 
-    /** Preview uses the same native overlay as incoming notifications. */
+    /** Preview drives the same island engine as incoming notifications. */
     override suspend fun showPreview() {
-        val hasOverlay = Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-            Settings.canDrawOverlays(appContext)
-        if (!hasOverlay) {
-            throw DynamicIslandException("Allow display over other apps first.")
-        }
         if (!prefs().getBoolean(ChatyIslandPrefs.KEY_ENABLED, false)) {
             throw DynamicIslandException("Enable Dynamic Island first.")
         }
-        IslandOverlay.preview(appContext)
+        if (!com.example.chat.island.core.Perms.accessibility(appContext) &&
+            !(Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(appContext))
+        ) {
+            throw DynamicIslandException("Allow the accessibility service or display over other apps first.")
+        }
+        IslandSettings.init(appContext)
+        IslandController.attach(appContext)
+        IslandControl.start(appContext)
+        IslandController.flash(
+            IslandMode.Notification("Chaty", "Dynamic Island preview", "New message - tap the pill to expand"),
+        )
     }
 
     /** MainActivity.kt:262-284 (error "channel_settings_failed"). */

@@ -1,910 +1,490 @@
 package com.example.chat
 
-import android.animation.ValueAnimator
 import android.app.KeyguardManager
 import android.app.Notification
-import android.app.PendingIntent
-import android.app.RemoteInput
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
-import android.content.IntentFilter
-import androidx.core.content.ContextCompat
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapShader
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.ColorFilter
-import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.PixelFormat
-import android.graphics.Rect
-import android.graphics.RectF
-import android.graphics.Shader
-import android.graphics.Typeface
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
+import android.content.IntentFilter
 import android.media.AudioManager
-import android.media.ToneGenerator
+import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Build
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
-import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import android.text.TextUtils
-import android.util.TypedValue
-import android.view.GestureDetector
-import android.view.Gravity
-import android.view.HapticFeedbackConstants
-import android.view.MotionEvent
-import android.view.View
-import android.view.ViewGroup
-import android.view.WindowManager
-import android.view.animation.DecelerateInterpolator
-import android.view.animation.OvershootInterpolator
-import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputMethodManager
-import android.widget.Button
-import android.widget.EditText
-import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.SeekBar
-import android.widget.TextView
-import androidx.core.view.WindowInsetsCompat
+import android.telecom.TelecomManager
+import androidx.core.content.ContextCompat
+import com.example.chat.island.core.IslandSettings
+import com.example.chat.island.core.Trigger
+import com.example.chat.island.engine.IslandController
+import com.example.chat.island.engine.IslandMode
+import com.example.chat.island.engine.LiveKind
+import com.example.chat.island.engine.dominantColor
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 
-/**
- * Camera-cutout aware NotificationListenerService for Chaty Dynamic Island.
- * Manages persistent notification stack aggregation, deduplication, active notifications reconciliation,
- * media sessions, gestures (tap to toggle/expand, vertical scroll, horizontal swipe-to-dismiss),
- * and direct inline replies via RemoteInput.
- */
 class DynamicIslandNotificationListener : NotificationListenerService() {
-    private var screenReceiverRegistered = false
-    private val screenReceiver = object : BroadcastReceiver() {
+    private val lifetime = MainScope()
+    private var bound = false
+    private var receiverReady = false
+    private var mediaManager: MediaSessionManager? = null
+    private var players = emptyList<MediaController>()
+    private val registration get() = ComponentName(this, DynamicIslandNotificationListener::class.java)
+    private val fingerprints = linkedMapOf<String, Int>()
+    private val timerSamples = mutableMapOf<String, Pair<Int, Long>>()
+    private val callKeys = mutableSetOf<String>()
+    private val settings get() = getSharedPreferences("chaty_dynamic_island", MODE_PRIVATE)
+    private val masterChanged = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        refreshPrivacy()
+        reconcile()
+    }
+    private val deviceState = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_SCREEN_OFF) {
-                // Remove before the device sleeps; never retain previously
-                // unlocked notification/media contents across a lock cycle.
-                IslandOverlay.suppressForPrivacy()
-            }
+            refreshPrivacy()
+            if (capture()) reconcile()
         }
+    }
+    private val sessionsChanged = MediaSessionManager.OnActiveSessionsChangedListener { list -> replacePlayers(list.orEmpty()) }
+    private val playerChanged = object : MediaController.Callback() {
+        override fun onMetadataChanged(metadata: MediaMetadata?) { updatePlayer() }
+        override fun onPlaybackStateChanged(state: PlaybackState?) { updatePlayer() }
+        override fun onSessionDestroyed() { refreshPlayers() }
     }
 
     override fun onCreate() {
         super.onCreate()
-        ContextCompat.registerReceiver(
-            this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF),
-            ContextCompat.RECEIVER_NOT_EXPORTED,
-        )
-        screenReceiverRegistered = true
-    }
-
-    private fun isPrivateScreen(): Boolean = IslandOverlay.isScreenPrivate(this)
-
-    private var mediaSessionManager: MediaSessionManager? = null
-    private var activeMediaController: MediaController? = null
-
-    private val mediaCallback = object : MediaController.Callback() {
-        override fun onPlaybackStateChanged(state: PlaybackState?) {
-            syncActiveMedia()
+        IslandSettings.init(applicationContext)
+        IslandController.attach(applicationContext)
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
         }
-
-        override fun onMetadataChanged(metadata: android.media.MediaMetadata?) {
-            syncActiveMedia()
+        ContextCompat.registerReceiver(this, deviceState, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        receiverReady = true
+        settings.registerOnSharedPreferenceChangeListener(masterChanged)
+        refreshPrivacy()
+        lifetime.launch {
+            combine(IslandSettings.triggers, IslandSettings.blockedApps, IslandSettings.enabled) { _, _, _ -> Unit }
+                .collect { reconcile() }
         }
     }
 
-    private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-        updateActiveController(controllers?.firstOrNull())
+    private fun capture(): Boolean = isEnabled(this) && IslandSettings.enabled.value && !isScreenPrivate(this)
+
+    private fun refreshPrivacy() {
+        val suppressed = !capture()
+        IslandController.setPrivacySuppressed(suppressed)
+        if (suppressed) {
+            fingerprints.clear()
+            timerSamples.clear()
+            IslandController.clearAll()
+            IslandController.clearCall()
+            IslandController.clearLive()
+            IslandController.clearDownload()
+            IslandController.dropClockTimerSilently()
+            IslandController.setMedia(null)
+        }
     }
 
     override fun onListenerConnected() {
-        super.onListenerConnected()
-        if (!isEnabled(this)) return
-        try {
-            mediaSessionManager = getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
-            val component = ComponentName(this, DynamicIslandNotificationListener::class.java)
-            mediaSessionManager?.addOnActiveSessionsChangedListener(sessionsListener, component)
-            val controllers = mediaSessionManager?.getActiveSessions(component)
-            updateActiveController(controllers?.firstOrNull())
-        } catch (_: Exception) {}
+        if (bound) disconnectMedia()
+        bound = true
+        mediaManager = getSystemService(MediaSessionManager::class.java)
+        try { mediaManager?.addOnActiveSessionsChangedListener(sessionsChanged, registration) } catch (_: Exception) {}
+        refreshPrivacy()
+        refreshPlayers()
+        reconcile()
+    }
 
-        // Reconcile active notifications on connect
-        try {
-            val active = activeNotifications ?: emptyArray()
-            for (sbn in active) {
-                processStatusBarNotification(sbn, isInitialReconcile = true)
-            }
-        } catch (_: Exception) {}
+    private fun disconnectMedia() {
+        try { mediaManager?.removeOnActiveSessionsChangedListener(sessionsChanged) } catch (_: Exception) {}
+        replacePlayers(emptyList())
     }
 
     override fun onListenerDisconnected() {
-        super.onListenerDisconnected()
-        IslandOverlay.remove()
-        try {
-            mediaSessionManager?.removeOnActiveSessionsChangedListener(sessionsListener)
-            activeMediaController?.unregisterCallback(mediaCallback)
-            activeMediaController = null
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isEnabled(this)) {
-                requestRebind(ComponentName(this, DynamicIslandNotificationListener::class.java))
-            }
-        } catch (_: Exception) {}
+        bound = false
+        disconnectMedia()
+        try { requestRebind(registration) } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
-        if (screenReceiverRegistered) {
-            runCatching { unregisterReceiver(screenReceiver) }
-            screenReceiverRegistered = false
-        }
-        try {
-            mediaSessionManager?.removeOnActiveSessionsChangedListener(sessionsListener)
-            activeMediaController?.unregisterCallback(mediaCallback)
-        } catch (_: Exception) {}
-        IslandOverlay.remove()
+        bound = false
+        disconnectMedia()
+        settings.unregisterOnSharedPreferenceChangeListener(masterChanged)
+        if (receiverReady) try { unregisterReceiver(deviceState) } catch (_: Exception) {}
+        receiverReady = false
+        lifetime.cancel()
         super.onDestroy()
     }
 
-    private fun updateActiveController(controller: MediaController?) {
-        if (activeMediaController?.sessionToken == controller?.sessionToken) return
-        activeMediaController?.unregisterCallback(mediaCallback)
-        activeMediaController = controller
-        activeMediaController?.registerCallback(mediaCallback)
-        syncActiveMedia()
+    private fun refreshPlayers() {
+        val available = try { mediaManager?.getActiveSessions(registration).orEmpty() } catch (_: Exception) { emptyList() }
+        replacePlayers(available)
     }
 
-    private fun syncActiveMedia() {
-        if (!isEnabled(this)) return
-        if (isPrivateScreen()) {
-            IslandOverlay.suppressForPrivacy()
-            return
-        }
-        val controller = activeMediaController ?: run {
-            IslandOverlay.clearMedia()
-            return
-        }
-        val playbackState = controller.playbackState
-        val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING
-        val metadata = controller.metadata
-
-        if (!isPlaying && metadata == null) {
-            IslandOverlay.clearMedia()
-            return
-        }
-
-        val title = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
-            ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
-            ?: "Playing Audio"
-        val artist = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
-            ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
-            ?: controller.packageName
-
-        var art: Bitmap? = metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ALBUM_ART)
-        if (art == null) {
-            art = metadata?.getBitmap(android.media.MediaMetadata.METADATA_KEY_ART)
-        }
-
-        val duration = metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L
-        val position = getRealtimePosition(playbackState)
-
-        IslandOverlay.updateMedia(
-            applicationContext,
-            title = title,
-            artist = artist,
-            art = art,
-            isPlaying = isPlaying,
-            duration = duration,
-            position = position,
-            controller = controller,
-        )
+    private fun replacePlayers(list: List<MediaController>) {
+        players.forEach { try { it.unregisterCallback(playerChanged) } catch (_: Exception) {} }
+        players = list
+        players.forEach { try { it.registerCallback(playerChanged) } catch (_: Exception) {} }
+        updatePlayer()
     }
 
-    override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        if (sbn == null || !isEnabled(this)) return
-        processStatusBarNotification(sbn, isInitialReconcile = false)
+    private fun playing(player: MediaController): Boolean = player.playbackState?.state in
+        setOf(PlaybackState.STATE_PLAYING, PlaybackState.STATE_BUFFERING, PlaybackState.STATE_CONNECTING)
+
+    private fun updatePlayer() {
+        val allowed = players.filter { it.packageName != packageName && it.packageName !in IslandSettings.blockedApps.value }
+        val player = allowed.firstOrNull { playing(it) } ?: allowed.firstOrNull()
+        IslandController.media = player
+        if (!capture() || !IslandSettings.isOn(Trigger.Media)) { IslandController.setMedia(null); return }
+        val metadata = player?.metadata
+        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
+        if (player == null || metadata == null || title.isNullOrBlank()) { IslandController.setMedia(null); return }
+        val artwork = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+        val playback = player.playbackState
+        IslandController.setMedia(IslandMode.Media(title, metadata.getString(MediaMetadata.METADATA_KEY_ARTIST).orEmpty(),
+            playing(player), artwork, artwork?.let { dominantColor(it) },
+            metadata.getLong(MediaMetadata.METADATA_KEY_DURATION).coerceAtLeast(0),
+            (playback?.position ?: 0).coerceAtLeast(0), playback?.lastPositionUpdateTime ?: 0,
+            playback?.playbackSpeed ?: 1f))
     }
 
-    private fun processStatusBarNotification(sbn: StatusBarNotification, isInitialReconcile: Boolean) {
-        if (!isEnabled(this)) return
-        if (isPrivateScreen()) {
-            IslandOverlay.suppressForPrivacy()
-            return
-        }
-        val notification = sbn.notification ?: return
-        if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+    private fun snapshot(): List<StatusBarNotification> = try { activeNotifications?.toList().orEmpty() } catch (_: Exception) { emptyList() }
 
+    private fun reconcile() {
+        if (!bound) return
+        refreshPrivacy()
+        updatePlayer()
+        if (!capture()) return
+        val current = snapshot().filter { it.packageName != packageName }
+        callKeys.retainAll(current.map { it.key }.toSet())
+        if (!IslandSettings.isOn(Trigger.Calls)) IslandController.clearCall()
+        else current.firstOrNull { callNotification(it) }?.let { presentCall(it) } ?: IslandController.clearCall()
+        IslandController.clearLive()
+        IslandController.clearDownload()
+        if (!IslandSettings.isOn(Trigger.Timer)) IslandController.dropClockTimerSilently()
+        current.filter { it.packageName !in IslandSettings.blockedApps.value }.forEach {
+            clockNotification(it) || liveNotification(it) || progressNotification(it)
+        }
+    }
+
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        if (sbn.packageName == packageName || !capture()) return
+        if (callNotification(sbn)) { presentCall(sbn); return }
+        if (sbn.packageName in IslandSettings.blockedApps.value) return
+        if (clockNotification(sbn) || liveNotification(sbn) || progressNotification(sbn)) return
+        presentAlert(sbn)
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        if (callKeys.remove(sbn.key)) IslandController.clearCall(sbn.key)
+        IslandController.clearLive(sbn.key)
+        IslandController.clearDownload(sbn.key)
+        if (capture()) IslandController.clearClockTimer(sbn.key) else IslandController.dropClockTimerSilently(sbn.key)
+        IslandController.notificationRemoved(sbn.key)
+        timerSamples.remove(sbn.key)
+        fingerprints.remove(sbn.key)
+    }
+
+    private fun appName(item: StatusBarNotification): String = try {
+        packageManager.getApplicationLabel(packageManager.getApplicationInfo(item.packageName, 0)).toString()
+    } catch (_: Exception) { item.packageName }
+
+    @Suppress("DEPRECATION")
+    private fun message(notification: Notification): String {
         val extras = notification.extras
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim().orEmpty()
-        val body = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
-            ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()?.trim().orEmpty()
+        val plain = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+        if (!plain.isNullOrBlank()) return plain
+        val history = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        if (history != null) {
+            val last = Notification.MessagingStyle.Message.getMessagesFromBundleArray(history).lastOrNull()?.text?.toString()
+            if (!last.isNullOrBlank()) return last
+        }
+        return extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty()
+    }
+
+    private fun presentAlert(item: StatusBarNotification) {
+        val value = item.notification
+        if (!IslandSettings.isOn(Trigger.Notifications) || value.flags and Notification.FLAG_GROUP_SUMMARY != 0 || value.category == Notification.CATEGORY_TRANSPORT) return
+        val includeQuiet = IslandSettings.isOn(Trigger.Quiet)
+        if (!includeQuiet && (item.isOngoing || value.category in setOf(Notification.CATEGORY_PROGRESS, Notification.CATEGORY_SERVICE))) return
+        val ranking = Ranking()
+        val quiet = currentRanking.getRanking(item.key, ranking) && ranking.importance < NotificationManager.IMPORTANCE_DEFAULT
+        if (quiet && !includeQuiet) return
+        val title = value.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val body = message(value)
         if (title.isBlank() && body.isBlank()) return
-
-        val subMessages: List<String> = runCatching {
-            val charSeqArr = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-            if (charSeqArr != null && charSeqArr.isNotEmpty()) {
-                charSeqArr.mapNotNull { it?.toString()?.trim() }.filter { it.isNotBlank() }
-            } else {
-                emptyList()
-            }
-        }.getOrDefault(emptyList())
-
-        val isCall = notification.category == Notification.CATEGORY_CALL ||
-            notification.category == Notification.CATEGORY_MISSED_CALL ||
-            (notification.flags and Notification.FLAG_ONGOING_EVENT != 0 &&
-                (notification.category == Notification.CATEGORY_CALL ||
-                    title.contains("call", ignoreCase = true)))
-
-        // Strictly filter out non-call ongoing services, background syncs, and silent phantoms (e.g. WhatsApp Web / Checking for messages)
-        if (!isCall) {
-            val isOngoing = (notification.flags and Notification.FLAG_ONGOING_EVENT != 0) ||
-                (notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0) ||
-                (notification.flags and Notification.FLAG_NO_CLEAR != 0)
-            if (isOngoing) return
-
-            @Suppress("DEPRECATION")
-            if (notification.priority < Notification.PRIORITY_DEFAULT) return
-
-            val scanText = "$title $body".lowercase()
-            val isSyncPhantom = scanText.contains("checking for new messages") ||
-                scanText.contains("whatsapp web") ||
-                scanText.contains("backup in progress") ||
-                scanText.contains("backing up") ||
-                scanText.contains("syncing messages") ||
-                scanText.contains("preparing backup") ||
-                scanText.contains("chat backup") ||
-                scanText.contains("running in the background")
-            if (isSyncPhantom) return
-        }
-
-        val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-        val locked = keyguard?.isKeyguardLocked ?: false
-        val safeTitle = if (locked) "New notification" else if (title.isBlank()) appLabel(sbn.packageName) else title
-        val safeBody = if (locked) "Unlock your phone to view details"
-            else if (body.isBlank()) (if (isCall) "Call notification" else "New notification") else body
-        val pendingIntent = notification.contentIntent
-
-        // Resolve real app icon
-        val appIcon = runCatching { packageManager.getApplicationIcon(sbn.packageName) }.getOrNull()
-
-        // Extract actions & RemoteInput reply action with strict deduplication
-        var replyAction: IslandReplyAction? = null
-        val rawActions = notification.actions ?: emptyArray()
-        for (action in rawActions) {
-            val actionIntent = action.actionIntent ?: continue
-            val remoteInputs = action.remoteInputs
-            if (remoteInputs != null && remoteInputs.isNotEmpty() && replyAction == null) {
-                val input = remoteInputs.first()
-                replyAction = IslandReplyAction(
-                    title = action.title?.toString()?.take(24) ?: "Reply",
-                    pendingIntent = actionIntent,
-                    remoteInput = input,
-                )
-                break
-            }
-        }
-
-        // Deduplicate: filter out actions whose title is "Reply" or matches replyAction intent
-        val actions = rawActions.take(4).mapNotNull { action ->
-            val actionIntent = action.actionIntent ?: return@mapNotNull null
-            val actionTitle = action.title?.toString()?.trim() ?: return@mapNotNull null
-            if (actionTitle.equals("reply", ignoreCase = true) || (replyAction != null && actionIntent == replyAction.pendingIntent)) {
-                return@mapNotNull null
-            }
-            IslandAction(actionTitle.take(24), actionIntent)
-        }
-
-        // Preserve the original Android notification. Dismissing it here
-        // races lock/disable checks and the removal callback can erase the
-        // island item too. Reduce banners only through Android channel settings;
-        // the legacy hide preference remains stored, not destructive takeover.
-
-        val notificationKey = sbn.key ?: "${sbn.packageName}:${sbn.id}"
-        Handler(Looper.getMainLooper()).post {
-            if (!isEnabled(this)) return@post
-            // Recheck after queueing: the screen can lock after ingestion.
-            if (isPrivateScreen()) {
-                IslandOverlay.suppressForPrivacy()
-                return@post
-            }
-            IslandOverlay.onNotificationReceived(
-                context = applicationContext,
-                key = notificationKey,
-                packageName = sbn.packageName,
-                title = safeTitle.take(90),
-                body = safeBody.take(180),
-                isCall = isCall,
-                appIcon = appIcon,
-                pendingIntent = pendingIntent,
-                actions = if (locked) emptyList() else actions,
-                replyAction = if (locked) null else replyAction,
-                animateArrival = !isInitialReconcile,
-                subMessages = if (locked) emptyList() else subMessages,
-            )
-            com.example.chat.ui.island.ChatyIslandNativeBridge.deliverNativeEvent(
-                com.example.chat.ui.island.IslandNativeEvent.NotificationPosted(
-                    notificationKey, isCall, safeTitle.take(90), safeBody.take(180),
-                ),
-            )
-        }
+        if (item.isOngoing && fingerprints.containsKey(item.key)) return
+        val signature = listOf(title, body, value.`when`).hashCode()
+        if (fingerprints[item.key] == signature) return
+        fingerprints[item.key] = signature
+        while (fingerprints.size > 256) fingerprints.remove(fingerprints.keys.first())
+        val actions = value.actions.orEmpty()
+        val reply = actions.firstOrNull { action -> action.remoteInputs.orEmpty().any { it.allowFreeFormInput } }
+        val read = actions.firstOrNull { action ->
+            val label = action.title?.toString()?.lowercase().orEmpty()
+            (Build.VERSION.SDK_INT >= 28 && action.semanticAction == Notification.Action.SEMANTIC_ACTION_MARK_AS_READ) || label in setOf("mark as read", "mark read")
+        }?.actionIntent
+        val duration = if (reply != null || read != null) 8000L else if (quiet || item.isOngoing) 3000L else 4500L
+        IslandController.flash(IslandMode.Notification(appName(item), title, body, reply != null, read != null),
+            durationMs = duration, open = value.contentIntent, pkg = item.packageName,
+            reply = reply, markRead = read, key = item.key)
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        if (sbn == null || !isEnabled(this)) return
-        val notificationKey = sbn.key ?: "${sbn.packageName}:${sbn.id}"
-        Handler(Looper.getMainLooper()).post {
-            IslandOverlay.onNotificationRemoved(notificationKey)
-            com.example.chat.ui.island.ChatyIslandNativeBridge.deliverNativeEvent(
-                com.example.chat.ui.island.IslandNativeEvent.NotificationRemoved(notificationKey),
-            )
-        }
+    private fun words(text: CharSequence?): Set<String> = text?.toString()?.lowercase()
+        ?.split(NON_LETTER)?.filter { it.isNotBlank() }?.toSet().orEmpty()
+
+    private fun audioMode(): Int = try { getSystemService(AudioManager::class.java)?.mode ?: AudioManager.MODE_NORMAL } catch (_: Exception) { AudioManager.MODE_NORMAL }
+
+    private fun callNotification(item: StatusBarNotification): Boolean {
+        if (item.packageName == packageName) return false
+        val value = item.notification
+        if (value.category == Notification.CATEGORY_CALL || value.extras.containsKey("android.callType") ||
+            value.extras.getString(Notification.EXTRA_TEMPLATE).orEmpty().contains("CallStyle")) return true
+        val default = try { getSystemService(TelecomManager::class.java)?.defaultDialerPackage } catch (_: Exception) { null }
+        if (item.packageName !in DIALERS && item.packageName != default) return false
+        val action = value.actions.orEmpty().any { words(it.title).intersect(CALL_ACTION_WORDS).isNotEmpty() }
+        return item.isOngoing || value.fullScreenIntent != null || action || audioMode() in setOf(AudioManager.MODE_IN_CALL, AudioManager.MODE_RINGTONE)
     }
 
-    private fun appLabel(pkg: String): String = runCatching {
-        packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-    }.getOrDefault(pkg)
+    private fun presentCall(item: StatusBarNotification) {
+        if (!IslandSettings.isOn(Trigger.Calls)) return
+        callKeys.add(item.key)
+        val value = item.notification
+        fun action(matching: Set<String>) = value.actions.orEmpty().firstOrNull { words(it.title).intersect(matching).isNotEmpty() }?.actionIntent
+        val accept = action(setOf("answer", "accept", "pick"))
+        // Never guess an action by its position. A mislabeled action must not be fired as decline.
+        val reject = action(setOf("decline", "reject", "hang", "hangup", "end", "cut", "disconnect", "dismiss"))
+        val type = value.extras.getInt("android.callType", 0)
+        val counting = value.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false)
+        val incoming = when (type) {
+            1 -> true
+            2 -> false
+            else -> accept != null || (!counting && (value.fullScreenIntent != null || audioMode() == AudioManager.MODE_RINGTONE))
+        }
+        IslandController.setCall(value.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty().ifBlank { "Call" },
+            incoming, accept, reject, key = item.key)
+    }
+
+    private fun clockNotification(item: StatusBarNotification): Boolean {
+        if (item.packageName !in CLOCK_APPS) return false
+        val value = item.notification
+        val extras = value.extras
+        if (extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER, false)) {
+            if (!extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN, false)) return false
+            if (!IslandSettings.isOn(Trigger.Timer)) return true
+            val remaining = value.`when` - System.currentTimeMillis()
+            if (remaining in 1..86_400_000L) IslandController.syncClockTimer(item.key, SystemClock.elapsedRealtime() + remaining)
+            return true
+        }
+        IslandController.pauseClockTimer(item.key)
+        if (!item.isOngoing) return false
+        val text = arrayOf(Notification.EXTRA_TITLE, Notification.EXTRA_TEXT, Notification.EXTRA_SUB_TEXT)
+            .joinToString(" ") { extras.getCharSequence(it)?.toString().orEmpty() }
+        if (text.contains("stopwatch", true) || text.contains("स्टॉपवॉच")) return false
+        val match = TIME_RE.find(text) ?: return false
+        if (!IslandSettings.isOn(Trigger.Timer)) return true
+        val hours = match.groupValues[1].toIntOrNull() ?: 0
+        val minutes = match.groupValues[2].toIntOrNull() ?: return false
+        val seconds = match.groupValues[3].toIntOrNull() ?: return false
+        if (minutes > 59 || seconds > 59) return false
+        val total = hours * 3600 + minutes * 60 + seconds
+        val now = SystemClock.elapsedRealtime()
+        val old = timerSamples[item.key]
+        if (old == null || now - old.second >= 1000) {
+            timerSamples[item.key] = total to now
+            if (old != null && total < old.first && now - old.second < 5000) {
+                IslandController.syncClockTimer(item.key, now + total * 1000L, needsBeat = true)
+            } else if (old != null) IslandController.clearClockTimer(item.key)
+        }
+        return true
+    }
+
+    private fun liveNotification(item: StatusBarNotification): Boolean {
+        if (!item.isOngoing) return false
+        val kind = when (item.packageName) {
+            in NAV_APPS -> LiveKind.Navigation
+            in TRACK_APPS -> LiveKind.Tracking
+            else -> return false
+        }
+        val enabled = if (kind == LiveKind.Navigation) Trigger.Navigation else Trigger.Tracking
+        if (!IslandSettings.isOn(enabled)) return true
+        val extras = item.notification.extras
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val detail = arrayOf(Notification.EXTRA_TEXT, Notification.EXTRA_SUB_TEXT, Notification.EXTRA_BIG_TEXT)
+            .mapNotNull { extras.getCharSequence(it)?.toString()?.trim()?.takeIf { value -> value.isNotEmpty() } }.distinct().joinToString(", ")
+        if (title.isNotBlank() || detail.isNotBlank()) IslandController.setLive(IslandMode.Live(kind, appName(item), title, detail),
+            item.key, item.notification.contentIntent, item.packageName)
+        return true
+    }
+
+    private fun progressNotification(item: StatusBarNotification): Boolean {
+        val value = item.notification
+        val extras = value.extras
+        val maximum = extras.getInt(Notification.EXTRA_PROGRESS_MAX, 0)
+        val unknown = extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false)
+        if (maximum <= 0 && !unknown) { IslandController.clearDownload(item.key); return false }
+        if (value.category == Notification.CATEGORY_TRANSPORT || value.category == Notification.CATEGORY_CALL) return false
+        if (!IslandSettings.isOn(Trigger.Downloads)) return true
+        val percentage = if (unknown || maximum <= 0) -1 else ((extras.getInt(Notification.EXTRA_PROGRESS, 0).toLong() * 100) / maximum).toInt().coerceIn(0, 100)
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val detail = message(value).ifBlank { if (percentage >= 0) "$percentage%" else "" }
+        if (title.isNotBlank() || detail.isNotBlank()) IslandController.setDownload(IslandMode.Live(LiveKind.Download, appName(item), title, detail, percentage),
+            item.key, value.contentIntent, item.packageName)
+        return true
+    }
 
     companion object {
-        fun isEnabled(context: Context): Boolean =
-            context.getSharedPreferences("chaty_dynamic_island", Context.MODE_PRIVATE)
-                .getBoolean("enabled", false)
-
-        fun isHideSystemNotificationsEnabled(context: Context): Boolean =
-            context.getSharedPreferences("chaty_dynamic_island", Context.MODE_PRIVATE)
-                .getBoolean("hide_system_notifications", false)
-
-        fun isHeaderEnabled(context: Context): Boolean =
-            context.getSharedPreferences("chaty_dynamic_island", Context.MODE_PRIVATE)
-                .getBoolean("show_island_header", false)
-
-        fun getRealtimePosition(playbackState: PlaybackState?): Long {
-            if (playbackState == null) return 0L
-            var pos = playbackState.position
-            if (playbackState.state == PlaybackState.STATE_PLAYING) {
-                val lastUpdate = playbackState.lastPositionUpdateTime
-                val now = SystemClock.elapsedRealtime()
-                if (lastUpdate > 0) {
-                    val diff = (now - lastUpdate) * playbackState.playbackSpeed
-                    pos += diff.toLong()
-                }
-            }
-            return pos.coerceAtLeast(0L)
-        }
-
-        fun setHideSystemNotifications(context: Context, hide: Boolean) {
-            context.getSharedPreferences("chaty_dynamic_island", Context.MODE_PRIVATE)
-                .edit().putBoolean("hide_system_notifications", hide).apply()
-        }
-
-        fun setHeaderEnabled(context: Context, enabled: Boolean) {
-            context.getSharedPreferences("chaty_dynamic_island", Context.MODE_PRIVATE)
-                .edit().putBoolean("show_island_header", enabled).apply()
-        }
-
+        private fun prefs(context: Context) = context.getSharedPreferences("chaty_dynamic_island", Context.MODE_PRIVATE)
+        fun isEnabled(context: Context): Boolean = prefs(context).getBoolean("enabled", false)
+        fun isHideSystemNotificationsEnabled(context: Context): Boolean = prefs(context).getBoolean("hide_system_notifications", false)
+        fun isHeaderEnabled(context: Context): Boolean = prefs(context).getBoolean("show_island_header", false)
+        fun setHideSystemNotifications(context: Context, hide: Boolean) { prefs(context).edit().putBoolean("hide_system_notifications", hide).apply() }
+        fun setHeaderEnabled(context: Context, enabled: Boolean) { prefs(context).edit().putBoolean("show_island_header", enabled).apply() }
         fun hasNotificationAccess(context: Context): Boolean {
-            val expected = ComponentName(context, DynamicIslandNotificationListener::class.java)
-            val enabled = Settings.Secure.getString(
-                context.contentResolver,
-                "enabled_notification_listeners",
-            ) ?: return false
-            return enabled.split(':').any { ComponentName.unflattenFromString(it) == expected }
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return false
+            return if (Build.VERSION.SDK_INT >= 27) manager.isNotificationListenerAccessGranted(ComponentName(context, DynamicIslandNotificationListener::class.java))
+            else androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
         }
+        fun isScreenPrivate(context: Context): Boolean {
+            val awake = (context.getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isInteractive
+            val locked = (context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager)?.isKeyguardLocked
+            return awake == false || locked == true
+        }
+        val NON_LETTER = Regex("[^\\p{L}]+")
+        val CALL_ACTION_WORDS = setOf("answer", "accept", "decline", "reject", "hang", "hangup", "end")
+        val TIME_RE = Regex("\\b(?:(\\d{1,2}):)?(\\d{1,2}):(\\d{2})\\b")
+        // Package identifiers are interoperability data, not implementation bodies.
+        val CLOCK_APPS = setOf(
+            "com.google.android.deskclock",
+            "com.android.deskclock",
+            "com.sec.android.app.clockpackage",
+            "com.coloros.alarmclock",
+            "com.oplus.alarmclock",
+            "com.oneplus.deskclock",
+            "com.android.BBKClock",
+            "com.huawei.deskclock",
+            "com.asus.deskclock",
+            "com.motorola.blur.alarmclock",
+            "com.lge.clock",
+            "com.sonyericsson.organizer",
+            "com.nothing.deskclock"
+        )
+        val NAV_APPS = setOf(
+            "com.google.android.apps.maps",
+            "com.waze",
+            "net.osmand",
+            "net.osmand.plus"
+        )
+        val TRACK_APPS = setOf(
+            "com.application.zomato",
+            "in.swiggy.android",
+            "com.grofers.customerapp",
+            "com.zeptoconsumerapp",
+            "com.ubercab",
+            "com.olacabs.customer",
+            "com.rapido.passenger"
+        )
+        val DIALERS = setOf(
+            "com.android.incallui",
+            "com.android.server.telecom",
+            "com.android.phone",
+            "com.android.dialer",
+            "com.android.contacts",
+            "com.android.telephony",
+            "com.google.android.dialer",
+            "com.google.android.apps.dialer",
+            "com.google.android.contacts",
+            "com.android.services.telephony",
+            "com.samsung.android.incallui",
+            "com.samsung.android.dialer",
+            "com.samsung.android.app.telephonyui",
+            "com.samsung.android.contacts",
+            "com.samsung.android.callassistant",
+            "com.samsung.android.phone",
+            "com.miui.voip",
+            "com.xiaomi.phone",
+            "com.miui.contacts",
+            "com.miui.incallui",
+            "com.xiaomi.simactivate.service",
+            "com.oplus.dialer",
+            "com.coloros.dialer",
+            "com.oneplus.dialer",
+            "com.oplus.incallui",
+            "com.coloros.incallui",
+            "com.oneplus.incallui",
+            "com.oplus.telephony",
+            "com.coloros.phone",
+            "com.oneplus.contacts",
+            "com.coloros.contacts",
+            "com.oplus.contacts",
+            "com.vivo.dialer",
+            "com.vivo.incallui",
+            "com.vivo.contacts",
+            "com.vivo.phone",
+            "com.bbk.dialer",
+            "com.bbk.incallui",
+            "com.iqoo.dialer",
+            "com.huawei.contacts",
+            "com.huawei.android.incallui",
+            "com.huawei.phone",
+            "com.hihonor.contacts",
+            "com.hihonor.incallui",
+            "com.hihonor.dialer",
+            "com.motorola.dialer",
+            "com.motorola.incallui",
+            "com.motorola.contacts",
+            "com.lenovo.dialer",
+            "com.lenovo.incallui",
+            "com.nothing.dialer",
+            "com.nothing.incallui",
+            "com.nothing.contacts",
+            "com.asus.contacts",
+            "com.asus.incallui",
+            "com.asus.dialer",
+            "com.sonyericsson.android.dialer",
+            "com.sonymobile.dialer",
+            "com.sonyericsson.android.incallui",
+            "com.lge.incallui",
+            "com.lge.contacts",
+            "com.lge.dialer",
+            "com.htc.contacts",
+            "com.htc.incallui",
+            "com.hmdglobal.incallui",
+            "com.hmdglobal.dialer",
+            "com.nokia.incallui",
+            "com.zte.incallui",
+            "com.zte.dialer",
+            "com.meizu.incallui",
+            "com.meizu.dialer",
+            "com.transsion.incallui",
+            "com.transsion.dialer",
+            "com.transsion.phonedialer",
+            "com.transsion.contacts",
+            "com.itel.dialer",
+            "com.tecno.dialer",
+            "com.infinix.dialer",
+            "com.lava.dialer",
+            "com.micromax.dialer",
+            "com.gionee.dialer",
+            "com.cloudminds.dialer",
+            "com.truecaller",
+            "com.simplemobiletools.dialer",
+            "org.fossify.phone",
+            "com.contacts.phone.dialer",
+            "com.drupe.swd",
+            "com.hiya.stingray",
+            "com.mobile.dialer",
+            "com.dialer.phone"
+        )
     }
 }
-
-
-internal data class IslandAction(val title: String, val pendingIntent: PendingIntent)
-
-internal data class IslandReplyAction(
-    val title: String,
-    val pendingIntent: PendingIntent,
-    val remoteInput: RemoteInput,
-)
-
-internal data class IslandNotificationItem(
-    val key: String,
-    val packageName: String,
-    val title: String,
-    val body: String,
-    val isCall: Boolean,
-    val appIcon: Drawable?,
-    val pendingIntent: PendingIntent?,
-    val actions: List<IslandAction>,
-    val replyAction: IslandReplyAction?,
-    val timestamp: Long = System.currentTimeMillis(),
-    val subMessages: List<String> = emptyList(),
-)
-
-internal data class IslandMediaState(
-    val title: String,
-    val artist: String,
-    val art: Bitmap?,
-    val isPlaying: Boolean,
-    val duration: Long,
-    val position: Long,
-    val controller: MediaController,
-)
-
-/** State machine for the dynamic island overlay */
-internal enum class IslandVisualState {
-    IDLE,
-    COMPACT,
-    EXPANDED,
-    REPLY,
-    MEDIA_EXPANDED,
-    CALL_EXPANDED,
-}
-
-internal enum class ExpandedTabMode {
-    MEDIA,
-    NOTIFICATIONS,
-}
-
-enum class IslandVectorType {
-    PLAY,
-    PAUSE,
-    PREVIOUS,
-    NEXT,
-    PHONE,
-    SPEAKER,
-    BELL,
-    CALL,
-    CALL_END,
-    CLOSE,
-    SEND,
-    MUSIC_NOTE,
-    CHEVRON_DOWN,
-    CHEVRON_UP,
-    VOLUME,
-}
-
-/**
- * Pure 144Hz-ready custom vector icon renderer.
- * Eliminates all emojis from the Dynamic Island, rendering bespoke anti-aliased geometry on Canvas.
- */
-class IslandVectorIconView(
-    context: Context,
-    var vectorType: IslandVectorType,
-    var iconColor: Int = Color.WHITE,
-) : View(context) {
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = iconColor
-        style = Paint.Style.FILL
-    }
-    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = iconColor
-        style = Paint.Style.STROKE
-        strokeWidth = 2.0f * resources.displayMetrics.density
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-    private val path = Path()
-
-    fun setColor(color: Int) {
-        iconColor = color
-        fillPaint.color = color
-        strokePaint.color = color
-        invalidate()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        val w = width.toFloat()
-        val h = height.toFloat()
-        if (w <= 0f || h <= 0f) return
-
-        path.reset()
-        when (vectorType) {
-            IslandVectorType.PLAY -> {
-                val left = w * 0.32f
-                val right = w * 0.72f
-                val top = h * 0.22f
-                val bottom = h * 0.78f
-                path.moveTo(left, top)
-                path.lineTo(right, h * 0.5f)
-                path.lineTo(left, bottom)
-                path.close()
-                canvas.drawPath(path, fillPaint)
-            }
-            IslandVectorType.PAUSE -> {
-                val barW = w * 0.16f
-                val barH = h * 0.52f
-                val top = (h - barH) / 2f
-                val bottom = top + barH
-                val radius = barW / 2f
-
-                val left1 = w * 0.28f
-                canvas.drawRoundRect(left1, top, left1 + barW, bottom, radius, radius, fillPaint)
-
-                val left2 = w * 0.56f
-                canvas.drawRoundRect(left2, top, left2 + barW, bottom, radius, radius, fillPaint)
-            }
-            IslandVectorType.PREVIOUS -> {
-                val barW = w * 0.12f
-                val top = h * 0.24f
-                val bottom = h * 0.76f
-                val radius = barW / 2f
-                val leftBar = w * 0.22f
-                canvas.drawRoundRect(leftBar, top, leftBar + barW, bottom, radius, radius, fillPaint)
-
-                path.moveTo(w * 0.78f, top)
-                path.lineTo(w * 0.38f, h * 0.5f)
-                path.lineTo(w * 0.78f, bottom)
-                path.close()
-                canvas.drawPath(path, fillPaint)
-            }
-            IslandVectorType.NEXT -> {
-                val barW = w * 0.12f
-                val top = h * 0.24f
-                val bottom = h * 0.76f
-                val radius = barW / 2f
-
-                path.moveTo(w * 0.22f, top)
-                path.lineTo(w * 0.62f, h * 0.5f)
-                path.lineTo(w * 0.22f, bottom)
-                path.close()
-                canvas.drawPath(path, fillPaint)
-
-                val rightBar = w * 0.66f
-                canvas.drawRoundRect(rightBar, top, rightBar + barW, bottom, radius, radius, fillPaint)
-            }
-            IslandVectorType.PHONE -> {
-                val padX = w * 0.26f
-                val padY = h * 0.16f
-                val cornerR = w * 0.10f
-                canvas.drawRoundRect(padX, padY, w - padX, h - padY, cornerR, cornerR, strokePaint)
-                val lineY = h * 0.25f
-                canvas.drawLine(w * 0.42f, lineY, w * 0.58f, lineY, strokePaint)
-            }
-            IslandVectorType.SPEAKER -> {
-                val left = w * 0.24f
-                val top = h * 0.35f
-                val bottom = h * 0.65f
-                path.moveTo(left, top)
-                path.lineTo(left + w * 0.18f, top)
-                path.lineTo(w * 0.62f, h * 0.20f)
-                path.lineTo(w * 0.62f, h * 0.80f)
-                path.lineTo(left + w * 0.18f, bottom)
-                path.lineTo(left, bottom)
-                path.close()
-                canvas.drawPath(path, fillPaint)
-            }
-            IslandVectorType.BELL -> {
-                val cx = w * 0.5f
-                path.moveTo(cx - w * 0.26f, h * 0.68f)
-                path.lineTo(cx + w * 0.26f, h * 0.68f)
-                path.quadTo(cx + w * 0.22f, h * 0.34f, cx, h * 0.20f)
-                path.quadTo(cx - w * 0.22f, h * 0.34f, cx - w * 0.26f, h * 0.68f)
-                canvas.drawPath(path, strokePaint)
-                canvas.drawCircle(cx, h * 0.77f, w * 0.08f, fillPaint)
-            }
-            IslandVectorType.CALL -> {
-                path.moveTo(w * 0.25f, h * 0.40f)
-                path.quadTo(w * 0.50f, h * 0.18f, w * 0.75f, h * 0.40f)
-                path.lineTo(w * 0.68f, h * 0.56f)
-                path.quadTo(w * 0.50f, h * 0.36f, w * 0.32f, h * 0.56f)
-                path.close()
-                canvas.drawPath(path, fillPaint)
-            }
-            IslandVectorType.CALL_END -> {
-                path.moveTo(w * 0.22f, h * 0.56f)
-                path.quadTo(w * 0.50f, h * 0.76f, w * 0.78f, h * 0.56f)
-                path.lineTo(w * 0.70f, h * 0.40f)
-                path.quadTo(w * 0.50f, h * 0.58f, w * 0.30f, h * 0.40f)
-                path.close()
-                canvas.drawPath(path, fillPaint)
-            }
-            IslandVectorType.CLOSE -> {
-                val pad = w * 0.28f
-                canvas.drawLine(pad, pad, w - pad, h - pad, strokePaint)
-                canvas.drawLine(w - pad, pad, pad, h - pad, strokePaint)
-            }
-            IslandVectorType.SEND -> {
-                path.moveTo(w * 0.18f, h * 0.20f)
-                path.lineTo(w * 0.86f, h * 0.50f)
-                path.lineTo(w * 0.18f, h * 0.80f)
-                path.lineTo(w * 0.38f, h * 0.50f)
-                path.close()
-                canvas.drawPath(path, fillPaint)
-            }
-            IslandVectorType.MUSIC_NOTE -> {
-                val headX = w * 0.36f
-                val headY = h * 0.70f
-                val rx = w * 0.16f
-                val ry = h * 0.12f
-                canvas.drawOval(headX - rx, headY - ry, headX + rx, headY + ry, fillPaint)
-                val stemX = headX + rx * 0.75f
-                val stemTop = h * 0.22f
-                canvas.drawLine(stemX, headY, stemX, stemTop, strokePaint)
-                path.moveTo(stemX, stemTop)
-                path.quadTo(stemX + w * 0.22f, stemTop + h * 0.08f, stemX + w * 0.20f, stemTop + h * 0.26f)
-                canvas.drawPath(path, strokePaint)
-            }
-            IslandVectorType.CHEVRON_DOWN -> {
-                path.moveTo(w * 0.22f, h * 0.38f)
-                path.lineTo(w * 0.50f, h * 0.64f)
-                path.lineTo(w * 0.78f, h * 0.38f)
-                canvas.drawPath(path, strokePaint)
-            }
-            IslandVectorType.CHEVRON_UP -> {
-                path.moveTo(w * 0.22f, h * 0.64f)
-                path.lineTo(w * 0.50f, h * 0.38f)
-                path.lineTo(w * 0.78f, h * 0.64f)
-                canvas.drawPath(path, strokePaint)
-            }
-            IslandVectorType.VOLUME -> {
-                val left = w * 0.20f
-                val top = h * 0.35f
-                val bottom = h * 0.65f
-                path.moveTo(left, top)
-                path.lineTo(left + w * 0.18f, top)
-                path.lineTo(w * 0.52f, h * 0.20f)
-                path.lineTo(w * 0.52f, h * 0.80f)
-                path.lineTo(left + w * 0.18f, bottom)
-                path.lineTo(left, bottom)
-                path.close()
-                canvas.drawPath(path, fillPaint)
-                val arcRect1 = RectF(w * 0.45f, h * 0.32f, w * 0.72f, h * 0.68f)
-                canvas.drawArc(arcRect1, -45f, 90f, false, strokePaint)
-                val arcRect2 = RectF(w * 0.55f, h * 0.20f, w * 0.88f, h * 0.80f)
-                canvas.drawArc(arcRect2, -45f, 90f, false, strokePaint)
-            }
-        }
-    }
-}
-
-/**
- * High-performance 12-bar live audio equalizer waveform visualizer.
- * Oscillates with sinusoidal phase offsets at 60fps when playback is active.
- */
-class WaveformVisualizerView(context: Context) : View(context) {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(56, 189, 248) // Electric cyan-blue
-        style = Paint.Style.FILL
-    }
-    private var isPlaying = false
-    private val barCount = 12
-    private val barHeights = FloatArray(barCount) { 0.22f }
-    private var animator: ValueAnimator? = null
-
-    fun setWaveformColor(color: Int) {
-        paint.color = color
-        invalidate()
-    }
-
-    fun setPlaying(playing: Boolean) {
-        if (isPlaying == playing) return
-        isPlaying = playing
-        if (playing) {
-            startAnimation()
-        } else {
-            stopAnimation()
-        }
-    }
-
-    private fun startAnimation() {
-        animator?.cancel()
-        animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 420
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            addUpdateListener { anim ->
-                val fraction = anim.animatedFraction
-                for (i in 0 until barCount) {
-                    val phase = i * 0.55f + fraction * Math.PI.toFloat()
-                    barHeights[i] = (0.18f + 0.78f * Math.abs(Math.sin(phase.toDouble()).toFloat())).coerceIn(0.15f, 1.0f)
-                }
-                invalidate()
-            }
-            start()
-        }
-    }
-
-    private fun stopAnimation() {
-        animator?.cancel()
-        for (i in 0 until barCount) {
-            barHeights[i] = 0.20f
-        }
-        invalidate()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        val w = width.toFloat()
-        val h = height.toFloat()
-        if (w <= 0f || h <= 0f) return
-        val totalSpacing = (barCount - 1) * 3f
-        val barWidth = ((w - totalSpacing) / barCount).coerceAtLeast(2f)
-        val radius = barWidth / 2f
-
-        for (i in 0 until barCount) {
-            val left = i * (barWidth + 3f)
-            val barH = (h * barHeights[i]).coerceAtLeast(radius * 2f)
-            val top = (h - barH) / 2f
-            val right = left + barWidth
-            val bottom = top + barH
-            canvas.drawRoundRect(left, top, right, bottom, radius, radius, paint)
-        }
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        animator?.cancel()
-    }
-}
-
-/**
- * Dynamic Material You / Kombai Wavy Audio Scrubber.
- * Renders an animated sinusoidal wave for the played audio segment, a vertical pill thumb,
- * and a sleek unplayed track. Supports interactive scrub touch drag seeking with haptics.
- */
-class WavyAudioScrubberView(context: Context) : View(context) {
-    private val playedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(56, 189, 248) // Electric cyan-blue
-        style = Paint.Style.STROKE
-        strokeWidth = dp(3.5f)
-        strokeCap = Paint.Cap.ROUND
-    }
-
-    fun setAccentColor(color: Int) {
-        playedPaint.color = color
-        invalidate()
-    }
-
-    private val unplayedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(45, 255, 255, 255)
-        style = Paint.Style.STROKE
-        strokeWidth = dp(3f)
-        strokeCap = Paint.Cap.ROUND
-    }
-
-    private val thumbPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        style = Paint.Style.FILL
-    }
-
-    private val wavePath = Path()
-    private var wavePhase: Float = 0f
-    private var phaseAnimator: ValueAnimator? = null
-
-    var progress: Float = 0f
-        set(value) {
-            field = value.coerceIn(0f, 1f)
-            invalidate()
-        }
-
-    var durationMs: Long = 0L
-    var isPlaying: Boolean = false
-        set(value) {
-            field = value
-            if (value) startWaveAnimation() else stopWaveAnimation()
-        }
-
-    var isDragging: Boolean = false
-        private set
-
-    var onSeekListener: ((Long) -> Unit)? = null
-
-    private fun dp(value: Float): Float =
-        value * resources.displayMetrics.density
-
-    fun setPlayingState(playing: Boolean) {
-        isPlaying = playing
-    }
-
-    private fun startWaveAnimation() {
-        if (phaseAnimator?.isRunning == true) return
-        phaseAnimator?.cancel()
-        phaseAnimator = ValueAnimator.ofFloat(0f, (2 * Math.PI).toFloat()).apply {
-            duration = 1200L
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
-            interpolator = android.view.animation.LinearInterpolator()
-            addUpdateListener { anim ->
-                wavePhase = anim.animatedValue as Float
-                invalidate()
-            }
-            start()
-        }
-    }
-
-    private fun stopWaveAnimation() {
-        phaseAnimator?.cancel()
-        phaseAnimator = null
-        invalidate()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        val w = width.toFloat()
-        val h = height.toFloat()
-        if (w <= 0f || h <= 0f) return
-
-        val centerY = h / 2f
-        val thumbX = (w * progress).coerceIn(0f, w)
-
-        // Draw played segment (sine wave if playing or subtle static wave if paused)
-        wavePath.reset()
-        val amp = dp(3.5f)
-        val wavelength = dp(24f)
-
-        if (thumbX > 0f) {
-            wavePath.moveTo(0f, centerY)
-            var x = 0f
-            val step = dp(2f)
-            while (x <= thumbX) {
-                val y = if (isPlaying) {
-                    centerY + amp * Math.sin((x / wavelength * 2 * Math.PI - wavePhase).toDouble()).toFloat()
-                } else {
-                    centerY + (amp * 0.4f) * Math.sin((x / wavelength * 2 * Math.PI).toDouble()).toFloat()
-                }
-                wavePath.lineTo(x, y)
-                x += step
-            }
-            wavePath.lineTo(thumbX, centerY)
-            canvas.drawPath(wavePath, playedPaint)
-        }
-
-        // Draw unplayed segment (straight track)
-        if (thumbX < w) {
-            canvas.drawLine(thumbX, centerY, w, centerY, unplayedPaint)
-        }
-
-        // Draw Scrubber Thumb: modern vertical pill
-        val thumbHalfW = dp(2.25f)
-        val thumbHalfH = dp(8f)
-        val thumbLeft = (thumbX - thumbHalfW).coerceIn(0f, w - thumbHalfW * 2f)
-        val thumbTop = centerY - thumbHalfH
-        val thumbRight = thumbLeft + thumbHalfW * 2f
-        val thumbBottom = centerY + thumbHalfH
-        canvas.drawRoundRect(thumbLeft, thumbTop, thumbRight, thumbBottom, thumbHalfW, thumbHalfW, thumbPaint)
-    }
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                isDragging = true
-                parent?.requestDisallowInterceptTouchEvent(true)
-                progress = (event.x / width.toFloat()).coerceIn(0f, 1f)
-                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                return true
-            }
-            MotionEvent.ACTION_MOVE -> {
-                if (isDragging) {
-                    progress = (event.x / width.toFloat()).coerceIn(0f, 1f)
-                    return true
-                }
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (isDragging) {
-                    isDragging = false
-                    parent?.requestDisallowInterceptTouchEvent(false)
-                    progress = (event.x / width.toFloat()).coerceIn(0f, 1f)
-                    if (durationMs > 0) {
-                        val targetMs = (progress * durationMs).toLong()
-                        onSeekListener?.invoke(targetMs)
-                    }
-                    performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                    return true
-                }
-            }
-        }
-        return super.onTouchEvent(event)
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        stopWaveAnimation()
-    }
-}
-
