@@ -103,6 +103,46 @@ def shot(name):
     (OUT / (name + '-activities.txt')).write_bytes(adb('shell', 'dumpsys', 'activity', 'activities', check=False))
 
 
+
+def onboarding_action(found):
+    """Only known, source-identified first-login overlays may be dismissed."""
+    if 'Chaty changelog' in found and 'Close' in found:
+        return 'Close'
+    if 'Stay Connected with Chaty' in found and 'Not Now' in found:
+        return 'Not Now'
+    # Compatibility with older first-login builds. Current AppRoot explicitly
+    # does not solicit lock setup; never dismiss an actual locked-app gate.
+    if 'Enable App Lock?' in found and 'Not now' in found:
+        return 'Not now'
+    return None
+
+
+def dismiss_demo_onboarding():
+    end = time.monotonic() + 60
+    dismissals = 0
+    stable_home = 0
+    while time.monotonic() < end:
+        if not adb('shell', 'pidof', PKG, check=False).strip():
+            raise RuntimeError('APP_PROCESS_DIED during onboarding')
+        found = labels(ui())
+        action = onboarding_action(found)
+        if action:
+            stable_home = 0
+            dismissals += 1
+            if dismissals > 8:
+                raise RuntimeError('ONBOARDING_OVERLAY_LOOP: more than eight identified prompts')
+            shot(f'onboarding-{dismissals}')
+            tap(action, 5)
+        elif 'Aisha (sample)' in found:
+            stable_home += 1
+            if stable_home >= 2:
+                return
+        else:
+            stable_home = 0
+        time.sleep(1)
+    raise RuntimeError('ONBOARDING_NOT_FINISHED: expected demo home without known overlays')
+
+
 def assert_chat(expected, name):
     wait('Chat options')
     wait(expected)
@@ -130,20 +170,7 @@ def run(apk):
         tap('Log In', 60)
         reveal_demo_entry()
         tap('Try demo', 15)
-        # Optional first-run sheets can differ by stored defaults.
-        end = time.monotonic() + 45
-        while time.monotonic() < end:
-            root = ui()
-            found = labels(root)
-            if 'Not now' in found:
-                tap('Not now', 2)
-            elif 'Not Now' in found:
-                tap('Not Now', 2)
-            elif 'Aisha (sample)' in found:
-                break
-            else:
-                time.sleep(1)
-        wait('Aisha (sample)')
+        dismiss_demo_onboarding()
         shot('demo-home')
         for i in range(1, 4):
             tap('Aisha (sample)')
