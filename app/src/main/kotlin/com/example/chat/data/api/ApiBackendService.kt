@@ -888,12 +888,14 @@ class ApiBackendService(
         if (refs.isNotEmpty()) runCatching { onAttachmentsGone(refs) }
     }
 
-    @Volatile private var _chatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val chatCoroutineExceptionHandler = kotlinx.coroutines.CoroutineExceptionHandler { _, _ -> }
+
+    @Volatile private var _chatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + chatCoroutineExceptionHandler)
     private val chatScope: CoroutineScope get() = _chatScope
 
     private fun resetSessionCoroutineScope() {
         val prev = _chatScope
-        _chatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        _chatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + chatCoroutineExceptionHandler)
         runCatching { prev.cancel() }
     }
     private val chatLock = Any()
@@ -1009,11 +1011,11 @@ class ApiBackendService(
         withAuthScope(expected) {
             synchronized(chatLock) {
                 if (_conversations.isEmpty() && !cachedConversations.isNullOrEmpty()) {
-                    _conversations.addAll(cachedConversations)
+                    _conversations.addAll(cachedConversations.filter { it.id.isNotBlank() }.distinctBy { it.id })
                     hydratedHeader = true
                 }
                 if (_users.isEmpty() && !cachedUsers.isNullOrEmpty()) {
-                    _users.addAll(cachedUsers)
+                    _users.addAll(cachedUsers.filter { it.id.isNotBlank() }.distinctBy { it.id })
                     hydratedHeader = true
                 }
             }
@@ -1079,8 +1081,13 @@ class ApiBackendService(
             startBackgroundSync()
             cleaned.forEach { roomId ->
                 chatScope.launch {
-                    loadMessagesIfNeeded(roomId)
-                    markConversationRead(roomId)
+                    try {
+                        loadMessagesIfNeeded(roomId)
+                        markConversationRead(roomId)
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
@@ -1535,8 +1542,13 @@ class ApiBackendService(
             realtime.connect()
             startBackgroundSync()
             chatScope.launch {
-                loadMessagesIfNeeded(conversationId)
-                markConversationRead(conversationId)
+                try {
+                    loadMessagesIfNeeded(conversationId)
+                    markConversationRead(conversationId)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                }
             }
         }
     }
@@ -1557,23 +1569,28 @@ class ApiBackendService(
                 while (true) {
                     delay(4000)
                     if (session.token == null || DemoMode.active) break
-                    ensureFreshToken()
-                    if (session.token == null) break
-                    ticks++
-                    callCoordinator.tick()
-                    if (!realtime.isConnected) realtime.connect()
-                    flushOutbox() // messages typed while offline
-                    val targets = buildSet {
-                        activeConversationId?.takeIf { it.isNotEmpty() }?.let { add(it) }
-                        addAll(activeConversationIds)
-                    }
-                    targets.forEach { target ->
-                        if (!realtime.isConnected || target in dirtyRooms || !syncedRooms.containsKey(target)) {
-                            syncActiveRoomMessages(target)
+                    try {
+                        ensureFreshToken()
+                        if (session.token == null) break
+                        ticks++
+                        callCoordinator.tick()
+                        if (!realtime.isConnected) realtime.connect()
+                        flushOutbox() // messages typed while offline
+                        val targets = buildSet {
+                            activeConversationId?.takeIf { it.isNotEmpty() }?.let { add(it) }
+                            addAll(activeConversationIds)
                         }
-                    }
-                    if (!conversationsSyncedFromServer || conversationsDirty || (!realtime.isConnected && ticks % 3 == 0)) {
-                        loadConversationsIfNeeded(force = conversationsDirty)
+                        targets.forEach { target ->
+                            if (!realtime.isConnected || target in dirtyRooms || !syncedRooms.containsKey(target)) {
+                                syncActiveRoomMessages(target)
+                            }
+                        }
+                        if (!conversationsSyncedFromServer || conversationsDirty || (!realtime.isConnected && ticks % 3 == 0)) {
+                            loadConversationsIfNeeded(force = conversationsDirty)
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
                     }
                 }
             } finally {
