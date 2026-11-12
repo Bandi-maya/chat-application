@@ -56,14 +56,39 @@ internal object ApiMessageDeliveryMerge {
      * Merges [remote] messages with any unconfirmed [current] pending messages while
      * preserving monotonic delivery progress for existing message IDs.
      */
+    fun deduplicateById(messages: List<ChatMessage>): List<ChatMessage> {
+        if (messages.size <= 1) return messages
+        val byId = LinkedHashMap<String, ChatMessage>(messages.size)
+        val blankIds = mutableListOf<ChatMessage>()
+        for (m in messages) {
+            if (m.id.isBlank()) {
+                blankIds.add(m)
+            } else {
+                val prev = byId[m.id]
+                byId[m.id] = if (prev == null) m else preserveMonotonicDelivery(prev, m)
+            }
+        }
+        return if (blankIds.isEmpty()) byId.values.toList() else byId.values + blankIds
+    }
+
     fun mergeRemoteMessages(
         current: List<ChatMessage>,
         remote: List<ChatMessage>,
         keepPending: (ChatMessage) -> Boolean,
     ): List<ChatMessage> {
         val existingById = current.associateBy { it.id }
-        val mergedRemote = remote.map { m -> preserveMonotonicDelivery(existingById[m.id], m) }
-        val pending = current.filter(keepPending)
+        val mergedRemote = deduplicateById(
+            remote.map { m -> preserveMonotonicDelivery(existingById[m.id], m) },
+        )
+        val remoteIds = mergedRemote.asSequence()
+            .map { it.id }
+            .filter { it.isNotBlank() }
+            .toHashSet()
+        val pending = deduplicateById(
+            current.filter { m ->
+                keepPending(m) && (m.id.isBlank() || m.id !in remoteIds)
+            },
+        )
         return (mergedRemote + pending).sortedBy { it.createdAt }
     }
 

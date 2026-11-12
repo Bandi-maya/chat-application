@@ -7,6 +7,8 @@ import com.example.chat.domain.models.ConversationType
 import com.example.chat.domain.models.DeliveryState
 import com.example.chat.domain.models.MessageType
 import com.example.chat.domain.models.UserProfile
+import com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy
+import com.example.chat.ui.chats.detail.MediaTimelineRow
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -220,5 +222,50 @@ class ApiMessageDeliveryAndSnapshotTest {
         // Separate account namespace stays completely isolated.
         assertNull(coordinator.readConversations("hash-b"))
         assertNull(coordinator.readMessages("hash-b", "r1"))
+    }
+
+    @Test
+    fun `mergeRemoteMessages deduplicates remote and pending IDs while preserving highest delivery state`() {
+        val t1 = Instant.parse("2026-11-12T10:00:00Z")
+        val t2 = Instant.parse("2026-11-12T10:01:00Z")
+        val pendingDup = message(id = "m1", text = "hi", state = DeliveryState.sending, at = t1)
+        val pendingUnique = message(id = "temp_2", text = "queued", state = DeliveryState.sending, at = t2)
+        val remote = listOf(
+            message(id = "m1", text = "hi", state = DeliveryState.sent, at = t1),
+            message(id = "m1", text = "hi", state = DeliveryState.read, at = t1),
+        )
+
+        val merged = ApiMessageDeliveryMerge.mergeRemoteMessages(
+            current = listOf(pendingDup, pendingUnique),
+            remote = remote,
+            keepPending = { it.deliveryState == DeliveryState.sending || it.id.startsWith("temp_") },
+        )
+
+        assertEquals(listOf("m1", "temp_2"), merged.map { it.id })
+        assertEquals(DeliveryState.read, merged.first().deliveryState)
+    }
+
+    @Test
+    fun `timeline rowKeys disambiguates duplicate and blank message IDs for LazyColumn`() {
+        val t1 = Instant.parse("2026-11-12T10:00:00Z")
+        val rows = listOf(
+            MediaTimelineRow(listOf(message(id = "dup-1#1", at = t1))),
+            MediaTimelineRow(listOf(message(id = "dup-1", at = t1.plusSeconds(1)))),
+            MediaTimelineRow(listOf(message(id = "dup-1", at = t1.plusSeconds(2)))),
+            MediaTimelineRow(listOf(message(id = "", at = t1.plusSeconds(3)))),
+            MediaTimelineRow(listOf(message(id = "", at = t1.plusSeconds(4)))),
+            MediaTimelineRow(listOf(message(id = "row#3", at = t1.plusSeconds(5)))),
+        )
+
+        val keys = ChatTimelinePositionPolicy.rowKeys(rows)
+
+        assertEquals(rows.size, keys.toSet().size)
+        assertTrue(keys.none { it.isBlank() })
+        assertEquals("dup-1#1", keys[0])
+        assertEquals("dup-1", keys[1])
+        assertEquals("dup-1#2", keys[2])
+        assertEquals("row#3", keys[3])
+        assertEquals("row#4", keys[4])
+        assertEquals("row#3#5", keys[5])
     }
 }

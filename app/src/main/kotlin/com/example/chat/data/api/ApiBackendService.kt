@@ -979,17 +979,19 @@ class ApiBackendService(
 
     private fun mergeCachedMessagesIntoRoomLocked(roomId: String, cached: List<ChatMessage>): Boolean {
         if (cached.isEmpty()) return false
+        val dedupedCached = ApiMessageDeliveryMerge.deduplicateById(cached)
         val existing = _messages[roomId]
         if (existing == null || existing.isEmpty()) {
-            _messages[roomId] = cached.toMutableList()
+            _messages[roomId] = dedupedCached.toMutableList()
             return true
         }
         val byId = existing.associateBy { it.id }
-        val merged = cached.map { c ->
+        val merged = dedupedCached.map { c ->
             ApiMessageDeliveryMerge.preserveMonotonicDelivery(byId[c.id], c)
         }
-        val extra = existing.filter { e -> merged.none { it.id == e.id } }
-        val combined = (merged + extra).sortedBy { it.createdAt }
+        val mergedIds = merged.asSequence().map { it.id }.filter { it.isNotBlank() }.toHashSet()
+        val extra = existing.filter { e -> e.id.isBlank() || e.id !in mergedIds }
+        val combined = ApiMessageDeliveryMerge.deduplicateById(merged + extra).sortedBy { it.createdAt }
         if (combined == existing) return false
         _messages[roomId] = combined.toMutableList()
         return true
@@ -1496,9 +1498,15 @@ class ApiBackendService(
                     synchronized(chatLock) {
                         if (query.isNullOrBlank()) {
                             _users.clear()
-                            _users.addAll(fetched)
+                            val seenUserIds = HashSet<String>(fetched.size)
+                            for (u in fetched) {
+                                if (u.id.isNotBlank() && seenUserIds.add(u.id)) {
+                                    _users.add(u)
+                                }
+                            }
                         } else {
                             for (u in fetched) {
+                                if (u.id.isBlank()) continue
                                 val idx = _users.indexOfFirst { it.id == u.id }
                                 if (idx == -1) _users.add(u) else _users[idx] = u
                             }

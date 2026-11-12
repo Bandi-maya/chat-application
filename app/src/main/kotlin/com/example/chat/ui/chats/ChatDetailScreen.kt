@@ -978,6 +978,9 @@ fun ChatDetailScreen(
                     avatarUrl = wallpaperAvatarUrl,
                 )
                 // Compact album geometry stays stable while selecting; effects still use each real message ID.
+                val timelineRowKeys = remember(timelineRows) {
+                    com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.rowKeys(timelineRows)
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().testTag("chat-message-list"),
@@ -985,7 +988,7 @@ fun ChatDetailScreen(
                 ) {
                     itemsIndexed(
                         timelineRows,
-                        key = { _, row -> row.anchor.id },
+                        key = { index, _ -> timelineRowKeys[index] },
                         contentType = { _, row -> if (row.messages.size > 1) "media-album" else row.anchor.type },
                     ) { rowIndex, row ->
                         Column(Modifier.fillMaxWidth()) {
