@@ -66,6 +66,33 @@ def tap(label, timeout=30):
     raise RuntimeError('No tappable bounds: ' + label)
 
 
+
+def reveal_demo_entry(max_swipes=5):
+    """Reveal the current login link, without unbounded scrolling or fallback taps."""
+    wait('Welcome back', 60)
+    for attempt in range(max_swipes + 1):
+        root = ui()
+        if 'Try demo' in labels(root):
+            return
+        if attempt == max_swipes:
+            break
+        scrolls = [n for n in root.iter('node') if n.get('scrollable') == 'true'
+                   and n.get('package') == PKG]
+        if not scrolls:
+            raise RuntimeError('DEMO_ENTRY_NOT_VISIBLE: no app scroll container')
+        bounds = list(map(int, re.findall(r'\d+', scrolls[0].get('bounds', ''))))
+        if len(bounds) != 4 or bounds[3] <= bounds[1] or bounds[2] <= bounds[0]:
+            raise RuntimeError('DEMO_ENTRY_NOT_VISIBLE: invalid scroll bounds')
+        x1, y1, x2, y2 = bounds
+        x = (x1 + x2) // 2
+        height = y2 - y1
+        adb('shell', 'input', 'swipe', str(x), str(y1 + height * 4 // 5),
+            str(x), str(y1 + height // 3), '400')
+        note(f'demo-entry scroll {attempt + 1}/{max_swipes}')
+        time.sleep(1)
+    raise RuntimeError('DEMO_ENTRY_NOT_VISIBLE: Try demo after bounded scroll')
+
+
 def shot(name):
     (OUT / (name + '.png')).write_bytes(adb('exec-out', 'screencap', '-p'))
     try:
@@ -101,7 +128,8 @@ def run(apk):
     try:
         adb('shell', 'am', 'start', '-W', '-n', PKG + '/com.example.chat.MainActivity')
         tap('Log In', 60)
-        tap('Try the demo', 60)
+        reveal_demo_entry()
+        tap('Try demo', 15)
         # Optional first-run sheets can differ by stored defaults.
         end = time.monotonic() + 45
         while time.monotonic() < end:
