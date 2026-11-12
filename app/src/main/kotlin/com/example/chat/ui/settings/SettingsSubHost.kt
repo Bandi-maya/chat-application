@@ -29,6 +29,7 @@ val hostedSettingsDestinations: Set<SettingsDestination> = setOf(
     SettingsDestination.Permissions, SettingsDestination.StorageMedia,
     SettingsDestination.TemplateStudio, SettingsDestination.ThemeEngine,
     SettingsDestination.HomeShortcuts, SettingsDestination.WasteCleaning,
+    SettingsDestination.DynamicIsland,
 )
 
 /**
@@ -332,6 +333,8 @@ fun SettingsSubHost(
                 onOpenHome = { onSwitch(SettingsDestination.HomeScreen) },
             )
         }
+        // Dynamic Island: the full island settings UI.
+        SettingsDestination.DynamicIsland -> com.example.chat.island.ui.DynamicIslandHostScreen(onBack = onBack)
         else -> return false
     }
     return true

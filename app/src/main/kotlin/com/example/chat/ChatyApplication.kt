@@ -17,6 +17,19 @@ class ChatyApplication : Application() {
         super.onCreate()
         UniffiMlsEngine.install()
         ServiceLocator.init(this)
+        // Dynamic Island: restore the island engine when the
+        // user left it on and the required permissions are still granted. The accessibility
+        // service alone survives reboot; this restarts the keep-alive foreground service.
+        try {
+            com.example.chat.island.core.IslandSettings.init(this)
+            if (DynamicIslandNotificationListener.isEnabled(this) &&
+                com.example.chat.island.core.Perms.coreOk(this)
+            ) {
+                com.example.chat.island.core.IslandControl.start(this)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ChatyApplication", "Dynamic Island bootstrap skipped: $e")
+        }
         // Keep the custom-backend WebSocket alive without Firebase. The backend owns one
         // account-scoped socket; the foreground service only preserves process execution.
         // Auth transitions start it for real accounts and stop it immediately on sign-out/demo.

@@ -169,6 +169,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    // Material 3 HCT palette from a seed color, used by the Dynamic Island engine
+    // for its accent-color themes.
+    implementation("com.materialkolor:material-kolor:2.0.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
     // Apache-2.0, same Coil version: scoped animated WebP sticker decoder, no extra network route.
     implementation("io.coil-kt:coil-gif:2.7.0")
