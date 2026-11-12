@@ -72,6 +72,15 @@ class FcmTokenRegistrar(
         }
     }
 
+    /** Retry fetching the platform token only when none has been observed yet
+     *  (e.g. cold boot while offline before Play Services could issue a token). */
+    fun retryIfTokenMissing() {
+        if (com.example.chat.data.demo.DemoMode.active) return
+        if (fcmToken.isNullOrEmpty()) {
+            fetchAndRegisterToken()
+        }
+    }
+
     /** Dart _fetchAndRegisterToken: getToken(); when non-empty remember it and register with the
      *  backends. Failures are logged only. */
     fun fetchAndRegisterToken() {

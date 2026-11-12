@@ -11,12 +11,19 @@ package com.example.chat.notifications
 interface PushWakeHandler {
     fun onSyncNudge()
 
+    /** Bounded-wait variant for FCM worker threads so Android keeps the wake
+     *  lock alive until message sync and notification posting complete. */
+    suspend fun onSyncNudgeAndWait() { onSyncNudge() }
+
     /** Incoming-call ring (calls matrix "REST fallback for ring when socket is
      *  down"): the nudge carries only the call id - a routing handle, not
      *  content. The handler fetches the queued signal over the authenticated
      *  channel and surfaces the full-screen ring. Default no-op keeps fakes
      *  and older handlers honest. */
     fun onIncomingCallNudge(callId: String) { }
+
+    /** Bounded-wait variant for FCM incoming-call worker threads. */
+    suspend fun onIncomingCallNudgeAndWait(callId: String) { onIncomingCallNudge(callId) }
 }
 
 object PushWakeHolder {

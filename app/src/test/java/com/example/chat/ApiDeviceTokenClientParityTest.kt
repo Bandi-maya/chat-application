@@ -159,4 +159,25 @@ class ApiDeviceTokenClientParityTest {
         assertTrue(t.calls.isEmpty())
         assertTrue(logs.single().contains("Failed to get FCM token"))
     }
+
+    @Test
+    fun retryIfTokenMissingFetchesOnceAndNoOpsWhenPresent() {
+        val t = FakeTransport()
+        var fetches = 0
+        val registrar = FcmTokenRegistrar(client(t), tokenFetcher = { ok, _ ->
+            fetches++
+            if (fetches == 1) ok(null) else ok("fcm-recovered")
+        })
+        registrar.retryIfTokenMissing()
+        assertEquals(1, fetches)
+        assertTrue(t.calls.isEmpty())
+
+        registrar.retryIfTokenMissing()
+        assertEquals(2, fetches)
+        assertEquals(1, t.calls.size)
+
+        registrar.retryIfTokenMissing()
+        assertEquals(2, fetches)
+        assertEquals(1, t.calls.size)
+    }
 }

@@ -285,7 +285,8 @@ class ApiBackendService(
     private val scopedCallListeners = java.util.concurrent.CopyOnWriteArrayList<(ApiAccountScope, Map<String, Any?>) -> Unit>()
     /** Push ring nudge: one-shot REST poll of queued call signals while the
      *  socket is down (app may be backgrounded). */
-    fun pollCallSignalsNow() = callCoordinator.pollNow()
+    fun pollCallSignalsNow() { callCoordinator.pollNow() }
+    suspend fun pollCallSignalsAndAwait() { callCoordinator.pollNow()?.join() }
     fun addScopedCallSignalListener(listener: (ApiAccountScope, Map<String, Any?>) -> Unit) = scopedCallListeners.add(listener)
     private val callRequests = CallRequestRegistry()
     private val sendRequests = CallRequestRegistry()
@@ -776,23 +777,62 @@ class ApiBackendService(
 
     /** Content-free push nudge (FCM or any wake transport): the message
      *  itself told us nothing, so do a bounded sync over the authenticated
-     *  channel. Single-flight; safe to call repeatedly. */
-    @Volatile private var pushSyncRunning = false
+     *  channel and emit incoming-message events for notification posting. */
+    private val pushSyncMutex = kotlinx.coroutines.sync.Mutex()
+    private val notifiedPushMessageIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     fun onPushNudge() {
         if (session.token == null || DemoMode.active) return
-        synchronized(this) {
-            if (pushSyncRunning) return
-            pushSyncRunning = true
-        }
-        chatScope.launch(Dispatchers.IO) {
-            try {
-                ensureFreshToken()
-                ensureOutboxLoaded()
-                flushOutbox()
-                conversationsDirty = true
-                loadConversationsIfNeeded(force = true)
-            } finally {
-                pushSyncRunning = false
+        chatScope.launch(Dispatchers.IO) { syncFromPushNudge() }
+    }
+
+    suspend fun syncFromPushNudge() {
+        if (session.token == null || DemoMode.active) return
+        pushSyncMutex.withLock {
+            val expected = authSnapshot()
+            if (expected.token == null || DemoMode.active) return@withLock
+            if (synchronized(chatLock) { _conversations.isEmpty() }) {
+                hydrateLocalStateForScope(expected)
+            }
+            val (conversationsBefore, cachedBeforeByRoom) = synchronized(chatLock) {
+                _conversations.toList() to _messages.mapValues { (_, list) -> list.toList() }
+            }
+            ensureFreshToken()
+            ensureOutboxLoaded()
+            flushOutbox()
+            conversationsDirty = true
+            loadConversationsIfNeeded(force = true)
+            if (authSnapshot() !== expected) return@withLock
+            val (conversationsAfter, dirtySnapshot, syncedSnapshot) = synchronized(chatLock) {
+                Triple(_conversations.toList(), dirtyRooms.toSet(), syncedRooms.keys.toSet())
+            }
+            val targetRooms = ApiPushSyncHelper.selectRoomsToSyncForPush(
+                conversationsBefore = conversationsBefore,
+                conversationsAfter = conversationsAfter,
+                dirtyRoomIds = dirtySnapshot,
+                syncedRoomIds = syncedSnapshot,
+                cachedMessagesByRoom = cachedBeforeByRoom,
+            )
+            val myUserId = expected.userId
+            for (conv in targetRooms) {
+                if (authSnapshot() !== expected) return@withLock
+                hydrateRoomMessagesFromCacheIfNeeded(conv.id)
+                val msgsBefore = synchronized(chatLock) { _messages[conv.id]?.toList().orEmpty() }
+                loadMessages(conv.id)
+                if (authSnapshot() !== expected) return@withLock
+                val msgsAfter = synchronized(chatLock) { _messages[conv.id]?.toList().orEmpty() }
+                val freshIncoming = ApiPushSyncHelper.findNewIncomingMessagesForPush(
+                    myUserId = myUserId,
+                    conversation = conv,
+                    messagesBefore = msgsBefore,
+                    messagesAfter = msgsAfter,
+                    alreadyNotifiedIds = notifiedPushMessageIds,
+                )
+                for (msg in freshIncoming) {
+                    if (notifiedPushMessageIds.add(msg.id)) {
+                        runCatching { onIncomingMessage?.invoke(msg, conv.title, conv.isMuted) }
+                    }
+                }
             }
         }
     }
@@ -802,6 +842,7 @@ class ApiBackendService(
     fun onNetworkRegained() {
         realtime.reconnectNow()
         chatScope.launch { flushOutbox() } // send what was typed while offline
+        try { retryFcmTokenHook?.invoke() } catch (_: Exception) {}
     }
 
     /** Invalidates local media copies for deleted/removed messages. Set by the locator BEFORE initialize(). */
@@ -895,6 +936,7 @@ class ApiBackendService(
         syncedRooms.clear()
         dirtyRooms.clear()
         hydratedRoomSnapshots.clear()
+        notifiedPushMessageIds.clear()
     }
 
     private fun snapshotNamespaceFor(expected: ApiAccountScope): String? {
@@ -2075,6 +2117,7 @@ class ApiBackendService(
      *  lazy locator, which Kotlin object-lazy graphs cannot do re-entrantly;
      *  ServiceLocator wires these hooks instead (same effect, no cycle). */
     var syncFcmTokenHook: (() -> Unit)? = null
+    var retryFcmTokenHook: (() -> Unit)? = null
     var unregisterFcmHook: (() -> Unit)? = null
     /** Optional process-wide ledger for visible message-transfer progress and payload usage. */
     @Volatile var transferMonitor: com.example.chat.data.network.TransferMonitor? = null

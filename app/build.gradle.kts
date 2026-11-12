@@ -41,10 +41,20 @@ fun javaString(value: String): String = "\"" + value.replace("\\", "\\\\").repla
 
 // Defined before android {} so sourceSets can swap the stub when native MLS is skipped.
 val skipMlsNative = providers.gradleProperty("skipMlsNative").orElse("false").map { it == "true" }
+val splitApks = providers.gradleProperty("splitApks").orElse("false").map { it == "true" }
 
 android {
     namespace = "com.example.chat"
     compileSdk = 36
+
+    splits {
+        abi {
+            isEnable = splitApks.get()
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = false
+        }
+    }
 
     defaultConfig {
         applicationId = "com.logybyte.chaty"
@@ -101,6 +111,10 @@ android {
     }
 
     packaging {
+        jniLibs {
+            // Compress native .so libraries inside the APK so split APKs stay under Telegram's 50 MB limit.
+            useLegacyPackaging = true
+        }
         resources {
             // bcprov-jdk18on (Ed25519 device keys) and jspecify both ship this
             // multi-release-jar metadata; keep first, drop duplicates.

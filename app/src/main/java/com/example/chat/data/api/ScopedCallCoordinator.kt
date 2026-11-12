@@ -64,13 +64,19 @@ class ScopedCallCoordinator(
      *  ring when socket is down"): the app may be backgrounded when FCM wakes
      *  it, so this bypasses the foreground gate and the backoff clock. Shares
      *  the same single-flight slot and dedup as the foreground cadence. */
-    fun pollNow() {
+    fun pollNow(): Job? {
         val expected = current()
+        var active: Job? = null
         guarded(expected) {
             val prepared = prepare(expected) ?: return@guarded
             synchronized(stateLock) {
-                if (account !== expected || polling?.isActive == true) return@synchronized
-                polling = scope.launch(start = CoroutineStart.LAZY) {
+                if (account !== expected) return@synchronized
+                val existing = polling
+                if (existing?.isActive == true) {
+                    active = existing
+                    return@synchronized
+                }
+                val job = scope.launch(start = CoroutineStart.LAZY) {
                     val result = prepared.first.poll(prepared.second)
                     guarded(expected) {
                         synchronized(stateLock) {
@@ -82,9 +88,13 @@ class ScopedCallCoordinator(
                             }
                         }
                     }
-                }.also { it.start() }
+                }
+                polling = job
+                active = job
+                job.start()
             }
         }
+        return active
     }
 
     /** Invoke from existing cadence; never creates another loop. */

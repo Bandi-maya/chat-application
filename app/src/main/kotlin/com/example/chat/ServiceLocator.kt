@@ -82,6 +82,18 @@ object ServiceLocator {
         appScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { mediaCache.purgeTransientTemps() } }
         preferencesController // start load + remote reconcile (Dart controller constructor)
         notificationCoordinator.start()
+        // Always wire FcmRegistrarHolder + PushWakeHolder at process init so early
+        // onNewToken / onMessageReceived callbacks never drop before UI launches.
+        fcmRegistrar
+    }
+
+    /** Defensive bootstrap invoked by background FCM entry points before accessing holders. */
+    fun ensurePushReady(context: Context) {
+        if (appContext == null) {
+            init(context.applicationContext)
+        }
+        fcmRegistrar
+        startCallNotifications()
     }
 
     private fun requireContext(): Context =
@@ -204,6 +216,7 @@ object ServiceLocator {
                 }
             }
             service.syncFcmTokenHook = { fcmRegistrar.syncTokenOnLogin() }
+            service.retryFcmTokenHook = { fcmRegistrar.retryIfTokenMissing() }
             service.unregisterFcmHook = { fcmRegistrar.unregisterOnLogout() }
             // Offline demo: fail-closed entry probe; a real GoTrue identity blocks demo mode.
             service.demoGoTruePresentHook = { sessionManager.hasAnySession() }
@@ -284,10 +297,18 @@ object ServiceLocator {
                     apiBackend.onPushNudge()
                 }
 
+                override suspend fun onSyncNudgeAndWait() {
+                    apiBackend.syncFromPushNudge()
+                }
+
                 override fun onIncomingCallNudge(callId: String) {
                     // Fetch the queued offer over the authenticated channel;
                     // the delivered signal surfaces the existing ring UI.
                     apiBackend.pollCallSignalsNow()
+                }
+
+                override suspend fun onIncomingCallNudgeAndWait(callId: String) {
+                    apiBackend.pollCallSignalsAndAwait()
                 }
             }
     }
