@@ -1311,7 +1311,7 @@ class ApiBackendService(
                         synchronized(chatLock) {
                             if (filtered.isNotEmpty()) {
                                 val serverIds = filtered.map { it.id }.toSet()
-                                val pendingConversations = _conversations.filter { it.id !in serverIds && (_pendingSending.containsKey(it.id) || it.draftText.isNotEmpty()) }
+                                val pendingConversations = _conversations.filter { it.id !in serverIds && (_messages[it.id].orEmpty().any { message -> message.deliveryState == DeliveryState.sending || message.id.startsWith("temp_") } || it.draftText.isNotEmpty()) }
                                 _conversations.clear()
                                 _conversations.addAll(filtered)
                                 _conversations.addAll(pendingConversations)
