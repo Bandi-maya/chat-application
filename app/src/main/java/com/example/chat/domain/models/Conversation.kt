@@ -66,10 +66,26 @@ data class Conversation(
 
             val otherUser = json["other_user"] as? Map<*, *>
             val participantIds = mutableListOf<String>()
-            json["created_by_id"]?.let { participantIds.add(it.toString()) }
+            val rawParticipants = json["participant_ids"] as? List<*>
+            if (rawParticipants != null) {
+                for (p in rawParticipants) {
+                    val pid = p?.toString()?.trim()
+                    if (!pid.isNullOrEmpty() && !participantIds.contains(pid)) {
+                        participantIds.add(pid)
+                    }
+                }
+            }
+            json["created_by_id"]?.let {
+                val cid = it.toString().trim()
+                if (cid.isNotEmpty() && !participantIds.contains(cid)) participantIds.add(cid)
+            }
             otherUser?.get("id")?.let {
-                val otherId = it.toString()
-                if (!participantIds.contains(otherId)) participantIds.add(otherId)
+                val otherId = it.toString().trim()
+                if (otherId.isNotEmpty() && !participantIds.contains(otherId)) participantIds.add(otherId)
+            }
+            otherUser?.get("uid")?.let {
+                val otherId = it.toString().trim()
+                if (otherId.isNotEmpty() && !participantIds.contains(otherId)) participantIds.add(otherId)
             }
 
             val rawTitle = json["display_name"]?.toString() ?: json["name"]?.toString() ?: "Chat"

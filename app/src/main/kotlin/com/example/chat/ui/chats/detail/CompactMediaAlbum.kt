@@ -44,8 +44,10 @@ internal fun CompactMediaAlbum(
                                 onDragEnd = { if (kotlin.math.abs(distance) >= 56.dp.toPx()) onReply(message) },
                                 onHorizontalDrag = { change, amount -> change.consume(); distance += amount })
                         }) {
-                        MediaAttachmentPreview(message.attachment!!, remoteImage, resolveUrl, null, false,
-                            message, binding, fixedRatio = if (columns == 1) 2f else 1f)
+                        message.attachment?.let { attachment ->
+                            MediaAttachmentPreview(attachment, remoteImage, resolveUrl, null, false,
+                                message, binding, fixedRatio = if (columns == 1) 2f else 1f)
+                        }
                     }
                 }
             }

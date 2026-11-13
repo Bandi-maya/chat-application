@@ -246,8 +246,18 @@ fun ChatDetailHost(
     ) { throw IllegalStateException("Media identity unavailable") }
 
     val isDirect = live.type == ConversationType.direct
-    val otherId = live.participantIds.firstOrNull { it != myId }
-    val other = api.users.firstOrNull { it.id == otherId }
+    val otherId = live.participantIds.firstOrNull { it != myId } ?: live.participantIds.firstOrNull()
+    val other = api.users.firstOrNull { it.id == otherId } ?: otherId?.let { id ->
+        com.example.chat.domain.models.UserProfile(
+            id = id,
+            displayName = live.title,
+            username = live.title,
+            avatarInitials = live.avatarInitials.takeIf { !it.isNullOrBlank() } ?: "C",
+            avatarColorHex = live.avatarColorHex ?: "0xFF6366F1",
+            about = "",
+            lastSeenAt = java.time.Instant.now(),
+        )
+    }
     val conv = prefs.conversation
     val privacy = prefs.privacy
     fun gbB(k: String, d: Boolean) = prefs.gbBool(k, d)

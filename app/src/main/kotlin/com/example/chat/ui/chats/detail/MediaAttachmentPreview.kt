@@ -84,7 +84,7 @@ internal fun MediaAttachmentPreview(
                 thumbnail = withContext(Dispatchers.IO) {
                     val retriever = MediaMetadataRetriever()
                     try {
-                        val resolved = url!!
+                        val resolved = url ?: return@withContext null
                         if (resolved.startsWith("http")) retriever.setDataSource(resolved, emptyMap())
                         else retriever.setDataSource(context, android.net.Uri.parse(resolved))
                         videoDurationMs = retriever
@@ -148,7 +148,7 @@ internal fun MediaAttachmentPreview(
             }
             video && thumbnail != null -> Image(thumbnail!!.asImageBitmap(), attachment.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             video || (url == null && ownedSource?.consumerModel() == null) -> CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-            !sticker && binding == null && remoteImage != null && remoteImage !== chatyRemoteImage -> remoteImage(url!!, Modifier.fillMaxSize(), attachment.name)
+            !sticker && binding == null && remoteImage != null && remoteImage !== chatyRemoteImage && url != null -> remoteImage(url, Modifier.fillMaxSize(), attachment.name)
             else -> SubcomposeAsyncImage(
                 imageLoader = if (sticker && !motionDisabled) StickerImageLoader.get(context) else coil.Coil.imageLoader(context),
                 model = ImageRequest.Builder(context).data(ownedSource?.consumerModel() ?: url).memoryCachePolicy(coil.request.CachePolicy.DISABLED).diskCachePolicy(coil.request.CachePolicy.DISABLED).crossfade(true).build(),

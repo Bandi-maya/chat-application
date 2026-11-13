@@ -50,8 +50,10 @@ internal fun CompactAlbumPreview(
                                 onDragEnd = { if (kotlin.math.abs(distance) >= 56.dp.toPx()) onReply(message) },
                                 onHorizontalDrag = { change, amount -> change.consume(); distance += amount })
                         }) {
-                        MediaAttachmentPreview(message.attachment!!, remoteImage, resolveUrl, null, false,
-                            message, binding, fixedRatio = if (columns == 1) 2f else 1f)
+                        message.attachment?.let { attachment ->
+                            MediaAttachmentPreview(attachment, remoteImage, resolveUrl, null, false,
+                                message, binding, fixedRatio = if (columns == 1) 2f else 1f)
+                        }
                         if (isCappedTail) {
                             Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0x66000000)),
                                 contentAlignment = androidx.compose.ui.Alignment.TopEnd) {

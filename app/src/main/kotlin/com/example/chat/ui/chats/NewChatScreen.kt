@@ -452,7 +452,7 @@ fun NewChatScreen(
                 }
                 else -> {
                     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
-                        itemsIndexed(results, key = { _, u -> u.id }) { index, user ->
+                        itemsIndexed(results, key = { index, u -> "${u.id}_$index" }) { index, user ->
                             val isSelected = selectedMembers.contains(user.id)
                             Row(
                                 modifier = Modifier

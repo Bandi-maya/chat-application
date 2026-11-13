@@ -1309,9 +1309,16 @@ class ApiBackendService(
                     is ApiChatClient.RoomsResult.Ok -> {
                         val filtered = result.conversations.filter { !it.isTask }
                         synchronized(chatLock) {
-                            _conversations.clear()
-                            _conversations.addAll(filtered)
-                            for (c in filtered) {
+                            if (filtered.isNotEmpty()) {
+                                val serverIds = filtered.map { it.id }.toSet()
+                                val pendingConversations = _conversations.filter { it.id !in serverIds && (_pendingSending.containsKey(it.id) || it.draftText.isNotEmpty()) }
+                                _conversations.clear()
+                                _conversations.addAll(filtered)
+                                _conversations.addAll(pendingConversations)
+                            } else if (_conversations.isEmpty()) {
+                                _conversations.clear()
+                            }
+                            for (c in _conversations) {
                                 val cachedMsgs = _messages[c.id]
                                 val latestCached = cachedMsgs?.lastOrNull()?.createdAt ?: Instant.EPOCH
                                 if (c.unreadCount > 0 ||

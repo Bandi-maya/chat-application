@@ -815,9 +815,9 @@ private fun HomeConversationList(
             count = entries.size,
             key = { index ->
                 when (val entry = entries[index]) {
-                    is HomeEntry.Section -> "section_${entry.label}"
-                    is HomeEntry.Archived -> "archived_entry"
-                    is HomeEntry.Item -> entry.conversation.id
+                    is HomeEntry.Section -> "section_${entry.label}_$index"
+                    is HomeEntry.Archived -> "archived_entry_$index"
+                    is HomeEntry.Item -> "${entry.conversation.id}_$index"
                 }
             },
         ) { index ->

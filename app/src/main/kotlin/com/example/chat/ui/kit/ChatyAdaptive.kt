@@ -70,6 +70,7 @@ fun clampedFontScale(maxScale: Float = 1.3f): Float =
 @Composable
 fun clampedLabelSp(baseSp: Float, maxScale: Float = 1.3f): TextUnit {
     val density = androidx.compose.ui.platform.LocalDensity.current
+    if (density.fontScale <= 0f) return baseSp.sp
     val clamped = density.fontScale.coerceAtMost(maxScale)
     return (baseSp * clamped / density.fontScale).sp
 }

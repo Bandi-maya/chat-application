@@ -708,47 +708,58 @@ fun ChatMessageBubble(
                     } else {
                         when (message.attachment?.type) {
                             "image" -> if (mediaContent != null) Box(Modifier.testTag("message_bubble_media")) { mediaContent() } else {
-                                val attachment = message.attachment!!
-                                val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
-                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
-                                else ImageAttachmentPreview(attachment = attachment, remoteImage = remoteImage, message = message, binding = attachmentBinding, resolveUrl = voiceUrlResolver, onTap = tap)
+                                val attachment = message.attachment
+                                if (attachment != null) {
+                                    val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
+                                    if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
+                                    else ImageAttachmentPreview(attachment = attachment, remoteImage = remoteImage, message = message, binding = attachmentBinding, resolveUrl = voiceUrlResolver, onTap = tap)
+                                }
                             }
                             "video" -> {
-                                val attachment = message.attachment!!
-                                val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
-                                if (attachment.url?.startsWith("chaty://transfer/") == true &&
-                                    message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true
-                                ) {
-                                    P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
-                                } else {
-                                    VideoAttachmentPreview(
+                                val attachment = message.attachment
+                                if (attachment != null) {
+                                    val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
+                                    if (attachment.url?.startsWith("chaty://transfer/") == true &&
+                                        message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true
+                                    ) {
+                                        P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
+                                    } else {
+                                        VideoAttachmentPreview(
+                                            attachment = attachment,
+                                            textColor = Color(textColor),
+                                            accentColor = Color(theme.accentColor),
+                                            remoteImage = remoteImage,
+                                            message = message, binding = attachmentBinding,
+                                            resolveUrl = voiceUrlResolver,
+                                            onTap = tap,
+                                        )
+                                    }
+                                }
+                            }
+                            "audio" -> {
+                                val attachment = message.attachment
+                                if (attachment != null) {
+                                    VoiceNoteCard(
                                         attachment = attachment,
                                         textColor = Color(textColor),
                                         accentColor = Color(theme.accentColor),
-                                        remoteImage = remoteImage,
+                                        playButtonColor = voicePlayButtonColor,
+                                        playingBarColor = voicePlayingBarColor,
+                                        playbackSpeed = voicePlaybackSpeed,
+                                        urlResolver = voiceUrlResolver,
                                         message = message, binding = attachmentBinding,
-                                        resolveUrl = voiceUrlResolver,
-                                        onTap = tap,
+                                        onPlay = onVoicePlay,
+                                        onPlaybackCompleted = if (isViewOnceVoice) onViewOncePlaybackCompleted else null,
                                     )
                                 }
                             }
-                            "audio" -> VoiceNoteCard(
-                                attachment = message.attachment!!,
-                                textColor = Color(textColor),
-                                accentColor = Color(theme.accentColor),
-                                playButtonColor = voicePlayButtonColor,
-                                playingBarColor = voicePlayingBarColor,
-                                playbackSpeed = voicePlaybackSpeed,
-                                urlResolver = voiceUrlResolver,
-                                message = message, binding = attachmentBinding,
-                                onPlay = onVoicePlay,
-                                onPlaybackCompleted = if (isViewOnceVoice) onViewOncePlaybackCompleted else null,
-                            )
                             "document" -> {
-                                val attachment = message.attachment!!
-                                val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
-                                if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
-                                else DocumentPreview(attachment = attachment, textColor = Color(textColor), accentColor = Color(theme.accentColor), onTap = tap)
+                                val attachment = message.attachment
+                                if (attachment != null) {
+                                    val tap: () -> Unit = { val bounds = bubbleRect; if (bounds != null && onMediaTapWithBounds != null) onMediaTapWithBounds(bounds) else onMediaTap?.invoke(); Unit }
+                                    if (attachment.url?.startsWith("chaty://transfer/") == true && message.metadata["p2p_invite_ciphertext"]?.toString()?.isNotBlank() == true) P2pFileInviteCard(attachment, isMe, Color(textColor), Color(theme.accentColor), tap, p2pTransferState)
+                                    else DocumentPreview(attachment = attachment, textColor = Color(textColor), accentColor = Color(theme.accentColor), onTap = tap)
+                                }
                             }
                         }
                         if (message.type == MessageType.location) {

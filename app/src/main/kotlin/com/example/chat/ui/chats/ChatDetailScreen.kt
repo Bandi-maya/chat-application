@@ -988,7 +988,7 @@ fun ChatDetailScreen(
                 ) {
                     itemsIndexed(
                         timelineRows,
-                        key = { index, _ -> timelineRowKeys[index] },
+                        key = { index, row -> timelineRowKeys.getOrNull(index) ?: "row_${row.anchor.id}_$index" },
                         contentType = { _, row -> if (row.messages.size > 1) "media-album" else row.anchor.type },
                     ) { rowIndex, row ->
                         Column(Modifier.fillMaxWidth()) {
@@ -1038,7 +1038,7 @@ fun ChatDetailScreen(
                             } else {
                                 null
                             },
-                            senderCluster = senderClusters[rowIndex],
+                            senderCluster = senderClusters.getOrNull(rowIndex) ?: com.example.chat.ui.chats.detail.SenderClusterPosition.SINGLE,
                             isSenderAdmin = conversation.isGroup &&
                                 conversation.adminIds.contains(message.senderId),
                             makeTextSelectable = convPrefs.makeTextSelectable,
