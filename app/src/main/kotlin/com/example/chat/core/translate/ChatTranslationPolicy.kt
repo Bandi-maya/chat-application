@@ -2,20 +2,24 @@ package com.example.chat.core.translate
 
 /** Online per-message translation following the GTranslate approach the user
  *  approved (same free Google endpoint family the GTranslate widget uses):
- *  client-side GET, no Chaty backend, no Firebase, no key. Fixed language set
- *  matches the Stempark GTranslate widget: en/ar/hi/fr/es.
+ *  client-side GET, no Chaty backend, no Firebase, no key. Bundled target-language catalogue
+ *  follows the free Google translation widget. Search is entirely on-device.
  *  Pure policy + parser: JVM-testable, no Android imports. */
 object ChatTranslationPolicy {
 
-    data class Language(val code: String, val label: String)
+    data class Language(val code: String, val label: String, val nativeLabel: String = label)
 
-    val languages: List<Language> = listOf(
-        Language("en", "English"),
-        Language("ar", "Arabic"),
-        Language("hi", "Hindi"),
-        Language("fr", "French"),
-        Language("es", "Spanish"),
-    )
+    val languages: List<Language> = TranslationLanguages.all
+
+    fun searchLanguages(query: String): List<Language> {
+        val needle = query.trim()
+        if (needle.isEmpty()) return languages
+        return languages.filter {
+            it.label.contains(needle, ignoreCase = true) ||
+                it.nativeLabel.contains(needle, ignoreCase = true) ||
+                it.code.contains(needle, ignoreCase = true)
+        }
+    }
 
     const val DEFAULT_TARGET = "en"
 

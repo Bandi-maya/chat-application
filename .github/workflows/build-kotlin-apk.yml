@@ -14,6 +14,8 @@ jobs:
     name: Build Compressed Release APK and Send to Telegram
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -133,13 +135,18 @@ jobs:
           echo "size_mb=$APK_SIZE_MB" >> "$GITHUB_OUTPUT"
           echo "Selected compressed APK: $DEST (${APK_SIZE_MB} MB / ${APK_SIZE} bytes)"
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: chaty-kotlin-apk
-          path: ${{ steps.apk.outputs.path }}
-          if-no-files-found: error
-          retention-days: 7
+      - name: Preserve APK in a draft release (no Actions artifact quota)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK_PATH: ${{ steps.apk.outputs.path }}
+        run: |
+          set -euo pipefail
+          TAG="ci-verified-candidate-${GITHUB_RUN_ID}"
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" \
+            --title "Chaty candidate ${GITHUB_SHA::7} (verification pending)" \
+            --notes "Unpublished candidate. Runtime verification is recorded in the workflow run; do not treat build success as crash verification."
+          gh release upload "$TAG" "$APK_PATH"
+          gh release view "$TAG" --json url --jq .url | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Send APK to Telegram
         env:
@@ -176,7 +183,7 @@ jobs:
               UPLOAD_PATH="$ZIP_PATH"
               CAPTION="📱 Chaty | Compressed APK ZIP (${ZIP_SIZE_MB} MB, arm64-v8a) | v${APK_VERSION} | Build: ${GITHUB_RUN_NUMBER} | Commit: ${SHORT_SHA} | FCM: ${FCM_STATE}"
             else
-              MSG="Chaty Release APK built (${APK_SIZE_MB} MB, compressed ${ZIP_SIZE_MB} MB — exceeds Telegram 50 MB limit). Download artifact: ${RUN_URL}"
+              MSG="Chaty Release APK built (${APK_SIZE_MB} MB, compressed ${ZIP_SIZE_MB} MB — exceeds Telegram 50 MB limit). APK preserved in draft release for authorized reviewers. Run: ${RUN_URL}"
               curl --fail --silent --show-error --retry 2 \
                 -d "chat_id=${TELEGRAM_CHANNEL_ID}" \
                 --data-urlencode "text=${MSG}" \
@@ -222,7 +229,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 65
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -356,16 +363,23 @@ jobs:
             echo 'Probe did not produce a verdict; setup/build/emulator failure is not a chat-crash diagnosis.' | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload chat-open logs, pixels and recording even on failure
+      - name: Preserve emulator evidence in the same draft release
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: chat-open-emulator-evidence-x86_64
-          path: |
-            chat-open-evidence/
-            emulator-apk/
-          if-no-files-found: warn
-          retention-days: 7
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          FILES=()
+          for DIR in chat-open-evidence emulator-apk; do
+            if [ -d "$DIR" ]; then FILES+=("$DIR"); fi
+          done
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo 'No emulator evidence exists; setup/build failed before capture.' | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          zip -q -r chat-open-emulator-evidence-x86_64.zip "${FILES[@]}"
+          gh release upload "ci-verified-candidate-${GITHUB_RUN_ID}" chat-open-emulator-evidence-x86_64.zip
+          gh release view "ci-verified-candidate-${GITHUB_RUN_ID}" --json url --jq .url | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Clean up emulator-job Firebase config file
         if: always()

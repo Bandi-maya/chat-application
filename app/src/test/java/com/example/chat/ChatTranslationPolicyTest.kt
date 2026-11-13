@@ -8,14 +8,26 @@ import org.junit.Test
 
 class ChatTranslationPolicyTest {
 
-    @Test fun languageSetMatchesApprovedGTranslateScope() {
-        assertEquals(listOf("en", "ar", "hi", "fr", "es"), ChatTranslationPolicy.languages.map { it.code })
+    @Test fun languageSetIncludesWidgetTargetsWithoutDuplicateCodes() {
+        assertEquals(249, ChatTranslationPolicy.languages.size)
+        assertEquals(249, ChatTranslationPolicy.languages.map { it.code }.toSet().size)
+        assertTrue(ChatTranslationPolicy.supported("te"))
+        assertTrue(ChatTranslationPolicy.supported("de"))
     }
 
     @Test fun unknownTargetFallsBackToEnglish() {
-        assertEquals("en", ChatTranslationPolicy.normalizeTarget("de"))
+        assertEquals("en", ChatTranslationPolicy.normalizeTarget("not-a-language"))
         assertEquals("en", ChatTranslationPolicy.normalizeTarget(null))
         assertEquals("hi", ChatTranslationPolicy.normalizeTarget("hi"))
+    }
+
+    @Test fun languageSearchMatchesEnglishNativeNameAndCode() {
+        for (query in listOf("Telugu", "TELUGU", "తెలుగు", " te ")) {
+            assertTrue(ChatTranslationPolicy.searchLanguages(query).any { it.code == "te" })
+        }
+        assertEquals(ChatTranslationPolicy.languages, ChatTranslationPolicy.searchLanguages("  "))
+        assertTrue(ChatTranslationPolicy.searchLanguages("no-such-language-123").isEmpty())
+        assertEquals("te", ChatTranslationPolicy.normalizeTarget("te"))
     }
 
     @Test fun endpointEncodesTextAndTarget() {
@@ -26,7 +38,7 @@ class ChatTranslationPolicyTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun endpointRejectsUnsupportedTarget() {
-        ChatTranslationPolicy.endpoint("hello", "de")
+        ChatTranslationPolicy.endpoint("hello", "not-a-language")
     }
 
     @Test(expected = IllegalArgumentException::class)

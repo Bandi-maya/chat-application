@@ -10,7 +10,9 @@ class TranslatorLanguageStore(context: Context) {
         .getSharedPreferences("chaty_translate", Context.MODE_PRIVATE)
 
     fun target(): String =
-        ChatTranslationPolicy.normalizeTarget(prefs.getString(KEY_TARGET, null))
+        ChatTranslationPolicy.normalizeTarget(
+            try { prefs.getString(KEY_TARGET, null) } catch (_: Exception) { null },
+        )
 
     fun setTarget(code: String) {
         prefs.edit().putString(KEY_TARGET, ChatTranslationPolicy.normalizeTarget(code)).apply()

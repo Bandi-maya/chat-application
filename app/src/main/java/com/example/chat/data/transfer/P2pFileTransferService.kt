@@ -169,7 +169,13 @@ class P2pFileTransferService(
         )
     }
     private val restoringUploads = ConcurrentHashMap.newKeySet<String>()
-    private val factory: PeerConnectionFactory
+    // Opening a chat observes transfer state but must not start native WebRTC.
+    private val factory: PeerConnectionFactory by lazy {
+        PeerConnectionFactory.initialize(
+            PeerConnectionFactory.InitializationOptions.builder(appContext).setEnableInternalTracer(false).createInitializationOptions(),
+        )
+        PeerConnectionFactory.builder().createPeerConnectionFactory()
+    }
     private val sessions = ConcurrentHashMap<String, Session>()
     private val incoming = ConcurrentHashMap<String, Pair<PendingOffer, Map<String, Any?>>>()
     private val incomingCandidates = ConcurrentHashMap<String, MutableList<Pair<String, IceCandidate>>>()
@@ -179,10 +185,6 @@ class P2pFileTransferService(
     val transfers: StateFlow<List<TransferState>> = _transfers.asStateFlow()
 
     init {
-        PeerConnectionFactory.initialize(
-            PeerConnectionFactory.InitializationOptions.builder(appContext).setEnableInternalTracer(false).createInitializationOptions(),
-        )
-        factory = PeerConnectionFactory.builder().createPeerConnectionFactory()
         scope.launch(Dispatchers.IO) { restorePersistedUploadSnapshots() }
     }
 
