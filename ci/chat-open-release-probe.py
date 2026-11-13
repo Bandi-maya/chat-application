@@ -41,13 +41,28 @@ def labels(root):
     return [n.get(k, '') for n in root.iter('node') for k in ('text', 'content-desc')]
 
 
+
+def node_matches(node, label):
+    if label in (node.get('text'), node.get('content-desc')):
+        return True
+    # ConversationRow exposes one merged accessibility node. Only accept the
+    # exact configured title followed by its summary delimiter, never substring.
+    return (label == 'Aisha (sample)' and node.get('package') == PKG
+            and node.get('clickable') == 'true'
+            and node.get('content-desc', '').startswith(label + ', '))
+
+
+def contains_label(root, label):
+    return any(node_matches(n, label) for n in root.iter('node'))
+
+
 def wait(label, timeout=30):
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         if not adb('shell', 'pidof', PKG, check=False).strip():
             raise RuntimeError(f'APP_PROCESS_DIED awaiting {label}')
         root = ui()
-        if label in labels(root):
+        if contains_label(root, label):
             return root
         time.sleep(1)
     raise RuntimeError(f'UI_NOT_REACHED: {label}')
@@ -55,7 +70,7 @@ def wait(label, timeout=30):
 
 def tap(label, timeout=30):
     root = wait(label, timeout)
-    nodes = [n for n in root.iter('node') if label in (n.get('text'), n.get('content-desc'))]
+    nodes = [n for n in root.iter('node') if node_matches(n, label)]
     nodes.sort(key=lambda n: n.get('clickable') != 'true')
     for n in nodes:
         b = list(map(int, re.findall(r'\d+', n.get('bounds', ''))))
@@ -124,7 +139,8 @@ def dismiss_demo_onboarding():
     while time.monotonic() < end:
         if not adb('shell', 'pidof', PKG, check=False).strip():
             raise RuntimeError('APP_PROCESS_DIED during onboarding')
-        found = labels(ui())
+        root = ui()
+        found = labels(root)
         action = onboarding_action(found)
         if action:
             stable_home = 0
@@ -133,7 +149,7 @@ def dismiss_demo_onboarding():
                 raise RuntimeError('ONBOARDING_OVERLAY_LOOP: more than eight identified prompts')
             shot(f'onboarding-{dismissals}')
             tap(action, 5)
-        elif 'Aisha (sample)' in found:
+        elif contains_label(root, 'Aisha (sample)'):
             stable_home += 1
             if stable_home >= 2:
                 return
