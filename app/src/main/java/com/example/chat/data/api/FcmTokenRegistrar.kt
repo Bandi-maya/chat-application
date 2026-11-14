@@ -27,6 +27,7 @@ class FcmTokenRegistrar(
     /** Executor for the network registration after a fetch or sync (the app installs a background thread,
      *  because the hook can be invoked on the main thread; the default runs inline for JVM tests). */
     private val runAsync: (() -> Unit) -> Unit = { block -> block() },
+    private val registerRetainedAccounts: ((String) -> Unit)? = null,
 ) {
     @Volatile
     private var fcmToken: String? = null
@@ -47,7 +48,8 @@ class FcmTokenRegistrar(
         // optional Supabase registry seam) while a demo session is active.
         if (com.example.chat.data.demo.DemoMode.active) return
         try {
-            apiDevices.registerDeviceToken(token, deviceType = platform)
+            val retained = registerRetainedAccounts
+            if (retained != null) retained(token) else apiDevices.registerDeviceToken(token, deviceType = platform)
         } catch (e: Exception) {
             log("[FcmTokenRegistrar] Failed to register token with api-hub: $e")
         }

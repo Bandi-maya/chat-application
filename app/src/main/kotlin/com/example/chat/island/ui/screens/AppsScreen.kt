@@ -355,8 +355,8 @@ private fun loadApps(context: Context, ownPackage: String): List<AppEntry> {
         PackageManager.MATCH_ALL,
     ).mapTo(HashSet()) { it.activityInfo.packageName }
 
-    return pm.getInstalledApplications(PackageManager.MATCH_ALL)
-        .asSequence()
+    return launcherPackages.asSequence()
+        .mapNotNull { packageName -> runCatching { pm.getApplicationInfo(packageName, 0) }.getOrNull() }
         .filter { it.packageName != ownPackage }
         .map { info ->
             AppEntry(

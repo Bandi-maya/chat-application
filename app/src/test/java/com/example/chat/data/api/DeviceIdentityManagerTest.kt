@@ -52,11 +52,31 @@ class DeviceIdentityManagerTest {
     }
 
     @Test
-    fun incompleteStoredIdentityIsRotated() = runTest {
+    fun freshChallengeSignsExactUtf8AndCarriesNoTenant() = runTest {
+        val manager = DeviceIdentityManager(InMemoryStore())
+        val message = "exact challenge \n bytes"
+        val installationId = manager.getOrCreate().deviceId
+        val transport = ApiHttpTransport { _, _, headers, body ->
+            assertTrue(!headers.containsKey("x-tenant-id"))
+            val request = org.json.JSONObject(body!!)
+            assertEquals(installationId, request.getString("installationId"))
+            200 to org.json.JSONObject().put("data", org.json.JSONObject().put("challengeId", "challenge")
+                .put("challengeMessage", message).put("expiresAt", java.time.Instant.now().plusSeconds(60).toString()).put("accountLimit", 2)).toString()
+        }
+        val headers = manager.challengeHeaders("https://example.invalid", "ignored", transport) { true }
+        val verifier = Ed25519Signer()
+        verifier.init(false, Ed25519PublicKeyParameters(Base64.decode(manager.getOrCreate().publicKeyBase64), 0))
+        val bytes = message.toByteArray(Charsets.UTF_8); verifier.update(bytes, 0, bytes.size)
+        assertTrue(verifier.verifySignature(Base64.decode(headers["x-device-proof"])))
+    }
+
+    @Test
+    fun incompleteStoredIdentityIsNotSilentlyRotated() = runTest {
         val store = InMemoryStore()
         val created = DeviceIdentityManager(store).getOrCreate()
         store.data.remove("chaty.device.ed25519.public.v1") // corrupt the pair
-        val rotated = DeviceIdentityManager(store).getOrCreate()
-        assertTrue(rotated.publicKeyBase64.isNotBlank())
+        try { DeviceIdentityManager(store).getOrCreate(); org.junit.Assert.fail("Must not rotate installation identity") }
+        catch (_: IllegalStateException) { }
+        assertEquals(created.deviceId, store.data["chaty.device.id.v1"])
     }
 }

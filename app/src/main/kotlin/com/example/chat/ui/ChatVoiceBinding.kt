@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,11 +93,16 @@ class ChatVoiceBindings(
     val onVoiceHoldStart: () -> Unit,
     val onVoiceMove: (Offset) -> Unit,
     val onVoiceHoldEnd: () -> Unit,
+    /** Invalidates any in-progress or staged recording (e.g. when encryption
+     *  is turned on mid-recording): the session fails its next validation and
+     *  is discarded, never uploaded. */
+    val cancelActiveRecording: () -> Unit = {},
     val overlay: @Composable () -> Unit,
 )
 
 @Composable
-fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping: () -> Unit): ChatVoiceBindings {
+fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping: () -> Unit, secureChannel: () -> Boolean = { false }): ChatVoiceBindings {
+    val secureChannelNow by rememberUpdatedState(secureChannel)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var ui by remember(conversationId) { mutableStateOf(VoiceUiState()) }
@@ -111,6 +117,9 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
             conversationId = conversationId,
             joinSegments = { parts, out -> withContext(Dispatchers.IO) { com.example.chat.ui.chats.detail.AndroidAacJoin.join(parts, out) } },
             validateSession = {
+                // Turning encryption on mid-recording invalidates the session:
+                // the note is discarded, never uploaded plaintext.
+                check(!secureChannelNow()) { "Encryption was turned on while recording; the voice note was discarded." }
                 val started = recordScope.get()
                 if (started != null) check(ServiceLocator.apiBackend.authSnapshot().generation == started.generation) {
                     "Account changed while recording."
@@ -119,42 +128,88 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
             recorder = AndroidPcmVoiceRecorderPort(context.applicationContext),
             staging = AndroidVoiceStagingPort(context.applicationContext),
             uploadAudio = { path, name, seconds ->
-                val file = java.io.File(path)
-                val transferId = ServiceLocator.transferMonitor.begin(
-                    TransferDirection.upload,
-                    TransferKind.audio,
-                    file.length(),
-                    name,
+                // Guard BEFORE any byte leaves the device: a secure chat never
+                // uploads plaintext audio to REST /chat/upload. The AUTHORITATIVE
+                // check is inside tracker.begin: it re-reads the durable flag
+                // (persisted-first repo state, not this possibly-stale UI lambda)
+                // after its dispatch-lock suspension, so a toggle that completed
+                // just before now still refuses the upload, and a toggle that
+                // comes after is blocked while the upload is registered.
+                // The expected identity is the scope captured when RECORDING
+                // started - not a fresh snapshot: an account switch between
+                // requireActive() and here must not upload the old recording
+                // under the new account. Checked before AND after begin's
+                // suspension (generation is the scope-identity discriminator,
+                // same as validateSession and the transition listener).
+                val scopeNow = recordScope.get()
+                    ?: throw IllegalStateException("No recording session; the voice note was not uploaded.")
+                check(ServiceLocator.apiBackend.authSnapshot().generation == scopeNow.generation) {
+                    "Account changed after recording; the voice note was discarded."
+                }
+                val endUpload = com.example.chat.data.messaging.AttachmentUploadTracker.begin(
+                    com.example.chat.data.messaging.ConversationDispatchLocks.accountKey(
+                        scopeNow.userId, scopeNow.tenantId, scopeNow.baseUrl),
+                    conversationId,
                 )
+                // Everything after begin() stays inside the counter cleanup:
+                // a throw from file setup, the transfer ledger or the scope
+                // revalidation still unregisters the upload.
                 try {
-                    val uploaded = ServiceLocator.apiBackend.uploadMedia(file) { sent, total ->
-                        ServiceLocator.transferMonitor.update(transferId, sent, total)
+                    check(ServiceLocator.apiBackend.authSnapshot().generation == scopeNow.generation) {
+                        "Account changed while the upload was starting; nothing was uploaded."
                     }
-                    val mediaUrl = uploaded["url"]?.toString()?.takeIf { it.isNotBlank() }
-                        ?: uploaded["path"]?.toString()?.takeIf { it.isNotBlank() }
-                        ?: throw IllegalStateException("Custom media endpoint returned no media URL.")
-                    ServiceLocator.transferMonitor.update(transferId, file.length(), file.length())
-                    ServiceLocator.transferMonitor.finish(transferId)
-                    MessageAttachment(
-                        id = java.util.UUID.randomUUID().toString(),
-                        type = "audio",
-                        name = name,
-                        size = ChatMediaService.formatBytes(file.length()),
-                        url = mediaUrl,
-                        durationSeconds = seconds,
+                    val file = java.io.File(path)
+                    val transferId = ServiceLocator.transferMonitor.begin(
+                        TransferDirection.upload,
+                        TransferKind.audio,
+                        file.length(),
+                        name,
                     )
-                } catch (error: Throwable) {
-                    ServiceLocator.transferMonitor.finish(transferId, TransferStatus.failed)
-                    throw error
+                    try {
+                        val uploaded = ServiceLocator.apiBackend.uploadMediaForScope(scopeNow, file) { sent, total ->
+                            ServiceLocator.transferMonitor.update(transferId, sent, total)
+                        }
+                        val mediaUrl = uploaded["url"]?.toString()?.takeIf { it.isNotBlank() }
+                            ?: uploaded["path"]?.toString()?.takeIf { it.isNotBlank() }
+                            ?: throw IllegalStateException("Custom media endpoint returned no media URL.")
+                        ServiceLocator.transferMonitor.update(transferId, file.length(), file.length())
+                        ServiceLocator.transferMonitor.finish(transferId)
+                        MessageAttachment(
+                            id = java.util.UUID.randomUUID().toString(),
+                            type = "audio",
+                            name = name,
+                            size = ChatMediaService.formatBytes(file.length()),
+                            url = mediaUrl,
+                            durationSeconds = seconds,
+                        )
+                    } catch (error: Throwable) {
+                        ServiceLocator.transferMonitor.finish(transferId, TransferStatus.failed)
+                        throw error
+                    }
+                } finally {
+                    endUpload()
                 }
             },
             sendAudioMessage = { attachment ->
+                // A secure chat never sends unencrypted voice notes; encrypted
+                // media is Phase 2 and not wired yet. (The recording itself is
+                // blocked earlier, at the hold-to-record entry point.)
+                if (secureChannelNow()) throw IllegalStateException("Voice notes are not sent in an encrypted chat yet; encrypted media is not wired.")
+                // Bind the send to the recording's account: sendMessage's own
+                // default would capture a FRESH scope after requireActive(),
+                // which is exactly the switch window this guard exists for.
+                val started = recordScope.get()
+                    ?: throw IllegalStateException("No recording session; the voice note was not sent.")
+                check(ServiceLocator.apiBackend.authSnapshot().generation == started.generation) {
+                    "Account changed after recording; the voice note was discarded."
+                }
                 ServiceLocator.apiBackend.sendMessage(
                     conversationId,
                     "",
                     MessageType.audio,
                     attachment,
                     extraMetadata = if (voiceViewOnce) mapOf("view_once" to true) else null,
+                    expectedScope = started,
                 )
             },
             recordConfig = {
@@ -212,6 +267,10 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
         if (!granted) Toast.makeText(context, "Microphone permission is required.", Toast.LENGTH_SHORT).show()
     }
     fun begin(locked: Boolean) {
+        if (secureChannelNow()) {
+            Toast.makeText(context, "Voice notes are not sent in an encrypted chat yet; encrypted media is not wired.", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             note.rearm()
             recordScope.set(ServiceLocator.apiBackend.authSnapshot())
@@ -226,6 +285,7 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
         onVoiceHoldStart = { origin = Offset.Zero; begin(false) },
         onVoiceMove = { o -> session.onDrag(o.x, o.y) },
         onVoiceHoldEnd = { session.onRelease() },
+        cancelActiveRecording = { note.invalidate() },
         overlay = {
             if (ui.review != null) {
                 Box(

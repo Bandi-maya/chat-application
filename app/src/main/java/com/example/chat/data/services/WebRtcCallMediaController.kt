@@ -434,21 +434,26 @@ class WebRtcCallMediaController(
     private var remoteAudioEnabled = true
     override val supportsLocalHold: Boolean get() = true
     override fun setRemoteAudioEnabled(enabled: Boolean): Boolean {
-        remoteAudioEnabled = enabled
-        remoteStream?.audioTracks?.forEach { it.setEnabled(enabled) }
+        val tracks = remoteStream?.audioTracks.orEmpty()
+        val previous = remoteAudioEnabled
+        val outcomes = tracks.map { it.setEnabled(enabled) }
+        if (outcomes.any { !it }) {
+            // Do not claim held if any current playout track rejected the change.
+            tracks.forEach { it.setEnabled(previous) }
+            return false
+        }
+        remoteAudioEnabled = enabled // Also applied to tracks that arrive later.
         return true
     }
 
     override fun setAudioEnabled(enabled: Boolean): Boolean {
         val track = localAudioTrack ?: return false
-        track.setEnabled(enabled)
-        return true
+        return track.setEnabled(enabled)
     }
 
     override fun setVideoEnabled(enabled: Boolean): Boolean {
         val track = localVideoTrack ?: return false
-        track.setEnabled(enabled)
-        return true
+        return track.setEnabled(enabled)
     }
 
     // This sender owns its track separately from localStream; ordinary audio is untouched.

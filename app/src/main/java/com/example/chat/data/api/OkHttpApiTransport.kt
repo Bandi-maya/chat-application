@@ -9,8 +9,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /** OkHttp implementation of the ApiAuthClient transport seam. */
-class OkHttpApiTransport : ApiHttpTransport {
+class OkHttpApiTransport(private val allowRedirects: Boolean = true) : ApiHeaderHttpTransport {
     private val client = ChatyOkHttp.shared.newBuilder()
+        .followRedirects(allowRedirects).followSslRedirects(allowRedirects)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
@@ -20,7 +21,9 @@ class OkHttpApiTransport : ApiHttpTransport {
         url: String,
         headers: Map<String, String>,
         body: String?,
-    ): Pair<Int, String> {
+    ): Pair<Int, String> = executeWithHeaders(method, url, headers, body).let { it.code to it.body }
+
+    override fun executeWithHeaders(method: String, url: String, headers: Map<String, String>, body: String?): ApiHeaderResponse {
         // Offline demo: while a demo session is active, or a request carries the
         // synthetic demo token, nothing leaves the device; fail closed before
         // any socket is opened (covers unsigned requests too).
@@ -42,7 +45,7 @@ class OkHttpApiTransport : ApiHttpTransport {
             else -> throw IllegalArgumentException("unsupported method $method")
         }
         client.newCall(builder.build()).execute().use { response ->
-            return response.code to (response.body?.string() ?: "")
+            return ApiHeaderResponse(response.code, response.body?.string() ?: "", response.header("ETag"))
         }
     }
 }

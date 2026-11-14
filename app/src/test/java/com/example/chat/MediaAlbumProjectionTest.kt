@@ -19,8 +19,41 @@ class MediaAlbumProjectionTest {
         assertEquals(input, rows.single().messages)
         assertEquals("One caption", rows.single().anchor.text)
     }
-    @Test fun adjacencyWithoutBatchNeverGroups() {
-        assertEquals(2, mediaTimelineRows(batch().map { it.copy(metadata = emptyMap()) }).size)
+    @Test fun unstampedBackToBackImagesGroupWithOrderedIdentitiesAndAnchorCaption() {
+        val input = batch().map { it.copy(metadata = emptyMap()) }
+        val rows = mediaTimelineRows(input)
+        assertEquals(1, rows.size)
+        assertEquals(input, rows.single().messages)
+        assertEquals("One caption", rows.single().anchor.text)
+    }
+    @Test fun localGroupingStopsAtTextSenderDeliveryStateAndDayBoundaries() {
+        val pair = batch().map { it.copy(metadata = emptyMap()) }
+        val textBetween = listOf(pair[0],
+            ChatMessage("t1", "conversation", "sender", MessageType.text, "hello", createdAt = Instant.EPOCH), pair[1])
+        assertEquals(3, mediaTimelineRows(textBetween).size)
+        assertEquals(2, mediaTimelineRows(listOf(pair[0], pair[1].copy(text = "Second caption"))).size)
+        assertEquals(2, mediaTimelineRows(listOf(pair[0], pair[1].copy(senderId = "other"))).size)
+        assertEquals(2, mediaTimelineRows(listOf(pair[0], pair[1].copy(conversationId = "other"))).size)
+        assertEquals(2, mediaTimelineRows(listOf(pair[0], pair[1].copy(deliveryState = DeliveryState.read))).size)
+        assertEquals(2, mediaTimelineRows(listOf(pair[0], pair[1].copy(createdAt = Instant.EPOCH.plusSeconds(172800)))).size)
+    }
+    @Test fun localGroupingLeavesProtectedAndUnsupportedMessagesSeparate() {
+        val base = batch().map { it.copy(metadata = emptyMap()) }
+        val modified = listOf(base[1].copy(metadata = mapOf("view_once" to true)),
+            base[1].copy(metadata = mapOf("unsupported_envelope_metadata" to true)),
+            base[1].copy(metadata = mapOf("forwarded" to true)),
+            base[1].copy(replyToMessageId = "reply"), base[1].copy(isDeletedForMe = true),
+            base[1].copy(isRevokedBySender = true), base[1].copy(isStarred = true),
+            base[1].copy(reactions = listOf(MessageReaction("x", listOf("peer")))),
+            base[1].copy(deliveryState = DeliveryState.failed))
+        for (second in modified) assertEquals(2, mediaTimelineRows(listOf(base[0], second)).size)
+    }
+    @Test fun localRunNeverMergesWithExplicitAlbumEnvelope() {
+        val stamped = batch()
+        val loose = batch().map { it.copy(metadata = emptyMap()) }
+        assertEquals(2, mediaTimelineRows(stamped + loose.first()).size)
+        assertEquals(2, mediaTimelineRows(listOf(loose.first()) + stamped).size)
+        assertEquals(1, mediaTimelineRows(listOf(loose[0], loose[1], loose[1].copy(id = "m2", attachment = loose[1].attachment!!.copy(id = "a2")))).size)
     }
     @Test fun incompleteWrongOrderDuplicateAndMixedSenderRemainSeparate() {
         val b = batch()

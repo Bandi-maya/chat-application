@@ -81,6 +81,10 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
         .collectAsState()
     androidx.compose.runtime.LaunchedEffect(pendingCallAction, revision) {
         val act = pendingCallAction ?: return@LaunchedEffect
+        if (act.owner == null || ServiceLocator.apiBackend.authSnapshot() !== act.owner) {
+            com.example.chat.notifications.ChatyNotifications.consumeCallAction()
+            return@LaunchedEffect
+        }
         val cs = service.currentSession
         if (cs == null || cs.callId != act.callId) return@LaunchedEffect
         com.example.chat.notifications.ChatyNotifications.consumeCallAction()
@@ -97,7 +101,9 @@ fun GlobalCallHost(isAuthenticated: Boolean) {
     androidx.compose.runtime.SideEffect {
         val islandCtrl = ServiceLocator.dynamicIslandController
         val cs = service.currentSession
-        if (cs != null && cs.isActive && presentation.isInAppIsland) {
+        // isActive excludes incoming by model design, but incoming is still a live
+        // call and must expose the approved Answer/Decline island controls.
+        if (cs != null && !cs.state.isTerminal && presentation.isInAppIsland) {
             islandCtrl.postPayload(
                 com.example.chat.ui.island.DynamicIslandPayload(
                     id = "call_${cs.callId}",

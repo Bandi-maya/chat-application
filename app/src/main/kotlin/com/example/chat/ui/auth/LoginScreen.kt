@@ -77,16 +77,40 @@ fun LoginScreen(
     loadSavedTenant: suspend () -> Pair<String?, Boolean>,
     initialIdentifier: String = "",
     initialWorkspace: String? = null,
+    requestEmailCode: (suspend (email: String, tenant: String?, isDefaultTenant: Boolean) -> com.example.chat.data.api.ApiBackendService.EmailCodeAttempt)? = null,
+    verifyEmailCode: (suspend (com.example.chat.data.api.ApiBackendService.EmailCodeAttempt, String) -> String)? = null,
 ) {
+    // Keep the deployed password route as the default until code-login backend is live.
+    var useEmailCode by remember { mutableStateOf(false) }
+    var identifier by remember(initialIdentifier) { mutableStateOf(initialIdentifier) }
+    var workspace by remember(initialWorkspace) { mutableStateOf(initialWorkspace.orEmpty()) }
+    var useOrganization by remember(initialWorkspace) { mutableStateOf(!initialWorkspace.isNullOrBlank()) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (initialWorkspace == null) {
+            val (saved, usingDefault) = loadSavedTenant()
+            useOrganization = !usingDefault && !saved.isNullOrBlank() &&
+                !saved.equals(com.example.chat.data.api.BackendRoutingPolicy.DEFAULT_TENANT_ID, ignoreCase = true)
+            workspace = if (useOrganization) saved.orEmpty() else ""
+        }
+    }
+    if (useEmailCode && requestEmailCode != null && verifyEmailCode != null) {
+        EmailCodeLoginForm(onBack, onLoggedIn, onRegister, onRegisterOrganization,
+            { workspace.takeIf { useOrganization } to !useOrganization }, identifier,
+            workspace.takeIf { useOrganization }, requestEmailCode, verifyEmailCode, demoLogin,
+            onUsePassword = { email, selectedWorkspace, organization ->
+                identifier = email
+                workspace = selectedWorkspace
+                useOrganization = organization
+                useEmailCode = false
+            })
+        return
+    }
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
 
-    var identifier by remember(initialIdentifier) { mutableStateOf(initialIdentifier) }
     var password by remember { mutableStateOf("") }
-    var workspace by remember(initialWorkspace) { mutableStateOf(initialWorkspace.orEmpty()) }
     var obscurePassword by remember { mutableStateOf(true) }
     var isLoading by remember { mutableStateOf(false) }
-    var useOrganization by remember(initialWorkspace) { mutableStateOf(!initialWorkspace.isNullOrBlank()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var identifierError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
@@ -137,16 +161,6 @@ fun LoginScreen(
                 errorMessage = friendlyLoginError(e)
                 isLoading = false
             }
-        }
-    }
-
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        val (saved, usingDefault) = loadSavedTenant()
-        if (!saved.isNullOrEmpty() && !saved.equals(com.example.chat.data.api.BackendRoutingPolicy.DEFAULT_TENANT_ID, ignoreCase = true)) {
-            workspace = saved
-            useOrganization = true
-        } else {
-            useOrganization = false
         }
     }
 
@@ -316,6 +330,12 @@ fun LoginScreen(
                 }
 
                 AuthPrimaryButton(text = "Log In", theme = theme, onClick = { handleLogin() }, isLoading = isLoading, capsule = true)
+                if (requestEmailCode != null && verifyEmailCode != null) {
+                    TextButton(onClick = { useEmailCode = true }, enabled = !isLoading,
+                        modifier = Modifier.heightIn(min = AuthCapsuleTokens.tapTarget)) {
+                        Text("Use email code instead", color = Color(theme.accentColor))
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -449,5 +469,109 @@ private fun RegisterOrgCard(theme: ThemeConfig, onClick: () -> Unit) {
             color = Color(theme.accentColor),
             modifier = Modifier.size(14.dp),
         )
+    }
+}
+
+
+/** Existing Login route's approved email-code mode. No local success bypass. */
+@Composable
+private fun EmailCodeLoginForm(
+    onBack: () -> Unit, onLoggedIn: (String) -> Unit,
+    onRegister: () -> Unit, onRegisterOrganization: () -> Unit,
+    loadSavedTenant: suspend () -> Pair<String?, Boolean>,
+    initialEmail: String, initialWorkspace: String?,
+    requestCode: suspend (String, String?, Boolean) -> com.example.chat.data.api.ApiBackendService.EmailCodeAttempt,
+    verifyCode: suspend (com.example.chat.data.api.ApiBackendService.EmailCodeAttempt, String) -> String,
+    demoLogin: (suspend () -> String)?,
+    onUsePassword: (String, String, Boolean) -> Unit,
+) {
+    val theme = LocalThemeConfig.current
+    val scope = rememberCoroutineScope()
+    var email by remember { mutableStateOf(initialEmail.takeIf { it.contains('@') }.orEmpty()) }
+    var workspace by remember { mutableStateOf(initialWorkspace.orEmpty()) }
+    var organization by remember { mutableStateOf(!initialWorkspace.isNullOrBlank()) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var attempt by remember { mutableStateOf<com.example.chat.data.api.ApiBackendService.EmailCodeAttempt?>(null) }
+    var signedInUser by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (initialWorkspace == null) {
+            val (saved, usingDefault) = loadSavedTenant()
+            organization = !usingDefault && !saved.isNullOrBlank()
+            workspace = if (organization) saved.orEmpty() else ""
+        }
+    }
+    val active = attempt
+    if (active != null) {
+        androidx.compose.runtime.key(active.challenge.id) {
+            OtpVerificationScreen(
+                email = active.challenge.email, purpose = OtpPurpose.SignIn,
+                onBack = { attempt = null; error = null },
+                verify = { code -> signedInUser = verifyCode(active, code) },
+                resend = {
+                    attempt = requestCode(active.challenge.email,
+                        active.targetTenant.takeUnless { active.isDefaultTenant }, active.isDefaultTenant)
+                    "If an account exists, a new sign-in code has been sent."
+                },
+                onVerified = { signedInUser?.let(onLoggedIn) ?: throw IllegalStateException("Server session was not established.") },
+                deliveryMessage = "If an account exists for this email, a sign-in code has been sent.",
+                initialResendSeconds = active.challenge.resendAfterSeconds,
+            )
+        }
+        return
+    }
+    Scaffold(containerColor = Color(theme.backgroundColor)) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
+            Column(Modifier.widthIn(max = ChatyAdaptiveLogic.AUTH_COLUMN_MAX_DP.dp).fillMaxWidth().padding(24.dp)) {
+                AuthBackButton(onClick = onBack)
+                Spacer(Modifier.height(24.dp))
+                Text("Welcome back", color = Color(theme.primaryTextColor), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Sign in with an email code.", color = Color(theme.secondaryTextColor))
+                Spacer(Modifier.height(24.dp))
+                AuthCapsuleModeSelector(theme, organization) { organization = it; error = null }
+                if (organization) {
+                    Spacer(Modifier.height(18.dp))
+                    AuthTextField(label = "Workspace ID", hintText = "e.g. acme-corp", capsule = true,
+                        theme = theme, value = workspace, onValueChange = { workspace = it })
+                }
+                Spacer(Modifier.height(18.dp))
+                AuthTextField(label = "Email", hintText = "you@example.com", capsule = true,
+                    theme = theme, value = email, onValueChange = { email = it }, keyboardType = KeyboardType.Email)
+                Spacer(Modifier.height(18.dp))
+                error?.let { Text(it, color = Color(theme.dangerColor)); Spacer(Modifier.height(12.dp)) }
+                AuthPrimaryButton(text = "Send code", isLoading = loading, capsule = true, theme = theme, onClick = {
+                    error = ChatyValidators.validateEmail(email)
+                    if (organization && workspace.isBlank()) error = "Enter a workspace ID."
+                    if (error == null && !loading) {
+                        loading = true
+                        val selectedEmail = email.trim()
+                        val selectedWorkspace = workspace.trim().takeIf { organization }
+                        val selectedDefault = !organization
+                        scope.launch {
+                            try { attempt = requestCode(selectedEmail, selectedWorkspace, selectedDefault) }
+                            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                            catch (e: Exception) { error = e.message ?: "Could not request a code." }
+                            finally { loading = false }
+                        }
+                    }
+                })
+                TextButton(onClick = { onUsePassword(email, workspace, organization) }, enabled = !loading,
+                    modifier = Modifier.heightIn(min = AuthCapsuleTokens.tapTarget)) {
+                    Text("Use password instead", color = Color(theme.accentColor))
+                }
+                TextButton(onClick = onRegister, enabled = !loading) { Text("Create account", color = Color(theme.accentColor)) }
+                TextButton(onClick = onRegisterOrganization, enabled = !loading) { Text("Create a workspace", color = Color(theme.secondaryTextColor)) }
+                if (demoLogin != null) {
+                    TextButton(enabled = !loading, onClick = {
+                        loading = true
+                        scope.launch {
+                            try { onLoggedIn(demoLogin()) }
+                            catch (e: Exception) { error = e.message ?: "Demo unavailable." }
+                            finally { loading = false }
+                        }
+                    }) { Text("Offline demo", color = Color(theme.secondaryTextColor)) }
+                }
+            }
+        }
     }
 }

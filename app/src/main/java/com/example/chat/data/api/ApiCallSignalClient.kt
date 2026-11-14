@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
 
 /** Opaque account/config snapshot. Never log this object or its token. */
-class CallSignalScope(val accountId: String, val baseUrl: String, val token: String, val generation: Long)
+class CallSignalScope(val accountId: String, val baseUrl: String, val token: String, val generation: Long, val tenantId: String = "")
 
 /** Inactive until wired by owner. Synchronous IO only; no scheduler, login or network retry.
  * Routes match Flutter api@cac25f1. A successful GET does not prove server dequeue semantics. */
@@ -35,7 +35,8 @@ class ApiCallSignalClient(
     private fun request(scope: CallSignalScope, method: String, path: String, body: String?): Pair<Int, String>? {
         val base = base(scope) ?: return null
         if (!valid(scope)) return null
-        val headers = mapOf("Authorization" to "Bearer ${scope.token}", "Content-Type" to "application/json")
+        val headers = mutableMapOf("Authorization" to "Bearer ${scope.token}", "Content-Type" to "application/json")
+        if (scope.tenantId.isNotBlank()) headers["x-tenant-id"] = scope.tenantId
         val first = transport.execute(method, "$base/$path", headers, body)
         if (!valid(scope)) return null
         return if (first.first == 404) {

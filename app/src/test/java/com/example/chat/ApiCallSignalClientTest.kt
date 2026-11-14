@@ -6,6 +6,18 @@ import org.junit.Test
 
 class ApiCallSignalClientTest {
     private fun scope() = CallSignalScope("me", "https://example.invalid", "fake-token", 1)
+    @Test fun tenantHeaderStaysBoundAcrossVersionedFallback() {
+        val original = CallSignalScope("me", "https://example.invalid", "fake-token", 1, "org-a")
+        var count = 0
+        val client = ApiCallSignalClient({ original }, ApiHttpTransport { _, _, headers, _ ->
+            assertEquals("org-a", headers["x-tenant-id"])
+            assertEquals("Bearer fake-token", headers["Authorization"])
+            count++
+            if (count == 1) 404 to "" else 200 to "{\"data\":[]}"
+        })
+        assertTrue(client.poll() is ApiCallSignalClient.PollResult.Signals)
+        assertEquals(2, count)
+    }
     @Test fun post404RetriesOnlySameHostVersionedPath() {
         val s=scope(); val urls=mutableListOf<String>()
         val client=ApiCallSignalClient({s}, ApiHttpTransport { _,url,_,_ -> urls.add(url); if(urls.size==1) 404 to "" else 202 to "" })

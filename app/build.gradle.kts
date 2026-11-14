@@ -74,6 +74,17 @@ android {
             .orElse("https://play.google.com/store/apps/details?id=com.logybyte.chaty")
             .get()
         buildConfigField("String", "CHATY_PLAY_STORE_URL", "\"" + playStoreUrl.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+        // Tamper guard (patch 26): expected release signing-cert SHA-256 plus
+        // the enforcement switch. Empty hash = signature check skipped; both
+        // default off so local/dev builds are unaffected. The real hash lives
+        // with the keystore owner (CI/vault), never in the repo.
+        val expectedCertSha = providers.gradleProperty("CHATY_CERT_SHA256")
+            .orElse(providers.environmentVariable("CHATY_CERT_SHA256")).orNull.orEmpty()
+        buildConfigField("String", "CHATY_CERT_SHA256", javaString(expectedCertSha))
+        val tamperEnforce = providers.gradleProperty("CHATY_TAMPER_ENFORCE")
+            .orElse(providers.environmentVariable("CHATY_TAMPER_ENFORCE")).orNull
+            ?.equals("true", ignoreCase = true) ?: false
+        buildConfigField("boolean", "CHATY_TAMPER_ENFORCE", tamperEnforce.toString())
     }
 
     signingConfigs {
@@ -114,6 +125,10 @@ android {
         jniLibs {
             // Compress native .so libraries inside the APK so split APKs stay under Telegram's 50 MB limit.
             useLegacyPackaging = true
+            // Android loads the UniFFI shim, which links the Rust OpenMLS API into itself.
+            // Do not ship the independent Flutter/FRB cdylib. Keep libchaty_mls_native.so.
+            // Source + historical arm64 ELF audited; final split APK/runtime validation is still required.
+            excludes += "**/libopenmls_frb.so"
         }
         resources {
             // bcprov-jdk18on (Ed25519 device keys) and jspecify both ship this
@@ -148,6 +163,8 @@ android {
 }
 
 dependencies {
+    // Optional SIM-number chooser; no phone/SMS permission and no ownership assertion.
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
     // Local bundled GeoLibre map: origin-scoped WebMessageListener and assets loader.
     implementation("androidx.webkit:webkit:1.18.0")
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
@@ -187,7 +204,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.6.2")
     implementation("androidx.camera:camera-view:1.6.2")
     implementation("androidx.camera:camera-video:1.6.2")
-    implementation("androidx.camera:camera-effects:1.6.2")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
@@ -205,8 +221,6 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // Required by the uniffi-generated Kotlin bindings (JNA native calls).
     implementation("net.java.dev.jna:jna:5.14.0@aar")
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("io.github.webrtc-sdk:android:150.7871.04")

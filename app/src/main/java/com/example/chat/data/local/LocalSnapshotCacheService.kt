@@ -44,9 +44,20 @@ class LocalSnapshotCacheService(context: Context) : SnapshotCacheStore {
     private val keyMutex = Mutex()
 
     override suspend fun writeJson(userId: String, scope: String, value: Any?) {
-        if (userId.isEmpty() || scope.isEmpty()) return
+        // Snapshots are a cache: a failed write is a cache miss, never app state.
+        runCatching { writeJsonInternal(userId, scope, value) }
+    }
+
+    /** Strict variant for security-critical scopes (secure_channels): a failed
+     *  write throws so the caller can fail closed instead of reporting success. */
+    override suspend fun writeJsonStrict(userId: String, scope: String, value: Any?) {
+        writeJsonInternal(userId, scope, value)
+    }
+
+    private suspend fun writeJsonInternal(userId: String, scope: String, value: Any?) {
+        require(userId.isNotEmpty() && scope.isNotEmpty()) { "userId and scope are required." }
         withContext(Dispatchers.IO) {
-            runCatching {
+            run {
                 val key = loadOrCreateKey()
                 val nonce = randomBytes(12)
                 val payload = JSONObject()
@@ -93,29 +104,37 @@ class LocalSnapshotCacheService(context: Context) : SnapshotCacheStore {
         }
     }
 
-    override suspend fun readJson(userId: String, scope: String): Any? {
+    override suspend fun readJson(userId: String, scope: String): Any? =
+        runCatching { readJsonInternal(userId, scope) }.getOrNull()
+
+    /** Strict variant for security-critical scopes (secure_channels): a
+     *  missing file is null (never written = empty), but a corrupt,
+     *  undecryptable, or malformed entry THROWS so the caller can fail closed
+     *  instead of mistaking corruption for "setting is off". */
+    override suspend fun readJsonStrict(userId: String, scope: String): Any? =
+        readJsonInternal(userId, scope)
+
+    private suspend fun readJsonInternal(userId: String, scope: String): Any? {
         if (userId.isEmpty() || scope.isEmpty()) return null
         return withContext(Dispatchers.IO) {
-            runCatching {
-                val file = fileFor(userId, scope)
-                if (!file.exists()) return@runCatching null
-                val map = JSONObject(file.readText())
-                if (map.optInt("v") != VERSION) return@runCatching null
-                val nonce = unb64(map.optString("n"))
-                val cipherText = unb64(map.optString("c"))
-                val mac = unb64(map.optString("m"))
-                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                cipher.init(
-                    Cipher.DECRYPT_MODE,
-                    SecretKeySpec(loadOrCreateKey(), "AES"),
-                    GCMParameterSpec(GCM_TAG_BITS, nonce),
-                )
-                cipher.updateAAD("$userId:$scope:v$VERSION".toByteArray(Charsets.UTF_8))
-                val clear = cipher.doFinal(cipherText + mac)
-                val body = JSONObject(String(clear, Charsets.UTF_8))
-                if (body.optInt("v") != VERSION) return@runCatching null
-                fromJsonValue(body.get("value"))
-            }.getOrNull()
+            val file = fileFor(userId, scope)
+            if (!file.exists()) return@withContext null
+            val map = JSONObject(file.readText())
+            if (map.optInt("v") != VERSION) throw IllegalStateException("Unsupported snapshot envelope version.")
+            val nonce = unb64(map.optString("n"))
+            val cipherText = unb64(map.optString("c"))
+            val mac = unb64(map.optString("m"))
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                SecretKeySpec(loadOrCreateKey(), "AES"),
+                GCMParameterSpec(GCM_TAG_BITS, nonce),
+            )
+            cipher.updateAAD("$userId:$scope:v$VERSION".toByteArray(Charsets.UTF_8))
+            val clear = cipher.doFinal(cipherText + mac)
+            val body = JSONObject(String(clear, Charsets.UTF_8))
+            if (body.optInt("v") != VERSION) throw IllegalStateException("Unsupported snapshot payload version.")
+            fromJsonValue(body.get("value"))
         }
     }
 

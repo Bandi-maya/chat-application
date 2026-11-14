@@ -3,6 +3,7 @@ package com.example.chat.island.engine
 import com.example.chat.island.ui.components.IslandIcon as Icon
 import com.example.chat.R
 import androidx.compose.ui.res.stringResource
+import android.graphics.Bitmap
 import android.os.BatteryManager
 import android.os.SystemClock
 import androidx.compose.animation.animateContentSize
@@ -14,11 +15,13 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,11 +35,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -55,6 +64,8 @@ import java.text.BreakIterator
 import java.text.DateFormat
 import java.util.Date
 import kotlin.math.abs
+import kotlin.math.floor
+import kotlin.math.sin
 
 private val panelInk = Color(0xFF090B10)
 private val panelText = Color(0xFFF7F8FA)
@@ -75,7 +86,8 @@ private data class Controls(
     val previous: () -> Unit, val play: () -> Unit, val next: () -> Unit, val seek: (Long) -> Unit,
     val answer: () -> Unit, val decline: () -> Unit, val read: () -> Unit, val reply: () -> Unit,
     val send: (String) -> Unit, val cancel: () -> Unit, val openMusic: () -> Unit,
-    val editing: Boolean, val openNotification: () -> Unit, val dismiss: () -> Unit
+    val editing: Boolean, val openNotification: () -> Unit, val dismiss: () -> Unit,
+    val callMute: () -> Unit, val callSpeaker: () -> Unit
 )
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -88,6 +100,7 @@ fun DynamicIslandUi(
     onPlayPause: () -> Unit = {}, onNext: () -> Unit = {}, onSeek: (Long) -> Unit = {},
     onAnswer: () -> Unit = {}, onDecline: () -> Unit = {}, onMarkRead: () -> Unit = {},
     onOpenNotification: () -> Unit = {},
+    onCallMute: () -> Unit = {}, onCallSpeaker: () -> Unit = {},
     onReply: () -> Unit = {}, onSendReply: (String) -> Unit = {}, onCancelReply: () -> Unit = {},
     replying: Boolean = false, onSwipeSide: (Int) -> Unit = {}, appAccent: Color? = null,
     onOpenMedia: () -> Unit = {}, secondary: IslandMode.Media? = null, queued: Int = 0,
@@ -102,7 +115,7 @@ fun DynamicIslandUi(
     val screen = LocalConfiguration.current.screenWidthDp
     val zoom = scale.coerceIn(.3f, 2.5f)
     val controls = Controls(onPrev, onPlayPause, onNext, onSeek, onAnswer, onDecline,
-        onMarkRead, onReply, onSendReply, onCancelReply, onOpenMedia, replying, onOpenNotification, onDismiss)
+        onMarkRead, onReply, onSendReply, onCancelReply, onOpenMedia, replying, onOpenNotification, onDismiss, onCallMute, onCallSpeaker)
     val mini = secondary.takeIf { mode is IslandMode.Timer || mode is IslandMode.Live }
     val accent = appAccent ?: (mode as? IslandMode.Media)?.accent?.let { Color(it) } ?: positive
     val targetWidth = if (expanded) 356f * style.cardW else when (level) {
@@ -125,9 +138,11 @@ fun DynamicIslandUi(
         animationSpec = if (reducedMotion) snap() else spring(dampingRatio = 1f, stiffness = 380f * animSpeed.coerceIn(.5f, 2f)),
         label = "islandCorner",
     )
+    // An expanded media card draws the real session artwork behind the whole card.
+    val backdrop = if (expanded) (mode as? IslandMode.Media)?.art?.takeUnless { it.isRecycled } else null
     CompositionLocalProvider(LocalDensity provides Density(density.density * zoom, density.fontScale * style.text)) {
         IslandTheme {
-            Column(
+            Box(
                 modifier
                     // Place animation before width so both width and height share one surface.
                     .animateContentSize(if (reducedMotion) snap() else spring(dampingRatio = 1f, stiffness = 380f * animSpeed.coerceIn(.5f, 2f)))
@@ -167,9 +182,17 @@ fun DynamicIslandUi(
                             change.consume()
                         }
                     }
-                    .padding(horizontal = if (expanded) 18.dp else 14.dp, vertical = paddingY.coerceAtLeast(4f).dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (backdrop != null) {
+                    Image(backdrop.asImageBitmap(), null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+                    // Scrim keeps text and controls readable over busy artwork.
+                    Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(
+                        panelInk.copy(alpha = .34f), panelInk.copy(alpha = .66f), panelInk.copy(alpha = .9f)))))
+                }
+                Column(
+                    Modifier.padding(horizontal = if (expanded) 18.dp else 14.dp, vertical = paddingY.coerceAtLeast(4f).dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                 if (expanded) ExpandedContent(mode, level == IslandLevel.Large, controls, accent)
                 else SmallContent(mode, level == IslandLevel.Banner, queued, accent)
                 if (expanded && controls.editing) ReplyEditor(controls.send, controls.cancel)
@@ -189,6 +212,7 @@ fun DynamicIslandUi(
                     }
                 }
                 if (expanded && queued > 0) Caption(stringResource(R.string.island_waiting, queued))
+                }
             }
         }
     }
@@ -236,7 +260,7 @@ private fun summary(mode: IslandMode): Pair<String, String> = when (mode) {
     is IslandMode.LowBattery -> stringResource(R.string.island_low_battery) to stringResource(R.string.island_remaining, mode.percent)
     is IslandMode.Device -> mode.name to (if (mode.headphones) stringResource(R.string.island_headphones_connected) else stringResource(R.string.island_device_connected))
     is IslandMode.Toggle -> toggleName(mode.kind) to (if (mode.on) stringResource(R.string.island_on) else stringResource(R.string.island_off))
-    is IslandMode.Call -> mode.name to (if (mode.incoming) stringResource(R.string.island_incoming_call) else stringResource(R.string.island_call_active))
+    is IslandMode.Call -> mode.name to (if (mode.incoming) stringResource(R.string.island_incoming_call) else if (mode.since > 0L) stringResource(R.string.island_call_active) else "Calling")
     is IslandMode.Timer -> timeLabel(mode.remainingSec.toLong()) to stringResource(R.string.island_timer)
     is IslandMode.Live -> mode.title to mode.text
     IslandMode.Idle -> "" to ""
@@ -285,10 +309,14 @@ private fun ExpandedContent(mode: IslandMode, large: Boolean, controls: Controls
         IdleDetails()
         return
     }
+    if (mode is IslandMode.Media) {
+        MediaCard(mode, large, controls, accent)
+        return
+    }
     val (title, detail) = summary(mode)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         when (mode) {
-            is IslandMode.Media -> Artwork(mode, if (large) 72 else 52)
+            is IslandMode.Media -> Artwork(mode, if (large) 72 else 52) // kept for exhaustiveness; Media returns via MediaCard above
             is IslandMode.Notification -> InitialBadge(mode.title)
             is IslandMode.Call -> InitialBadge(mode.name)
             else -> ModeIcon(mode, accent, Modifier.padding(8.dp))
@@ -313,30 +341,39 @@ private fun ExpandedContent(mode: IslandMode, large: Boolean, controls: Controls
                 }
             }
             if (!controls.editing) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (mode.canMarkRead) OutlinedButton(onClick = controls.read) { Text(stringResource(R.string.island_mark_read)) }
-                if (mode.canReply) Button(onClick = controls.reply) { Text(stringResource(R.string.island_reply)) }
-            }
-        }
-        is IslandMode.Media -> {
-            MediaProgress(mode, controls.seek, accent)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                PlaybackButtons(mode.playing, controls)
+                if (mode.canMarkRead) OutlinedButton(onClick = controls.read, shape = CircleShape, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.island_mark_read)) }
+                if (mode.canReply) Button(onClick = controls.reply, shape = CircleShape, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.island_reply)) }
             }
         }
         is IslandMode.Call -> {
-            if (!mode.incoming) {
+            if (!mode.incoming && mode.since > 0L) {
                 val elapsed by elapsedSeconds(mode.since)
                 Caption(timeLabel(elapsed))
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (mode.incoming && mode.canAnswer) Button(onClick = controls.answer,
-                    colors = ButtonDefaults.buttonColors(containerColor = positive), modifier = Modifier.weight(1f)) {
+                    colors = ButtonDefaults.buttonColors(containerColor = positive), shape = CircleShape, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                     Icon(Icons.Rounded.Call, null); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.island_answer))
                 }
-                if (mode.canDecline) Button(onClick = controls.decline, colors = ButtonDefaults.buttonColors(containerColor = negative),
-                    modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Rounded.CallEnd, null); Spacer(Modifier.width(6.dp))
-                    Text(if (mode.incoming) stringResource(R.string.island_decline) else stringResource(R.string.island_end_call))
+                if (!mode.incoming && mode.since > 0L && mode.canSpeaker) {
+                    FilledIconButton(onClick = controls.callSpeaker, modifier = Modifier.size(48.dp)) {
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.speaker, semanticLabel = "Speaker", color = panelText)
+                    }
+                }
+                if (!mode.incoming && mode.since > 0L && mode.canMute) {
+                    FilledIconButton(onClick = controls.callMute, modifier = Modifier.size(48.dp)) {
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.microphone, semanticLabel = "Mute or unmute", color = panelText)
+                    }
+                }
+                if (mode.canDecline) {
+                    if (mode.incoming) Button(onClick = controls.decline,
+                        colors = ButtonDefaults.buttonColors(containerColor = negative), shape = CircleShape,
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.island_decline))
+                    } else FilledIconButton(onClick = controls.decline,
+                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = negative), modifier = Modifier.size(48.dp)) {
+                        com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.callEnd, semanticLabel = "Hang up", color = panelText)
+                    }
                 }
             }
         }
@@ -424,24 +461,143 @@ private fun ReplyEditor(send: (String) -> Unit, cancel: () -> Unit) {
     }
 }
 
+/** Live playback position, advanced from the session's last update timestamp. */
 @Composable
-private fun MediaProgress(media: IslandMode.Media, seek: (Long) -> Unit, accent: Color) {
-    val position by produceState(media.positionMs, media) {
-        while (true) {
-            val elapsed = if (media.playing && media.updatedAt > 0) SystemClock.elapsedRealtime() - media.updatedAt else 0L
-            value = (media.positionMs + (elapsed * media.speed).toLong()).coerceIn(0, media.durationMs.coerceAtLeast(0))
-            delay(500)
+private fun mediaPosition(media: IslandMode.Media): State<Long> {
+    val resumed = com.example.chat.ui.island.rememberIslandHostResumed()
+    return produceState(media.positionMs, media, resumed) {
+    if (!resumed || !media.playing || media.durationMs <= 0) return@produceState
+    while (true) {
+        val elapsed = if (media.playing && media.updatedAt > 0) SystemClock.elapsedRealtime() - media.updatedAt else 0L
+        value = (media.positionMs + (elapsed * media.speed).toLong()).coerceIn(0, media.durationMs.coerceAtLeast(0))
+        delay(500)
+    }
+    }
+}
+
+/** The source app's real launcher icon and label, or null when unknown. Never substituted. */
+@Suppress("DEPRECATION")
+@Composable
+private fun rememberSourceApp(appPackage: String?): Pair<ImageBitmap, String>? {
+    val context = LocalContext.current
+    return remember(appPackage) {
+        appPackage ?: return@remember null
+        try {
+            val manager = context.packageManager
+            val info = manager.getApplicationInfo(appPackage, 0)
+            val label = manager.getApplicationLabel(info).toString()
+            val drawable = manager.getApplicationIcon(info)
+            val bitmap = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            drawable.setBounds(0, 0, 96, 96)
+            drawable.draw(canvas)
+            bitmap.asImageBitmap() to label
+        } catch (_: Exception) {
+            null
         }
     }
+}
+
+/**
+ * Expanded media card: source app icon top-left, title and artist middle-left,
+ * play/pause chip center-right, and a bottom row of previous / wave progress / next.
+ * Artwork is drawn behind the card by [DynamicIslandUi]. Controls only exist when
+ * the card is backed by a real media session; previews and demos show no buttons.
+ */
+@Composable
+private fun MediaCard(media: IslandMode.Media, large: Boolean, controls: Controls, accent: Color) {
+    val position by mediaPosition(media)
+    val source = rememberSourceApp(media.appPackage)
+    Box(Modifier.fillMaxWidth().height((if (large) 148 else 116).dp)) {
+        if (source != null) {
+            Image(source.first, source.second, Modifier.align(Alignment.TopStart).size(26.dp)
+                .clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+        }
+        Column(Modifier.align(Alignment.CenterStart).padding(end = if (media.hasSession && media.canPlayPause) 62.dp else 0.dp)) {
+            Text(media.title, color = panelText, style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (media.artist.isNotBlank()) Caption(media.artist, maxLines = 1)
+        }
+        if (media.hasSession && media.canPlayPause) {
+            IconButton(onClick = controls.play, modifier = Modifier.align(Alignment.CenterEnd)
+                .size(48.dp).clip(RoundedCornerShape(14.dp)).background(accent)) {
+                Icon(if (media.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    if (media.playing) stringResource(R.string.island_pause) else stringResource(R.string.island_play),
+                    tint = panelInk)
+            }
+        }
+    }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (media.hasSession && media.canPrevious) {
+            IconButton(onClick = controls.previous, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Rounded.SkipPrevious, stringResource(R.string.island_previous), tint = panelText)
+            }
+        }
+        WaveProgress(media, position, if (media.hasSession && media.canSeek) controls.seek else null, accent, Modifier.weight(1f))
+        if (media.hasSession && media.canNext) {
+            IconButton(onClick = controls.next, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.Rounded.SkipNext, stringResource(R.string.island_next), tint = panelText)
+            }
+        }
+    }
+}
+
+/**
+ * Waveform-style progress. Played bars use the artwork accent; the rest stay muted.
+ * Deterministic per track. Tap or drag seeks only with a real session and a known duration.
+ */
+@Composable
+private fun WaveProgress(media: IslandMode.Media, positionMs: Long, onSeek: ((Long) -> Unit)?,
+    accent: Color, modifier: Modifier = Modifier) {
+    val amplitudes = remember(media.title) {
+        val seed = media.title.hashCode()
+        FloatArray(40) { index ->
+            val wave = sin(index * 12.9898 + seed * .0174533) * 43758.5453
+            val fraction = wave - floor(wave)
+            (0.25 + 0.7 * fraction).toFloat()
+        }
+    }
+    val duration = media.durationMs
+    val played = if (duration > 0) (positionMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
+    val rest = panelMuted.copy(alpha = .45f)
+    val seekable = onSeek != null && duration > 0
     var scrub by remember(media.title) { mutableStateOf<Float?>(null) }
-    if (media.durationMs > 0) {
-        Slider(value = scrub ?: position.toFloat(), onValueChange = { scrub = it },
-            valueRange = 0f..media.durationMs.toFloat(), onValueChangeFinished = {
-                scrub?.let { seek(it.toLong()) }; scrub = null
-            }, colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Caption(timeLabel((scrub?.toLong() ?: position) / 1000))
-            Caption(timeLabel(media.durationMs / 1000))
+    Canvas(modifier
+        .fillMaxWidth()
+        .height(26.dp)
+        .pointerInput(seekable, duration) {
+            if (!seekable) return@pointerInput
+            detectTapGestures { offset ->
+                onSeek?.invoke(((offset.x / size.width).coerceIn(0f, 1f) * duration).toLong())
+            }
+        }
+        .pointerInput(seekable, duration) {
+            if (!seekable) return@pointerInput
+            var latest = 0f
+            detectDragGestures(
+                onDragStart = { offset -> latest = offset.x / size.width },
+                onDragEnd = {
+                    onSeek?.invoke((latest.coerceIn(0f, 1f) * duration).toLong())
+                    scrub = null
+                }
+            ) { change, _ ->
+                latest = change.position.x / size.width
+                scrub = latest.coerceIn(0f, 1f)
+                change.consume()
+            }
+        }) {
+        val fill = scrub ?: played
+        val step = size.width / amplitudes.size
+        val barWidth = step * .55f
+        for (index in amplitudes.indices) {
+            val heightPx = amplitudes[index] * size.height
+            val left = index * step + (step - barWidth) / 2f
+            drawRoundRect(
+                color = if ((index + .5f) / amplitudes.size <= fill) accent else rest,
+                topLeft = Offset(left, (size.height - heightPx) / 2f),
+                size = Size(barWidth, heightPx),
+                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f))
         }
     }
 }
@@ -449,7 +605,8 @@ private fun MediaProgress(media: IslandMode.Media, seek: (Long) -> Unit, accent:
 @Composable
 private fun SoundBars(playing: Boolean, accent: Color) {
     val reducedMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
-    val amount = if (reducedMotion || !playing) .5f else {
+    val hostResumed = com.example.chat.ui.island.rememberIslandHostResumed()
+    val amount = if (reducedMotion || !playing || !hostResumed) .5f else {
         val pulse = rememberInfiniteTransition(label = "musicPulse")
         val animated by pulse.animateFloat(.25f, 1f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "barHeight")
         animated
@@ -463,13 +620,33 @@ private fun SoundBars(playing: Boolean, accent: Color) {
 }
 
 @Composable
-private fun wallClock(): State<Long> = produceState(System.currentTimeMillis()) {
-    while (true) { value = System.currentTimeMillis(); delay(1000) }
+private fun wallClock(): State<Long> {
+    val context = LocalContext.current
+    val now = remember { mutableStateOf(System.currentTimeMillis()) }
+    androidx.compose.runtime.DisposableEffect(context) {
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+                now.value = System.currentTimeMillis()
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_TIME_TICK)
+            addAction(android.content.Intent.ACTION_TIME_CHANGED)
+            addAction(android.content.Intent.ACTION_TIMEZONE_CHANGED)
+        }
+        androidx.core.content.ContextCompat.registerReceiver(context, receiver, filter, androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    return now
 }
 
 @Composable
-private fun elapsedSeconds(since: Long): State<Long> = produceState(0L, since) {
-    while (true) { value = ((SystemClock.elapsedRealtime() - since) / 1000).coerceAtLeast(0); delay(1000) }
+private fun elapsedSeconds(since: Long): State<Long> {
+    val resumed = com.example.chat.ui.island.rememberIslandHostResumed()
+    return produceState(0L, since, resumed) {
+        if (!resumed) return@produceState
+        while (true) { value = ((SystemClock.elapsedRealtime() - since) / 1000).coerceAtLeast(0); delay(1000) }
+    }
 }
 
 @Composable

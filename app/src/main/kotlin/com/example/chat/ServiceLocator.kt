@@ -70,7 +70,7 @@ object ServiceLocator {
     fun init(context: Context) {
         appContext = context.applicationContext
         loadChatFontScale()
-        appTrafficMonitor.start(appScope)
+        appScope.launch(kotlinx.coroutines.Dispatchers.IO) { appTrafficMonitor.start(appScope) }
         com.example.chat.core.theme.ThemePresets.platformIsLightProvider = {
             (requireContext().resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) != android.content.res.Configuration.UI_MODE_NIGHT_YES
         }
@@ -82,6 +82,8 @@ object ServiceLocator {
         appScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { mediaCache.purgeTransientTemps() } }
         preferencesController // start load + remote reconcile (Dart controller constructor)
         notificationCoordinator.start()
+        com.example.chat.ui.chats.detail.ReadAlertCenter.init(requireContext())
+        com.example.chat.ui.chats.detail.ReadAlertCenter.notifier = { key, room, _ -> notificationCoordinator.showReadAlert(key, room) }
         com.example.chat.bubbles.ChatBubbleController.install(context)
         // Always wire FcmRegistrarHolder + PushWakeHolder at process init so early
         // onNewToken / onMessageReceived callbacks never drop before UI launches.
@@ -191,12 +193,29 @@ object ServiceLocator {
         }
     }
 
+    /** Cross-plane per-conversation dispatch lock, shared by the REST outbox
+     *  flush, the MLS delivery path, and the secure-channel toggle (see
+     *  ConversationDispatchLocks for invariants and lock-order rules). */
+    val conversationDispatchLocks = com.example.chat.data.messaging.ConversationDispatchLocks()
+        .also { locks ->
+            com.example.chat.data.messaging.AttachmentUploadTracker.dispatchLocks = locks
+            // Uploads re-read the AUTHORITATIVE flag (persisted-first repo
+            // state), never a UI lambda: warm read before the dispatch lock,
+            // non-suspending loaded read inside it (see AttachmentUploadTracker).
+            com.example.chat.data.messaging.AttachmentUploadTracker.secureFlagProbe =
+                com.example.chat.data.messaging.AttachmentUploadTracker.SecureFlagProbe(
+                    warmAndRead = { cid -> conversationsRepository.isSecureChannel(cid) },
+                    readLoaded = { cid -> conversationsRepository.isSecureChannelLoaded(cid) },
+                )
+        }
+
     val apiBackend: com.example.chat.data.api.ApiBackendService by lazy {
         com.example.chat.data.api.ApiBackendService(requireContext()).also { service ->
             apiBackendUnderConstruction = service
             service.deviceIdentity = com.example.chat.data.api.DeviceIdentityManager(secureStore)
             service.configureSnapshotCache(snapshotCache)
             service.transferMonitor = transferMonitor
+            service.conversationDispatchLocks = conversationDispatchLocks
             // Dart locator wiring for _syncFcmToken / unregisterOnLogout:
             // deferred lambdas so the registrar's lazy init cannot cycle
             // back into this lazy block during construction.
@@ -214,6 +233,11 @@ object ServiceLocator {
             service.secureMessageDeleteIngest = { data ->
                 appScope.launch {
                     runCatching { conversationsRepository.applyRemoteDeleteForEveryone(data) }
+                }
+            }
+            service.onDurableCallInboxWake = { owner ->
+                if (service.authSnapshot() === owner) service.multiAccount.activeAccountMeta()?.let { meta ->
+                    owner.token?.let { token -> consumeAccountCallInbox(meta, token) }
                 }
             }
             service.syncFcmTokenHook = { fcmRegistrar.syncTokenOnLogin() }
@@ -271,6 +295,7 @@ object ServiceLocator {
             apiDevices = (apiBackendUnderConstruction ?: apiBackend).deviceTokenClient,
             log = { android.util.Log.d("FcmTokenRegistrar", it) },
             runAsync = { block -> Thread(block, "fcm-register").start() },
+            registerRetainedAccounts = { token -> appScope.launch(kotlinx.coroutines.Dispatchers.IO) { accountPushBindings.registerRetained(token) } },
             // Dart FirebaseMessaging.getToken(); throws IllegalStateException while FirebaseApp is
             // not initialised (no google-services.json), which the registrar logs.
             tokenFetcher = { onToken, onError ->
@@ -294,6 +319,141 @@ object ServiceLocator {
     private val inactiveAccountPush by lazy {
         com.example.chat.data.api.InactiveAccountPushBridge(requireContext(), apiBackend, secureStore)
     }
+    private val callInboxStage by lazy { com.example.chat.data.api.EncryptedCallInboxStage(secureStore) }
+    private val callInboxConsumer by lazy { com.example.chat.data.api.DurableCallInboxConsumer(callInboxStage) }
+    private val handledCallInboxEvents = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val callInboxRunning = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val callInboxRetries = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
+    private val callInboxRecoveryScheduledAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    /** A push may be the only wake. Retry only this accepted inbox task, bounded to its 60s event lifetime. */
+    private fun retryAccountCallInbox(meta: com.example.chat.data.api.ApiRegisteredAccountMeta, bearer: String) {
+        synchronized(callInboxRetries) {
+            if (callInboxRetries[meta.accountHash]?.isActive == true) return
+            callInboxRetries[meta.accountHash] = appScope.launch {
+                try {
+                    for (delayMillis in listOf(2_100L, 4_100L, 8_100L, 16_100L, 30_100L)) {
+                        kotlinx.coroutines.delay(delayMillis)
+                        val api = apiBackendUnderConstruction ?: apiBackend
+                        if (api.multiAccount.accountByKey(meta.accountKey)?.sessionExpired != false ||
+                            api.multiAccount.credentialsFor(meta.accountKey)?.accessToken != bearer) break
+                        var retryNeeded = false
+                        consumeAccountCallInbox(meta, bearer, scheduleRetry = false, retryResult = { retryNeeded = it })
+                        if (!retryNeeded) break
+                    }
+                } finally { synchronized(callInboxRetries) { callInboxRetries.remove(meta.accountHash) } }
+            }
+        }
+    }
+    private val accountPushBindings by lazy {
+        com.example.chat.data.api.AccountPushBindingRouter(requireContext(), apiBackendUnderConstruction ?: apiBackend,
+            inactive = { key -> inactiveAccountPush.run(key) }, durableCalls = { meta, token -> consumeAccountCallInbox(meta, token) })
+    }
+    private suspend fun consumeAccountCallInbox(meta: com.example.chat.data.api.ApiRegisteredAccountMeta, bearer: String, scheduleRetry: Boolean = true, retryResult: (Boolean) -> Unit = {}): Boolean {
+        val api = apiBackendUnderConstruction ?: apiBackend
+        fun valid() = !com.example.chat.data.demo.DemoMode.active && api.multiAccount.accountByKey(meta.accountKey)?.sessionExpired == false &&
+            api.multiAccount.credentialsFor(meta.accountKey)?.accessToken == bearer
+        val owner = com.example.chat.data.api.ApiAccountScope(meta.userId, bearer, meta.tenantId, meta.baseUrl, meta.webSocketTemplate, 0)
+        val client = com.example.chat.data.api.DurableCallInboxClient(owner, com.example.chat.data.api.OkHttpApiTransport(allowRedirects = false), ::valid)
+        if (!valid() || !kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { client.supports() }) return false
+        if (!callInboxRunning.add(meta.accountHash)) { retryResult(true); return true }
+        try {
+            val outcome = callInboxConsumer.consume(meta.accountHash, client, ::valid, prepareRecovery = {
+                val now = android.os.SystemClock.elapsedRealtime()
+                val prior = callInboxRecoveryScheduledAt[meta.accountHash]
+                if (scheduleRetry && (prior == null || now - prior >= 10_000L)) {
+                    com.example.chat.data.api.CallInboxRetryWorker.schedule(requireContext(), meta.accountHash)
+                    callInboxRecoveryScheduledAt[meta.accountHash] = now
+                }
+            }) { events ->
+                val active = api.authSnapshot()
+                val ownsActive = valid() && api.currentAccountKey() == meta.accountKey && active.token == bearer
+                val svc = callSignaling
+                val firstOffer = events.firstOrNull { it.kind == "offer" && it.data.opt("ice_restart") != true }
+                if (!ownsActive) {
+                    events.filter { it.kind in setOf("end", "hangup", "decline", "reject", "busy", "cancel") }.forEach { event ->
+                        if (valid()) com.example.chat.notifications.ChatyNotifications.cancelAccountIncomingCall(requireContext(), meta.accountHash, event.callId)
+                    }
+                    if (firstOffer != null && valid()) com.example.chat.notifications.ChatyNotifications.showAccountIncomingCall(requireContext(), meta.accountHash, firstOffer.callId, java.time.Duration.between(java.time.Instant.now(), firstOffer.expiresAt).toMillis())
+                } else {
+                    val delivered = mutableSetOf<String>()
+                    val deferredCalls = mutableSetOf<String>()
+                    for (event in events) {
+                        if (!valid() || api.authSnapshot() !== active) break
+                        // ICE renegotiation cannot create a fresh incoming session after process death.
+                        if (event.kind == "offer" && event.data.opt("ice_restart") == true &&
+                            svc.currentSession?.let { it.callId == event.callId && !it.state.isTerminal } != true) {
+                            delivered += event.eventId
+                            continue
+                        }
+                        if (event.kind == "offer" && svc.hasActiveSession && svc.currentSession?.callId != event.callId) {
+                            deferredCalls += event.callId
+                            com.example.chat.notifications.ChatyNotifications.showAccountIncomingCall(requireContext(), meta.accountHash, event.callId, java.time.Duration.between(java.time.Instant.now(), event.expiresAt).toMillis())
+                            continue
+                        }
+                        if (event.callId in deferredCalls && event.kind !in setOf("end", "hangup", "decline", "reject", "busy", "cancel")) continue
+                        if (event.kind in setOf("end", "hangup", "decline", "reject", "busy", "cancel"))
+                            com.example.chat.notifications.ChatyNotifications.cancelAccountIncomingCall(requireContext(), meta.accountHash, event.callId)
+                        val key = "${meta.accountHash}:${event.eventId}"
+                        if (key !in handledCallInboxEvents) {
+                            svc.handleRemoteSignal(com.example.chat.data.api.ApiChatClient.deepMap(event.data),
+                                validScope = { valid() && api.authSnapshot() === active },
+                                guardScope = { action -> api.withAuthScope(active, action) })
+                            if (!valid() || api.authSnapshot() !== active) break
+                            handledCallInboxEvents.add(key)
+                        }
+                        // Keep the unanswered offer and early ICE durable while the in-memory service rings.
+                        // Explicit answer/decline writes a resolved tombstone before media or signaling.
+                        val ringing = svc.currentSession?.let { it.callId == event.callId && it.state == com.example.chat.data.services.CallSessionState.incoming } == true
+                        if (!ringing) delivered += event.eventId
+                    }
+                    if (delivered.isNotEmpty()) callInboxStage.forget(meta.accountHash, delivered)
+                    if (handledCallInboxEvents.size > 1024) handledCallInboxEvents.clear() // Service also dedups call/session identity.
+                }
+            }
+            val needsRetry = valid() && outcome == com.example.chat.data.api.DurableCallInboxConsumer.Outcome.RETRY_REQUIRED
+            retryResult(needsRetry)
+            // A server-caught-up inbox can still contain a locally staged unanswered call.
+            // Keep its durable wake until disposition/expiry so process death cannot orphan that offer.
+            val awaitingAnswer = callInboxStage.pending(meta.accountHash).any { it.kind == "offer" && it.data.opt("ice_restart") != true }
+            if (scheduleRetry && !needsRetry && !awaitingAnswer && callInboxRecoveryScheduledAt.remove(meta.accountHash) != null)
+                com.example.chat.data.api.CallInboxRetryWorker.cancel(requireContext(), meta.accountHash)
+            if (scheduleRetry && needsRetry)
+                retryAccountCallInbox(meta, bearer)
+        } finally { callInboxRunning.remove(meta.accountHash) }
+        return true // Capability exists, even if this wake needs retry. NEVER switch to destructive legacy drain.
+    }
+    /** Return true only while this exact retained account's bounded inbox task still needs recovery. */
+    suspend fun retryDurableCallInboxFromWorker(accountHash: String): Boolean {
+        val api = apiBackendUnderConstruction ?: apiBackend
+        val meta = api.multiAccount.accounts().firstOrNull { it.accountHash == accountHash && !it.sessionExpired } ?: return false
+        val bearer = api.multiAccount.credentialsFor(meta.accountKey)?.accessToken ?: return false
+        var needsRetry = true
+        val supported = consumeAccountCallInbox(meta, bearer, scheduleRetry = false, retryResult = { needsRetry = it })
+        // A failed capability lookup is not proof that an inbox previously verified as v2 vanished.
+        val awaitingAnswer = callInboxStage.pending(accountHash).any { it.kind == "offer" && it.data.opt("ice_restart") != true }
+        return !supported || needsRetry || awaitingAnswer
+    }
+    suspend fun replayAccountCallInbox(accountHash: String): Boolean {
+        val meta = apiBackend.multiAccount.accounts().firstOrNull { it.accountHash == accountHash } ?: return false
+        val token = apiBackend.multiAccount.credentialsFor(meta.accountKey)?.accessToken ?: return false
+        return consumeAccountCallInbox(meta, token)
+    }
+    suspend fun hasPendingAccountCall(accountHash: String, callId: String): Boolean =
+        callInboxStage.pending(accountHash).any { it.callId == callId && it.kind == "offer" }
+
+    suspend fun declinePendingAccountCall(accountHash: String, callId: String): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val meta = apiBackend.multiAccount.accounts().firstOrNull { it.accountHash == accountHash && !it.sessionExpired } ?: return@withContext false
+        val credentials = apiBackend.multiAccount.credentialsFor(meta.accountKey) ?: return@withContext false
+        val offer = callInboxStage.pending(accountHash).firstOrNull { it.callId == callId && it.kind == "offer" } ?: return@withContext false
+        val wire = com.example.chat.data.api.CallSignalScope(meta.userId, meta.baseUrl, credentials.accessToken, 0, meta.tenantId)
+        val client = com.example.chat.data.api.ApiCallSignalClient({ wire.takeIf { apiBackend.multiAccount.credentialsFor(meta.accountKey)?.accessToken == wire.token } },
+            com.example.chat.data.api.OkHttpApiTransport(allowRedirects = false))
+        val event = mapOf("signal_type" to "decline", "call_id" to callId, "client_event_id" to java.util.UUID.randomUUID().toString())
+        if (client.send(wire, offer.senderId, event) != com.example.chat.data.api.ApiCallSignalClient.SendResult.ACCEPTED) return@withContext false
+        callInboxStage.resolveCall(accountHash, callId)
+        com.example.chat.notifications.ChatyNotifications.cancelAccountIncomingCall(requireContext(), accountHash, callId)
+        true
+    }
     private suspend fun catchUpInactiveAccounts() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try { inactiveAccountPush.run() } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { /* Inactive catch-up cannot fail the active wake. */ }
     }
@@ -301,6 +461,8 @@ object ServiceLocator {
     private fun installPushWakeHandler() {
         com.example.chat.notifications.PushWakeHolder.handler =
             object : com.example.chat.notifications.PushWakeHandler {
+                override suspend fun onAccountSyncNudgeAndWait(bindingId: String) { accountPushBindings.handle(bindingId) }
+                override suspend fun onAccountIncomingCallNudgeAndWait(bindingId: String, callId: String) { accountPushBindings.handle(bindingId, callId) }
                 override fun onSyncNudge() {
                     appScope.launch { apiBackend.syncFromPushNudge(); catchUpInactiveAccounts() }
                 }
@@ -662,6 +824,55 @@ object ServiceLocator {
     val conversationsRepository: ConversationsRepository by lazy {
         ConversationsRepository(
             secureRpc = mlsRpcClient,
+            // Central routing: routeTextSend sends flagged chats over the MLS
+            // plane and everything else through the REST sender below. The
+            // flag read inside routeTextSend throws when it is unreadable, so
+            // a caller can never silently fall back to plaintext.
+            restTextSend = { cid, text -> apiBackend.sendMessage(cid, text) },
+            // Enabling encryption is refused while a REST send for that chat
+            // is queued or delivering, or an attachment/voice upload for it
+            // is in flight. The upload count is registered under the same
+            // dispatch lock the toggle holds, so check-then-register cannot
+            // slip through.
+            restSendsInFlight = { cid ->
+                if (apiBackend.hasPendingRestSends(cid)) {
+                    true
+                } else {
+                    val s = apiBackend.authSnapshot()
+                    com.example.chat.data.messaging.AttachmentUploadTracker.hasInFlight(
+                        com.example.chat.data.messaging.ConversationDispatchLocks.accountKey(
+                            s.userId, s.tenantId, s.baseUrl),
+                        cid,
+                    )
+                }
+            },
+            dispatchLocks = conversationDispatchLocks,
+            lockAccountKey = {
+                val s = apiBackend.authSnapshot()
+                com.example.chat.data.messaging.ConversationDispatchLocks.accountKey(
+                    s.userId, s.tenantId, s.baseUrl)
+            },
+            // The toggle holds the dispatch lock already; these are the
+            // non-locking bodies (the public variants would self-deadlock).
+            // The scope comes from the toggle's captured identity - the
+            // service re-checks it against live auth before acting.
+            // Storage keys for secure_channels/sync_cursors are namespaced by
+            // the account hash (tenant+backend+user), never the raw uid: the
+            // same uid on another backend cannot load this backend's flags or
+            // cursors. Demo/unsigned falls back to the raw uid.
+            storageNamespace = {
+                apiBackend.currentAccountHash() ?: throw IllegalStateException("Account storage is unavailable until sign-in completes.")
+            },
+            holdRestSends = { scope, cid ->
+                val s = scope as? com.example.chat.data.api.ApiAccountScope
+                    ?: throw IllegalStateException("Missing account scope for the quarantine hold.")
+                apiBackend.holdQueuedMessagesForConversationLocked(s, cid)
+            },
+            releaseRestSends = { scope, cid ->
+                val s = scope as? com.example.chat.data.api.ApiAccountScope
+                    ?: throw IllegalStateException("Missing account scope for the quarantine release.")
+                apiBackend.releaseQueuedMessagesForConversationLocked(s, cid)
+            },
             // D1: the repository's reads (conversations list, message list,
             // profile search) ride the Chaty backend too - the Supabase
             // PostgREST client is retired from the messaging path.
@@ -672,6 +883,11 @@ object ServiceLocator {
             onQueuedCountChanged = { count -> connectionHealth.updateQueuedCount(count) },
             onPendingEnqueued = { appScope.launch { outgoingQueue.processQueue() } },
             snapshotCache = snapshotCache,
+            messageSnapshotNamespace = { captured ->
+                val owner = captured as? com.example.chat.data.api.ApiAccountScope
+                owner?.let { com.example.chat.data.api.ApiAccountRoutingCanonicalizer.accountKey(it.tenantId, it.baseUrl, it.userId.orEmpty()) }
+                    ?.let(com.example.chat.data.api.ApiAccountRoutingCanonicalizer::accountHash)
+            },
             snapshotScope = appScope,
             scopeSnapshot = { apiBackend.authSnapshot() },
             withScope = { expected, action ->
@@ -692,8 +908,11 @@ object ServiceLocator {
         ).also { repo ->
             // Matrices 11/18: mirror decrypted, user-visible messages into the
             // SQLCipher DB so global search works offline.
-            repo.localMessageMirror = { conversationId, messages ->
-                val activeHash = apiBackend.currentAccountHash()
+            repo.localMessageMirror = mirror@{ captured, conversationId, messages ->
+                val owner = captured as? com.example.chat.data.api.ApiAccountScope ?: return@mirror
+                if (apiBackend.authSnapshot() !== owner) return@mirror
+                val key = com.example.chat.data.api.ApiAccountRoutingCanonicalizer.accountKey(owner.tenantId, owner.baseUrl, owner.userId.orEmpty()) ?: return@mirror
+                val activeHash = com.example.chat.data.api.ApiAccountRoutingCanonicalizer.accountHash(key)
                 val dao = secureMessageStore.database(activeHash).messages()
                 dao.upsertAll(messages.map { m ->
                     com.example.chat.data.local.LocalMessageEntity(
@@ -701,11 +920,11 @@ object ServiceLocator {
                         conversationId = conversationId,
                         senderId = m.senderId,
                         type = m.type.name,
-                        text = m.text,
-                        caption = m.metadata["caption"]?.toString(),
+                        text = if (com.example.chat.core.messages.ViewOnceTextPolicy.restricted(m.metadata)) "" else m.text,
+                        caption = if (com.example.chat.core.messages.ViewOnceTextPolicy.restricted(m.metadata)) null else m.metadata["caption"]?.toString(),
                         createdAtMillis = m.createdAt.toEpochMilli(),
                         editedAtMillis = m.editedAt?.toEpochMilli(),
-                        isDeletedForEveryone = m.isDeletedForEveryone,
+                        isDeletedForEveryone = m.isDeletedForEveryone || com.example.chat.core.messages.ViewOnceTextPolicy.restricted(m.metadata),
                     )
                 })
             }
@@ -779,6 +998,16 @@ object ServiceLocator {
         com.example.chat.data.services.CallSignalingService(
             scope = appScope,
             currentUserId = { apiBackend.currentUser?.id },
+            beforeIncomingDisposition = { captured, callId ->
+                val owner = captured as? com.example.chat.data.api.ApiAccountScope ?: error("Call account is unavailable.")
+                check(apiBackend.authSnapshot() === owner) { "Call account changed." }
+                val key = com.example.chat.data.api.ApiAccountRoutingCanonicalizer.accountKey(owner.tenantId, owner.baseUrl, owner.userId.orEmpty())
+                    ?: error("Call account is unavailable.")
+                val hash = com.example.chat.data.api.ApiAccountRoutingCanonicalizer.accountHash(key)
+                if (callInboxStage.pending(hash).any { it.callId == callId && it.kind == "offer" })
+                    callInboxStage.resolveCall(hash, callId)
+                check(apiBackend.authSnapshot() === owner) { "Call account changed." }
+            },
             currentUserDisplayName = { apiBackend.currentUser?.displayName ?: "User" },
             currentUserAvatarInitials = { apiBackend.currentUser?.avatarInitials },
             currentUserAvatarColorHex = { apiBackend.currentUser?.avatarColorHex },
@@ -1011,12 +1240,37 @@ object ServiceLocator {
     }
 
     val scheduledMessageService: com.example.chat.ui.automation.ScheduledMessageService by lazy {
-        com.example.chat.ui.automation.ScheduledMessageService(backend = gbFeatures, scope = appScope)
+        com.example.chat.ui.automation.ScheduledMessageService(backend = gbFeatures, scope = appScope,
+            session = { apiBackend.scheduledMessagesClient() },
+            sendGuard = { cid ->
+                // Scheduled sends dispatch server-side later, without this
+                // device - always plaintext. Refuse encrypted chats; an
+                // unreadable flag throws from isSecureChannel, which fails
+                // closed the same way.
+                if (conversationsRepository.isSecureChannel(cid)) {
+                    throw IllegalStateException(
+                        "Scheduled messages are not available in an encrypted chat: the server would send them as plaintext.")
+                }
+            })
     }
 
     val autoReplyRuleEngine: com.example.chat.ui.automation.AutoReplyRuleEngine by lazy {
         com.example.chat.ui.automation.AutoReplyRuleEngine(prefs = preferencesController, backend = gbFeatures, scope = appScope,
-            sendReply = { cid, text -> apiBackend.sendMessage(cid, text) })
+            sendReply = { cid, text ->
+                // Fail closed by default: when the chat is flagged for
+                // end-to-end encryption, or its flag cannot be read, the
+                // auto-reply is skipped entirely instead of leaking plaintext.
+                // (Sending the canned reply over MLS is a deliberate product
+                // choice for later - automation inside encrypted chats should
+                // be opt-in, not silent.)
+                val secure = try {
+                    conversationsRepository.isSecureChannel(cid)
+                } catch (e: Exception) {
+                    android.util.Log.w("AutoReply", "encryption flag unreadable; auto-reply skipped: ${e.message}")
+                    true
+                }
+                if (!secure) apiBackend.sendMessage(cid, text)
+            })
     }
 
     val messageAutomation: MessageAutomationService by lazy {

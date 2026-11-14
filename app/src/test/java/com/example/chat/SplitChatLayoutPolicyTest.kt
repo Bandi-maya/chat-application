@@ -94,5 +94,15 @@ class SplitChatLayoutPolicyTest {
         assertEquals(0f, y, 0.01f)
     }
 
+
+    @Test fun snapNear_onlyWithinThreshold() {
+        assertEquals(100f, SplitChatLayoutPolicy.snapNear(106f, listOf(0f,100f,200f),12f),0f)
+        assertEquals(119f, SplitChatLayoutPolicy.snapNear(119f, listOf(0f,100f,200f),12f),0f)
+        assertEquals(0f, SplitChatLayoutPolicy.snapNear(-5f,listOf(0f),12f),0f)
+    }
+    @Test fun snapNear_noTargetsOrInvalidToleranceLeavesFreeMovement() {
+        assertEquals(43f,SplitChatLayoutPolicy.snapNear(43f,emptyList(),12f),0f)
+        assertEquals(43f,SplitChatLayoutPolicy.snapNear(43f,listOf(45f),-1f),0f)
+    }
 }
 

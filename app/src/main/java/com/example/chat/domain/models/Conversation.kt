@@ -49,7 +49,9 @@ data class Conversation(
             val lastMsg = json["last_message"] as? Map<String, Any?>
             if (lastMsg != null) {
                 val raw = lastMsg["content"]?.toString() ?: ""
-                lastText = if (raw.startsWith("{") && raw.contains("\"image\"")) {
+                lastText = if (lastMsg["view_once"] == true || json["last_message_view_once"] == true) {
+                    com.example.chat.core.messages.ViewOnceTextPolicy.PLACEHOLDER
+                } else if (raw.startsWith("{") && raw.contains("\"image\"")) {
                     "📷 Photo"
                 } else if (raw.startsWith("{") && raw.contains("\"type\"")) {
                     "📎 Attachment"

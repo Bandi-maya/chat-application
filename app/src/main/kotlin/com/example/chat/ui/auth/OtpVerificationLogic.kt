@@ -43,4 +43,4 @@ object OtpVerificationLogic {
 
 /** Why the OTP screen is on screen: verifying a fresh registration's email, or
  *  confirming ownership before a password reset. */
-enum class OtpPurpose { VerifyEmail, ResetPassword }
+enum class OtpPurpose { VerifyEmail, ResetPassword, SignIn }

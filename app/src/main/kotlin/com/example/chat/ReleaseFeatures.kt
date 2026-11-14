@@ -8,6 +8,15 @@ package com.example.chat
  * paths are deployed and covered by integration tests.
  */
 object ReleaseFeatures {
+    /** Device heuristics are advisory. No app lockout until reviewed and device-tested. */
+    const val ENFORCE_TAMPER_GUARD = false
+    /** Experimental routing only. No verified MLS setup, encrypted media or cross-device proof yet. */
+    const val EXPERIMENTAL_MLS_CHAT_ROUTING = false
+
+    /** Prepared only: needs deployed explicit-ID endpoint, DB privacy/race tests,
+     *  and two-device verification. Never fall back to room-wide receipts. */
+    const val SCOPED_DELIVERY_RECEIPTS = false
+
     // Legal acceptance remains off pending owner-reviewed final policy.
     const val LEGAL_ACCEPTANCE_GATE = false
     /** Status / stories ("Updates" tab, camera centre action). Needs a status API. */

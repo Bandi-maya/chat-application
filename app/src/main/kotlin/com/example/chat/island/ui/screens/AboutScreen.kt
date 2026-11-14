@@ -32,6 +32,8 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -215,6 +217,10 @@ private fun PermissionRow(
 
 @Composable
 private fun PermissionChecklistCard(context: Context, tick: Int) {
+    var disclosure by remember { mutableStateOf<com.example.chat.island.core.IslandPermissionAccess?>(null) }
+    disclosure?.let { access -> com.example.chat.island.core.IslandPermissionDisclosure(access,
+        onContinue = { disclosure = null; access.open(context) }, onDismiss = { disclosure = null }) }
+
     val accessibility = remember(tick) { Perms.accessibility(context) }
     val listener = remember(tick) { Perms.listener(context) }
     val post = remember(tick) { Perms.post(context) }
@@ -238,14 +244,14 @@ private fun PermissionChecklistCard(context: Context, tick: Int) {
                 label = stringResource(R.string.about_perm_accessibility),
                 granted = accessibility,
                 actionLabel = stringResource(R.string.about_fix),
-                onAction = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+                onAction = { disclosure = com.example.chat.island.core.IslandPermissionAccess.Accessibility },
             )
             PermissionRow(
                 label = stringResource(R.string.about_perm_listener),
                 granted = listener,
                 actionLabel = stringResource(R.string.about_fix),
                 onAction = {
-                    context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    disclosure = com.example.chat.island.core.IslandPermissionAccess.Notifications
                 },
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -301,6 +307,10 @@ private fun GestureGuideCard() {
 /** Extra help shown only while the accessibility service is not yet enabled. */
 @Composable
 private fun AccessibilityHelpCard(context: Context, tick: Int) {
+    var disclosure by remember { mutableStateOf<com.example.chat.island.core.IslandPermissionAccess?>(null) }
+    disclosure?.let { access -> com.example.chat.island.core.IslandPermissionDisclosure(access,
+        onContinue = { disclosure = null; access.open(context) }, onDismiss = { disclosure = null }) }
+
     val accessibility = remember(tick) { Perms.accessibility(context) }
     if (accessibility) return
 
@@ -321,7 +331,7 @@ private fun AccessibilityHelpCard(context: Context, tick: Int) {
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    disclosure = com.example.chat.island.core.IslandPermissionAccess.Accessibility
                 }) { Text(stringResource(R.string.home_open_accessibility_settings)) }
                 OutlinedButton(onClick = { openAppInfo(context) }) {
                     Text(stringResource(R.string.home_app_info))
@@ -381,13 +391,5 @@ private fun BackgroundTroubleshootingCard(context: Context) {
 }
 
 private fun openBatteryExemption(context: Context) {
-    val request = Intent(
-        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-        Uri.parse("package:${context.packageName}"),
-    )
-    try {
-        context.startActivity(request)
-    } catch (e: ActivityNotFoundException) {
-        context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-    }
+    Perms.openBatterySettings(context)
 }

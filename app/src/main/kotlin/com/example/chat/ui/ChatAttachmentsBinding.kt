@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -54,7 +55,8 @@ class ChatAttachmentsBindings(
 )
 
 @Composable
-fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): ChatAttachmentsBindings {
+fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit, secureChannel: () -> Boolean = { false }): ChatAttachmentsBindings {
+    val secureChannelNow by rememberUpdatedState(secureChannel)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val api = ServiceLocator.apiBackend
@@ -147,6 +149,9 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
             conversationId = conversationId,
             backend = object : AttachmentBackendPort {
                 override suspend fun upload(type: String, file: PickedFile, durationSeconds: Int): MessageAttachment {
+                    // A secure chat never uploads plaintext media; encrypted media
+                    // (SecureImageSendService) is Phase 2 and not wired yet.
+                    if (secureChannelNow()) throw IllegalStateException("Encrypted media is not wired yet, so media is not sent in an encrypted chat.")
                     // Camera captures arrive as a file path (no picker bytes): read them here,
                     // matching Dart ChatMediaService.uploadFile(sourcePath:).
                     val stagedFile = file.path?.let { java.io.File(it) }
@@ -160,8 +165,23 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                                 uploadTarget = compressed
                             }
                         }
+                        val scopeNow = api.authSnapshot()
+                        val endUpload = com.example.chat.data.messaging.AttachmentUploadTracker.begin(
+                            com.example.chat.data.messaging.ConversationDispatchLocks.accountKey(
+                                scopeNow.userId, scopeNow.tenantId, scopeNow.baseUrl),
+                            conversationId,
+                        )
                         try {
-                            val uploaded = api.uploadMedia(uploadTarget) { _, _ -> }
+                            // No flag re-check here: begin() already enforced the
+                            // durable flag inside the dispatch lock, and a toggle
+                            // is refused while this upload stays registered.
+                            // But the ACCOUNT is revalidated after begin's
+                            // suspension: tracker registration and upload must
+                            // ride the SAME captured identity.
+                            check(api.authSnapshot() === scopeNow) {
+                                "Account changed while the upload was starting; nothing was uploaded."
+                            }
+                            val uploaded = api.uploadMediaForScope(scopeNow, uploadTarget) { _, _ -> }
                             val effectiveName = if (type == "image" && compressedTemp != null) {
                                 if (file.name.contains('.')) "${file.name.substringBeforeLast('.')}.jpg" else "${file.name}.jpg"
                             } else {
@@ -176,6 +196,7 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                                 durationSeconds = durationSeconds,
                             )
                         } finally {
+                            endUpload()
                             compressedTemp?.delete()
                             if (stagedFile.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")) {
                                 stagedFile.delete()
@@ -205,33 +226,61 @@ fun rememberChatAttachments(conversationId: String, afterSend: () -> Unit): Chat
                         }
                         throw error
                     }
+                    val scopeLegacy = api.authSnapshot()
+                    val endLegacyUpload = com.example.chat.data.messaging.AttachmentUploadTracker.begin(
+                        com.example.chat.data.messaging.ConversationDispatchLocks.accountKey(
+                            scopeLegacy.userId, scopeLegacy.tenantId, scopeLegacy.baseUrl),
+                        conversationId,
+                    )
                     try {
+                        // Same as above: begin()'s durable in-lock check is the
+                        // enforcement; the UI lambda is not consulted here. The
+                        // account is revalidated after begin's suspension (the
+                        // legacy adapter has no scoped variant, so this check
+                        // is the binding).
+                        check(api.authSnapshot() === scopeLegacy) {
+                            "Account changed while the upload was starting; nothing was uploaded."
+                        }
                         return ServiceLocator.chatMedia.uploadBytes(
                             conversationId, type, payload, file.name, file.mimeType, durationSeconds,
                         )
                     } finally {
+                        endLegacyUpload()
                         if (stagedFile?.parentFile == context.cacheDir && stagedFile.name.startsWith("chaty-outgoing-")) {
                             stagedFile.delete()
                         }
                     }
                 }
                 override suspend fun sendMessage(text: String, type: MessageType, attachment: MessageAttachment?, extraMetadata: Map<String, Any?>?) {
+                    if (secureChannelNow()) throw IllegalStateException("Encrypted media is not wired yet, so media is not sent in an encrypted chat.")
                     api.sendMessage(conversationId, text, type, attachment, extraMetadata)
                 }
                 override suspend fun sendStructuredMessage(type: String, body: String, metadata: Map<String, Any?>) {
+                    // Conservative lambda also represents UNKNOWN. Never interpret
+                    // unknown as permission to send through either transport.
+                    if (secureChannelNow()) throw IllegalStateException("Contact/location send blocked until secure routing is verified.")
                     // Location / contact go to backend_python as a normal text message: the body already
                     // carries the maps link or the contact details. (Was a Supabase call that never ran.)
                     api.sendMessage(conversationId, body)
                 }
                 // Polls are hidden in this release (ReleaseFeatures.POLLS); these stay on the old backend.
                 override suspend fun createPoll(question: String, options: List<String>, allowMultiple: Boolean) {
+                    // Polls ride the old server-readable backend; never let one
+                    // leak out of an encrypted chat.
+                    if (secureChannelNow()) throw IllegalStateException("Polls are not available in an encrypted chat yet.")
                     ServiceLocator.gbFeatures.createPoll(conversationId, question, options, allowMultiple)
                 }
                 override suspend fun getPoll(messageId: String): Map<String, Any?>? = ServiceLocator.gbFeatures.getPoll(messageId)
                 override suspend fun votePoll(messageId: String, optionId: String) {
+                    // Same plane as createPoll: server-readable, blocked in an
+                    // encrypted chat.
+                    if (secureChannelNow()) throw IllegalStateException("Polls are not available in an encrypted chat yet.")
                     ServiceLocator.gbFeatures.votePoll(messageId, optionId)
                 }
-                override suspend fun reloadConversation() { api.loadMessages(conversationId) }
+                override suspend fun reloadConversation() {
+                    check(!secureChannelNow()) { "Message reload blocked until secure routing is verified." }
+                    api.loadMessages(conversationId)
+                }
             },
             toast = { toast(it) },
             imageShareLimit = { ServiceLocator.preferencesController.gbDouble("Img_share_limit", 30.0).toInt() },

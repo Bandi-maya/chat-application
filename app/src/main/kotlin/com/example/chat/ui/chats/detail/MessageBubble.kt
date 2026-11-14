@@ -211,12 +211,26 @@ fun ChatMessageBubble(
     onVoicePlay: ((MessageAttachment) -> Unit)? = null,
     onViewOnceOpen: (() -> Unit)? = null,
     onViewOncePlaybackCompleted: (() -> Unit)? = null,
+    onVoicePlaybackCompleted: (() -> Unit)? = null,
     onRetry: (() -> Unit)? = null,
     task: ChatTask? = null,
     onTaskTap: (() -> Unit)? = null,
     onTaskToggle: (() -> Unit)? = null,
     onTaskMenu: ((Rect) -> Unit)? = null,
 ) {
+    if (com.example.chat.core.messages.ViewOnceTextPolicy.text(message)) {
+        val unavailable = com.example.chat.core.messages.ViewOnceTextPolicy.unavailable(message)
+        androidx.compose.material3.Surface(
+            modifier = Modifier.padding(8.dp).clickable(enabled = !isMe && !unavailable) { onViewOnceOpen?.invoke() },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text(if (unavailable) "No longer available" else "View once message")
+                if (!isMe && !unavailable) Text("Tap to open once")
+            }
+        }
+        return // No raw text/link preview/reply/copy/selection/forward affordance.
+    }
     val isVisualMedia = message.attachment?.type in setOf("image", "video")
     val mediaInset = with(LocalDensity.current) { 1f.toDp() }
     val bubbleBg = if (isMe) {
@@ -388,7 +402,7 @@ fun ChatMessageBubble(
                     style = theme.deliveryTickStyle,
                     state = message.deliveryState,
                     unreadColor = tickUnreadColor(Color(bubbleBg), Color(theme.secondaryTextColor)),
-                    readColor = Color(theme.accentColor),
+                    readColor = tickReadColor(Color(bubbleBg)),
                     size = 15.dp,
                 )
             }
@@ -749,7 +763,10 @@ fun ChatMessageBubble(
                                         urlResolver = voiceUrlResolver,
                                         message = message, binding = attachmentBinding,
                                         onPlay = onVoicePlay,
-                                        onPlaybackCompleted = if (isViewOnceVoice) onViewOncePlaybackCompleted else null,
+                                        onPlaybackCompleted = {
+                                            onVoicePlaybackCompleted?.invoke()
+                                            if (isViewOnceVoice) onViewOncePlaybackCompleted?.invoke()
+                                        },
                                     )
                                 }
                             }
@@ -1100,8 +1117,25 @@ private fun TaskCardChip(
     }
 }
 
-private fun tickUnreadColor(surface: Color, secondaryText: Color): Color =
-    if (surface.luminance() < 0.5f) Color(0xB3FFFFFF) else secondaryText
+private fun tickContrast(first: Color, second: Color): Float {
+    val a = first.luminance()
+    val b = second.luminance()
+    return (maxOf(a, b) + 0.05f) / (minOf(a, b) + 0.05f)
+}
+
+private fun tickUnreadColor(surface: Color, secondaryText: Color): Color {
+    val preferred = secondaryText.copy(alpha = 1f)
+    if (tickContrast(surface, preferred) >= 3f) return preferred
+    val light = Color(0xFFF1F3F7)
+    val dark = Color(0xFF252B35)
+    return if (tickContrast(surface, light) >= tickContrast(surface, dark)) light else dark
+}
+
+private fun tickReadColor(surface: Color): Color {
+    val lightGreen = Color(0xFFA9F5BE)
+    val darkGreen = Color(0xFF00421D)
+    return if (tickContrast(surface, lightGreen) >= tickContrast(surface, darkGreen)) lightGreen else darkGreen
+}
 
 @Composable
 private fun MessageMetaRow(
@@ -1161,7 +1195,7 @@ private fun MessageMetaRow(
                     style = theme.deliveryTickStyle,
                     state = message.deliveryState,
                     unreadColor = tickUnreadColor(Color(bubbleBg), Color(theme.secondaryTextColor)),
-                    readColor = Color(theme.accentColor),
+                    readColor = tickReadColor(Color(bubbleBg)),
                     size = 15.dp,
                 )
             }
@@ -1310,7 +1344,7 @@ private fun VoiceNoteCard(
                             check(binding.deliver(result) { playbackSource = result }) { "Session changed" }
                         }
                         catch (e: kotlinx.coroutines.CancellationException) { releaseConsumerSource(result); throw e }
-                        result.consumerUri() ?: throw IllegalStateException("Audio unavailable offline or access denied.")
+                        result.consumerUri() ?: throw IllegalStateException(result.audioUnavailableMessage())
                     } else urlResolver?.invoke(path) ?: path
                     kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
                         player.setOnPreparedListener { if (cont.isActive) cont.resumeWith(Result.success(Unit)) }

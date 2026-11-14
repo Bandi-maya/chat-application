@@ -211,4 +211,20 @@ class ApiChatClientParityTest {
         assertEquals("https://example.invalid/a.jpg", user.avatarUrl)
         assertEquals("https://example.invalid/b.jpg", user.bannerUrl)
     }
+    @Test fun queuedRetryAndRouteFallbackKeepSameClientIdentityAndPayload() {
+        val t = FakeTransport { call -> if (call.url.contains("/api/v1/")) 503 to "{}" else 404 to "{}" }
+        val c = client(t)
+        repeat(2) { assertEquals(ApiChatClient.SendResult.Offline, c.sendMessageResult("room", "same payload", "temp_stable-key")) }
+        assertEquals(4, t.calls.size)
+        assertEquals(1, t.calls.map { it.body }.distinct().size)
+        t.calls.forEach { assertEquals("temp_stable-key", org.json.JSONObject(it.body).getString("client_id")) }
+    }
+
+    @Test fun malformedCommitResponseKeepsQueuedMessageUnconfirmed() {
+        val missingId = FakeTransport { 200 to """{"data":{"content":"hello"}}""" }
+        assertEquals(ApiChatClient.SendResult.Offline, client(missingId).sendMessageResult("room", "hello", "temp_key"))
+        val wrongRoom = FakeTransport { 200 to """{"data":{"id":"message","room_id":"other-room"}}""" }
+        assertEquals(ApiChatClient.SendResult.Offline, client(wrongRoom).sendMessageResult("room", "hello", "temp_key"))
+    }
+
 }

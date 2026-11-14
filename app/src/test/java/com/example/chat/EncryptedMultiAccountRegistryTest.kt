@@ -101,6 +101,24 @@ class EncryptedMultiAccountRegistryTest {
     )
 
     @Test
+    fun defaultTwoAccountCapAllowsAnyMixAndNeverRemovesExistingSessions() {
+        val multi = FakeMultiAccountStore()
+        val coordinator = MultiAccountRegistryCoordinator(multi)
+        val personal = ApiRoutingSnapshot("personal", "https://api.example.com", "wss://api.example.com/ws", 0L)
+        val organization = personal.copy(tenantId = "organization")
+        val first = coordinator.registerAuthenticatedAccount(ApiAuthResult("token1", user("u1")), personal, true)
+        val second = coordinator.registerAuthenticatedAccount(ApiAuthResult("token2", user("u2")), personal, true)
+        assertNotNull(first); assertNotNull(second)
+        val active = multi.activeKey
+        assertNull(coordinator.registerAuthenticatedAccount(ApiAuthResult("token3", user("u3")), organization, false))
+        assertEquals(2, multi.registry.size)
+        assertEquals(active, multi.activeKey)
+        assertEquals(2, multi.credentials.size)
+        assertNotNull(coordinator.registerAuthenticatedAccount(ApiAuthResult("renewed", user("u1")), personal, true))
+        assertEquals(2, multi.registry.size)
+    }
+
+    @Test
     fun sameUserIdAcrossTenantsProducesDistinctAccountKeysAndHashes() {
         val k1 = ApiAccountRoutingCanonicalizer.accountKey("Acme ", "HTTPS://API.Chaty.app:443/", "user-1")
         val k2 = ApiAccountRoutingCanonicalizer.accountKey("beta", "https://api.chaty.app", "user-1")

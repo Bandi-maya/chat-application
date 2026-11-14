@@ -21,8 +21,7 @@ import org.bouncycastle.crypto.signers.Ed25519Signer
  *    therefore unusable without this device's private key.
  *
  * The key material lives in [SecureKeyValueStore] (EncryptedSharedPreferences /
- * Keystore-backed) and never leaves the device. Legacy sessions simply omit the
- * headers and keep working.
+ * Keystore-backed) and never leaves the device. The server decides whether legacy sessions may continue. A new login must obtain a fresh challenge; reinstall creates a new installation, not a physical-device guarantee.
  */
 class DeviceIdentityManager(
     private val secureStore: SecureKeyValueStore,
@@ -30,7 +29,7 @@ class DeviceIdentityManager(
     private val mutex = Mutex()
     @Volatile private var cached: DeviceIdentity? = null
 
-    data class DeviceIdentity(
+    class DeviceIdentity(
         val deviceId: String,
         val publicKeyBase64: String,
         private val privateKeyBytes: ByteArray,
@@ -52,16 +51,17 @@ class DeviceIdentityManager(
         val storedPrivate = secureStore.read(KEY_PRIVATE)
         val storedPublic = secureStore.read(KEY_PUBLIC)
         val identity = if (storedId != null && storedPrivate != null && storedPublic != null) {
-            DeviceIdentity(
-                deviceId = storedId,
-                publicKeyBase64 = storedPublic,
-                privateKeyBytes = Base64.decode(storedPrivate),
-            )
+            val privateBytes = Base64.decode(storedPrivate)
+            val publicBytes = Base64.decode(storedPublic)
+            check(privateBytes.size == 32 && publicBytes.size == 32 &&
+                java.security.MessageDigest.isEqual(Ed25519PrivateKeyParameters(privateBytes, 0).generatePublicKey().encoded, publicBytes) &&
+                runCatching { UUID.fromString(storedId).toString() == storedId }.getOrDefault(false)) {
+                "Saved installation identity is invalid. It cannot be silently replaced."
+            }
+            DeviceIdentity(storedId, storedPublic, privateBytes)
         } else {
-            if (storedId != null || storedPrivate != null || storedPublic != null) {
-                // Incomplete identity material: rotate rather than risk a
-                // mismatched key pair being presented to the server.
-                secureStore.deleteAll(setOf(KEY_DEVICE_ID, KEY_PRIVATE, KEY_PUBLIC))
+            check(storedId == null && storedPrivate == null && storedPublic == null) {
+                "Saved installation identity is incomplete. It cannot be silently replaced."
             }
             val privateKey = Ed25519PrivateKeyParameters(SecureRandom())
             val publicKey = privateKey.generatePublicKey().encoded
@@ -92,6 +92,34 @@ class DeviceIdentityManager(
         )
     }
 
+    /** Fresh one-use proof for every login/register attempt; shared identity across retained accounts. */
+    suspend fun challengeHeaders(baseUrl: String, tenantId: String, transport: ApiHttpTransport,
+        isCurrent: () -> Boolean): Map<String, String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val identity = getOrCreate()
+        val uri = java.net.URI(baseUrl)
+        require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null && uri.query == null && uri.fragment == null) { "Secure device verification endpoint required." }
+        check(isCurrent()) { "Account changed. Start sign-in again." }
+        val body = org.json.JSONObject().put("installationId", identity.deviceId).put("publicKey", identity.publicKeyBase64).toString()
+        val headers = mapOf("Content-Type" to "application/json")
+        var response = transport.execute("POST", "${baseUrl.trimEnd('/')}/auth/device/challenge", headers, body)
+        check(isCurrent()) { "Account changed. Start sign-in again." }
+        if (response.first == 404) {
+            response = transport.execute("POST", "${baseUrl.trimEnd('/')}/api/v1/auth/device/challenge", headers, body)
+            check(isCurrent()) { "Account changed. Start sign-in again." }
+        }
+        check(response.first == 200) { "Installation verification unavailable (${response.first}). Try again later." }
+        val data = org.json.JSONObject(response.second).optJSONObject("data") ?: error("Invalid installation challenge.")
+        val challengeId = data.getString("challengeId")
+        val message = data.getString("challengeMessage")
+        val expires = java.time.Instant.parse(data.getString("expiresAt"))
+        val now = java.time.Instant.now()
+        check(challengeId.length in 1..128 && message.length in 1..4096 && data.optInt("accountLimit") == 2 &&
+            expires.isAfter(now) && !expires.isAfter(now.plusSeconds(90))) { "Invalid or expired installation challenge." }
+        check(isCurrent()) { "Account changed. Start sign-in again." }
+        mapOf(HEADER_DEVICE_ID to identity.deviceId, HEADER_DEVICE_PUBLIC_KEY to identity.publicKeyBase64,
+            HEADER_DEVICE_CHALLENGE_ID to challengeId, HEADER_DEVICE_PROOF to Base64.toBase64String(identity.sign(message.toByteArray(Charsets.UTF_8))))
+    }
+
     /** Headers for refresh: prove possession of the device key by signing the
      *  exact refresh token being presented. */
     suspend fun proofHeaders(refreshToken: String): Map<String, String> {
@@ -106,6 +134,7 @@ class DeviceIdentityManager(
     companion object {
         const val HEADER_DEVICE_ID = "x-device-id"
         const val HEADER_DEVICE_PUBLIC_KEY = "x-device-public-key"
+        const val HEADER_DEVICE_CHALLENGE_ID = "x-device-challenge-id"
         const val HEADER_DEVICE_PROOF = "x-device-proof"
         private const val KEY_DEVICE_ID = "chaty.device.id.v1"
         private const val KEY_PRIVATE = "chaty.device.ed25519.private.v1"

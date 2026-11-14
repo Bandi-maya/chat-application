@@ -45,6 +45,12 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
     private var bound = false
     private var receiverReady = false
     private var mediaManager: MediaSessionManager? = null
+    private var mediaSubscribed = false
+    private val appLabels = android.util.LruCache<String, String>(32)
+    private var artworkSource = java.lang.ref.WeakReference<android.graphics.Bitmap>(null)
+    private var artworkGeneration = -1
+    private var boundedArtwork: android.graphics.Bitmap? = null
+    private var artworkAccent: Int? = null
     private var players = emptyList<MediaController>()
     private val registration get() = ComponentName(this, DynamicIslandNotificationListener::class.java)
     private val fingerprints = linkedMapOf<String, Int>()
@@ -58,7 +64,7 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
     private val deviceState = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             refreshPrivacy()
-            if (capture()) reconcile()
+            reconcile()
         }
     }
     private val sessionsChanged = MediaSessionManager.OnActiveSessionsChangedListener { list -> replacePlayers(list.orEmpty()) }
@@ -110,21 +116,50 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
         if (bound) disconnectMedia()
         bound = true
         mediaManager = getSystemService(MediaSessionManager::class.java)
-        try { mediaManager?.addOnActiveSessionsChangedListener(sessionsChanged, registration) } catch (_: Exception) {}
         refreshPrivacy()
-        refreshPlayers()
         reconcile()
     }
 
     private fun disconnectMedia() {
-        try { mediaManager?.removeOnActiveSessionsChangedListener(sessionsChanged) } catch (_: Exception) {}
+        if (mediaSubscribed) try { mediaManager?.removeOnActiveSessionsChangedListener(sessionsChanged) } catch (_: Exception) {}
+        mediaSubscribed = false
         replacePlayers(emptyList())
+    }
+
+    private fun syncMediaObservation() {
+        val needed = bound && capture() && IslandSettings.isOn(Trigger.Media)
+        if (!needed) { disconnectMedia(); return }
+        if (!mediaSubscribed) {
+            try {
+                mediaManager?.addOnActiveSessionsChangedListener(sessionsChanged, registration) ?: return
+                mediaSubscribed = true
+            } catch (_: Exception) { return }
+            refreshPlayers()
+        }
+    }
+
+    private fun artwork(source: android.graphics.Bitmap?): Pair<android.graphics.Bitmap?, Int?> {
+        if (source == null || source.isRecycled) {
+            artworkSource.clear(); boundedArtwork = null; artworkAccent = null; artworkGeneration = -1
+            return null to null
+        }
+        if (artworkSource.get() !== source || artworkGeneration != source.generationId) {
+            artworkSource = java.lang.ref.WeakReference(source)
+            artworkGeneration = source.generationId
+            val scale = minOf(1f, 256f / maxOf(source.width, source.height).coerceAtLeast(1))
+            boundedArtwork = runCatching {
+                android.graphics.Bitmap.createScaledBitmap(source, (source.width * scale).toInt().coerceAtLeast(1),
+                    (source.height * scale).toInt().coerceAtLeast(1), true)
+            }.getOrNull()
+            artworkAccent = boundedArtwork?.let { dominantColor(it) }
+        }
+        return boundedArtwork to artworkAccent
     }
 
     override fun onListenerDisconnected() {
         bound = false
         disconnectMedia()
-        try { requestRebind(registration) } catch (_: Exception) {}
+        if (isEnabled(this) && IslandSettings.enabled.value) try { requestRebind(registration) } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
@@ -140,13 +175,16 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
     }
 
     private fun refreshPlayers() {
+        if (!mediaSubscribed || !capture()) return
         val available = try { mediaManager?.getActiveSessions(registration).orEmpty() } catch (_: Exception) { emptyList() }
         replacePlayers(available)
     }
 
     private fun replacePlayers(list: List<MediaController>) {
+        val allowed = if (mediaSubscribed && capture()) list else emptyList()
+        if (players.map { it.sessionToken } == allowed.map { it.sessionToken }) { updatePlayer(); return }
         players.forEach { try { it.unregisterCallback(playerChanged) } catch (_: Exception) {} }
-        players = list
+        players = allowed
         players.forEach { try { it.registerCallback(playerChanged) } catch (_: Exception) {} }
         updatePlayer()
     }
@@ -155,20 +193,30 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
         setOf(PlaybackState.STATE_PLAYING, PlaybackState.STATE_BUFFERING, PlaybackState.STATE_CONNECTING)
 
     private fun updatePlayer() {
+        if (!mediaSubscribed || !capture() || !IslandSettings.isOn(Trigger.Media)) {
+            IslandController.media = null
+            IslandController.setMedia(null)
+            artwork(null)
+            return
+        }
         val allowed = players.filter { it.packageName != packageName && it.packageName !in IslandSettings.blockedApps.value }
         val player = allowed.firstOrNull { playing(it) } ?: allowed.firstOrNull()
         IslandController.media = player
         if (!capture() || !IslandSettings.isOn(Trigger.Media)) { IslandController.setMedia(null); return }
         val metadata = player?.metadata
         val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
-        if (player == null || metadata == null || title.isNullOrBlank()) { IslandController.setMedia(null); return }
-        val artwork = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+        if (player == null || metadata == null || title.isNullOrBlank()) { IslandController.setMedia(null); artwork(null); return }
+        val (artwork, accent) = artwork(metadata.getBitmap(MediaMetadata.METADATA_KEY_ART) ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART))
         val playback = player.playbackState
         IslandController.setMedia(IslandMode.Media(title, metadata.getString(MediaMetadata.METADATA_KEY_ARTIST).orEmpty(),
-            playing(player), artwork, artwork?.let { dominantColor(it) },
+            playing(player), artwork, accent,
             metadata.getLong(MediaMetadata.METADATA_KEY_DURATION).coerceAtLeast(0),
             (playback?.position ?: 0).coerceAtLeast(0), playback?.lastPositionUpdateTime ?: 0,
-            playback?.playbackSpeed ?: 1f))
+            playback?.playbackSpeed ?: 1f, player.packageName, true,
+            canPlayPause = ((playback?.actions ?: 0L) and (if (playing(player)) PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_PLAY_PAUSE else PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PLAY_PAUSE)) != 0L,
+            canPrevious = ((playback?.actions ?: 0L) and PlaybackState.ACTION_SKIP_TO_PREVIOUS) != 0L,
+            canNext = ((playback?.actions ?: 0L) and PlaybackState.ACTION_SKIP_TO_NEXT) != 0L,
+            canSeek = ((playback?.actions ?: 0L) and PlaybackState.ACTION_SEEK_TO) != 0L))
     }
 
     private fun snapshot(): List<StatusBarNotification> = try { activeNotifications?.toList().orEmpty() } catch (_: Exception) { emptyList() }
@@ -176,6 +224,7 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
     private fun reconcile() {
         if (!bound) return
         refreshPrivacy()
+        syncMediaObservation()
         updatePlayer()
         if (!capture()) return
         val current = snapshot().filter { it.packageName != packageName }
@@ -211,9 +260,14 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
         fingerprints.remove(sbn.key)
     }
 
-    private fun appName(item: StatusBarNotification): String = try {
-        packageManager.getApplicationLabel(packageManager.getApplicationInfo(item.packageName, 0)).toString()
-    } catch (_: Exception) { item.packageName }
+    private fun appName(item: StatusBarNotification): String {
+        appLabels.get(item.packageName)?.let { return it }
+        val label = try {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(item.packageName, 0)).toString()
+        } catch (_: Exception) { item.packageName }
+        appLabels.put(item.packageName, label)
+        return label
+    }
 
     @Suppress("DEPRECATION")
     private fun message(notification: Notification): String {
@@ -304,8 +358,14 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
             2 -> false
             else -> accept != null || (!counting && (value.fullScreenIntent != null || audioMode() == AudioManager.MODE_RINGTONE))
         }
+        val elapsedStart = if (!incoming && counting && value.`when` > 0L &&
+            !value.extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN, false)) {
+            val elapsed = (System.currentTimeMillis() - value.`when`).coerceAtLeast(0L)
+            (android.os.SystemClock.elapsedRealtime() - elapsed).coerceAtLeast(1L)
+        } else null
         IslandController.setCall(value.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty().ifBlank { "Call" },
-            incoming, accept, reject, key = item.key)
+            incoming, accept, reject, key = item.key, connectedSince = elapsedStart,
+            mute = action(setOf("mute", "unmute")), speaker = action(setOf("speaker", "speakerphone")))
     }
 
     private fun clockNotification(item: StatusBarNotification): Boolean {

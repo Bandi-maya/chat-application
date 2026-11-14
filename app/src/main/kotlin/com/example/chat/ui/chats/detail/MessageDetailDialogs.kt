@@ -1,5 +1,7 @@
 package com.example.chat.ui.chats.detail
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -15,6 +17,9 @@ import androidx.compose.ui.unit.dp
 import com.example.chat.domain.models.ChatMessage
 import com.example.chat.ui.kit.ChatyConfirmationDialog as AlertDialog
 import java.time.ZoneId
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 
 /** Resolve IDs against live messages on every composition, never expose a stale revoked copy. */
 @Composable
@@ -47,11 +52,16 @@ internal fun MessageDetailDialogs(
     }
     messages.firstOrNull { it.id == infoMessageId }?.let { message ->
         AlertDialog(onDismissRequest = onCloseInfo, title = { Text("Message info") },
-            text = { Column {
-                Text("Sent: ${message.createdAt.atZone(ZoneId.systemDefault())}")
-                Text("Status: ${message.deliveryState}")
-                message.editedAt?.let { Text("Edited: ${it.atZone(ZoneId.systemDefault())}") }
-                Text("Per-recipient delivery and read times are not provided by this conversation.")
+            text = { Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                val formatter = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm:ss z", java.util.Locale.getDefault()).withZone(ZoneId.systemDefault())
+                val confirmed = message.deliveryState in setOf(com.example.chat.domain.models.DeliveryState.sent, com.example.chat.domain.models.DeliveryState.delivered, com.example.chat.domain.models.DeliveryState.read)
+                Text("Status: ${message.deliveryState.name.replaceFirstChar { it.uppercase() }}")
+                Text("${if (confirmed) "Message time" else "Created on this device"}: ${formatter.format(message.createdAt)}")
+                ServerReceiptInfo(message.id, message.type == com.example.chat.domain.models.MessageType.audio)
+                message.editedAt?.let { Text("Edited: ${formatter.format(it)}") }
+                Text("Message type: ${message.type.name}")
+                Text("Message ID: ${message.id}")
+                Text("Receipt times come from the server. Hidden/private times and unknown historical receipts are never inferred.")
             } },
             confirmButton = { TextButton(onClick = onCloseInfo) { Text("Close") } })
     }
@@ -71,4 +81,44 @@ internal fun LocalMessageEditDialog(
         } },
         confirmButton = { TextButton(onClick = onSave) { Text("Save locally") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
+}
+
+@Composable
+private fun ServerReceiptInfo(messageId: String, isAudio: Boolean) {
+    val api = com.example.chat.ServiceLocator.apiBackend
+    val owner = api.authSnapshot()
+    var page by androidx.compose.runtime.remember(messageId, owner) { androidx.compose.runtime.mutableStateOf<com.example.chat.data.api.MessageInfoPage?>(null) }
+    var recipients by androidx.compose.runtime.remember(messageId, owner) { androidx.compose.runtime.mutableStateOf(emptyList<com.example.chat.data.api.MessageInfoRecipient>()) }
+    var busy by androidx.compose.runtime.remember(messageId, owner) { androidx.compose.runtime.mutableStateOf(false) }
+    var error by androidx.compose.runtime.remember(messageId, owner) { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    suspend fun load(after: String?) {
+        if (busy) return
+        busy = true; error = null
+        try {
+            val result = api.messageInfo(messageId, after, owner)
+            if (api.authSnapshot() !== owner) return
+            recipients = (if (after == null) result.recipients else recipients + result.recipients).distinctBy { it.userId }
+            page = result
+        } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+        catch (failure: Exception) { if (api.authSnapshot() === owner) error = failure.message ?: "Could not load message receipts." }
+        finally { busy = false }
+    }
+    androidx.compose.runtime.LaunchedEffect(messageId, owner) { load(null) }
+    val formatter = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm:ss z", java.util.Locale.getDefault()).withZone(ZoneId.systemDefault())
+    fun time(value: java.time.Instant?) = value?.let(formatter::format) ?: "Not recorded"
+    if (busy) Text("Loading receipts...")
+    error?.let { Text(it); TextButton(onClick = { scope.launch { load(page?.nextAfterUserId) } }, enabled = !busy) { Text("Retry") } }
+    page?.let { current ->
+        if (!current.snapshotKnown) Text("Send-time recipients and exact receipts are unknown for this older message.")
+        Text("Sent to service: ${time(current.sentAt)}")
+        recipients.forEach { recipient ->
+            Text("Recipient: ${recipient.userId}")
+            Text("Delivered: ${time(recipient.times.deliveredAt)}")
+            Text("Read: ${if (recipient.readHidden) "Private" else time(recipient.times.readAt)}")
+            if (isAudio) Text("Played: ${if (recipient.readHidden) "Private" else time(recipient.times.playedAt)}")
+        }
+        if (current.nextAfterUserId != null) TextButton(onClick = { scope.launch { load(current.nextAfterUserId) } }, enabled = !busy) { Text("Load more recipients") }
+        if (current.snapshotKnown && recipients.isEmpty() && current.nextAfterUserId == null) Text("No visible recipient receipts.")
+    }
 }

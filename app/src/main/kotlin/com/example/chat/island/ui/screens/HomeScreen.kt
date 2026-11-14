@@ -34,6 +34,8 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -110,7 +112,10 @@ fun HomeScreen(tick: Int) {
 
 @Composable
 private fun StatusCard(context: Context) {
-    val running by IslandService.running.collectAsState()
+    val running by IslandService.active.collectAsState(initial = IslandService.isActive())
+    var disclosure by remember { mutableStateOf<com.example.chat.island.core.IslandPermissionAccess?>(null) }
+    disclosure?.let { access -> com.example.chat.island.core.IslandPermissionDisclosure(access,
+        onContinue = { disclosure = null; access.open(context) }, onDismiss = { disclosure = null }) }
     Card(Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -138,7 +143,10 @@ private fun StatusCard(context: Context) {
             Switch(
                 checked = running,
                 onCheckedChange = { want ->
-                    if (want) IslandControl.start(context) else IslandControl.stop(context)
+                    if (!want) IslandControl.stop(context)
+                    else if (!Perms.overlay(context) && !Perms.accessibility(context)) disclosure = com.example.chat.island.core.IslandPermissionAccess.Overlay
+                    else if (!Perms.listener(context)) disclosure = com.example.chat.island.core.IslandPermissionAccess.Notifications
+                    else IslandControl.start(context)
                 },
             )
         }
@@ -189,6 +197,10 @@ private fun PreviewCard() {
 
 @Composable
 private fun AccessibilityWarningCard(context: Context, tick: Int) {
+    var disclosure by remember { mutableStateOf<com.example.chat.island.core.IslandPermissionAccess?>(null) }
+    disclosure?.let { access -> com.example.chat.island.core.IslandPermissionDisclosure(access,
+        onContinue = { disclosure = null; access.open(context) }, onDismiss = { disclosure = null }) }
+
     val granted = remember(tick) { Perms.accessibility(context) }
     if (granted) return
 
@@ -198,7 +210,7 @@ private fun AccessibilityWarningCard(context: Context, tick: Int) {
         body = stringResource(R.string.home_accessibility_warning_body),
     ) {
         Button(onClick = {
-            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            disclosure = com.example.chat.island.core.IslandPermissionAccess.Accessibility
         }) {
             Text(stringResource(R.string.home_open_accessibility_settings))
         }
@@ -242,15 +254,7 @@ private fun BatteryCard(context: Context, tick: Int) {
         body = stringResource(R.string.home_battery_body),
     ) {
         Button(onClick = {
-            val request = Intent(
-                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                Uri.parse("package:${context.packageName}"),
-            )
-            try {
-                context.startActivity(request)
-            } catch (e: ActivityNotFoundException) {
-                context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-            }
+            Perms.openBatterySettings(context)
         }) {
             Text(stringResource(R.string.home_battery_fix))
         }

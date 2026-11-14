@@ -87,6 +87,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -157,7 +158,6 @@ import com.example.chat.ui.chats.detail.ChatyEmojiPickerSheet
 import com.example.chat.ui.chats.detail.ComposerColors
 import com.example.chat.ui.chats.detail.ConnectionDetailSheetContent
 import com.example.chat.ui.chats.detail.ChatMessageBubble
-import com.example.chat.ui.chats.detail.ConnectionHealthIndicator
 import com.example.chat.ui.chats.detail.GlobalConnectionBanner
 import com.example.chat.ui.chats.detail.MessageActionRegistry
 import com.example.chat.ui.chats.detail.MessageActionType
@@ -213,8 +213,16 @@ fun ChatDetailScreen(
         if (senderId == currentUserId) "You" else "Team Member"
     },
     resolveQuoteSender: (String) -> com.example.chat.domain.models.UserProfile? = { null },
+    useScopedChatTheme: Boolean = false,
     presenceText: String? = null,
     presenceIsOnline: Boolean = false,
+    showUnknownSenderSafety: Boolean = false,
+    onContinueUnknownSender: () -> Unit = {},
+    onReportUnknownSender: () -> Unit = {},
+    peerTyping: Boolean = false,
+    typingAvatarInitials: String = "",
+    typingAvatarUrl: String? = null,
+    typingAvatarColorHex: String? = null,
     showHeaderAvatar: Boolean = true,
     showHeaderName: Boolean = true,
     showHeaderCalls: Boolean = true,
@@ -244,6 +252,10 @@ fun ChatDetailScreen(
     onToggleMute: (() -> Unit)? = null,
     ghostModeEnabled: Boolean = false,
     onToggleGhostMode: (() -> Unit)? = null,
+    // Per-conversation end-to-end encryption (MLS plane). The host owns the
+    // flag; when onToggleSecureChannel is null the menu item is hidden.
+    secureChannelEnabled: Boolean = false,
+    onToggleSecureChannel: (() -> Unit)? = null,
     onBlockContact: (() -> Unit)? = null,
     onReportMessage: (ChatMessage) -> Unit = {},
     onBlockMessageSender: (String) -> Unit = {},
@@ -253,6 +265,7 @@ fun ChatDetailScreen(
     disableDoubleTapReaction: Boolean = false,
     doubleTapReactionEmoji: String = "❤️",
     onDoubleTapReactionEmojiChanged: ((String) -> Unit)? = null,
+    onReadAlertNotification: (ChatMessage) -> Unit = {},
     showGroupAvatar: Boolean = true,
     colorOverrides: BubbleColorOverrides? = null,
     remoteImage: RemoteImageSlot? = chatyRemoteImage,
@@ -325,12 +338,19 @@ fun ChatDetailScreen(
     // Test-only hook for debug fixtures (MenuAlbumProofActivity): opens the header
     // overflow menu on first composition. Default keeps product behavior unchanged.
     initialChatMenuOpen: Boolean = false,
+    // G10: @handles the current user answers to (without "@"), used by the
+    // text-mention fallback. Empty list keeps the mention jump button hidden
+    // unless structured message metadata marks a mention. Host wires this.
+    currentUserMentionHandles: List<String> = emptyList(),
+    /** G1: Own-server GIF tab draft. Provider requests and sends remain disabled. */
+    gifApiKey: String = "",
+    onGifSend: ((com.example.chat.core.gif.GifResult) -> Unit)? = null,
 ) {
     androidx.compose.runtime.CompositionLocalProvider(
         com.example.chat.ui.chats.detail.LocalEmojiPack provides
             com.example.chat.ui.chats.detail.ChatyEmojiPack.normalize(universalEmojiStyle),
     ) {
-    val theme = com.example.chat.ui.chats.bundles.messageBundleTheme(LocalThemeConfig.current)
+    val theme = if (useScopedChatTheme) LocalThemeConfig.current else com.example.chat.ui.chats.bundles.messageBundleTheme(LocalThemeConfig.current)
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -338,6 +358,42 @@ fun ChatDetailScreen(
     // Dart initState: the composer restores the persisted draft.
     var composerText by remember(conversation.id) { mutableStateOf(conversation.draftText) }
     var sending by remember { mutableStateOf(false) }
+    var viewOnceTextTarget by remember(conversation.id, currentUserId, messageSessionIdentity) { mutableStateOf<ChatMessage?>(null) }
+    val viewOnceOwner = remember(conversation.id, currentUserId, messageSessionIdentity) { com.example.chat.ServiceLocator.apiBackend.authSnapshot() }
+    viewOnceTextTarget?.let { target ->
+        com.example.chat.ui.chats.detail.TemporaryViewOnceTextViewer(
+            messageId = target.id,
+            open = { com.example.chat.ServiceLocator.apiBackend.openViewOnceText(target, viewOnceOwner) },
+            onDismiss = { viewOnceTextTarget = null },
+        )
+    }
+    var scheduleDraft by remember(conversation.id, currentUserId) { mutableStateOf<String?>(null) }
+    var scheduling by remember(conversation.id, currentUserId) { mutableStateOf(false) }
+    val scheduleOwner = remember(conversation.id, currentUserId, messageSessionIdentity) { com.example.chat.ServiceLocator.apiBackend.authSnapshot() }
+    scheduleDraft?.let { draft ->
+        com.example.chat.ui.automation.ScheduleMessageSheet(
+            conversations = listOf(conversation), initialConversationId = conversation.id,
+            initialBody = draft, confirmEnabled = !scheduling,
+            onDismiss = { if (!scheduling) scheduleDraft = null },
+            onConfirm = { cid, body, at ->
+                if (!scheduling) {
+                    scheduling = true
+                    scope.launch {
+                        try {
+                            check(!secureChannelEnabled) { "Scheduling is unavailable in encrypted chats." }
+                            check(com.example.chat.ServiceLocator.apiBackend.authSnapshot() === scheduleOwner) { "Account changed. Open this chat again." }
+                            com.example.chat.ServiceLocator.scheduledMessageService.scheduleMessage(cid, body, at,
+                                expectedSession = com.example.chat.ServiceLocator.apiBackend.scheduledMessagesClient(scheduleOwner))
+                            scheduleDraft = null
+                            snackbarHostState.showSnackbar("Schedule confirmed. Check Scheduled messages for its status.")
+                        } catch (e: Exception) {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            snackbarHostState.showSnackbar(e.message ?: "Could not schedule message")
+                        } finally { scheduling = false }
+                    }
+                }
+            })
+    }
     var replyTarget by remember { mutableStateOf<ChatMessage?>(null) }
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var selectedIds by remember(conversation.id) { mutableStateOf<Set<String>>(emptySet()) }
@@ -486,8 +542,29 @@ fun ChatDetailScreen(
     val menuView = LocalView.current
     val menuConfig = LocalConfiguration.current
     val menuDensity = LocalDensity.current
-    var typingPublished by remember { mutableStateOf(false) }
-    var typingIdleJob by remember { mutableStateOf<Job?>(null) }
+    var typingPublished by remember(conversation.id) { mutableStateOf(false) }
+    var lastTypingPublishedAt by remember(conversation.id) { mutableStateOf(0L) }
+    var typingIdleJob by remember(conversation.id) { mutableStateOf<Job?>(null) }
+    val typingLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(conversation.id, typingLifecycle) {
+        // Capture this room's account-bound callback, not the next room's callback at disposal.
+        val stopTyping = {
+            typingIdleJob?.cancel()
+            typingIdleJob = null
+            if (typingPublished) {
+                typingPublished = false
+                onTypingChanged(false)
+            }
+        }
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) stopTyping()
+        }
+        typingLifecycle.addObserver(observer)
+        onDispose {
+            typingLifecycle.removeObserver(observer)
+            stopTyping()
+        }
+    }
     val searchFocusRequester = remember { FocusRequester() }
 
     val listState = rememberLazyListState()
@@ -497,18 +574,86 @@ fun ChatDetailScreen(
     androidx.activity.compose.BackHandler(isSelectionMode) { selectedIds = emptySet() }
 
     // One projection owns both rendered rows and all scroll destinations.
-    // Selection and menus do not change projection or tile geometry. Group identity comes from
-    // the validated album envelope, never adjacency or timestamps.
+    // Selection and menus do not change projection or tile geometry. Validated album
+    // envelopes take priority; eligible adjacent single-image sends form display-only groups.
     // Memoized: this screen recomposes on every composer keystroke; the O(n)
     // album projection and cluster pass must run only when messages change.
-    val timelineRows = remember(messages) { com.example.chat.ui.chats.detail.mediaTimelineRows(messages) }
-    val senderClusters = remember(timelineRows) { com.example.chat.ui.chats.detail.SenderClusterPolicy.forRows(timelineRows, java.time.ZoneId.systemDefault()) }
+    val timelineZone = java.time.ZoneId.systemDefault()
+    val timelineRows = remember(messages, timelineZone) { com.example.chat.ui.chats.detail.mediaTimelineRows(messages, zone = timelineZone) }
+    // Notify When Message Read + presence toasts (Bandi, 2026-11-14).
+    com.example.chat.ui.chats.detail.ReadAlertCenter.init(shareContext.applicationContext)
+    // Restore persisted watches for this account so they resume observing after a
+    // restart without waiting for each chat to be opened (sync layer feeds them
+    // via ReadAlertCenter.onMessages).
+    LaunchedEffect(localOverrideAccountKey) { com.example.chat.ui.chats.detail.ReadAlertCenter.ensureWatching(localOverrideAccountKey) }
+    val readAlertController = remember(localOverrideAccountKey, conversation.id) {
+        com.example.chat.ui.chats.detail.ReadAlertCenter.forConversation(localOverrideAccountKey, conversation.id) { message ->
+            scope.launch { snackbarHostState.showSnackbar("${conversation.title} read your message") }
+            onReadAlertNotification(message)
+        }
+    }
+    var readAlertWatchedIds by remember(localOverrideAccountKey, conversation.id) { mutableStateOf(readAlertController.watched) }
+    LaunchedEffect(messages) {
+        withContext(Dispatchers.IO) { readAlertController.onMessages(messages) }
+        readAlertWatchedIds = readAlertController.watched
+    }
+    DisposableEffect(localOverrideAccountKey, conversation.id) {
+        onDispose { com.example.chat.ui.chats.detail.ReadAlertCenter.clearScreenListener(localOverrideAccountKey, conversation.id) }
+    }
+    // Transition-guarded presence toasts: the initial snapshot (was == null) never toasts,
+    // only a real false->true flip does. Typing toasts are direct-chat only.
+    var lastPresenceOnline by remember(conversation.id) { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(presenceIsOnline) {
+        val was = lastPresenceOnline
+        lastPresenceOnline = presenceIsOnline
+        if (presenceIsOnline && was == false && conversation.isDirect) {
+            val event = com.example.chat.ui.chats.detail.PresenceEvent(conversation.id, conversation.title, com.example.chat.ui.chats.detail.PresenceEventType.online, java.time.Instant.now())
+            com.example.chat.ui.chats.detail.PresenceFeed.forAccount(localOverrideAccountKey).record(event)
+            com.example.chat.ui.chats.detail.PresenceToastPolicy.text(event)?.let { text -> scope.launch { snackbarHostState.showSnackbar(text) } }
+        }
+    }
+    var lastPeerTyping by remember(conversation.id) { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(peerTyping) {
+        val was = lastPeerTyping
+        lastPeerTyping = peerTyping
+        if (peerTyping && was == false && conversation.isDirect) {
+            val event = com.example.chat.ui.chats.detail.PresenceEvent(conversation.id, conversation.title, com.example.chat.ui.chats.detail.PresenceEventType.typing, java.time.Instant.now())
+            com.example.chat.ui.chats.detail.PresenceFeed.forAccount(localOverrideAccountKey).record(event)
+            com.example.chat.ui.chats.detail.PresenceToastPolicy.text(event)?.let { text -> scope.launch { snackbarHostState.showSnackbar(text) } }
+        }
+    }
+    val senderClusters = remember(timelineRows, timelineZone) { com.example.chat.ui.chats.detail.SenderClusterPolicy.forRows(timelineRows, timelineZone) }
+
+    // Freeze the entry unread count and then its concrete message ID. New arrivals/paging must not move this divider.
+    val unreadAtOpen = remember(conversation.id, messageSessionIdentity) { conversation.unreadCount.coerceAtLeast(0) }
+    var firstUnreadMessageId by remember(conversation.id, messageSessionIdentity) { mutableStateOf<String?>(null) }
+    val firstUnreadRowIndex = remember(timelineRows, firstUnreadMessageId) {
+        firstUnreadMessageId?.let { com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.rowIndex(timelineRows, it) } ?: -1
+    }
+
+    // G3: hide the message list until the initial anchor is applied, so the
+    // first frame never flashes the oldest page before the jump. Empty
+    // conversations render immediately.
+    var initialPositionSettled by remember(conversation.id, messageSessionIdentity) { mutableStateOf(false) }
+
+    // G10: messages that mention the current user. Structured metadata wins
+    // (backend mention type pending); text fallback matches the host-passed
+    // @handles. Own, deleted and revoked messages never count.
+    val mentionMessageIds = remember(messages, currentUserId, currentUserMentionHandles) {
+        val handles = currentUserMentionHandles.map { it.trim().lowercase().removePrefix("@") }.filter { it.isNotEmpty() }
+        messages.mapNotNull { m ->
+            if (m.senderId == currentUserId || m.isDeletedForEveryone || m.isDeletedForMe || m.isRevokedBySender) return@mapNotNull null
+            val metaMentions = (m.metadata["mentions"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+            val hit = currentUserId in metaMentions || handles.any { h -> Regex("(?<![\\p{L}\\p{N}_])@" + Regex.escape(h) + "(?![\\p{L}\\p{N}_])", RegexOption.IGNORE_CASE).containsMatchIn(m.text) }
+            if (hit) m.id else null
+        }
+    }
+
     fun selectionUnit(messageId: String): Set<String> =
         com.example.chat.ui.chats.detail.AlbumSelectionPolicy.unit(timelineRows, messageId)
     fun toggleSelectionUnit(messageId: String) {
         selectedIds = com.example.chat.ui.chats.detail.AlbumSelectionPolicy.toggle(timelineRows, selectedIds, messageId)
     }
-    val timelineZone = java.time.ZoneId.systemDefault()
     val dayHeaderLocale = LocalConfiguration.current.locales[0] ?: java.util.Locale.getDefault()
     val dayHeaderFormatter = remember(dayHeaderLocale) { DateTimeFormatter.ofPattern("d MMM yyyy", dayHeaderLocale) }
     var pendingScrollTarget by remember(conversation.id) { mutableStateOf<String?>(null) }
@@ -518,15 +663,19 @@ fun ChatDetailScreen(
         if (rowIndex >= 0) listState.animateScrollToItem(rowIndex)
         pendingScrollTarget = null
     }
-    var openedAtLatest by remember(conversation.id) { mutableStateOf(false) }
-    LaunchedEffect(conversation.id, messages.isNotEmpty()) {
+    var previousCount by remember(conversation.id, messageSessionIdentity) { mutableIntStateOf(messages.size) }
+    var openedAtLatest by remember(conversation.id, messageSessionIdentity) { mutableStateOf(false) }
+    LaunchedEffect(conversation.id, messageSessionIdentity, messages.isNotEmpty()) {
         if (!openedAtLatest && messages.isNotEmpty()) {
+            val incoming = messages.filter { it.senderId != currentUserId && !it.isDeletedForMe }
+            firstUnreadMessageId = if (unreadAtOpen > 0) incoming.takeLast(unreadAtOpen).firstOrNull()?.id else null
+            val targetId = initialMessageId ?: firstUnreadMessageId
+            val requested = targetId?.let { com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.rowIndex(timelineRows, it) } ?: -1
+            val anchor = if (requested >= 0) requested else com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.latestRowIndex(timelineRows)
+            anchor?.let { listState.scrollToItem(it) }
+            previousCount = messages.size // Initial history is not a new-message arrival.
             openedAtLatest = true
-            if (initialMessageId == null) {
-                com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.latestRowIndex(timelineRows)?.let {
-                    listState.scrollToItem(it)
-                }
-            }
+            initialPositionSettled = true
         }
     }
 
@@ -552,11 +701,10 @@ fun ChatDetailScreen(
     }
 
     // New messages: follow the bottom when pinned, else count the unseen.
-    var previousCount by remember { mutableIntStateOf(messages.size) }
     LaunchedEffect(messages.size) {
         val delta = messages.size - previousCount
         previousCount = messages.size
-        if (delta <= 0) return@LaunchedEffect
+        if (delta <= 0 || !initialPositionSettled) return@LaunchedEffect
         if (isNearBottom) {
             scrollToBottom()
             pendingBelowCount = 0
@@ -683,8 +831,10 @@ fun ChatDetailScreen(
         composerText = value
         onDraftChanged(value)
         val shouldType = value.trim().isNotEmpty()
-        if (shouldType && !typingPublished) {
+        val tick = android.os.SystemClock.elapsedRealtime()
+        if (com.example.chat.data.api.TypingCadencePolicy.shouldPublish(shouldType, typingPublished, tick, lastTypingPublishedAt)) {
             typingPublished = true
+            lastTypingPublishedAt = tick
             onTypingChanged(true)
         }
         if (!shouldType && typingPublished) {
@@ -694,7 +844,7 @@ fun ChatDetailScreen(
         typingIdleJob?.cancel()
         if (shouldType) {
             typingIdleJob = scope.launch {
-                delay(5000)
+                delay(com.example.chat.data.api.TypingCadencePolicy.IDLE_MS)
                 if (typingPublished) {
                     typingPublished = false
                     onTypingChanged(false)
@@ -935,6 +1085,8 @@ fun ChatDetailScreen(
                     onToggleMute = onToggleMute,
                     ghostModeEnabled = ghostModeEnabled,
                     onToggleGhostMode = onToggleGhostMode,
+                    secureChannelEnabled = secureChannelEnabled,
+                    onToggleSecureChannel = onToggleSecureChannel,
                     onBlockContact = onBlockContact,
                     onClearConversation = {
                         chatMenuOpen = false
@@ -999,7 +1151,10 @@ fun ChatDetailScreen(
                     com.example.chat.ServiceLocator.preferencesController.effects.conversationListAnimation
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().testTag("chat-message-list"),
+                    modifier = Modifier.fillMaxSize().testTag("chat-message-list")
+                        // G3: the anchor jump happens while the list is still
+                        // invisible; no flash of the oldest page on open.
+                        .alpha(if (initialPositionSettled || messages.isEmpty()) 1f else 0f),
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
                     itemsIndexed(
@@ -1008,6 +1163,14 @@ fun ChatDetailScreen(
                         contentType = { _, row -> if (row.messages.size > 1) "media-album" else row.anchor.type },
                     ) { rowIndex, row ->
                         Column(Modifier.fillMaxWidth().listEntrance(conversationListAnimation, row.anchor.id)) {
+                        if (rowIndex == firstUnreadRowIndex && firstUnreadRowIndex >= 0) {
+                            Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                                Text("Unread messages",
+                                    color = Color(theme.accentColor), fontSize = 11.sp,
+                                    modifier = Modifier.background(Color(theme.cardColor), RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp))
+                            }
+                        }
                         if (com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.startsDay(timelineRows, rowIndex, timelineZone)) {
                             Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                                 Text(com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.dayAt(timelineRows, rowIndex, timelineZone)
@@ -1031,6 +1194,7 @@ fun ChatDetailScreen(
                         }
                         val localText = remember(message, localOverrideAccountKey, conversation.id, localMessageRevision) { localMessageStore.text(message) }
                         if (localText != null) Text("Modified locally - only on this device", color = Color(theme.secondaryTextColor), fontSize = 10.sp, modifier = Modifier.padding(horizontal = 16.dp))
+                        if (message.id in readAlertWatchedIds) Text("You'll be notified when this is read", color = Color(theme.secondaryTextColor), fontSize = 10.sp, modifier = Modifier.padding(horizontal = 16.dp))
                         val bubble: @Composable () -> Unit = { ChatMessageBubble(
                             message = if (localText != null) message.copy(text = localText) else message,
                             isMe = isMine,
@@ -1108,10 +1272,17 @@ fun ChatDetailScreen(
                             },
                             onVoicePlay = { attachment -> onVoicePlay(attachment) },
                             onViewOnceOpen = {
-                                if (viewOnceNuxStore.needsReceiverNux()) {
+                                if (com.example.chat.core.messages.ViewOnceTextPolicy.text(message)) {
+                                    viewOnceTextTarget = message
+                                } else if (viewOnceNuxStore.needsReceiverNux()) {
                                     viewOnceNuxPending = (++viewOnceNuxRequestCount) to message
                                 } else {
                                     openViewOnceMessage(message)
+                                }
+                            },
+                            onVoicePlaybackCompleted = {
+                                if (!isMine && isMessageSessionCurrent()) scope.launch {
+                                    com.example.chat.ServiceLocator.apiBackend.acknowledgeAudioPlayed(message.id, conversation.id, viewOnceOwner)
                                 }
                             },
                             onViewOncePlaybackCompleted = {
@@ -1167,10 +1338,52 @@ fun ChatDetailScreen(
                     onRetryLoad = onRetryLoad,
                 )
 
+                // G10: mention jump button (Telegram-style). Visible while any
+                // loaded message mentions the current user; each tap moves to
+                // the next mention oldest-to-newest and flashes it.
+                var mentionCursor by remember(conversation.id, messageSessionIdentity) { mutableIntStateOf(0) }
+                if (mentionMessageIds.isNotEmpty()) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 14.dp, bottom = 72.dp)
+                            .size(48.dp).testTag("chat-mention-jump")
+                            .background(Color(theme.cardColor), CircleShape)
+                            .border(1.dp, Color(theme.surfaceColor), CircleShape)
+                            .clickable(
+                                role = androidx.compose.ui.semantics.Role.Button,
+                                onClickLabel = "Jump to next mention",
+                            ) {
+                                val targetId = mentionMessageIds[mentionCursor % mentionMessageIds.size]
+                                mentionCursor = (mentionCursor + 1) % mentionMessageIds.size
+                                flashHighlight(targetId)
+                                pendingScrollTarget = targetId
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("@", color = Color(theme.accentColor), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .offset(y = (-20).dp)
+                                .background(Color(theme.accentColor), CircleShape)
+                                .padding(horizontal = 5.dp, vertical = 1.dp),
+                        ) {
+                            Text(
+                                "${mentionMessageIds.size}",
+                                color = Color(theme.onAccentColor),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                }
+
                 // Scroll-to-bottom FAB with unseen-count badge.
                 val fabVisible = !isNearBottom && messages.isNotEmpty()
-                val fabScale by animateFloatAsState(if (fabVisible) 1f else 0.4f, label = "fabScale")
-                val fabAlpha by animateFloatAsState(if (fabVisible) 1f else 0f, label = "fabAlpha")
+                val fabReduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+                val fabScale by animateFloatAsState(if (fabVisible) 1f else 0.4f, animationSpec = if (fabReduceMotion) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(), label = "fabScale")
+                val fabAlpha by animateFloatAsState(if (fabVisible) 1f else 0f, animationSpec = if (fabReduceMotion) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(), label = "fabAlpha")
                 Box(
                     Modifier
                         .align(Alignment.BottomEnd)
@@ -1218,6 +1431,29 @@ fun ChatDetailScreen(
                     messageState = contextMenuMessageState, anchorRect = contextMenuAnchor, regionTop = messageRegionTop,
                     currentUserId = currentUserId, theme = theme, onAction = ::runAction,
                     onToggleReaction = onToggleReaction, reactionTargetState = emojiReactionTargetState,
+                )
+            }
+
+            if (showUnknownSenderSafety && !isSelectionMode) {
+                Column(Modifier.fillMaxWidth().background(Color(theme.cardColor)).padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Text("New sender", color = Color(theme.primaryTextColor), fontWeight = FontWeight.SemiBold)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        TextButton(onClick = onContinueUnknownSender, modifier = Modifier.heightIn(min = 48.dp)) { Text("Continue") }
+                        TextButton(onClick = onReportUnknownSender, modifier = Modifier.heightIn(min = 48.dp)) { Text("Report") }
+                        if (onBlockContact != null) {
+                            TextButton(onClick = onBlockContact, modifier = Modifier.heightIn(min = 48.dp)) { Text("Block") }
+                        }
+                    }
+                }
+            }
+
+            if (peerTyping && !isSelectionMode) {
+                com.example.chat.ui.chats.detail.PeerTypingIndicator(
+                    initials = typingAvatarInitials,
+                    avatarUrl = typingAvatarUrl,
+                    avatarColorHex = typingAvatarColorHex,
+                    theme = theme,
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
                 )
             }
 
@@ -1304,8 +1540,8 @@ fun ChatDetailScreen(
             } else {
             // Dart composer bar container (chat_detail_screen.dart:3233): bg =
             // conv.uiEntryBackgroundColor ?: surfaceColor, top border cardColor.
-            val composerBarBg = convPrefs.uiEntryBackgroundColor?.let(::Color)
-                ?: Color(theme.surfaceColor)
+            val composerBarBg = if (useScopedChatTheme) Color(theme.surfaceColor) else
+                convPrefs.uiEntryBackgroundColor?.let(::Color) ?: Color(theme.surfaceColor)
             Box(Modifier.fillMaxWidth()) {
             Box(
                 Modifier
@@ -1360,6 +1596,36 @@ fun ChatDetailScreen(
                     onVideoHoldEnd = onVideoHoldEnd,
                     onVideoHoldCancel = onVideoHoldCancel,
                     onSend = ::sendCurrent,
+                    onSendViewOnce = {
+                        val plain = composerText.trim()
+                        if (!sending && plain.isNotEmpty() && editingMessage == null) {
+                            if (!conversation.isDirect || secureChannelEnabled) scope.launch {
+                                snackbarHostState.showSnackbar("View-once text requires a regular direct chat. Nothing was sent.")
+                            } else {
+                                sending = true
+                                scope.launch {
+                                    try {
+                                        check(com.example.chat.ServiceLocator.apiBackend.supportsViewOnceText(viewOnceOwner)) {
+                                            "View-once text is unavailable on this server. Nothing was sent."
+                                        }
+                                        // The draft may have changed while capability validation suspended.
+                                        check(composerText.trim() == plain) { "Draft changed. Choose Send as view once again." }
+                                        handleComposerChanged("")
+                                        com.example.chat.ServiceLocator.apiBackend.sendViewOnceText(conversation.id, plain, viewOnceOwner)
+                                    } catch (e: Exception) {
+                                        if (e is kotlinx.coroutines.CancellationException) throw e
+                                        snackbarHostState.showSnackbar(e.message ?: "Send not confirmed. Check the chat before sending again.")
+                                    } finally { sending = false }
+                                }
+                            }
+                        }
+                    },
+                    onScheduleSend = {
+                        if (!sending && editingMessage == null && composerText.isNotBlank()) {
+                            if (secureChannelEnabled) scope.launch { snackbarHostState.showSnackbar("Scheduling is unavailable in encrypted chats.") }
+                            else scheduleDraft = composerText.trim()
+                        }
+                    },
                 )
             }
 
@@ -1374,6 +1640,8 @@ fun ChatDetailScreen(
                     reactionMode = false,
                     composerMode = true,
                     onStickerSend = onStickerSend?.let { send -> { sticker -> if (isMessageSessionCurrent()) send(sticker) } },
+                    gifApiKey = gifApiKey,
+                    onGifSend = onGifSend?.let { send -> { gif -> if (isMessageSessionCurrent()) send(gif) } },
                     stickerSessionKey = messageSessionIdentity,
                     headerColor = convPrefs.emojiHeaderColor?.let(::Color),
                     headerIconsColor = convPrefs.emojiHeaderIconsColor?.let(::Color),
@@ -1420,7 +1688,12 @@ fun ChatDetailScreen(
                 },
                 com.example.chat.ui.chats.detail.MessageMoreOption(if (tapped.isStarred) "Unstar" else "Star", standard) { onToggleStar(tapped.id) },
                 com.example.chat.ui.chats.detail.MessageMoreOption("Starred messages", true) { showStarredInChat = true },
-                com.example.chat.ui.chats.detail.MessageMoreOption("Notify When Message Read", false) {},
+                com.example.chat.ui.chats.detail.MessageMoreOption(if (tapped.id in readAlertWatchedIds) "Stop Read Notification" else "Notify When Message Read", com.example.chat.ui.chats.detail.ReadAlertPolicy.canWatch(tapped, currentUserId, conversation.isDirect) || tapped.id in readAlertWatchedIds) { scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) { if (tapped.id in readAlertController.watched) readAlertController.cancel(tapped.id) else readAlertController.watch(tapped.id) }
+                        readAlertWatchedIds = readAlertController.watched
+                    } catch (e: Exception) { snackbarHostState.showSnackbar(e.message ?: "Could not save read notification") }
+                } },
                 com.example.chat.ui.chats.detail.MessageMoreOption("Message info", true) { infoMessage = tapped },
             ),
             onDismiss = { singleTapMessage = null },
@@ -1792,6 +2065,8 @@ private fun ConversationHeader(
     onToggleMute: (() -> Unit)?,
     ghostModeEnabled: Boolean,
     onToggleGhostMode: (() -> Unit)?,
+    secureChannelEnabled: Boolean,
+    onToggleSecureChannel: (() -> Unit)?,
     onBlockContact: (() -> Unit)?,
     onClearConversation: () -> Unit,
 ) {
@@ -1897,7 +2172,7 @@ private fun ConversationHeader(
                     semanticLabel = if (callsAllowed) {
                         "Voice call"
                     } else {
-                        "Voice call • contact acceptance required"
+                        "Voice call unavailable"
                     },
                     color = callTint,
                 )
@@ -1907,18 +2182,9 @@ private fun ConversationHeader(
                     semanticLabel = if (callsAllowed) {
                         "Video call"
                     } else {
-                        "Video call • contact acceptance required"
+                        "Video call unavailable"
                     },
                     color = callTint,
-                )
-            }
-        }
-        connectionState?.let { state ->
-            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                ConnectionHealthIndicator(
-                    health = state.health,
-                    size = 24.dp,
-                    onTap = onConnectionDetailsTap,
                 )
             }
         }
@@ -1933,6 +2199,13 @@ private fun ConversationHeader(
             DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }, rememberKey = "chat-header-menu") {
                 val menuIconTint = Color(theme.secondaryTextColor)
                 if (!moreMenuPage) {
+                    if (connectionState != null) {
+                        DropdownMenuItem(
+                            leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.signal, color = menuIconTint, size = 20.dp) },
+                            text = { Text("Connection health") },
+                            onClick = { onMenuOpenChange(false); onConnectionDetailsTap() },
+                        )
+                    }
                     DropdownMenuItem(
                         leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.profile, semanticLabel = null, color = menuIconTint, modifier = Modifier.size(20.dp)) },
                         text = {
@@ -1956,6 +2229,21 @@ private fun ConversationHeader(
                             leadingIcon = { com.example.chat.ui.icons.ChatyGhostIcon(menuIconTint) },
                             text = { Text(if (ghostModeEnabled) "Turn off Ghost mode" else "Turn on Ghost mode") },
                             onClick = { onMenuOpenChange(false); onToggleGhostMode() },
+                        )
+                    }
+                    if (onToggleSecureChannel != null) {
+                        DropdownMenuItem(
+                            modifier = Modifier.testTag("chat-secure-toggle"),
+                            leadingIcon = {
+                                com.example.chat.ui.icons.ChatyIcon(
+                                    if (secureChannelEnabled) com.example.chat.ui.icons.ChatyIconId.lock else com.example.chat.ui.icons.ChatyIconId.unlock,
+                                    semanticLabel = null,
+                                    color = menuIconTint,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            text = { Text(if (secureChannelEnabled) "Turn off experimental secure routing" else "Request experimental secure routing") },
+                            onClick = { onMenuOpenChange(false); onToggleSecureChannel() },
                         )
                     }
                     if (onToggleMute != null) {

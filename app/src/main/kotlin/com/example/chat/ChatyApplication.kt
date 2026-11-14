@@ -15,6 +15,12 @@ import kotlinx.coroutines.launch
 class ChatyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Tamper guard (patch 26): collect signature / debugger / emulator /
+        // hook signals off the UI thread in report-only mode. Enforcement still
+        // runs before engine/locator setup; every probe failure is
+        // fail-open so a broken device API can never lock a real user out.
+        if (ReleaseFeatures.ENFORCE_TAMPER_GUARD) runIntegrityDiagnostics()
+        else ServiceLocator.appScope.launch(kotlinx.coroutines.Dispatchers.IO) { runIntegrityDiagnostics() }
         UniffiMlsEngine.install()
         ServiceLocator.init(this)
         // Dynamic Island: restore the island engine when the
@@ -49,6 +55,23 @@ class ChatyApplication : Application() {
             ServiceLocator.templateController.init(ServiceLocator.templateRuntime, restorePresentation = false)
         }
         ProcessLifecycleOwner.get().lifecycle.addObserver(foregroundObserver)
+    }
+
+    /** Report-only filesystem/package probes must not block the first UI frame. Enforcement stays synchronous. */
+    private fun runIntegrityDiagnostics() {
+        try {
+            val tamperVerdict = com.example.chat.core.security.TamperGuard.evaluate(this@ChatyApplication)
+            if (tamperVerdict.tampered) {
+                android.util.Log.w("ChatyApplication", "optional integrity diagnostics: signature=${tamperVerdict.signals.signature}; enforcement=${tamperVerdict.enforced}")
+            } else {
+                android.util.Log.i("ChatyApplication", "optional integrity diagnostics: signature=${tamperVerdict.signals.signature}; enforcement=${tamperVerdict.enforced}")
+            }
+            if (tamperVerdict.enforced) {
+                kotlin.system.exitProcess(1)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ChatyApplication", "optional integrity diagnostics unavailable")
+        }
     }
 
     /** Dart _ChatyAppState.didChangeAppLifecycleState (main.dart:669), matched

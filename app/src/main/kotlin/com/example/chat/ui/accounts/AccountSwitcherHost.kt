@@ -82,6 +82,12 @@ fun AccountSwitcherHost(
     LaunchedEffect(open) { if (open) manageMode = startInManage }
 
     fun startAddAccount() {
+        if (multi.accounts().size >= com.example.chat.data.api.MultiAccountRegistryCoordinator.DEFAULT_MAX_ACCOUNTS) {
+            errorMessage = "This app installation supports two signed-in accounts. Remove an account before adding another."
+            onToast(errorMessage!!)
+            manageMode = true
+            return
+        }
         reauthIdentifier = ""
         reauthWorkspace = null
         errorMessage = null
@@ -283,6 +289,12 @@ fun AccountSwitcherHost(
                 loadSavedTenant = {
                     (reauthWorkspace ?: api.config.getSavedTenantId()) to
                         (if (reauthWorkspace != null) false else api.config.isUsingDefaultTenant)
+                },
+                requestEmailCode = { email, tenant, isDefaultTenant ->
+                    com.example.chat.ServiceLocator.apiBackend.requestEmailLoginCode(email, tenant, isDefaultTenant)
+                },
+                verifyEmailCode = { attempt, code ->
+                    com.example.chat.ServiceLocator.apiBackend.verifyEmailLoginCode(attempt, code).id
                 },
                 login = { identifier, password, tenant, isDefaultTenant ->
                     val meta = api.loginForAddAccount(identifier, password, tenant, isDefaultTenant)

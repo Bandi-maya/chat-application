@@ -57,6 +57,9 @@ import kotlinx.coroutines.delay
 @Composable
 fun OnboardingScreen(tick: Int) {
     val context = LocalContext.current
+    var disclosure by remember { mutableStateOf<com.example.chat.island.core.IslandPermissionAccess?>(null) }
+    disclosure?.let { access -> com.example.chat.island.core.IslandPermissionDisclosure(access,
+        onContinue = { disclosure = null; access.open(context) }, onDismiss = { disclosure = null }) }
     val scroll = rememberSaveable(saver = ScrollState.Saver) { ScrollState(0) }
 
     // Permission state, recomputed whenever the host's resume tick changes.
@@ -109,7 +112,7 @@ fun OnboardingScreen(tick: Int) {
                 null
             },
             actionLabel = stringResource(R.string.home_open_accessibility_settings),
-            onAction = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+            onAction = { disclosure = com.example.chat.island.core.IslandPermissionAccess.Accessibility },
             extraActionLabel = stringResource(R.string.home_app_info),
             onExtraAction = { openAppInfoSettings(context) },
         )
@@ -123,14 +126,7 @@ fun OnboardingScreen(tick: Int) {
                 required = false,
                 deferNote = null,
                 actionLabel = stringResource(R.string.onboarding_overlay_action),
-                onAction = {
-                    context.startActivity(
-                        Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${context.packageName}"),
-                        ),
-                    )
-                },
+                onAction = { disclosure = com.example.chat.island.core.IslandPermissionAccess.Overlay },
                 extraActionLabel = null,
                 onExtraAction = null,
             )
@@ -144,9 +140,7 @@ fun OnboardingScreen(tick: Int) {
             required = true,
             deferNote = null,
             actionLabel = stringResource(R.string.onboarding_listener_action),
-            onAction = {
-                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-            },
+            onAction = { disclosure = com.example.chat.island.core.IslandPermissionAccess.Notifications },
             extraActionLabel = stringResource(R.string.home_app_info),
             onExtraAction = { openAppInfoSettings(context) },
         )
@@ -188,27 +182,16 @@ fun OnboardingScreen(tick: Int) {
             why = stringResource(R.string.onboarding_battery_why),
             granted = battery,
             actionLabel = stringResource(R.string.home_battery_fix),
-            onAction = {
-                val request = Intent(
-                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                    Uri.parse("package:${context.packageName}"),
-                )
-                try {
-                    context.startActivity(request)
-                } catch (e: ActivityNotFoundException) {
-                    context.startActivity(
-                        Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
-                    )
-                }
-            },
+            onAction = { com.example.chat.island.core.Perms.openBatterySettings(context) },
         )
 
         Button(
             onClick = {
+                if (!coreGranted) com.example.chat.island.core.IslandControl.stop(context)
                 IslandSettings.onboarded.value = true
                 IslandSettings.save()
             },
-            enabled = coreGranted,
+            enabled = true,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.onboarding_finish))
@@ -228,7 +211,10 @@ fun OnboardingScreen(tick: Int) {
 @Composable
 private fun HeroCard() {
     var stage by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
+    val resumed = com.example.chat.ui.island.rememberIslandHostResumed()
+    val reducedMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    LaunchedEffect(resumed, reducedMotion) {
+        if (!resumed || reducedMotion) return@LaunchedEffect
         while (true) {
             delay(2600)
             stage = (stage + 1) % 3

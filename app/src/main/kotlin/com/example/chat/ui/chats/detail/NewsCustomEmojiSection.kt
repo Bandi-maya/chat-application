@@ -38,56 +38,15 @@ internal object CustomEmojiPanelTokens {
 /** Frontend preview only. Selection stays local until the custom-emoji payload is implemented. */
 @Composable
 internal fun NewsCustomEmojiSection(theme: ThemeConfig, modifier: Modifier = Modifier) {
-    var selected by remember { mutableStateOf<NewsCustomEmoji?>(null) }
-    val foreground = Color(theme.primaryTextColor)
-    Column(modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Text("News Emoji", color = foreground, modifier = Modifier.weight(1f), fontSize = 14.sp)
-            Text("100", color = Color(theme.secondaryTextColor), fontSize = 12.sp)
-        }
-        Text("Preview only · custom emoji sending is not connected",
-            color = Color(theme.secondaryTextColor), fontSize = 11.sp,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp))
-        LazyVerticalGrid(columns = GridCells.Adaptive(CustomEmojiPanelTokens.target),
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentPadding = PaddingValues(horizontal = CustomEmojiPanelTokens.sidePadding)) {
-            items(NewsCustomEmojiCatalog.items, key = { it.id }) { item ->
-                Box(Modifier.height(CustomEmojiPanelTokens.target).fillMaxWidth()
-                    .semantics { contentDescription = "News emoji ${item.id}, preview only" }
-                    .clickable { selected = item }, contentAlignment = Alignment.Center) {
-                    NewsCustomEmojiArtwork(item, CustomEmojiPanelTokens.artwork)
-                }
-            }
-        }
-        selected?.let { item ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                NewsCustomEmojiArtwork(item, 24f)
-                Text("News ${item.id} selected · not sent", color = foreground, fontSize = 12.sp,
-                    modifier = Modifier.padding(start = 8.dp))
-            }
-        }
+    Column(modifier.fillMaxWidth().padding(16.dp)) {
+        Text("News emoji pack is saved for your server. Downloading is not connected yet.", color = Color(theme.primaryTextColor))
+        Text("Custom emoji sending is not connected.", color = Color(theme.secondaryTextColor), fontSize = 11.sp)
     }
 }
 
 @Composable
 private fun NewsCustomEmojiArtwork(item: NewsCustomEmoji, size: Float) {
-    val reduced = com.example.chat.ui.kit.rememberChatyReduceMotion()
-    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    var foreground by remember(owner) { mutableStateOf(owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) }
-    DisposableEffect(owner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, _ ->
-            foreground = owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
-        }
-        owner.lifecycle.addObserver(observer)
-        onDispose { owner.lifecycle.removeObserver(observer) }
-    }
-    var failed by remember(item.id) { mutableStateOf(false) }
-    if (failed) Text("·", color = Color.Gray)
-    else if (android.os.Build.VERSION.SDK_INT >= 28 && !reduced) {
-        IosAnimatedEmoji(item.assetPath, size, animate = foreground, onUnavailable = { failed = true })
-    } else StaticAssetEmoji(item.posterPath, size, onUnavailable = { failed = true })
+    Text("N", color = Color.Gray, fontSize = (size * .6f).sp)
 }
 
 @Composable

@@ -15,6 +15,7 @@ import org.json.JSONObject
 class InactiveAccountPushBridge(context: Context, private val api: ApiBackendService,
     private val secureStorage: com.example.chat.data.e2ee.SecureKeyValueStore) {
     private val runLock = kotlinx.coroutines.sync.Mutex()
+    private var onlyAccountKey: String? = null
     private var vaultIds: Map<String, Set<String>> = emptyMap()
     private val context = context.applicationContext
     private val state = this.context.getSharedPreferences("inactive_push_fingerprints", Context.MODE_PRIVATE)
@@ -28,7 +29,7 @@ class InactiveAccountPushBridge(context: Context, private val api: ApiBackendSer
     private val catchUp = InactiveAccountCatchUp(
         targets = {
             if (DemoMode.active) emptyList() else api.multiAccount.accounts().filter {
-                it.accountKey != api.currentAccountKey() && !it.sessionExpired
+                it.accountKey != api.currentAccountKey() && !it.sessionExpired && (onlyAccountKey == null || it.accountKey == onlyAccountKey)
             }.mapNotNull { meta -> api.multiAccount.credentialsFor(meta.accountKey)?.let { credentials ->
                 InactiveAccountCatchUp.Target(meta.accountKey, meta.accountHash, meta.baseUrl, meta.tenantId,
                     credentials.accessToken, credentials.expiresAtEpochMs ?: JwtExpiryDecoder.decodeExpiryEpochMs(credentials.accessToken), meta.displayName, meta.userId)
@@ -39,9 +40,10 @@ class InactiveAccountPushBridge(context: Context, private val api: ApiBackendSer
         alert = { t -> if (current(t)) ChatyNotifications.showInactiveAccountMessage(context, t.hash, t.label) else false },
         clear = { t -> ChatyNotifications.cancelInactiveAccountMessage(context, t.hash) },
     )
-    suspend fun run() {
+    suspend fun run(accountKey: String? = null) {
         if (DemoMode.active || !runLock.tryLock()) return
-        try { runLocked() } finally { vaultIds = emptyMap(); runLock.unlock() }
+        onlyAccountKey = accountKey
+        try { runLocked() } finally { onlyAccountKey = null; vaultIds = emptyMap(); runLock.unlock() }
     }
     private suspend fun runLocked() {
         val retained = api.multiAccount.accounts()

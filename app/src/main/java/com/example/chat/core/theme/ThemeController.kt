@@ -88,6 +88,9 @@ class ThemeController(
         }
     }
 
+    /** Null preserves the caller's resolved global theme when no local override exists. */
+    fun getChatThemeOverride(conversationId: String): ThemeConfig? = _perChatThemes[conversationId]
+
     fun getThemeForChat(conversationId: String): ThemeConfig =
         _perChatThemes[conversationId] ?: _globalTheme
 

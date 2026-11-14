@@ -205,6 +205,8 @@ class CallSignalingService(
     private val lowDataUsageEnabled: () -> Boolean = { false },
     private val now: () -> Instant = { Instant.now() },
     private val onCallWaiting: (String) -> Unit = {},
+    /** Durable local disposition must complete before answer/decline media or network effects. */
+    private val beforeIncomingDisposition: suspend (Any?, String) -> Unit = { _, _ -> },
     private val captureAccountScope: () -> Any? = { null },
     private val accountScopeValid: (Any?) -> Boolean = { true },
     private val accountScopeGuard: (Any?, () -> Unit) -> Boolean = { _, action -> action(); true },
@@ -296,7 +298,7 @@ class CallSignalingService(
     private val seenPeerReactions = linkedSetOf<String>()
     private var localHoldRevision = 0L
     private var remoteHoldRevision = -1L
-    val canHoldLocally: Boolean get() = currentSession?.state == CallSessionState.connected && media?.supportsLocalHold == true
+    val canHoldLocally: Boolean get() = currentSession?.let { it.state == CallSessionState.connected && !it.isSharingScreen } == true && media?.supportsLocalHold == true
     val canNotifyHold: Boolean get() = currentSession?.let { callExtrasCapability(it.callId, it.remoteUserId, "hold_v1") } == true
     fun toggleLocalHold(): Boolean {
         var applied = false
@@ -305,11 +307,17 @@ class CallSignalingService(
         guardCall(expected, session.callId) {
             val active = currentSession ?: return@guardCall
             val peer = media ?: return@guardCall
-            if (active.state != CallSessionState.connected || !peer.supportsLocalHold) return@guardCall
+            if (active.state != CallSessionState.connected || active.isSharingScreen || !peer.supportsLocalHold) return@guardCall
             val held = !active.isLocallyHeld
             if (!peer.setRemoteAudioEnabled(!held)) return@guardCall
             if (!peer.setAudioEnabled(!held && !active.isMuted)) {
                 peer.setRemoteAudioEnabled(!active.isLocallyHeld); return@guardCall
+            }
+            if (active.isVideo && !peer.setVideoEnabled(!held && !active.isCameraOff)) {
+                // Never label a video call held if its camera would keep transmitting.
+                peer.setAudioEnabled(!active.isLocallyHeld && !active.isMuted)
+                peer.setRemoteAudioEnabled(!active.isLocallyHeld)
+                return@guardCall
             }
             currentSession = active.copy(isLocallyHeld = held)
             if (callExtrasCapability(active.callId, active.remoteUserId, "hold_v1")) {
@@ -531,6 +539,7 @@ class CallSignalingService(
             "offer" -> {
                 receiveGuard offerGuard@{
                 val active = currentSession
+                if (signal["ice_restart"] == true && (active?.callId != callId || active.state.isTerminal)) return@offerGuard
                 if (active != null && active.callId != callId && !active.state.isTerminal) {
                     signalSender.sendCallSignal(senderId, mapOf(
                         "signal_type" to "busy",
@@ -814,58 +823,63 @@ class CallSignalingService(
             throw IllegalStateException("No authorized incoming call is available.")
         }
 
-        check(acceptingCallId != session.callId) { "Call is already being accepted" }
-        ringTimeoutJob?.cancel()
-        if (session.isDemo) {
-            callDurationSeconds = 0
-            currentSession = session.copy(
-                state = CallSessionState.connected,
-                connectedAt = now(),
-            )
-            startDurationTimer()
-            notifyChanged()
-            return
-        }
+        // Reserve before the first suspend (durable resolution). A duplicate Answer
+        // must not resolve twice or mark the first attempt's live media as failed.
+        if (!guardCall(expectedAccount, session.callId) {
+            check(currentSession?.state == CallSessionState.incoming && acceptingCallId != session.callId) { "Call is already being accepted" }
+            acceptingCallId = session.callId
+        }) return
         try {
-            val offerSdp = cachedRemoteOfferSdp
-            if (offerSdp.isNullOrEmpty()) {
-                throw IllegalStateException("Incoming call has no SDP offer.")
+            if (!session.isDemo) beforeIncomingDisposition(expectedAccount, session.callId)
+            requireCallIdentity(expectedAccount, session.callId)
+            ringTimeoutJob?.cancel()
+            if (session.isDemo) {
+                callDurationSeconds = 0
+                currentSession = session.copy(
+                    state = CallSessionState.connected,
+                    connectedAt = now(),
+                )
+                startDurationTimer()
+                notifyChanged()
+                return
             }
+            try {
+                val offerSdp = cachedRemoteOfferSdp
+                if (offerSdp.isNullOrEmpty()) {
+                    throw IllegalStateException("Incoming call has no SDP offer.")
+                }
 
-            if (!guardCall(expectedAccount, session.callId) {
-                check(currentSession?.state == CallSessionState.incoming && acceptingCallId != session.callId) { "Call is already being accepted" }
-                acceptingCallId = session.callId
-            }) return
-            val peer = createMediaTransport(session.isVideo, expectedAccount, session.callId)
-            requireCallIdentity(expectedAccount, session.callId, peer)
-            peer.setRemoteDescription(offerSdp, "offer")
-            requireCallIdentity(expectedAccount, session.callId, peer)
-            if (!guardCall(expectedAccount, session.callId, peer) { remoteDescriptionReady = true }) return
-            flushRemoteCandidates({ runCatching { requireCallIdentity(expectedAccount, session.callId, peer) }.isSuccess },
-                { action -> guardCall(expectedAccount, session.callId, peer, action) })
-            requireCallIdentity(expectedAccount, session.callId, peer)
-            val answerSdp = peer.createAnswer(session.isVideo)
-            requireCallIdentity(expectedAccount, session.callId, peer)
-            if (answerSdp.isEmpty()) {
-                throw IllegalStateException("WebRTC did not produce an SDP answer.")
+                val peer = createMediaTransport(session.isVideo, expectedAccount, session.callId)
+                requireCallIdentity(expectedAccount, session.callId, peer)
+                peer.setRemoteDescription(offerSdp, "offer")
+                requireCallIdentity(expectedAccount, session.callId, peer)
+                if (!guardCall(expectedAccount, session.callId, peer) { remoteDescriptionReady = true }) return
+                flushRemoteCandidates({ runCatching { requireCallIdentity(expectedAccount, session.callId, peer) }.isSuccess },
+                    { action -> guardCall(expectedAccount, session.callId, peer, action) })
+                requireCallIdentity(expectedAccount, session.callId, peer)
+                val answerSdp = peer.createAnswer(session.isVideo)
+                requireCallIdentity(expectedAccount, session.callId, peer)
+                if (answerSdp.isEmpty()) {
+                    throw IllegalStateException("WebRTC did not produce an SDP answer.")
+                }
+
+                if (!guardCall(expectedAccount, session.callId, peer) {
+                signalSender.sendCallSignal(session.remoteUserId, mapOf(
+                    "signal_type" to "answer",
+                    "call_id" to session.callId,
+                    "callee_id" to currentUserId(),
+                    "sdp" to answerSdp,
+                ))
+
+                flushLocalCandidates(session)
+                currentSession = session.copy(state = CallSessionState.connecting)
+                startConnectionTimeout(session.callId)
+                notifyChanged()
+                }) return
+            } catch (error: Throwable) {
+                guardCall(expectedAccount, session.callId) { markTransportFailed(error.toString()) }
+                throw error
             }
-
-            if (!guardCall(expectedAccount, session.callId, peer) {
-            signalSender.sendCallSignal(session.remoteUserId, mapOf(
-                "signal_type" to "answer",
-                "call_id" to session.callId,
-                "callee_id" to currentUserId(),
-                "sdp" to answerSdp,
-            ))
-
-            flushLocalCandidates(session)
-            currentSession = session.copy(state = CallSessionState.connecting)
-            startConnectionTimeout(session.callId)
-            notifyChanged()
-            }) return
-        } catch (error: Throwable) {
-            guardCall(expectedAccount, session.callId) { markTransportFailed(error.toString()) }
-            throw error
         } finally {
             accountScopeGuard(expectedAccount) { if (acceptingCallId == session.callId) acceptingCallId = null }
         }
@@ -874,6 +888,12 @@ class CallSignalingService(
     /** Dart declineCall. */
     suspend fun declineCall(expectedCallId: String? = null) {
         val expected = callAccountScope
+        val incoming = currentSession
+        if (incoming != null && incoming.state == CallSessionState.incoming &&
+            (expectedCallId == null || incoming.callId == expectedCallId) && !incoming.isDemo) {
+            beforeIncomingDisposition(expected, incoming.callId)
+            requireCallIdentity(expected, incoming.callId)
+        }
         var detached: CallMediaController? = null
         if (!accountScopeGuard(expected) {
             val session = currentSession
@@ -1045,7 +1065,7 @@ class CallSignalingService(
         }
         val stream = media ?: return@control
         if (!stream.hasLocalMedia) return@control
-        stream.setAudioEnabled(!nextMuted && !session.isLocallyHeld)
+        if (!stream.setAudioEnabled(!nextMuted && !session.isLocallyHeld)) return@control
         currentSession = session.copy(isMuted = nextMuted)
         notifyChanged()
         }
@@ -1063,7 +1083,7 @@ class CallSignalingService(
         }
         val stream = media ?: return@control
         if (!stream.hasLocalMedia) return@control
-        stream.setVideoEnabled(!nextCameraOff)
+        if (!stream.setVideoEnabled(!nextCameraOff && !session.isLocallyHeld)) return@control
         currentSession = session.copy(isCameraOff = nextCameraOff)
         notifyChanged()
         }
@@ -1077,7 +1097,7 @@ class CallSignalingService(
         val session = currentSession
         val peer = media
         if (session == null || peer == null || !session.isVideo) return
-        if (session.isSharingScreen) return
+        if (session.isSharingScreen || session.isLocallyHeld) return
         if (!peer.startScreenShare()) return
         requireCallScope(expected)
         if (!guardCall(expected, session.callId) {

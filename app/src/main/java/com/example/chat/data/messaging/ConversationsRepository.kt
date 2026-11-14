@@ -21,6 +21,8 @@ import java.time.Instant
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Port of the conversation/message loading paths in backend_service.dart
@@ -49,6 +51,7 @@ class ConversationsRepository(
     /** Snapshot-cache seam for _persistConversationSnapshot /
      *  _persistMessageSnapshot (LocalSnapshotCacheService). */
     private val snapshotCache: SnapshotCacheStore? = null,
+    private val messageSnapshotNamespace: (Any?) -> String? = { currentUserId() },
     /** Scope for the Dart-unawaited snapshot writes. */
     private val snapshotScope: kotlinx.coroutines.CoroutineScope? = null,
     /** Account-scope capture/guard: stale responses from a previous login cannot mutate this repository. */
@@ -60,10 +63,55 @@ class ConversationsRepository(
     /** D1: the encrypted send/edit/delete plane rides the Chaty backend via
      *  ApiMlsRpcClient; defaults to [rpc] (Supabase) until wired. */
     private val secureRpc: SupabaseRpc? = null,
+    /** Experimental router injection. Must honor caller account and target scope. */
+    private val restTextSend: (suspend (conversationId: String, text: String) -> Unit)? = null,
+    private val restSendsInFlight: (suspend (conversationId: String) -> Boolean)? = null,
+    private val experimentalSecureRoutingEnabled: () -> Boolean = { com.example.chat.ReleaseFeatures.EXPERIMENTAL_MLS_CHAT_ROUTING },
+    /** Cross-plane dispatch lock shared with the REST outbox flush: see
+     *  ConversationDispatchLocks. When null (tests), sends and toggles run
+     *  unlocked - the single-plane behavior from before. */
+    private val dispatchLocks: ConversationDispatchLocks? = null,
+    /** Full account+tenant+backend identity for the dispatch-lock key; wired
+     *  by ServiceLocator from the live auth scope. Default (userId only)
+     *  keeps tests un-keyed by tenant/backend. */
+    private val lockAccountKey: () -> String = {
+        ConversationDispatchLocks.accountKey(currentUserId(), null, null)
+    },
+    /** REST-plane quarantine hooks, invoked by [setSecureChannel] INSIDE the
+     *  conversation's dispatch lock (already held for the whole toggle), so
+     *  the flag write and the hold are one critical section: no enqueue,
+     *  quick-reply or flush delivery can slip between them. The hooks receive
+     *  the toggle's captured scope: the dispatch lock is keyed to THAT
+     *  account, so the hooks must act on that identity (never live auth) and
+     *  throw if the account changed. They must NOT re-acquire the dispatch
+     *  lock (the Mutex is not reentrant) and must throw when the hold/release
+     *  is not durable. Wired to
+     *  ApiBackendService.holdQueuedMessagesForConversationLocked /
+     *  releaseQueuedMessagesForConversationLocked. */
+    private val holdRestSends: (suspend (expectedScope: Any?, conversationId: String) -> Int)? = null,
+    private val releaseRestSends: (suspend (expectedScope: Any?, conversationId: String) -> Unit)? = null,
+    /** Storage-key namespace for the secure_channels flag and sync_cursors:
+     *  a hash of tenant+backend+user (wired by ServiceLocator from the live
+     *  auth scope), so the same uid on another backend can never load this
+     *  backend's routing flags or cursors. Reads fall back to the legacy
+     *  raw-userId file when the namespaced file is absent; old files are
+     *  NEVER deleted or migrated destructively. Default (tests): raw userId. */
+    private val storageNamespace: () -> String = { currentUserId() ?: "anonymous" },
 ) {
+    private suspend fun <T> withDispatchLock(
+        conversationId: String,
+        block: suspend () -> T,
+    ): T {
+        val locks = dispatchLocks ?: return block()
+        return locks.withLock(lockAccountKey(), conversationId, block)
+    }
     private fun notifyGone(refs: List<com.example.chat.data.local.AttachmentRef>) {
         if (refs.isNotEmpty()) runCatching { onAttachmentsGone(refs) }
     }
+
+    /** S1: offline read fallback for [loadMessages]; reads only this repo's own
+     *  snapshot-cache scope, no ApiBackendService state. */
+    private val snapshotFallback = MessageSnapshotFallback(snapshotCache, messageSnapshotNamespace, withScope)
 
     private val stateLock = Any()
     val conversationsById = LinkedHashMap<String, Conversation>()
@@ -78,8 +126,282 @@ class ConversationsRepository(
             usersById.clear()
             lastSeqByChatId.clear()
             cursorsRestored = false
+            secureChannelIds.clear()
+            secureChannelsLoaded = false
+            secureChannelsScope = null
         }
         notifyChanged()
+    }
+
+    // ── Per-conversation secure-channel flags (Phase 1, experimental) ──
+    // When a conversation is flagged, the chat UI routes its send/read/edit/
+    // delete path through the MLS plane (this repository + SecureMessageTransport
+    // + MlsE2eeService) instead of the plaintext REST plane. The flag is local
+    // and per-account: it lives in the encrypted snapshot cache, survives
+    // restarts, and is never stored server-side.
+    //
+    // Failure contract (fail closed):
+    //  - A storage error while reading the flag throws; it never resolves to
+    //    "off", so an unreadable flag can never drop a chat onto the plaintext
+    //    plane. Callers must treat "unknown" as "block all sending".
+    //  - A failed update write changes nothing: memory and storage move
+    //    together or not at all.
+    //  - Every load/update/persist runs under the captured account scope
+    //    (scopeSnapshot/withScope), so an account switch mid-flight can never
+    //    read, write, or apply another account's flags - including on the
+    //    failure path.
+    private val secureChannelIds = HashSet<String>()
+    @Volatile private var secureChannelsLoaded = false
+    @Volatile private var secureChannelsScope: Any? = null
+    /** Serializes flag load/update: concurrent per-chat toggles cannot
+     *  overwrite each other, and an older load cannot erase a newer toggle. */
+    private val secureChannelMutex = Mutex()
+
+    private suspend fun ensureSecureChannelsLoaded() = secureChannelMutex.withLock {
+        ensureSecureChannelsLoadedLocked()
+    }
+
+    private suspend fun ensureSecureChannelsLoadedLocked() {
+        val expectedScope = scopeSnapshot()
+        if (secureChannelsLoaded && secureChannelsScope === expectedScope) return
+        val userId = currentUserId()
+            ?: throw IllegalStateException("The encryption setting is unavailable until sign-in completes.")
+        val cache = snapshotCache
+            ?: throw IllegalStateException("Secure settings storage is unavailable.")
+        // Strict read: a corrupt or undecryptable flag file throws (fail
+        // closed, never false); a missing file is null = nothing flagged yet;
+        // a malformed payload (not a list of strings) also throws - corruption
+        // must never read as "off". The namespaced (tenant+backend+user) file
+        // wins; when it is absent the LEGACY raw-userId file is read (strict
+        // too) so existing installs keep their flags. Old files are never
+        // deleted; the next toggle writes the namespaced file only.
+        var capturedStorage: String? = null
+        check(withScope(expectedScope) { capturedStorage = storageNamespace() }) { "Account changed while loading secure routing." }
+        val storageId = checkNotNull(capturedStorage)
+        val raw = cache.readJsonStrict(storageId, "secure_channels")
+        if (raw == null && storageId != userId) {
+            val legacy = cache.readJsonStrict(userId, "secure_channels")
+            check(legacy == null || legacy == emptyList<String>()) {
+                "A legacy routing setting has no verified backend owner. Recheck it before sending; no settings were imported."
+            }
+        }
+        val ids = when (raw) {
+            null -> emptyList()
+            is List<*> -> raw.map {
+                it as? String
+                    ?: throw IllegalStateException("The encryption setting is corrupt (unexpected entry). Open the chat again.")
+            }
+            else -> throw IllegalStateException("The encryption setting is corrupt (unexpected shape). Open the chat again.")
+        }
+        var applied = false
+        if (!withScope(expectedScope) {
+            synchronized(stateLock) {
+                secureChannelIds.clear()
+                secureChannelIds.addAll(ids)
+            }
+            // Inside the scope check: a raced account switch must not mark the
+            // next account's flags as loaded.
+            secureChannelsScope = expectedScope
+            secureChannelsLoaded = true
+            applied = true
+        } || !applied) {
+            throw IllegalStateException("Account changed while the encryption setting was loading. Open the chat again.")
+        }
+    }
+
+    /** Whether this conversation's UI path uses the end-to-end encrypted plane.
+     *  Throws when the flag cannot be read; callers must block sending in that
+     *  case instead of assuming off. A true here is a routing request, not
+     *  proof of encryption: readiness is decided by [isSecureTransportReady]
+     *  and by the server at send time (it fails closed while setup is pending). */
+    suspend fun isSecureChannel(conversationId: String): Boolean {
+        val expectedScope = scopeSnapshot()
+        return secureChannelMutex.withLock {
+            var current = false
+            check(withScope(expectedScope) { current = true } && current) { "Account changed while checking secure routing." }
+            ensureSecureChannelsLoadedLocked()
+            var result = false
+            current = false
+            check(withScope(expectedScope) {
+                synchronized(stateLock) { result = secureChannelIds.contains(conversationId) }
+                current = true
+            } && current) { "Account changed while checking secure routing." }
+            result
+        }
+    }
+
+    /** Non-suspending fast read of the flag for AttachmentUploadTracker's
+     *  in-dispatch-lock re-check. NEVER takes secureChannelMutex: the lock
+     *  order is flag mutex -> dispatch lock, so taking it under a dispatch
+     *  lock would invert and deadlock the toggle. Throws when the flags are
+     *  not yet loaded for the current scope; callers must warm them with the
+     *  suspending [isSecureChannel] BEFORE acquiring the dispatch lock. The
+     *  in-memory set is authoritative because [setSecureChannel] persists
+     *  before swapping memory (strict write), and loads are strict. */
+    fun isSecureChannelLoaded(conversationId: String): Boolean {
+        val expectedScope = scopeSnapshot()
+        check(secureChannelsLoaded && secureChannelsScope === expectedScope) {
+            "Encryption setting not loaded for this account; warm it before the dispatch lock."
+        }
+        return synchronized(stateLock) { secureChannelIds.contains(conversationId) }
+    }
+
+    /** Outcome of one secure-routing toggle, for the host to surface: how
+     *  many queued plaintext texts were quarantined (enable) - those were
+     *  NOT sent and stay visible with the clock icon - and which account
+     *  identity the transition ran under. */
+    data class SecureChannelTransition(
+        val conversationId: String,
+        val enabled: Boolean,
+        val heldCount: Int,
+    )
+
+    /** Turns the experimental routing request on/off for one conversation.
+     *  Persists first, then swaps memory under the captured account scope.
+     *  A failed post-write scope check attempts rollback to the captured set;
+     *  a rollback I/O failure requires re-reading the original account's file. Messages sent while the
+     *  flag was off stay on the server unencrypted; enabling does not
+     *  re-encrypt history. */
+    suspend fun setSecureChannel(conversationId: String, enabled: Boolean, expectedScope: Any? = scopeSnapshot()): SecureChannelTransition {
+        secureChannelMutex.withLock {
+        // Hold the conversation's dispatch lock for the whole toggle: no
+        // plane on this device can be mid-delivery while the flag changes
+        // (lock order: flag mutex first, dispatch lock second; flushMutex is
+        // never acquired under a dispatch lock - see ConversationDispatchLocks).
+        withDispatchLock(conversationId) {
+        var stillCurrent = false
+        check(withScope(expectedScope) { stillCurrent = true } && stillCurrent) { "Account changed while saving secure routing." }
+        ensureSecureChannelsLoadedLocked()
+        val cache = snapshotCache
+            ?: throw IllegalStateException("Secure settings storage is unavailable.")
+        if (enabled) {
+            check(experimentalSecureRoutingEnabled()) { "Experimental secure routing is disabled in this build." }
+            // Snapshot check only, not a proven atomic transition. Keep master gate disabled.
+            val pending = restSendsInFlight ?: error("Cannot inspect pending regular sends.")
+            check(!pending(conversationId)) { "Regular messages are still pending. Secure routing was not enabled." }
+        }
+        var capturedUser: String? = null
+        var capturedStorageId: String? = null
+        var previous: List<String> = emptyList()
+        var next: List<String> = emptyList()
+        var current = false
+        check(withScope(expectedScope) {
+            capturedUser = currentUserId()
+            capturedStorageId = storageNamespace()
+            synchronized(stateLock) {
+                previous = secureChannelIds.toList()
+                val copy = LinkedHashSet(secureChannelIds)
+                if (enabled) copy.add(conversationId) else copy.remove(conversationId)
+                next = copy.toList()
+            }
+            current = true
+        } && current) { "Account changed while saving secure routing." }
+        checkNotNull(capturedUser) { "Sign in to change secure routing." }
+        // Namespaced (tenant+backend+user hash) storage key, captured under
+        // the same scope guard: writes and rollbacks never touch another
+        // backend's file, and the legacy raw-userId file is left in place.
+        val storageId = checkNotNull(capturedStorageId) { "Sign in to change secure routing." }
+        // Hold and flag write are ONE critical section under this
+        // conversation's dispatch lock: queued REST texts are quarantined
+        // (durably, or this throws) before the flag moves, and no send can
+        // enqueue or deliver in between. If anything after the hold fails,
+        // the hold is rolled back (best effort; a rollback failure fails
+        // closed - messages stay quarantined while routing is unchanged).
+        var heldForToggle = false
+        var heldCount = 0
+        try {
+            if (enabled) {
+                heldCount = holdRestSends?.invoke(expectedScope, conversationId) ?: 0
+                heldForToggle = true
+            }
+            // Persist first (strict: failures throw) leaving both storage and
+            // memory as they were, so a chat never half-moves between planes.
+            // NOTE: writeJsonStrict can throw AFTER a durable write, so on
+            // failure the durable flag state is UNCERTAIN.
+            cache.writeJsonStrict(storageId, "secure_channels", next)
+            var applied = false
+            if (!withScope(expectedScope) {
+                synchronized(stateLock) {
+                    secureChannelIds.clear()
+                    secureChannelIds.addAll(next)
+                }
+                applied = true
+            } || !applied) {
+                // The write already landed for the captured account; roll it back
+                // with THAT account's captured set (still keyed to its userId).
+                // The hold is NOT released here: the account changed, so the
+                // release hooks would target the wrong account's outbox. The
+                // original account's queue stays quarantined - fail closed.
+                runCatching { cache.writeJsonStrict(storageId, "secure_channels", previous) }
+                throw IllegalStateException("Account changed while saving secure routing. Reopen the original account to check the saved setting; its queued messages stay quarantined.")
+            }
+        } catch (t: Throwable) {
+            // Release the hold ONLY when the old flag is positively durable
+            // again under the ORIGINAL account identity AND that account is
+            // still current. A failed/uncertain rollback keeps the hold:
+            // on restart the chat may load as encrypted with its queue still
+            // quarantined (fail closed), never the reverse.
+            if (heldForToggle) {
+                val flagRestored = runCatching {
+                    cache.writeJsonStrict(storageId, "secure_channels", previous)
+                }.isSuccess
+                var sameAccount = false
+                withScope(expectedScope) { sameAccount = true }
+                if (flagRestored && sameAccount) {
+                    runCatching { releaseRestSends?.invoke(expectedScope, conversationId) }
+                }
+            }
+            throw t
+        }
+        if (!enabled) {
+            // Releasing AFTER the flag write, still under the dispatch lock:
+            // a send racing the toggle either saw the old flag (refused) or
+            // sees the new one - and then the hold must already be gone. A
+            // throw here fails closed: routing moved back to REST but the
+            // queue stays quarantined rather than half-released.
+            releaseRestSends?.invoke(expectedScope, conversationId)
+        }
+        notifyChanged()
+        return SecureChannelTransition(conversationId, enabled, heldCount)
+        }
+        }
+    }
+
+    /** Experimental shared text routing. Not yet an app-wide transport invariant:
+     *  concurrent toggle, queued and in-flight sends need atomic dispatch guards. */
+    suspend fun routeTextSend(conversationId: String, text: String, extraMetadata: Map<String, Any?>? = null) {
+        val expected = scopeSnapshot()
+        val secure = isSecureChannel(conversationId)
+        var current = false
+        check(withScope(expected) { current = true } && current) { "Account changed; nothing sent." }
+        if (secure) {
+            check(experimentalSecureRoutingEnabled()) { "Secure routing is unavailable in this build." }
+            sendMessage(conversationId, text, extraMetadata = extraMetadata)
+        } else {
+            check(extraMetadata.isNullOrEmpty()) { "Text routing cannot silently discard metadata." }
+            val rest = restTextSend ?: error("Regular text routing is unavailable.")
+            rest(conversationId, text)
+        }
+    }
+
+    /** True only when this device's MLS identity is initialized and holds a
+     *  device id. Conversation-level readiness (every member's device
+     *  registered) is decided by the server at send time, which fails closed
+     *  with a setup-pending error; use this only to pick between
+     *  "setup pending" and "ready" UX, never to claim encryption. */
+    fun isSecureTransportReady(): Boolean {
+        val service = mls()
+        return service != null && service.isReady && service.currentDeviceId != null
+    }
+
+    /** Drives MLS group setup/catch-up for a conversation (device
+     *  registration, key-package claims, group publish/join). Throws while
+     *  setup cannot complete yet; callers surface "setup pending", never
+     *  "encrypted". */
+    suspend fun ensureSecureConversationReady(conversationId: String) {
+        val service = mls()
+            ?: throw IllegalStateException("Secure messaging is not available on this device.")
+        service.ensureConversationReady(conversationId)
     }
 
     private val transport = SecureMessageTransport(
@@ -118,6 +440,8 @@ class ConversationsRepository(
                 isArchived = row["is_archived"] == true,
                 isMuted = row["is_muted"] == true,
                 draftText = row["draft_text"]?.toString() ?: "",
+                // The secure-channel flag alone never proves MLS readiness, so
+                // it must not surface EncryptionStatus.encrypted here.
                 encryptionStatus = EncryptionStatus.verificationNeeded,
             )
             next[id] = conversation
@@ -173,24 +497,38 @@ class ConversationsRepository(
     @Suppress("UNCHECKED_CAST")
     suspend fun loadMessages(conversationId: String) {
         val expectedScope = scopeSnapshot()
-        val raw = rpc.rpc(
-            "get_conversation_messages",
-            mapOf(
-                "p_conversation_id" to conversationId,
-                "p_limit" to 100,
-            ),
-        )
-        val rows = raw as? List<*> ?: emptyList<Any?>()
-        val hydratedRows = mutableListOf<Map<String, Any?>>()
-        for (item in rows) {
-            val row = item as? Map<String, Any?> ?: continue
-            if (row["is_hidden"] == true) continue
-            noteSeq(conversationId, row)
-            hydratedRows.add(hydrateEncryptedMessageRow(conversationId, row))
+        val messages: MutableList<ChatMessage>
+        var fromSnapshot = false
+        try {
+            val raw = rpc.rpc(
+                "get_conversation_messages",
+                mapOf(
+                    "p_conversation_id" to conversationId,
+                    "p_limit" to 100,
+                ),
+            )
+            val rows = raw as? List<*> ?: emptyList<Any?>()
+            val hydratedRows = mutableListOf<Map<String, Any?>>()
+            for (item in rows) {
+                val row = item as? Map<String, Any?> ?: continue
+                if (row["is_hidden"] == true) continue
+                noteSeq(conversationId, row)
+                hydratedRows.add(hydrateEncryptedMessageRow(conversationId, row))
+            }
+            messages = hydratedRows.map { transport.messageFromRow(it, currentUserId()) }
+                .sortedBy { it.createdAt }
+                .toMutableList()
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            // S1 offline read fallback (Bandi, 2026-11-14): serve the encrypted
+            // snapshot cache so a cold-opened chat shows its saved messages, no
+            // spinner. Cached rows never advance seq cursors and are not
+            // re-persisted. Nothing cached -> keep the old error path.
+            val cached = snapshotFallback.read(conversationId, expectedScope)
+            if (cached == null) throw error
+            messages = cached.toMutableList()
+            fromSnapshot = true
         }
-        val messages = hydratedRows.map { transport.messageFromRow(it, currentUserId()) }
-            .sortedBy { it.createdAt }
-            .toMutableList()
 
         // Retain any optimistic / queued messages currently in memory so they
         // don't disappear on reload.
@@ -223,7 +561,7 @@ class ConversationsRepository(
             val capturedUser = currentUserId()
             val snapshotCopy = messages.toList()
             // Dart: unawaited(_persistMessageSnapshot(conversationId, ..)).
-            snapshotScope?.launch { persistMessageSnapshot(conversationId, snapshotCopy, expectedScope, capturedUser) }
+            if (!fromSnapshot) snapshotScope?.launch { persistMessageSnapshot(conversationId, snapshotCopy, expectedScope, capturedUser) }
         }
         if (!applied) return
     }
@@ -260,23 +598,30 @@ class ConversationsRepository(
     ) {
         val userId = capturedUserId ?: return
         val cache = snapshotCache ?: return
+        // Capture the namespace INSIDE the scope guard: a switch between the
+        // check and the read must not write this account's cursors into the
+        // next account's file.
         var stillCurrent = false
-        if (!withScope(expectedScope) { stillCurrent = true } || !stillCurrent) return
+        var ns: String? = null
+        if (!withScope(expectedScope) { ns = storageNamespace(); stillCurrent = true } || !stillCurrent) return
         val payload = cursors ?: synchronized(stateLock) { lastSeqByChatId.toMap() }
-        runCatching { cache.writeJson(userId, "sync_cursors", payload) }
+        // Namespaced cursor file (tenant+backend+user hash); the legacy
+        // raw-userId file is left untouched (no destructive migration).
+        runCatching { cache.writeJson(ns ?: return, "sync_cursors", payload) }
     }
 
     /** Restores persisted cursors at session start (called from the locator
      *  after the repository is wired). */
     suspend fun restoreSyncCursors() {
-        val userId = currentUserId() ?: return
+        val expected = scopeSnapshot()
         val cache = snapshotCache ?: return
-        val raw = runCatching { cache.readJson(userId, "sync_cursors") }.getOrNull() ?: return
+        var storageId: String? = null
+        if (!withScope(expected) { storageId = storageNamespace() }) return
+        val raw = runCatching { cache.readJson(storageId ?: return, "sync_cursors") }.getOrNull() ?: return
         @Suppress("UNCHECKED_CAST")
         val map = raw as? Map<String, Any?> ?: return
-        for ((key, value) in map) {
-            (value as? Number)?.toLong()?.let { lastSeqByChatId[key] = it }
-        }
+        val parsed = map.mapNotNull { (key, value) -> value?.toString()?.toLongOrNull()?.let { key to it } }.toMap()
+        withScope(expected) { synchronized(stateLock) { lastSeqByChatId.putAll(parsed) } }
     }
 
     /** Fetches every message newer than the local cursor, oldest first, and
@@ -442,7 +787,7 @@ class ConversationsRepository(
     /** Matrix 11/18: mirrors decrypted, user-visible messages into the
      *  SQLCipher local DB for offline global search. Installed by
      *  ServiceLocator; null in JVM tests. */
-    var localMessageMirror: (suspend (conversationId: String, messages: List<ChatMessage>) -> Unit)? = null
+    var localMessageMirror: (suspend (expectedScope: Any?, conversationId: String, messages: List<ChatMessage>) -> Unit)? = null
 
     /** Exact port of _persistMessageSnapshot. Content is encrypted at rest by
      *  LocalSnapshotCacheService; nothing plaintext is ever written to disk. */
@@ -452,12 +797,12 @@ class ConversationsRepository(
         expectedScope: Any? = scopeSnapshot(),
         capturedUserId: String? = currentUserId(),
     ) {
-        val userId = capturedUserId ?: return
+        val userId = messageSnapshotNamespace(expectedScope) ?: return
         val cache = snapshotCache ?: return
         if (messages.isNullOrEmpty()) return
         var stillCurrent = false
         if (!withScope(expectedScope) { stillCurrent = true } || !stillCurrent) return
-        val snapshot = messages.toList()
+        val snapshot = messages.map(com.example.chat.core.messages.ViewOnceTextPolicy::redact)
         runCatching {
             cache.writeJson(
                 userId = userId,
@@ -467,7 +812,7 @@ class ConversationsRepository(
         }
         if (!withScope(expectedScope) { stillCurrent = true } || !stillCurrent) return
         localMessageMirror?.let { mirror ->
-            runCatching { mirror(conversationId, snapshot) }
+            runCatching { mirror(expectedScope, conversationId, snapshot) }
         }
     }
 
@@ -480,6 +825,13 @@ class ConversationsRepository(
         source: Map<String, Any?>,
     ): Map<String, Any?> {
         val row = source.toMutableMap()
+        if (row["view_once"] == true || (row["metadata"] as? Map<*, *>)?.get("view_once") == true) {
+            row["body"] = com.example.chat.core.messages.ViewOnceTextPolicy.PLACEHOLDER
+            row["encrypted_payload"] = null
+            row["metadata"] = mapOf("view_once" to true, "view_once_state" to row["view_once_state"],
+                "encrypted" to (row["encryption_protocol"] == MlsE2eeService.protocolSuite))
+            return row
+        }
         if (row["encryption_protocol"] != MlsE2eeService.protocolSuite) return row
         if (row["deleted_at"] != null) return row
 
@@ -560,7 +912,13 @@ class ConversationsRepository(
     ): ChatMessage {
         val me = currentUserId() ?: throw Exception("Authentication required.")
         if (!conversationsById.containsKey(conversationId)) {
-            throw Exception("Conversation not found.")
+            // A secure-channel send can arrive before any conversation list
+            // load this session (the flag lives outside the list): hydrate the
+            // list once instead of failing a send the server would accept.
+            loadConversations(loadMembers = false)
+            if (!conversationsById.containsKey(conversationId)) {
+                throw Exception("Conversation not found.")
+            }
         }
         if (mls() == null) {
             throw IllegalStateException("Encrypted message transport is unavailable.")
@@ -645,7 +1003,12 @@ class ConversationsRepository(
         send: PendingSecureSend,
         fallbackType: MessageType,
     ): ChatMessage {
-        val messageId = transport.deliverEncryptedMessage(send)
+        // The single MLS dispatch point (direct sends AND queued retries):
+        // takes the cross-plane lock so a toggle can never catch an MLS
+        // delivery mid-flight.
+        val messageId = withDispatchLock(send.conversationId) {
+            transport.deliverEncryptedMessage(send)
+        }
         kotlinx.coroutines.coroutineScope {
             val a = launch { loadMessages(send.conversationId) }
             val b = launch { loadConversations(loadMembers = false) }

@@ -70,6 +70,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -169,6 +170,8 @@ fun ChatEntryBar(
     onVoiceMove: (Offset) -> Unit = {},
     onVoiceHoldEnd: () -> Unit = {},
     onSend: () -> Unit = {},
+    onSendViewOnce: () -> Unit = {},
+    onScheduleSend: () -> Unit = {},
     onVideoHoldStart: ((Long) -> Unit)? = null,
     onVideoHoldMove: (Long, Float, Float) -> Unit = { _, _, _ -> },
     onVideoHoldEnd: (Long) -> Unit = {},
@@ -229,8 +232,23 @@ fun ChatEntryBar(
     @Composable
     fun sendMic() {
         if (hasText) {
-            ComposerActionButton("Send message", Icons.AutoMirrored.Rounded.Send, Color(theme.onAccentColor),
-                fillColor = colors.sendFill, emphasized = true, onTap = onSend)
+            var sendOptionsOpen by remember { mutableStateOf(false) }
+            Box {
+                ComposerActionButton("Send message", Icons.AutoMirrored.Rounded.Send, Color(theme.onAccentColor),
+                    fillColor = colors.sendFill, emphasized = true, onTap = onSend,
+                    onLongClick = { sendOptionsOpen = true })
+                com.example.chat.ui.kit.ChatyDropdownMenu(expanded = sendOptionsOpen,
+                    onDismissRequest = { sendOptionsOpen = false }) {
+                    com.example.chat.ui.kit.ChatyDropdownMenuItem(
+                        text = { androidx.compose.material3.Text("Send as view once") },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.numberOne, semanticLabel = null) },
+                        onClick = { sendOptionsOpen = false; onSendViewOnce() })
+                    com.example.chat.ui.kit.ChatyDropdownMenuItem(
+                        text = { androidx.compose.material3.Text("Schedule send") },
+                        leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.scheduleSend, semanticLabel = null) },
+                        onClick = { sendOptionsOpen = false; onScheduleSend() })
+                }
+            }
         } else {
             // MicGestureDiag (bounded, DEBUG-only): timestamps the recomposition
             // that publishes the new mode label - with the run-127 toggle vs
@@ -674,11 +692,14 @@ private fun ComposerActionButton(
     enabled: Boolean = true,
     emphasized: Boolean = false,
     onTap: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     onLongPressStart: (() -> Unit)? = null,
     onLongPressMove: ((Offset) -> Unit)? = null,
     onLongPressEnd: (() -> Unit)? = null,
     onLongPressCancel: (() -> Unit)? = null,
 ) {
+    val longClickNow by rememberUpdatedState(onLongClick)
+    val tapNow by rememberUpdatedState(onTap)
     val pressedState = remember { mutableStateOf(false) }
     val pressed = pressedState.value
     val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
@@ -713,6 +734,9 @@ private fun ComposerActionButton(
                 // hold/record stays gesture-only, so a11y activation invokes the
                 // same mode-toggle/send callback as a tap and can never start a
                 // recording. Visuals and gesture handling are unchanged.
+                if (onLongClick != null) {
+                    this.onLongClick(label = "Send options") { longClickNow?.invoke(); true }
+                }
                 if (onTap != null) {
                     this.role = Role.Button
                     // MicGestureDiag (bounded, DEBUG-only): run-131 saw ONE a11y
@@ -721,7 +745,7 @@ private fun ComposerActionButton(
                     // the pointer path (logged below) at the next occurrence.
                     this.onClick(label = null) {
                         if (com.example.chat.BuildConfig.DEBUG && (semanticsLabel.startsWith("Microphone mode") || semanticsLabel.startsWith("Video mode"))) android.util.Log.i("MicGestureDiag", "mic semanticsOnClick dispatch t=" + System.currentTimeMillis())
-                        onTap(); true
+                        tapNow?.invoke(); true
                     }
                 }
             }
@@ -733,15 +757,16 @@ private fun ComposerActionButton(
                         tryAwaitRelease()
                         pressedState.value = false
                     },
+                    onLongPress = if (onLongClick != null) ({ _ -> longClickNow?.invoke() }) else null,
                     onTap = {
                         if (emphasized) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (com.example.chat.BuildConfig.DEBUG && (semanticsLabel.startsWith("Microphone mode") || semanticsLabel.startsWith("Video mode"))) android.util.Log.i("MicGestureDiag", "mic pointerTap dispatch t=" + System.currentTimeMillis())
-                        onTap?.invoke()
+                        tapNow?.invoke()
                     },
                 )
             }
             .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
+                if (!enabled || onLongClick != null) return@pointerInput
                 var dragOffset = Offset.Zero
                 detectDragGesturesAfterLongPress(
                     onDragStart = {

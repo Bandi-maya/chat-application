@@ -109,7 +109,7 @@ object SnapshotCodec {
         } else {
             emptyMap()
         }
-        return ChatMessage(
+        return com.example.chat.core.messages.ViewOnceTextPolicy.redact(ChatMessage(
             id = json["id"]?.toString() ?: "",
             conversationId = json["conversation_id"]?.toString() ?: "",
             senderId = json["sender_id"]?.toString() ?: "",
@@ -126,14 +126,25 @@ object SnapshotCodec {
                 ?: Instant.ofEpochMilli(0),
             editedAt = json["edited_at"]?.let { parseIsoToInstant(it.toString()) },
             deliveryState = deliveryState(json["delivery_state"]?.toString()),
+            readAt = (json["read_at"] as? String)?.let(::parseIsoToInstant),
             isPinned = json["is_pinned"] == true,
             isStarred = json["is_starred"] == true,
             isDeletedForEveryone = json["deleted_for_everyone"] == true,
             isDeletedForMe = json["deleted_for_me"] == true,
-        )
+        ))
     }
 
-    fun chatMessageToJson(message: ChatMessage): Map<String, Any?> =
+    fun chatMessageToJson(message: ChatMessage): Map<String, Any?> {
+        @Suppress("UNCHECKED_CAST")
+        val confirmedReactions = if (message.metadata["reaction_pending_token"] != null)
+            (message.metadata["reaction_before"] as? List<MessageReaction>).orEmpty() else message.reactions
+        val confirmed = message.copy(reactions = confirmedReactions,
+            metadata = message.metadata - "reaction_pending_token" - "reaction_before")
+        val redacted = com.example.chat.core.messages.ViewOnceTextPolicy.redact(confirmed)
+        return chatMessageRedactedToJson(redacted)
+    }
+
+    private fun chatMessageRedactedToJson(message: ChatMessage): Map<String, Any?> =
         buildMap {
             put("id", message.id)
             put("conversation_id", message.conversationId)
@@ -170,6 +181,7 @@ object SnapshotCodec {
             put("created_at", message.createdAt.toString())
             message.editedAt?.let { put("edited_at", it.toString()) }
             put("delivery_state", message.deliveryState.name)
+            message.readAt?.let { put("read_at", it.toString()) }
             put("is_pinned", message.isPinned)
             put("is_starred", message.isStarred)
             put("deleted_for_everyone", message.isDeletedForEveryone)
@@ -205,7 +217,8 @@ object SnapshotCodec {
         "sent" -> DeliveryState.sent
         "read" -> DeliveryState.read
         "failed" -> DeliveryState.failed
-        else -> DeliveryState.delivered
+        "delivered" -> DeliveryState.delivered
+        else -> DeliveryState.sent
     }
 
     private fun stringList(source: Any?): List<String> =

@@ -47,7 +47,7 @@ class ApiBackendService(
     private val auth = ApiAuthClient(
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
-        transport = OkHttpApiTransport(),
+        transport = OkHttpApiTransport(allowRedirects = false),
         token = { session.token },
     )
 
@@ -55,7 +55,7 @@ class ApiBackendService(
     private fun scopedAuthClient(baseUrl: String, tenantId: String): ApiAuthClient = ApiAuthClient(
         baseUrl = { baseUrl },
         tenantId = { tenantId },
-        transport = OkHttpApiTransport(),
+        transport = OkHttpApiTransport(allowRedirects = false),
         token = { session.token },
     )
 
@@ -67,19 +67,17 @@ class ApiBackendService(
     private val contactsClient = ApiContactsClient(
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
-        transport = OkHttpApiTransport(),
+        transport = OkHttpApiTransport(allowRedirects = false),
         token = { session.token },
     )
-    private val presenceClient = ApiPresenceClient(
-        baseUrl = { config.restApiBaseUrl },
-        tenantId = { config.tenantId },
-        transport = OkHttpApiTransport(),
-        token = { session.token },
+    private fun scopedPresenceClient(expected: ApiAccountScope) = ApiPresenceClient(
+        baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
+        transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
     )
     private val callHistoryClient = ApiCallHistoryClient(
         baseUrl = { config.restApiBaseUrl },
         tenantId = { config.tenantId },
-        transport = OkHttpApiTransport(),
+        transport = OkHttpApiTransport(allowRedirects = false),
         token = { session.token },
     )
 
@@ -161,7 +159,8 @@ class ApiBackendService(
             check(authSnapshot() === expected) { "Account changed. Open this chat again." }
             val id = ApiPathSegments.safe(userId) ?: throw IllegalArgumentException("Invalid user identifier.")
             require(id != expected.userId) { "You cannot block yourself." }
-            if (blocked) contactsClient.blockUser(id) else contactsClient.unblock(id)
+            val client = contactsPlane(expected)
+            if (blocked) client.blockUser(id) else client.unblock(id)
             check(authSnapshot() === expected) { "Account changed. Result was not applied." }
         }
 
@@ -275,18 +274,49 @@ class ApiBackendService(
      *  over the custom-backend WebSocket (payload type call_signal). */
     fun sendCallSignal(targetUserId: String, data: Map<String, Any?>): Boolean {
         val expected = authSnapshot()
+        // One logical id shared by socket and REST retry. Never generate a different id in each transport.
+        val eventId = (data["client_event_id"] as? String)?.takeIf { runCatching { java.util.UUID.fromString(it).toString() == it }.getOrDefault(false) }
+            ?: java.util.UUID.randomUUID().toString()
+        val event = data + ("client_event_id" to eventId)
         var queued = false
-        withAuthScope(expected) { queued = realtime.sendCallSignal(targetUserId, data) }
-        callCoordinator.send(expected, targetUserId, data)
-        return queued // Socket enqueue only, never delivery confirmation.
+        withAuthScope(expected) { queued = realtime.sendCallSignal(targetUserId, event) }
+        callCoordinator.send(expected, targetUserId, event)
+        return queued // Enqueue only, not delivery/receipt.
     }
     fun removeCallSignalListener(listener: (Map<String, Any?>) -> Unit) { callSignalListeners.remove(listener) }
 
     private val scopedCallListeners = java.util.concurrent.CopyOnWriteArrayList<(ApiAccountScope, Map<String, Any?>) -> Unit>()
     /** Push ring nudge: one-shot REST poll of queued call signals while the
      *  socket is down (app may be backgrounded). */
-    fun pollCallSignalsNow() { callCoordinator.pollNow() }
-    suspend fun pollCallSignalsAndAwait() { callCoordinator.pollNow()?.join() }
+    @Volatile private var callProtocolOwner: ApiAccountScope? = null
+    @Volatile private var durableCallInbox = false
+    private val callProtocolMutex = kotlinx.coroutines.sync.Mutex()
+    private var lastInboxWakeMs = 0L
+    @Volatile var onDurableCallInboxWake: (suspend (ApiAccountScope) -> Unit)? = null
+    suspend fun usesDurableCallInbox(expected: ApiAccountScope): Boolean = callProtocolMutex.withLock {
+        if (authSnapshot() !== expected) return@withLock false
+        if (callProtocolOwner !== expected) {
+            val supported = withContext(Dispatchers.IO) { ApiServerCapabilities.supports(expected, OkHttpApiTransport(allowRedirects = false), "call_signal_inbox_v1") }
+            if (authSnapshot() !== expected) return@withLock false
+            durableCallInbox = supported; callProtocolOwner = expected
+            realtime.connect() // URL changes only after authenticated capability verification.
+        }
+        durableCallInbox
+    }
+    private fun wakeCallInbox(expected: ApiAccountScope) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        synchronized(callProtocolMutex) {
+            if (now - lastInboxWakeMs < 1_000) return
+            lastInboxWakeMs = now
+        }
+        chatScope.launch { pollCallSignalsAndAwait(expected) }
+    }
+    fun pollCallSignalsNow() { wakeCallInbox(authSnapshot()) }
+    suspend fun pollCallSignalsAndAwait(expected: ApiAccountScope = authSnapshot()) {
+        if (authSnapshot() !== expected) return
+        if (usesDurableCallInbox(expected)) onDurableCallInboxWake?.invoke(expected)
+        else if (callProtocolOwner === expected) callCoordinator.pollNow(expected)?.join()
+    }
     fun addScopedCallSignalListener(listener: (ApiAccountScope, Map<String, Any?>) -> Unit) = scopedCallListeners.add(listener)
     private val callRequests = CallRequestRegistry()
     private val sendRequests = CallRequestRegistry()
@@ -297,7 +327,9 @@ class ApiBackendService(
                     ScopedCallHttpTransport(expected, ::withAuthScope, callRequests))
             }, cancelRequests = callRequests::cancelAll,
             deliver = { expected, data -> scopedCallListeners.forEach { it(expected, data) } },
-            clock = { android.os.SystemClock.elapsedRealtime() })
+            clock = { android.os.SystemClock.elapsedRealtime() },
+            legacyAllowed = { expected -> callProtocolOwner === expected && !durableCallInbox },
+            inboxWake = ::wakeCallInbox)
     }
     private fun startCallScopeMonitoring() {
         addAuthScopeListener(callCoordinator::transition)
@@ -342,16 +374,34 @@ class ApiBackendService(
             }
         }
         if (uid.isEmpty()) return null
-        return ApiRealtimeClient.resolveWebSocketUrl(
+        val resolved = ApiRealtimeClient.resolveWebSocketUrl(
             userId = uid,
             customWebSocketUrl = ApiBackendConfig.DOTENV_WEBSOCKET_URL,
             envWebSocketUrl = ApiBackendConfig.WEBSOCKET_URL_OVERRIDE,
             restApiBaseUrl = config.restApiBaseUrl,
         )
+        return if (resolved != null && callProtocolOwner === authSnapshot() && durableCallInbox) {
+            android.net.Uri.parse(resolved).buildUpon().appendQueryParameter("call_signals_v2", "true").build().toString()
+        } else resolved
     }
 
     private val realtimeListener: ApiRealtimeClient.Listener = object : ApiRealtimeClient.Listener {
         override fun onConnected() {
+            val connectedOwner = authSnapshot()
+            chatScope.launch { usesDurableCallInbox(connectedOwner) }
+            chatScope.launch(Dispatchers.IO) {
+                val key = com.example.chat.core.messages.LocalMessageOverridePolicy.accountKey(connectedOwner.tenantId, connectedOwner.baseUrl, connectedOwner.userId.orEmpty())
+                    ?: return@launch
+                com.example.chat.ui.chats.detail.ReadAlertCenter.init(appContext)
+                val rooms = com.example.chat.ui.chats.detail.ReadAlertCenter.watchedConversationIds(key)
+                val reader = ApiChatClient(baseUrl = { connectedOwner.baseUrl }, tenantId = { connectedOwner.tenantId }, token = { connectedOwner.token },
+                    transport = ScopedCallHttpTransport(connectedOwner, ::withAuthScope, sendRequests))
+                for (room in rooms) {
+                    if (authSnapshot() !== connectedOwner) return@launch
+                    val rows = reader.listMessages(room) ?: continue
+                    applyLoadedMessages(room, rows, connectedOwner)
+                }
+            }
             val wasDown = socketWasDisconnected
             socketWasDisconnected = false
             if (wasDown) {
@@ -393,6 +443,40 @@ class ApiBackendService(
             // Telegram-style push invalidation: revalidate (ETag) on the hint;
             // the fresh document activates on the next app start.
             chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
+        }
+
+        override fun onReactionAggregate(data: Map<String, Any?>, capturedScope: Any?) {
+            val owner = capturedScope as? ApiAccountScope ?: return
+            val aggregate = runCatching { ReactionAggregate.parse(data) }.getOrNull() ?: return
+            applyReactionAggregate(aggregate, owner)
+        }
+
+        override fun onMessageLifecycleChanged(roomId: String, messageId: String?, consumed: Boolean, capturedScope: Any?) {
+            val owner = capturedScope as? ApiAccountScope ?: return
+            if (consumed && messageId != null) {
+                if (!withAuthScope(owner) {
+                    synchronized(chatLock) {
+                        val list = _messages[roomId]
+                        val index = list?.indexOfFirst { it.id == messageId } ?: -1
+                        if (list != null && index >= 0) list[index] = com.example.chat.core.messages.ViewOnceTextPolicy.redact(
+                            list[index].copy(metadata = list[index].metadata + mapOf("view_once" to true, "view_once_state" to "consumed")))
+                    }
+                }) return
+                onConversationRead(roomId) // Remove local notification text, never open or mark server read.
+                schedulePersistRoomMessages(roomId, owner)
+                notifyChatListeners()
+            }
+            chatScope.launch {
+                if (authSnapshot() !== owner) return@launch
+                val reader = ApiChatClient(baseUrl = { owner.baseUrl }, tenantId = { owner.tenantId }, token = { owner.token },
+                    transport = ScopedCallHttpTransport(owner, ::withAuthScope, sendRequests))
+                val rows = withContext(Dispatchers.IO) { reader.listMessages(roomId) } ?: return@launch
+                applyLoadedMessages(roomId, rows, owner)
+                if (authSnapshot() === owner) {
+                    conversationsDirty = true
+                    loadConversationsIfNeeded(force = true)
+                }
+            }
         }
 
         override fun onNewMessage(message: ChatMessage) {
@@ -446,7 +530,8 @@ class ApiBackendService(
                     _conversations.add(
                         0,
                         old.copy(
-                            lastMessageText = if (normalized.text.isNotEmpty()) normalized.text
+                            lastMessageText = if (com.example.chat.core.messages.ViewOnceTextPolicy.restricted(normalized.metadata)) com.example.chat.core.messages.ViewOnceTextPolicy.PLACEHOLDER
+                            else if (normalized.text.isNotEmpty()) normalized.text
                             else if (normalized.type == MessageType.image) "📷 Photo" else "📎 Attachment",
                             lastMessageTime = normalized.createdAt,
                             lastMessageSenderId = normalized.senderId,
@@ -517,7 +602,8 @@ class ApiBackendService(
                     val lastMsg = list.lastOrNull()
                     _conversations[convIdx] = _conversations[convIdx].copy(
                         lastMessageText = if (lastMsg != null) {
-                            if (lastMsg.text.isNotEmpty()) lastMsg.text
+                            if (com.example.chat.core.messages.ViewOnceTextPolicy.restricted(lastMsg.metadata)) com.example.chat.core.messages.ViewOnceTextPolicy.PLACEHOLDER
+                            else if (lastMsg.text.isNotEmpty()) lastMsg.text
                             else if (lastMsg.type == MessageType.image) "📷 Photo" else "📎 Attachment"
                         } else "",
                         lastMessageTime = lastMsg?.createdAt ?: _conversations[convIdx].lastMessageTime,
@@ -553,47 +639,67 @@ class ApiBackendService(
         }
 
         override fun onMessagesRead(roomId: String, messageIds: List<String>, readerId: String) {
-            val expected = authSnapshot()
-            val myId = session.currentUser?.id
-            if (readerId.isNotEmpty() && readerId == myId) return
-            // Live backend sends no message_ids when a reader marks the whole
-            // room read ({room_id, user_id, read_at}); the client delivers an
-            // empty list for that form, meaning "all of my messages here".
-            val markAll = messageIds.isEmpty() && readerId.isNotEmpty()
-            val ids = messageIds.toSet()
+            // Legacy room-wide read is an unread cursor, not per-message or all-group proof.
+            // Exact receipt state is repaired by history/Info and message_receipt_updated.
+        }
+
+        override fun onScopedMessageReceiptUpdated(event: MessageReceiptEvent, capturedScope: Any?) {
+            val expected = capturedScope as? ApiAccountScope ?: return
+            if (authSnapshot() !== expected) return
+            val myId = expected.userId ?: return
             var changed = false
-            synchronized(chatLock) {
-                val list = _messages[roomId] ?: return@synchronized
-                for (i in list.indices) {
-                    val m = list[i]
-                    if ((markAll || m.id in ids) && m.senderId == myId && m.deliveryState != DeliveryState.read) {
-                        list[i] = m.copy(deliveryState = DeliveryState.read)
-                        changed = true
-                    }
-                }
-            }
-            if (changed) {
-                schedulePersistRoomMessages(roomId, expected)
-                notifyChatListeners()
-            }
+            withAuthScope(expected) { synchronized(chatLock) {
+                val list = _messages[event.roomId] ?: return@synchronized
+                val index = list.indexOfFirst { it.id == event.messageId && it.senderId == myId }
+                if (index < 0) return@synchronized
+                val current = list[index]
+                list[index] = current.copy(
+                    deliveryState = when { event.allRead -> DeliveryState.read; event.allDelivered -> DeliveryState.delivered; else -> DeliveryState.sent },
+                    readAt = if (event.allRead) current.readAt else null, // A member's timestamp is not the aggregate group-read time.
+                    recipientReceipts = current.recipientReceipts + (event.userId to event.times),
+                )
+                changed = true
+            } }
+            if (changed) { schedulePersistRoomMessages(event.roomId, expected); notifyChatListeners() }
+        }
+
+        override fun onScopedInitialPresence(ids: List<String>, capturedScope: Any?) {
+            val owner = capturedScope as? ApiAccountScope ?: return
+            withAuthScope(owner) { onInitialPresence(ids) }
+        }
+        override fun onScopedPresence(userId: String, online: Boolean, lastSeen: String?, capturedScope: Any?) {
+            val owner = capturedScope as? ApiAccountScope ?: return
+            withAuthScope(owner) { onPresence(userId, online, lastSeen) }
+        }
+        override fun onScopedPresenceChanged(userId: String, online: Boolean, lastSeen: String?, approx: String?, capturedScope: Any?) {
+            val owner = capturedScope as? ApiAccountScope ?: return
+            withAuthScope(owner) { onPresenceChanged(userId, online, lastSeen, approx) }
+        }
+        override fun onScopedTyping(roomId: String, userId: String, typing: Boolean, capturedScope: Any?) {
+            val owner = capturedScope as? ApiAccountScope ?: return
+            withAuthScope(owner) { onTyping(roomId, userId, typing) }
         }
 
         override fun onInitialPresence(onlineUserIds: List<String>) {
+            (onlineIds.toSet() + onlineUserIds).forEach(::bumpPresenceRevision)
             onlineIds.clear()
             onlineIds.addAll(onlineUserIds)
             notifyChatListeners()
         }
 
         override fun onPresence(userId: String, isOnline: Boolean, lastSeen: String?) {
+            bumpPresenceRevision(userId)
             if (isOnline) onlineIds.add(userId) else onlineIds.remove(userId)
             val seen = parseIsoOrNull(lastSeen)
             if (seen != null) lastSeenById[userId] = seen
-            else if (!isOnline) lastSeenById.remove(userId)
+            else lastSeenById.remove(userId)
+            approxPresenceById.remove(userId)
             notifyChatListeners()
             for (l in contactEventListeners) runCatching { l.onContactOnlineChanged(userId, isOnline) }
         }
 
         override fun onPresenceChanged(userId: String, online: Boolean, lastSeenAt: String?, approx: String?) {
+            bumpPresenceRevision(userId)
             // Server already privacy-filtered this view for us; store exactly
             // what it said and drop everything else (fail-closed).
             if (online) onlineIds.add(userId) else onlineIds.remove(userId)
@@ -602,6 +708,30 @@ class ApiBackendService(
             if (approx != null) approxPresenceById[userId] = approx else approxPresenceById.remove(userId)
             notifyChatListeners()
             for (l in contactEventListeners) runCatching { l.onContactOnlineChanged(userId, online) }
+        }
+
+        override fun onScopedMessagesDelivered(roomId: String, messageIds: List<String>, receiverId: String, capturedScope: Any?) {
+            if (!com.example.chat.ReleaseFeatures.SCOPED_DELIVERY_RECEIPTS) return
+            val expected = capturedScope as? ApiAccountScope ?: return
+            val myId = expected.userId ?: return
+            val ids = messageIds.toSet()
+            var changed = false
+            if (!withAuthScope(expected) {
+                synchronized(chatLock) {
+                    val conv = _conversations.firstOrNull { it.id == roomId }
+                    if (conv?.isDirect == true && receiverId != myId && receiverId in conv.participantIds) {
+                        val list = _messages[roomId]
+                        if (list != null) for (i in list.indices) {
+                            val m = list[i]
+                            if (m.id in ids && m.senderId == myId && m.deliveryState == DeliveryState.sent) {
+                                list[i] = m.copy(deliveryState = DeliveryState.delivered)
+                                changed = true
+                            }
+                        }
+                    }
+                }
+            }) return
+            if (changed) { schedulePersistRoomMessages(roomId, expected); notifyChatListeners() }
         }
 
         override fun onMessagesDelivered(roomId: String, deliveredUpTo: String) {
@@ -658,6 +788,9 @@ class ApiBackendService(
     }
 
     private val onlineIds: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    private val presenceRevisions = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private fun bumpPresenceRevision(userId: String) { presenceRevisions.merge(userId, 1L) { old, step -> old + step } }
+    fun presenceRevisionOf(userId: String): Long = presenceRevisions[userId] ?: 0L
     private val lastSeenById = java.util.concurrent.ConcurrentHashMap<String, Instant>()
     private val approxPresenceById = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val typingUntil = java.util.concurrent.ConcurrentHashMap<String, Long>()
@@ -675,18 +808,34 @@ class ApiBackendService(
     /** One-shot privacy-filtered presence for the chat header (research 5.2:
      *  header shows online / last seen / bucket; nothing when the server
      *  says nothing). */
-    suspend fun fetchPresence(userId: String): ApiPresenceClient.PresenceView =
-        withContext(Dispatchers.IO) { presenceClient.presence(userId) }
+    suspend fun fetchPresence(userId: String, expected: ApiAccountScope = authSnapshot()): ApiPresenceClient.PresenceView {
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        val result = withContext(Dispatchers.IO) { scopedPresenceClient(expected).presence(userId) }
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        return result
+    }
 
     /** POST /presence/heartbeat (REST presence transport; server believes
      *  online for 90s only). Fail-closed false. */
-    suspend fun presenceHeartbeat(online: Boolean): Boolean =
-        withContext(Dispatchers.IO) { presenceClient.heartbeat(online) }
+    suspend fun presenceHeartbeat(online: Boolean, expected: ApiAccountScope = authSnapshot()): Boolean {
+        if (authSnapshot() !== expected || (online && !syncForeground)) return false
+        val result = withContext(Dispatchers.IO) { scopedPresenceClient(expected).heartbeat(online) }
+        return authSnapshot() === expected && result
+    }
 
-    fun presencePrivacy(): ApiPresenceClient.PresencePrivacy? = presenceClient.privacy()
+    fun presencePrivacy(expected: ApiAccountScope = authSnapshot()): ApiPresenceClient.PresencePrivacy? {
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        val result = scopedPresenceClient(expected).privacy()
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        return result
+    }
 
-    fun putPresencePrivacy(lastSeenPolicy: String, onlinePolicy: String, exceptions: List<String>?): ApiPresenceClient.PresencePrivacy? =
-        presenceClient.putPrivacy(lastSeenPolicy, onlinePolicy, exceptions)
+    fun putPresencePrivacy(lastSeenPolicy: String, onlinePolicy: String, exceptions: List<String>?, expected: ApiAccountScope = authSnapshot()): ApiPresenceClient.PresencePrivacy? {
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        val result = scopedPresenceClient(expected).putPrivacy(lastSeenPolicy, onlinePolicy, exceptions)
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        return result
+    }
 
     // --- Contacts plane (research 5.3) ------------------------------------
 
@@ -739,9 +888,10 @@ class ApiBackendService(
         typingUntil.keys.any { it.startsWith("$roomId|") && isTyping(roomId, it.substringAfter('|')) }
 
     /** Publishes our typing state to the room (fire-and-forget). */
-    fun sendTyping(roomId: String, isTyping: Boolean) {
-        if (session.token == null) return
-        realtime.sendTyping(roomId, isTyping)
+    fun sendTyping(roomId: String, isTyping: Boolean, expected: ApiAccountScope = authSnapshot()) {
+        if (authSnapshot() !== expected || expected.token == null) return
+        if (isTyping && (!syncForeground || (activeConversationId != roomId && roomId !in activeConversationIds))) return
+        withAuthScope(expected) { realtime.sendTyping(roomId, isTyping) }
     }
 
     /** Publishes voice-note recording state through the custom backend socket. */
@@ -822,11 +972,25 @@ class ApiBackendService(
     /** Remote settings-blob sync seam for the preferences controller
      *  (RemoteSettingsStore over /chat/settings extras): fetch returns
      *  (blob, updatedAt), null on transport failure. Push replaces the blob. */
-    suspend fun remoteSettingsFetch(): Pair<Map<String, Any?>?, String?>? =
-        withContext(Dispatchers.IO) { chat.getChatSettingsExtras() }
+    private fun scopedSettingsClient(expected: ApiAccountScope): ApiChatClient = ApiChatClient(
+        baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
+        transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
+    )
+    suspend fun remoteSettingsFetch(expected: ApiAccountScope = authSnapshot()): Pair<Map<String, Any?>?, String?>? =
+        withContext(Dispatchers.IO) {
+            if (authSnapshot() !== expected) throw ApiScopeChangedException()
+            val result = scopedSettingsClient(expected).getChatSettingsExtras()
+            if (authSnapshot() !== expected) throw ApiScopeChangedException()
+            result
+        }
 
-    suspend fun remoteSettingsPush(snapshot: Map<String, Any?>): Boolean =
-        withContext(Dispatchers.IO) { chat.updateChatSettings(mapOf("extras" to snapshot)) }
+    suspend fun remoteSettingsPush(snapshot: Map<String, Any?>, expected: ApiAccountScope = authSnapshot()): Boolean =
+        withContext(Dispatchers.IO) {
+            if (authSnapshot() !== expected) throw ApiScopeChangedException()
+            val result = scopedSettingsClient(expected).updateChatSettings(mapOf("extras" to snapshot))
+            if (authSnapshot() !== expected) throw ApiScopeChangedException()
+            result
+        }
 
     /** Hook set by the locator: true while a call is in progress (token refresh waits until it ends). */
     @Volatile var isCallActive: () -> Boolean = { false }
@@ -864,11 +1028,10 @@ class ApiBackendService(
         chatScope.launch(Dispatchers.IO) { syncFromPushNudge() }
     }
 
-    suspend fun syncFromPushNudge() {
-        if (session.token == null || DemoMode.active) return
+    suspend fun syncFromPushNudge(expected: ApiAccountScope = authSnapshot()) {
+        if (session.token == null || DemoMode.active || authSnapshot() !== expected) return
         pushSyncMutex.withLock {
-            val expected = authSnapshot()
-            if (expected.token == null || DemoMode.active) return@withLock
+            if (expected.token == null || DemoMode.active || authSnapshot() !== expected) return@withLock
             if (synchronized(chatLock) { _conversations.isEmpty() }) {
                 hydrateLocalStateForScope(expected)
             }
@@ -876,7 +1039,7 @@ class ApiBackendService(
                 _conversations.toList() to _messages.mapValues { (_, list) -> list.toList() }
             }
             ensureFreshToken()
-            ensureOutboxLoaded()
+            ensureOutboxLoaded(expected)
             flushOutbox()
             conversationsDirty = true
             loadConversationsIfNeeded(force = true)
@@ -896,7 +1059,21 @@ class ApiBackendService(
                 if (authSnapshot() !== expected) return@withLock
                 hydrateRoomMessagesFromCacheIfNeeded(conv.id)
                 val msgsBefore = synchronized(chatLock) { _messages[conv.id]?.toList().orEmpty() }
-                loadMessages(conv.id)
+                if (com.example.chat.ReleaseFeatures.SCOPED_DELIVERY_RECEIPTS && conv.isDirect) {
+                    val scopedChat = ApiChatClient(
+                        baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
+                        transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
+                    )
+                    val fetched = withContext(Dispatchers.IO) { scopedChat.listMessages(conv.id) }
+                    if (authSnapshot() !== expected) return@withLock
+                    if (fetched == null || !applyLoadedMessages(conv.id, fetched, expected)) continue
+                    val incomingIds = fetched.filter {
+                        it.senderId != myUserId && !it.isDeletedForEveryone && !it.isDeletedForMe && !it.isRevokedBySender
+                    }.map { it.id }.distinct().take(100)
+                    if (incomingIds.isNotEmpty()) withContext(Dispatchers.IO) {
+                        scopedChat.markFetchedMessagesDelivered(conv.id, incomingIds)
+                    }
+                } else loadMessages(conv.id)
                 if (authSnapshot() !== expected) return@withLock
                 val msgsAfter = synchronized(chatLock) { _messages[conv.id]?.toList().orEmpty() }
                 val freshIncoming = ApiPushSyncHelper.findNewIncomingMessagesForPush(
@@ -1047,12 +1224,19 @@ class ApiBackendService(
     }
 
     private fun schedulePersistRoomMessages(roomId: String, expected: ApiAccountScope = authSnapshot()) {
-        val coord = snapshotCoordinator ?: return
-        val ns = snapshotNamespaceFor(expected) ?: return
         if (roomId.isBlank()) return
         val snapshot = synchronized(chatLock) { _messages[roomId]?.toList() } ?: return
         chatScope.launch(Dispatchers.IO) {
             if (authSnapshot() !== expected) return@launch
+            val key = com.example.chat.core.messages.LocalMessageOverridePolicy.accountKey(expected.tenantId, expected.baseUrl, expected.userId.orEmpty())
+            if (key != null) {
+                com.example.chat.ui.chats.detail.ReadAlertCenter.init(appContext)
+                com.example.chat.ui.chats.detail.ReadAlertCenter.ensureWatching(key)
+                com.example.chat.ui.chats.detail.ReadAlertCenter.onMessages(key, roomId, snapshot)
+            }
+            if (authSnapshot() !== expected) return@launch
+            val coord = snapshotCoordinator ?: return@launch
+            val ns = snapshotNamespaceFor(expected) ?: return@launch
             coord.persistMessages(ns, roomId, snapshot)
         }
     }
@@ -1472,6 +1656,10 @@ class ApiBackendService(
     suspend fun loadMessages(chatId: String) {
         val expected = authSnapshot()
         val remote = withContext(Dispatchers.IO) { chat.listMessages(chatId) } ?: return
+        applyLoadedMessages(chatId, remote, expected)
+    }
+
+    private fun applyLoadedMessages(chatId: String, remote: List<ChatMessage>, expected: ApiAccountScope): Boolean {
         var gone: List<com.example.chat.data.local.AttachmentRef> = emptyList()
         val applied = withAuthScope(expected) {
             synchronized(chatLock) {
@@ -1487,10 +1675,11 @@ class ApiBackendService(
             dirtyRooms.remove(chatId)
             hydratedRoomSnapshots.add(chatId)
         }
-        if (!applied) return
+        if (!applied) return false
         schedulePersistRoomMessages(chatId, expected)
         notifyGone(gone)
         notifyChatListeners()
+        return true
     }
 
     /**
@@ -1521,8 +1710,9 @@ class ApiBackendService(
     /** startDirectChat: POST /chat/rooms/direct (no fallback), upsert at
      *  index 0 (replace if the id already exists), notify. 402 sets the
      *  subscription state with the exact Dart message, notifies, rethrows. */
-    suspend fun createOrGetDirectConversation(targetUserId: String): Conversation {
-        val expected = authSnapshot()
+    suspend fun createOrGetDirectConversation(targetUserId: String, expectedScope: ApiAccountScope? = null): Conversation {
+        val expected = expectedScope ?: authSnapshot()
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
         // Bind the request to the original credentials and cancel it on
         // auth/routing transition, just like scope-bound message sends.
         val scopedChat = ApiChatClient(
@@ -1553,10 +1743,22 @@ class ApiBackendService(
         }
     }
 
+    /** Read-only snapshot for GroupInfo. Not global membership authority on network failure. */
+    suspend fun loadGroupMembers(roomId: String, expected: ApiAccountScope = authSnapshot()): ApiGroupMembers? {
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        val scoped = ApiChatClient(baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId },
+            token = { expected.token }, transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests))
+        val result = withContext(Dispatchers.IO) { scoped.listGroupMembers(roomId) }
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        return result
+    }
+
     /** createGroup: scope-bound request and publication; never insert an old
      *  account's room into a newly switched account's list or snapshot. */
-    suspend fun createGroupRoom(name: String, memberUserIds: List<String>): Conversation {
-        val expected = authSnapshot()
+    suspend fun createGroupRoom(name: String, memberUserIds: List<String>, expectedScope: ApiAccountScope? = null): Conversation {
+        val expected = expectedScope ?: authSnapshot()
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        require(name.trim().isNotEmpty() && memberUserIds.isNotEmpty() && memberUserIds.all { it.isNotBlank() }) { "Choose a group name and members." }
         val scopedChat = ApiChatClient(
             baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
             transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
@@ -1578,8 +1780,9 @@ class ApiBackendService(
     /** deleteUser: local-first removal (user + their direct conversations),
      *  notify, then the backend DELETE with errors swallowed. Deleting
      *  oneself signs out (Dart). */
-    suspend fun deleteUser(userId: String) {
-        val expected = authSnapshot()
+    suspend fun deleteUser(userId: String, expectedScope: ApiAccountScope? = null) {
+        val expected = expectedScope ?: authSnapshot()
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
         withContext(Dispatchers.IO) { accountDeletion.delete(expected, { authSnapshot() === expected }, userId) }
         check(withAuthScope(expected) {
             synchronized(chatLock) {
@@ -1649,6 +1852,138 @@ class ApiBackendService(
         val q = query.lowercase().trim()
         loadUsers(q)
         return com.example.chat.ui.chats.newchat.NewChatRules.filterUsers(users, q, session.currentUser?.id, includeSelf)
+    }
+
+    private val reactionLocks = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
+
+    private fun applyReactionAggregate(aggregate: ReactionAggregate, owner: ApiAccountScope, acknowledgedToken: String? = null) {
+        if (!withAuthScope(owner) {
+            synchronized(chatLock) {
+                val list = _messages[aggregate.roomId] ?: return@synchronized
+                val index = list.indexOfFirst { it.id == aggregate.messageId }
+                if (index < 0) return@synchronized
+                val message = list[index]
+                val oldAt = message.metadata["reaction_updated_at"]?.toString()?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+                if (oldAt != null && (oldAt > aggregate.updatedAt ||
+                    (oldAt == aggregate.updatedAt && message.metadata["reaction_pending_token"] != null &&
+                        message.metadata["reaction_pending_token"] != acknowledgedToken))) return@synchronized
+                list[index] = message.copy(reactions = aggregate.reactions,
+                    metadata = (message.metadata - "reaction_pending_token" - "reaction_before") + ("reaction_updated_at" to aggregate.updatedAt.toString()))
+            }
+        }) return
+        schedulePersistRoomMessages(aggregate.roomId, owner)
+        notifyChatListeners()
+    }
+
+    suspend fun toggleServerReaction(roomId: String, messageId: String, emoji: String, owner: ApiAccountScope) {
+        require(emoji.isNotBlank() && emoji.length <= 64) { "Invalid reaction" }
+        val key = "${owner.generation}:$roomId:$messageId"
+        reactionLocks.getOrPut(key) { kotlinx.coroutines.sync.Mutex() }.withLock {
+            val client = ApiReactionsClient(owner, ScopedCallHttpTransport(owner, ::withAuthScope, sendRequests), { authSnapshot() === owner })
+            check(withContext(Dispatchers.IO) { client.supported() }) { "Reactions are unavailable on this server." }
+            val token = java.util.UUID.randomUUID().toString()
+            var before: ChatMessage? = null
+            var remove = false
+            check(withAuthScope(owner) {
+                synchronized(chatLock) {
+                    val list = _messages[roomId] ?: error("Open this chat again.")
+                    val index = list.indexOfFirst { it.id == messageId }
+                    check(index >= 0) { "Message is no longer available." }
+                    val message = list[index]
+                    check(!message.isDeletedForEveryone && !message.isDeletedForMe && !message.isRevokedBySender &&
+                        !com.example.chat.core.messages.ViewOnceTextPolicy.restricted(message.metadata)) { "This message cannot receive reactions." }
+                    before = message
+                    remove = message.reactions.any { it.emoji == emoji && owner.userId.orEmpty() in it.userIds }
+                    list[index] = message.copy(reactions = com.example.chat.core.messages.ReactionUpdatePolicy.toggle(message.reactions, owner.userId.orEmpty(), emoji),
+                        metadata = message.metadata + mapOf("reaction_pending_token" to token, "reaction_before" to message.reactions))
+                }
+            }) { "Account changed." }
+            notifyChatListeners()
+            try {
+                val aggregate = withContext(Dispatchers.IO) { client.set(messageId, if (remove) null else emoji) }
+                check(aggregate.messageId == messageId && aggregate.roomId == roomId) { "Unexpected reaction response." }
+                applyReactionAggregate(aggregate, owner, acknowledgedToken = token)
+            } catch (error: Exception) {
+                withAuthScope(owner) {
+                    synchronized(chatLock) {
+                        val list = _messages[roomId]
+                        val index = list?.indexOfFirst { it.id == messageId } ?: -1
+                        if (list != null && index >= 0 && list[index].metadata["reaction_pending_token"] == token) {
+                            val old = before!!
+                            list[index] = list[index].copy(reactions = old.reactions, metadata = list[index].metadata - "reaction_pending_token" - "reaction_before")
+                        }
+                    }
+                }
+                notifyChatListeners()
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                throw IllegalStateException("Reaction was not confirmed. Refresh the chat to check its server state.", error)
+            }
+        }
+    }
+
+    private fun viewOnceTextClient(expected: ApiAccountScope) = ApiViewOnceTextClient(expected,
+        ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests), { authSnapshot() === expected })
+
+    suspend fun supportsViewOnceText(expected: ApiAccountScope): Boolean = withContext(Dispatchers.IO) {
+        viewOnceTextClient(expected).supported()
+    }
+
+    suspend fun sendViewOnceText(roomId: String, text: String, expected: ApiAccountScope): ChatMessage {
+        check(authSnapshot() === expected) { "Account changed." }
+        val room = conversations.firstOrNull { it.id == roomId } ?: error("Open this chat again.")
+        check(room.isDirect) { "View-once text is available in direct chats only." }
+        check(!com.example.chat.ServiceLocator.conversationsRepository.isSecureChannel(roomId)) { "Encrypted view-once text is not available in this build." }
+        val endSend = com.example.chat.data.messaging.AttachmentUploadTracker.begin(
+            com.example.chat.data.messaging.ConversationDispatchLocks.accountKey(expected.userId, expected.tenantId, expected.baseUrl), roomId)
+        val result = try {
+            check(authSnapshot() === expected) { "Account changed. Nothing sent." }
+            withContext(Dispatchers.IO) { viewOnceTextClient(expected).send(roomId, text, java.util.UUID.randomUUID().toString()) }
+        } finally { endSend() }
+        check(withAuthScope(expected) {
+            synchronized(chatLock) {
+                val list = _messages.getOrPut(roomId) { mutableListOf() }
+                if (list.none { it.id == result.id }) list.add(result)
+                touchConversationPreview(roomId, result)
+            }
+        }) { "Account changed. Check the original chat for send status." }
+        schedulePersistRoomMessages(roomId, expected)
+        schedulePersistConversations(expected)
+        notifyChatListeners()
+        return result
+    }
+
+    suspend fun openViewOnceText(message: ChatMessage, expected: ApiAccountScope): String {
+        check(authSnapshot() === expected && message.senderId != expected.userId) { "No longer available" }
+        check(com.example.chat.core.messages.ViewOnceTextPolicy.text(message) && !com.example.chat.core.messages.ViewOnceTextPolicy.unavailable(message)) { "No longer available" }
+        check(message.metadata["encrypted"] != true) { "Encrypted view-once text is not supported in this build." }
+        return withContext(Dispatchers.IO) { viewOnceTextClient(expected).openPlain(message.id) }
+    }
+
+    /** Captured scheduling session. Retry IDs contain no body, credentials or raw account ID. */
+    fun scheduledMessagesClient(expected: ApiAccountScope = authSnapshot()): com.example.chat.ui.automation.ScheduledMessagesPort =
+        ApiScheduledMessagesClient(expected,
+            ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests), ::withAuthScope,
+            retryId = { fingerprint ->
+                val key = "schedule_retry_$fingerprint"
+                synchronized(prefs) {
+                    prefs.getString(key, null) ?: java.util.UUID.randomUUID().toString().also { id ->
+                        check(prefs.edit().putString(key, id).commit()) { "Could not save the schedule retry ID. Nothing was sent." }
+                    }
+                }
+            })
+
+    /** Fresh, account-bound new-message lookup. No merged directory/cache fallback. */
+    suspend fun findExactUsername(query: String, expected: ApiAccountScope): List<UserProfile> {
+        val q = com.example.chat.ui.chats.newchat.NewChatRules.normalizedUsername(query)
+        if (q.isEmpty()) return emptyList()
+        check(authSnapshot() === expected) { "Account changed. Open New message again." }
+        val reader = ApiChatClient(
+            baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
+            transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests))
+        val fresh = withContext(Dispatchers.IO) { reader.listUsers(q) }
+            ?: throw IllegalStateException("Could not check this username. Try again when connected.")
+        check(authSnapshot() === expected) { "Account changed. Open New message again." }
+        return com.example.chat.ui.chats.newchat.NewChatRules.exactUsernameMatch(fresh, q, expected.userId)
     }
 
     /** Dart setActiveConversation: track the room, start sync, hydrate/load messages only when needed. */
@@ -1753,7 +2088,8 @@ class ApiBackendService(
                     val lastMsg = list.lastOrNull()
                     _conversations[convIdx] = _conversations[convIdx].copy(
                         lastMessageText = if (lastMsg != null) {
-                            if (lastMsg.text.isNotEmpty()) lastMsg.text
+                            if (com.example.chat.core.messages.ViewOnceTextPolicy.restricted(lastMsg.metadata)) com.example.chat.core.messages.ViewOnceTextPolicy.PLACEHOLDER
+                            else if (lastMsg.text.isNotEmpty()) lastMsg.text
                             else if (lastMsg.type == MessageType.image) "📷 Photo" else "📎 Attachment"
                         } else "",
                         lastMessageTime = lastMsg?.createdAt ?: _conversations[convIdx].lastMessageTime,
@@ -1804,7 +2140,8 @@ class ApiBackendService(
                         val idx = _conversations.indexOfFirst { it.id == chatId }
                         if (idx != -1) {
                             _conversations[idx] = _conversations[idx].copy(
-                                lastMessageText = if (lastMsg.text.isNotEmpty()) lastMsg.text
+                                lastMessageText = if (com.example.chat.core.messages.ViewOnceTextPolicy.restricted(lastMsg.metadata)) com.example.chat.core.messages.ViewOnceTextPolicy.PLACEHOLDER
+                            else if (lastMsg.text.isNotEmpty()) lastMsg.text
                                 else if (lastMsg.type == MessageType.image) "📷 Photo" else "📎 Attachment",
                                 lastMessageTime = lastMsg.createdAt,
                                 lastMessageSenderId = lastMsg.senderId,
@@ -1833,6 +2170,28 @@ class ApiBackendService(
      * is created; the confirmed message is merged into the local list only if the scope still matches.
      */
     suspend fun sendMessageForScope(expected: ApiAccountScope, conversationId: String, text: String): Boolean {
+        // Quarantined conversation: the notification quick-reply path sends
+        // directly (no outbox), so it needs its own refusal AND the dispatch
+        // lock - without the lock it could race the toggle mid-send.
+        // Strict, owner-scoped outbox load FIRST: a quick reply right after
+        // login must not beat the persisted holds loading (a load failure
+        // throws = the reply is rejected, fail closed).
+        ensureOutboxLoaded(expected)
+        if (authSnapshot() !== expected) return false
+        if (isHeld(conversationId)) return false
+        val dispatchLocks = conversationDispatchLocks
+        if (dispatchLocks != null) {
+            val accountKey = com.example.chat.data.messaging.ConversationDispatchLocks.accountKey(
+                expected.userId, expected.tenantId, expected.baseUrl)
+            return dispatchLocks.withLock(accountKey, conversationId) {
+                if (isHeld(conversationId)) return@withLock false
+                sendMessageForScopeLocked(expected, conversationId, text)
+            }
+        }
+        return sendMessageForScopeLocked(expected, conversationId, text)
+    }
+
+    private suspend fun sendMessageForScopeLocked(expected: ApiAccountScope, conversationId: String, text: String): Boolean {
         var merged = false
         val sender = ScopedMessageSender(
             current = ::authSnapshot, guarded = ::withAuthScope,
@@ -1879,6 +2238,17 @@ class ApiBackendService(
         if (expected.userId.isNullOrBlank() || expected.token.isNullOrBlank() || authSnapshot() !== expected) {
             throw IllegalStateException("Account changed or signed out; message not sent.")
         }
+        // Quarantined conversation (moved to the encrypted plane): refuse
+        // BEFORE the optimistic row so nothing plaintext is queued or shown
+        // as sending. Catches unrouted callers during the toggle window.
+        // Strict load first: persisted holds must beat a send right after login.
+        ensureOutboxLoaded(expected)
+        if (authSnapshot() !== expected) {
+            throw IllegalStateException("Account changed or signed out; message not sent.")
+        }
+        if (isHeld(conversationId)) {
+            throw IllegalStateException("This chat is being moved to encryption; the message was not sent.")
+        }
         if (DemoMode.isDemoUser(expected.userId)) {
             // Offline demo: record locally as 'queued'; the message never leaves
             // the device, so it must not claim a server-confirmed state.
@@ -1904,7 +2274,8 @@ class ApiBackendService(
                         _conversations.add(
                             0,
                             old.copy(
-                                lastMessageText = if (confirmed.text.isNotEmpty()) confirmed.text
+                                lastMessageText = if (com.example.chat.core.messages.ViewOnceTextPolicy.restricted(confirmed.metadata)) com.example.chat.core.messages.ViewOnceTextPolicy.PLACEHOLDER
+                            else if (confirmed.text.isNotEmpty()) confirmed.text
                                 else if (confirmed.type == MessageType.image) "📷 Photo" else "📎 Attachment",
                                 lastMessageTime = confirmed.createdAt,
                                 lastMessageSenderId = confirmed.senderId,
@@ -1951,9 +2322,26 @@ class ApiBackendService(
         }
         if (!added) throw IllegalStateException("Account changed or signed out; message not sent.")
         // Queue first, so the message survives no internet / app restarts until the server has it.
-        enqueueOutbox(OutboxEntry(tempId, conversationId, effectiveContent, tempMsg))
+        val queued = try { enqueueOutbox(OutboxEntry(tempId, conversationId, effectiveContent, tempMsg), expected) }
+        catch (error: Exception) {
+            withAuthScope(expected) { synchronized(chatLock) { _messages[conversationId]?.removeAll { it.id == tempId } } }
+            notifyChatListeners()
+            throw error
+        }
+        if (!queued) {
+            // A quarantine hold landed while this send was being prepared:
+            // remove the optimistic row and fail the send - never plaintext.
+            withAuthScope(expected) {
+                synchronized(chatLock) {
+                    _messages[conversationId]?.removeAll { it.id == tempId }
+                }
+            }
+            notifyChatListeners()
+            throw IllegalStateException("This chat is being moved to encryption; the message was not sent.")
+        }
         notifyChatListeners()
 
+        scheduleOutboxRecovery(expected)
         // Sends the queue in order (older offline messages first). If it is still queued afterwards
         // there is no internet: it keeps the clock and goes out automatically when back online.
         flushOutbox()
@@ -1970,10 +2358,28 @@ class ApiBackendService(
         val conversationId: String,
         val content: String,
         val message: ChatMessage,
+        /** Quarantined: preserved in the store but skipped by the flush loop
+         *  (the conversation moved to the encrypted plane). */
+        val held: Boolean = false,
+        val requiresReconciliation: Boolean = false,
+        val failed: Boolean = false,
+        val reconciledMessageId: String? = null,
+        val reconciledState: String? = null,
     )
 
     private val outboxLock = Any()
     private val outbox = mutableListOf<OutboxEntry>()
+    /** Conversations whose REST sends are quarantined. Guarded by
+     *  [outboxLock]; persisted as `held_conversations` in the outbox store
+     *  (an EMPTY chat's hold must survive restart too - entry flags alone
+     *  cannot carry it). [enqueueOutbox] consults it under the same lock, so
+     *  a send and a hold can never interleave into a new plaintext entry. */
+    private val heldConversations = HashSet<String>()
+    /** All heldConversations reads go through here: the set is mutated under
+     *  outboxLock (hold/release/load), so bare reads outside that lock race
+     *  the mutations. */
+    private fun isHeld(conversationId: String): Boolean =
+        synchronized(outboxLock) { heldConversations.contains(conversationId) }
     @Volatile private var outboxLoadedFor: String? = null
     private val flushMutex = kotlinx.coroutines.sync.Mutex()
     // Outcome hand-off from the flush loop back to the sendMessage call that queued the message.
@@ -1983,25 +2389,76 @@ class ApiBackendService(
     private fun legacyOutboxKey(userId: String) = "api_outbox_$userId"
 
     /** Loads the signed-in account's encrypted queued messages once and puts them back in their chats. */
-    private fun ensureOutboxLoaded() {
-        val snap = authSnapshot()
+    /** Account hash derived from a CAPTURED identity (never live auth): a
+     *  slow load for account A must not be able to target account B's store
+     *  after a switch. */
+    private fun accountHashFor(scope: ApiAccountScope): String? {
+        val uid = scope.userId?.takeIf { it.isNotBlank() } ?: return null
+        if (DemoMode.isDemoUser(uid)) return null
+        return ApiAccountRoutingCanonicalizer.accountHash(
+            ApiAccountRoutingCanonicalizer.accountKey(scope.tenantId, scope.baseUrl, uid))
+    }
+
+    /** Loads the outbox for [expected]'s identity. The slow I/O touches only
+     *  locals; the global outbox/heldConversations/outboxLoadedFor swap
+     *  happens inside withAuthScope(expected), so a load that finishes after
+     *  an account switch throws instead of overwriting the new account's
+     *  state. Callers must revalidate authSnapshot() against [expected] after
+     *  this returns. */
+    private fun ensureOutboxLoaded(expected: ApiAccountScope) {
+        val snap = expected
         val userId = snap.userId?.takeIf { it.isNotBlank() } ?: return
-        val accountHash = currentAccountHash() ?: userId
+        val accountHash = accountHashFor(expected) ?: userId
         if (outboxLoadedFor == accountHash) return
         val restored = mutableListOf<OutboxEntry>()
-        try {
-            var rawJson = multiAccountStore.loadEncryptedOutboxJson(accountHash)
-            if (rawJson.isNullOrBlank()) {
-                val legacyRaw = prefs.getString(legacyOutboxKey(userId), null)
-                if (!legacyRaw.isNullOrBlank() && legacyRaw != "[]") {
-                    rawJson = legacyRaw
-                    multiAccountStore.saveEncryptedOutboxJson(accountHash, legacyRaw)
-                }
-                prefs.edit().remove(legacyOutboxKey(userId)).apply()
+        var heldFromStore = listOf<String>()
+        // Strict read, BEFORE the lenient parse below: null means no outbox
+        // was ever saved; a present-but-unreadable store throws, because
+        // treating a corrupt store as empty would silently drop quarantined
+        // conversations on restart (fail closed instead).
+        var rawJson = try {
+            multiAccountStore.loadEncryptedOutboxJsonStrict(accountHash)
+        } catch (t: Throwable) {
+            throw IllegalStateException(
+                "The encrypted outbox could not be read; refusing to treat a possibly-quarantined queue as empty.", t)
+        }
+        if (rawJson.isNullOrBlank()) {
+            val legacyRaw = prefs.getString(legacyOutboxKey(userId), null)
+            if (!legacyRaw.isNullOrBlank() && legacyRaw != "[]") {
+                rawJson = legacyRaw
+                // Migration copy is strict too: the legacy entries may carry
+                // held flags, and a lost copy must surface, not vanish.
+                multiAccountStore.saveEncryptedOutboxJsonStrict(accountHash, legacyRaw)
             }
-            val arr = org.json.JSONArray(rawJson ?: "[]")
-            for (i in 0 until arr.length()) {
-                val o = arr.optJSONObject(i) ?: continue
+            prefs.edit().remove(legacyOutboxKey(userId)).apply()
+        }
+        // Strict parse (fail closed): structural corruption THROWS instead of
+        // loading as an empty queue - an optJSONArray-style "missing = empty"
+        // read would silently drop the persisted holds. Only INDIVIDUALLY
+        // malformed entries are skipped, and their conversation's hold still
+        // stands via held_conversations.
+        val corrupt = IllegalStateException(
+            "The encrypted outbox is corrupt; refusing to load a possibly-quarantined queue as empty.")
+        // Stable local: a var cannot smartcast inside the lambdas below.
+        val stableRaw: String? = rawJson
+        val rootObj = if (stableRaw.isNullOrBlank()) null else runCatching {
+            org.json.JSONObject(stableRaw)
+        }.getOrNull()
+        val arr: org.json.JSONArray = when {
+            stableRaw.isNullOrBlank() -> org.json.JSONArray()
+            rootObj != null -> {
+                val h = rootObj.optJSONArray("held_conversations") ?: throw corrupt
+                heldFromStore = (0 until h.length()).map {
+                    h.getString(it).takeIf(String::isNotEmpty) ?: throw corrupt
+                }
+                rootObj.optJSONArray("entries") ?: throw corrupt
+            }
+            // Legacy layout: a bare array of entries (entry-level held flags).
+            else -> runCatching { org.json.JSONArray(stableRaw) }.getOrNull() ?: throw corrupt
+        }
+        for (i in 0 until arr.length()) {
+            val parsed = runCatching {
+                val o = arr.getJSONObject(i)
                 val att = o.optJSONObject("attachment")?.let { a ->
                     com.example.chat.domain.models.MessageAttachment(
                         id = a.optString("id"), type = a.optString("type"), name = a.optString("name"),
@@ -2023,16 +2480,36 @@ class ApiBackendService(
                                 .associateWith { key -> if (content.has(key)) content.opt(key) else null })
                     }.getOrDefault(emptyMap()),
                     createdAt = runCatching { Instant.parse(o.optString("created_at")) }.getOrDefault(Instant.now()),
-                    deliveryState = DeliveryState.sending,
+                    deliveryState = if (o.optBoolean("requires_reconciliation", false) || o.optBoolean("failed", false)) DeliveryState.failed else DeliveryState.sending,
                 )
-                restored += OutboxEntry(msg.id, msg.conversationId, o.getString("content"), msg)
-            }
-        } catch (_: Exception) {
+                OutboxEntry(msg.id, msg.conversationId, o.getString("content"), msg,
+                    held = o.optBoolean("held", false), requiresReconciliation = o.optBoolean("requires_reconciliation", false), failed = o.optBoolean("failed", false),
+                    reconciledMessageId = (o.opt("reconciled_message_id") as? String)?.takeIf { it.isNotBlank() },
+                    reconciledState = o.optString("reconciled_state").takeIf { it in setOf("sent", "edited", "deleted") })
+            }.getOrNull() ?: throw corrupt
+            restored += parsed
         }
-        synchronized(outboxLock) {
-            outbox.clear()
-            outbox.addAll(restored)
-            outboxLoadedFor = accountHash
+        // Swap ONLY under the auth guard for the captured identity: if the
+        // account changed during the I/O above, nothing is applied and this
+        // throws (fail closed) instead of clobbering the new account's queue.
+        var swapped = false
+        withAuthScope(expected) {
+            synchronized(outboxLock) {
+                // A racing load for THIS same account may have landed while
+                // we were doing I/O; keep the first one.
+                if (outboxLoadedFor != accountHash) {
+                    outbox.clear()
+                    outbox.addAll(restored)
+                    heldConversations.clear()
+                    heldConversations.addAll(heldFromStore)
+                    heldConversations.addAll(restored.filter { it.held }.map { it.conversationId })
+                    outboxLoadedFor = accountHash
+                }
+            }
+            swapped = true
+        }
+        if (!swapped) {
+            throw IllegalStateException("Account changed while the outbox was loading; nothing was applied.")
         }
         if (restored.isNotEmpty()) {
             val shouldPublish = withAuthScope(snap) {
@@ -2048,8 +2525,12 @@ class ApiBackendService(
         }
     }
 
-    private fun persistOutboxLocked() {
-        val accountHash = outboxLoadedFor ?: return
+    /** False when the encrypted outbox store could not be written. Most
+     *  callers keep the historical best-effort behavior; the quarantine
+     *  hold/release treat false as fatal (a memory-only hold fails open on
+     *  restart). */
+    private fun persistOutboxLocked(): Boolean {
+        val accountHash = outboxLoadedFor ?: return false
         val arr = org.json.JSONArray()
         for (e in outbox) {
             val o = org.json.JSONObject()
@@ -2059,6 +2540,11 @@ class ApiBackendService(
                 .put("text", e.message.text)
                 .put("type", e.message.type.name)
                 .put("created_at", e.message.createdAt.toString())
+                .put("held", e.held)
+                .put("requires_reconciliation", e.requiresReconciliation)
+                .put("failed", e.failed)
+                .put("reconciled_message_id", e.reconciledMessageId ?: org.json.JSONObject.NULL)
+                .put("reconciled_state", e.reconciledState ?: org.json.JSONObject.NULL)
             e.message.attachment?.let { a ->
                 o.put("attachment", org.json.JSONObject()
                     .put("id", a.id).put("type", a.type).put("name", a.name).put("size", a.size)
@@ -2066,22 +2552,195 @@ class ApiBackendService(
             }
             arr.put(o)
         }
-        try {
-            multiAccountStore.saveEncryptedOutboxJson(accountHash, if (arr.length() == 0) null else arr.toString())
-        } catch (_: Exception) {}
+        val root = org.json.JSONObject()
+            .put("entries", arr)
+            .put("held_conversations", org.json.JSONArray(heldConversations.toList()))
+        return try {
+            multiAccountStore.saveEncryptedOutboxJsonStrict(accountHash,
+                if (arr.length() == 0 && heldConversations.isEmpty()) null else root.toString())
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
-    private fun enqueueOutbox(entry: OutboxEntry) {
-        ensureOutboxLoaded()
-        synchronized(outboxLock) {
-            if (outbox.none { it.tempId == entry.tempId }) outbox.add(entry)
-            persistOutboxLocked()
+    /** Holds (quarantines) queued REST texts for one conversation: they stay
+     *  in the encrypted outbox store - preserved, never deleted - but
+     *  [flushOutbox] skips them while held. Used when the conversation moves
+     *  to the end-to-end encrypted plane: a message typed while it was a
+     *  plaintext chat must not flush to the server afterwards, and it must not
+     *  be silently deleted either. The optimistic rows stay visible (clock
+     *  icon); the user can resend the text over the encrypted plane or delete
+     *  it themselves. The held flag persists via the STRICT outbox write
+     *  (checked commit), so a restart cannot fail open. Returns how many
+     *  queued entries the conversation currently has; callers should surface
+     *  that count so the user knows those messages were not sent.
+     *
+     *  This is the ONLY entry point - there is deliberately no public
+     *  self-locking variant: holds are placed by
+     *  ConversationsRepository.setSecureChannel as part of the atomic
+     *  toggle, never by hosts directly (a host calling a suspend hold from
+     *  its non-suspend scope block was a review blocker). The caller MUST
+     *  already hold this conversation's dispatch lock (the toggle does, for
+     *  the whole toggle); the Mutex is not reentrant. flushMutex is
+     *  deliberately NOT taken here: the lock order is flushMutex -> dispatch
+     *  lock (flush per entry), so taking it under the dispatch lock would
+     *  invert and deadlock. Exclusion of in-flight delivery comes from the
+     *  dispatch lock plus the flush loop re-checking `held` under it before
+     *  each delivery (see flushOutbox). */
+    fun holdQueuedMessagesForConversationLocked(expected: ApiAccountScope, conversationId: String): Int {
+        // The repo toggle calls this while holding the OLD account's
+        // dispatch lock: act on the CAPTURED identity, never live auth.
+        if (authSnapshot() !== expected) {
+            throw IllegalStateException("Account changed; the quarantine hold was not applied.")
         }
+        ensureOutboxLoaded(expected)
+        if (authSnapshot() !== expected) {
+            throw IllegalStateException("Account changed while the outbox was loading; the quarantine hold was not applied.")
+        }
+        var count = 0
+        // Mutation AND persist inside the auth guard (same auth -> outbox
+        // ordering as the load swap): an account switch cannot slip between
+        // an adjacent identity check and the lock acquisition and make this
+        // edit/persist another account's queue under the old account's
+        // dispatch lock.
+        var guarded = false
+        withAuthScope(expected) {
+            synchronized(outboxLock) {
+                val flipped = mutableListOf<Int>()
+                // Exact-state rollback: the chat may ALREADY be held (idempotent
+                // re-hold); on persist failure restore what was there, not empty.
+                val wasAlreadyHeld = heldConversations.contains(conversationId)
+                for (i in outbox.indices) {
+                    val e = outbox[i]
+                    if (e.conversationId == conversationId) {
+                        count++
+                        if (!e.held) {
+                            outbox[i] = e.copy(held = true)
+                            flipped += i
+                        }
+                    }
+                }
+                // Durable or nothing: the held flag persists in the outbox
+                // store, so a restart cannot fail open; if the persist fails
+                // the in-memory change is rolled back and this throws.
+                heldConversations.add(conversationId)
+                if (!persistOutboxLocked()) {
+                    if (!wasAlreadyHeld) heldConversations.remove(conversationId)
+                    for (i in flipped) outbox[i] = outbox[i].copy(held = false)
+                    throw IllegalStateException("Could not durably save the hold; the queued messages were left untouched and nothing was quarantined.")
+                }
+            }
+            guarded = true
+        }
+        if (!guarded) {
+            throw IllegalStateException("Account changed; the quarantine hold was not applied.")
+        }
+        return count
+    }
+
+    /** Releases a hold (the conversation moved back to the REST plane):
+     *  queued texts become flushable again. Same caller-holds-dispatch-lock
+     *  contract as [holdQueuedMessagesForConversationLocked]. A persist
+     *  failure ALWAYS throws (even when no entry flags flipped - removing
+     *  the conversation from held_conversations must be durable too) and
+     *  the in-memory change is rolled back, so a failure fails closed:
+     *  the queue stays quarantined. */
+    fun releaseQueuedMessagesForConversationLocked(expected: ApiAccountScope, conversationId: String) {
+        if (authSnapshot() !== expected) {
+            throw IllegalStateException("Account changed; the quarantine release was not applied (the queue stays held).")
+        }
+        ensureOutboxLoaded(expected)
+        if (authSnapshot() !== expected) {
+            throw IllegalStateException("Account changed while the outbox was loading; the queue stays held.")
+        }
+        var guarded = false
+        withAuthScope(expected) {
+            synchronized(outboxLock) {
+                val flipped = mutableListOf<Int>()
+                // Exact-state rollback: only restore a hold that actually existed.
+                val wasHeld = heldConversations.contains(conversationId)
+                for (i in outbox.indices) {
+                    val e = outbox[i]
+                    if (e.conversationId == conversationId && e.held) {
+                        outbox[i] = e.copy(held = false)
+                        flipped += i
+                    }
+                }
+                heldConversations.remove(conversationId)
+                if (!persistOutboxLocked()) {
+                    if (wasHeld) heldConversations.add(conversationId)
+                    for (i in flipped) outbox[i] = outbox[i].copy(held = true)
+                    throw IllegalStateException("Could not durably save the release; the queued messages are still held.")
+                }
+            }
+            guarded = true
+        }
+        if (!guarded) {
+            throw IllegalStateException("Account changed; the quarantine release was not applied (the queue stays held).")
+        }
+    }
+
+    /** True while the conversation has REST sends pending or in flight: every
+     *  REST send passes through the outbox (queued first, removed only after
+     *  the server confirms), so a non-held entry for the conversation means a
+     *  plaintext send is queued or being delivered right now. Used to refuse
+     *  enabling the encrypted plane mid-send. Attachment uploads are not
+     *  covered here; the chat bindings re-check the flag at every send port,
+     *  so an upload that finishes after enabling fails closed instead of
+     *  sending plaintext. */
+    fun hasPendingRestSends(conversationId: String): Boolean {
+        val expected = authSnapshot()
+        ensureOutboxLoaded(expected)
+        // The read itself runs inside the auth guard; a guard failure fails
+        // closed as "still pending" so the toggle refuses.
+        var pending = true
+        var guarded = false
+        withAuthScope(expected) {
+            pending = synchronized(outboxLock) {
+                outbox.any { it.conversationId == conversationId && !it.held }
+            }
+            guarded = true
+        }
+        return !guarded || pending
+    }
+
+    /** Queues a message for the REST plane. Returns false - nothing queued -
+     *  when the conversation is quarantined: a held conversation must never
+     *  gain new plaintext sends. */
+    private fun enqueueOutbox(entry: OutboxEntry, expected: ApiAccountScope): Boolean {
+        ensureOutboxLoaded(expected)
+        // Enqueue + persist inside the auth guard (same auth -> outbox
+        // ordering as hold/release): no check-then-act gap where an account
+        // switch lands between the identity check and the mutation.
+        var enqueued = false
+        var guarded = false
+        withAuthScope(expected) {
+            synchronized(outboxLock) {
+                if (!heldConversations.contains(entry.conversationId)) {
+                    val existing = outbox.firstOrNull { it.tempId == entry.tempId }
+                    check(existing == null || (existing.conversationId == entry.conversationId && existing.content == entry.content)) { "A queued message identity cannot be reused for different content." }
+                    val added = existing == null
+                    if (added) outbox.add(entry)
+                    if (!persistOutboxLocked()) {
+                        if (added) outbox.removeAll { it.tempId == entry.tempId }
+                        throw java.io.IOException("Message was not saved to the encrypted outbox. Nothing was sent; try again.")
+                    }
+                    enqueued = true
+                }
+            }
+            guarded = true
+        }
+        return guarded && enqueued
     }
 
     private fun removeFromOutbox(tempId: String) {
         synchronized(outboxLock) {
-            if (outbox.removeAll { it.tempId == tempId }) persistOutboxLocked()
+            val before = outbox.toList()
+            if (outbox.removeAll { it.tempId == tempId } && !persistOutboxLocked()) {
+                outbox.clear(); outbox.addAll(before)
+                throw java.io.IOException("The server may have committed this message, but local confirmation could not be saved. Its original retry key was retained.")
+            }
         }
     }
 
@@ -2094,6 +2753,12 @@ class ApiBackendService(
         expectedScope: ApiAccountScope = authSnapshot(),
     ): ApiChatClient.SendResult {
         if (authSnapshot() !== expectedScope) return ApiChatClient.SendResult.Offline
+        if (entry.requiresReconciliation) return ApiChatClient.SendResult.Offline
+        val supported = withContext(Dispatchers.IO) {
+            ApiServerCapabilities.supports(expectedScope, ScopedCallHttpTransport(expectedScope, ::withAuthScope, sendRequests), "message_send_idempotency_v1")
+        }
+        // Legacy deployments retain their existing best-effort dedup behavior. Same persisted key always.
+        if (authSnapshot() !== expectedScope) return ApiChatClient.SendResult.Offline
         val payloadBytes = entry.content.toByteArray(Charsets.UTF_8).size.toLong()
         val ledger = transferMonitor
         val transferId = ledger?.begin(
@@ -2105,7 +2770,11 @@ class ApiBackendService(
         val result = try {
             withContext(Dispatchers.IO) {
                 if (authSnapshot() !== expectedScope) ApiChatClient.SendResult.Offline
-                else chat.sendMessageResult(entry.conversationId, entry.content, clientId = entry.tempId)
+                else ApiChatClient(
+                    baseUrl = { expectedScope.baseUrl }, tenantId = { expectedScope.tenantId }, token = { expectedScope.token },
+                    transport = ScopedCallHttpTransport(expectedScope, ::withAuthScope, sendRequests),
+                ).sendMessageResult(entry.conversationId, entry.content, clientId = entry.tempId,
+                    messageType = if (entry.message.type == MessageType.audio) "audio" else "text")
             }
         } catch (error: Throwable) {
             if (transferId != null) ledger?.finish(transferId, com.example.chat.data.network.TransferStatus.failed)
@@ -2131,7 +2800,18 @@ class ApiBackendService(
         }
         when (result) {
             is ApiChatClient.SendResult.Ok -> {
-                val confirmed = result.message
+                // A reduced dedup hit proves committed, not delivered. Preserve submitted display content.
+                val response = result.message
+                val restoreLegacyProjection = !supported && !response.isDeletedForEveryone && !response.isRevokedBySender &&
+                    entry.message.metadata["view_once"] != true && response.metadata["view_once"] != true
+                val confirmed = response.copy(
+                    conversationId = entry.conversationId,
+                    senderId = response.senderId.ifBlank { entry.message.senderId },
+                    text = if (restoreLegacyProjection && response.text.isEmpty() && entry.message.text.isNotEmpty()) entry.message.text else response.text,
+                    attachment = response.attachment ?: entry.message.attachment.takeIf { restoreLegacyProjection },
+                    type = if (restoreLegacyProjection && response.attachment == null && entry.message.attachment != null) entry.message.type else response.type,
+                    metadata = entry.message.metadata + response.metadata,
+                )
                 val updated = withAuthScope(expectedScope) {
                     removeFromOutbox(entry.tempId)
                     synchronized(outboxLock) {
@@ -2159,9 +2839,20 @@ class ApiBackendService(
             }
             is ApiChatClient.SendResult.Rejected -> {
                 val updated = withAuthScope(expectedScope) {
-                    removeFromOutbox(entry.tempId)
+                    if (supported && result.code == 409) {
+                        synchronized(outboxLock) {
+                            val index = outbox.indexOfFirst { it.tempId == entry.tempId }
+                            if (index >= 0) outbox[index] = outbox[index].copy(requiresReconciliation = true)
+                            check(persistOutboxLocked()) { "Could not save message conflict state." }
+                        }
+                    } else synchronized(outboxLock) {
+                        // Retain the exact ORIGINAL wire payload for a deliberate retry, including attachment metadata.
+                        val index = outbox.indexOfFirst { it.tempId == entry.tempId }
+                        if (index >= 0) outbox[index] = outbox[index].copy(failed = true)
+                        check(persistOutboxLocked()) { "Could not save message failure state." }
+                    }
                     synchronized(outboxLock) {
-                        rejectedSends[entry.tempId] = result.detail ?: "Message could not be sent (${result.code})."
+                        rejectedSends[entry.tempId] = if (supported && result.code == 409) "This message needs reconciliation with its original server record. Automatic retry is stopped; no new send key was created." else result.detail ?: "Message could not be sent (${result.code})."
                         if (rejectedSends.size > 50) rejectedSends.keys.firstOrNull()?.let { rejectedSends.remove(it) }
                     }
                     setLocalDeliveryState(entry.conversationId, entry.tempId, DeliveryState.failed)
@@ -2173,16 +2864,61 @@ class ApiBackendService(
         return result
     }
 
+    /** A failed/conflicted row blocks later messages in its thread, not unrelated conversations. outboxLock required. */
+    private fun nextOutboxEntryLocked(): OutboxEntry? {
+        return OutboxOrderPolicy.next(outbox, { it.conversationId }, { !it.held && !it.requiresReconciliation && !it.failed })
+    }
+
+    /** Inactive queues remain encrypted until their account is selected. Background retry NEVER changes UI ownership. */
+    suspend fun retryActiveOutboxFromWorker(accountHash: String): Boolean {
+        val expected = authSnapshot()
+        if (accountHashFor(expected) != accountHash || expected.token.isNullOrBlank() || isDemoSession) return false
+        flushOutbox()
+        if (authSnapshot() !== expected) return false
+        return synchronized(outboxLock) { outboxLoadedFor == accountHash && nextOutboxEntryLocked() != null }
+    }
+    private suspend fun scheduleOutboxRecovery(expected: ApiAccountScope) {
+        val hash = accountHashFor(expected) ?: return
+        // Queue is already durable. Scheduler failure must not erase it or claim the message was rejected.
+        try { MessageOutboxRetryWorker.schedule(appContext, hash) }
+        catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+        catch (_: Exception) { /* Existing foreground reconnect/switch paths still retry the saved queue. */ }
+    }
+
     /** Sends everything queued for the captured scope, oldest first. */
     suspend fun flushOutbox() {
         val expectedScope = authSnapshot()
         if (expectedScope.token.isNullOrBlank()) return
-        ensureOutboxLoaded()
+        ensureOutboxLoaded(expectedScope)
+        if (authSnapshot() !== expectedScope) return
         if (!flushMutex.tryLock()) return
         try {
             while (authSnapshot() === expectedScope && session.token != null) {
-                val next = synchronized(outboxLock) { outbox.firstOrNull() } ?: break
-                val r = sendOutboxEntry(next, expectedScope)
+                // Held (quarantined) entries are preserved but never flushed:
+                // their conversation moved to the encrypted plane.
+                val next = synchronized(outboxLock) { nextOutboxEntryLocked() } ?: break
+                // Per-entry cross-plane lock (flushMutex is already held and
+                // stays outermost): a toggle for this conversation waits for
+                // an in-flight delivery instead of racing it.
+                val dispatchLocks = conversationDispatchLocks
+                val r = if (dispatchLocks != null) {
+                    val accountKey = com.example.chat.data.messaging.ConversationDispatchLocks.accountKey(
+                        expectedScope.userId, expectedScope.tenantId, expectedScope.baseUrl)
+                    dispatchLocks.withLock(accountKey, next.conversationId) {
+                        // The entry was selected under outboxLock but a hold
+                        // for its conversation may have landed before this
+                        // lock was acquired: re-check INSIDE the dispatch
+                        // lock (holds run under the same lock), or this
+                        // entry would deliver plaintext after the toggle.
+                        val heldNow = synchronized(outboxLock) {
+                            outbox.any { it.tempId == next.tempId && it.held }
+                        }
+                        if (heldNow) null else sendOutboxEntry(next, expectedScope)
+                    }
+                } else {
+                    sendOutboxEntry(next, expectedScope)
+                }
+                if (r == null) continue
                 if (r == ApiChatClient.SendResult.Offline) break
             }
         } finally {
@@ -2192,24 +2928,47 @@ class ApiBackendService(
 
     /** Retry for a failed (red) message: queue it again and try now. */
     suspend fun retryMessage(messageId: String): Boolean {
+        val owner = authSnapshot()
         val msg = synchronized(chatLock) {
             _messages.values.firstNotNullOfOrNull { list -> list.firstOrNull { it.id == messageId } }
         } ?: return false
         if (msg.deliveryState != DeliveryState.failed) return false
-        val att = msg.attachment
-        val content = if (att != null) {
-            val o = org.json.JSONObject()
-            o.put("type", msg.type.name)
-            o.put("url", att.url ?: org.json.JSONObject.NULL)
-            o.put("name", att.name)
-            o.put("size", att.size)
-            o.put("text", msg.text)
-            o.put("duration", att.durationSeconds)
-            o.toString()
-        } else msg.text
-        setLocalDeliveryState(msg.conversationId, msg.id, DeliveryState.sending)
-        val entry = OutboxEntry(msg.id, msg.conversationId, content, msg.copy(deliveryState = DeliveryState.sending))
-        enqueueOutbox(entry)
+        if (authSnapshot() !== owner) throw ApiScopeChangedException()
+        ensureOutboxLoaded(owner)
+        val conflicting = synchronized(outboxLock) { outbox.firstOrNull { it.tempId == messageId && it.requiresReconciliation } }
+        if (conflicting != null) {
+            val identity = withContext(Dispatchers.IO) {
+                ApiMessageKeyLookupClient(owner, ScopedCallHttpTransport(owner, ::withAuthScope, sendRequests)) {
+                    authSnapshot() === owner
+                }.lookup(conflicting.conversationId, conflicting.tempId)
+            }
+            check(withAuthScope(owner) {
+                synchronized(outboxLock) {
+                    val index = outbox.indexOfFirst { it.tempId == messageId && it.requiresReconciliation }
+                    check(index >= 0)
+                    val previous = outbox[index]
+                    outbox[index] = previous.copy(reconciledMessageId = identity.messageId, reconciledState = identity.state)
+                    if (!persistOutboxLocked()) { outbox[index] = previous; throw java.io.IOException("Reconciliation metadata could not be saved.") }
+                }
+            }) { "Account changed. Reconciliation was not saved." }
+            // Metadata does not prove payload equality. Never publish the pending body as the stored message.
+            throw IllegalStateException("Original server message found (${identity.state}, ${identity.messageId}). No new send was made. Refresh this chat to inspect its current server content; this pending item remains stopped.")
+        }
+        val expected = owner
+        val original = synchronized(outboxLock) { outbox.firstOrNull { it.tempId == messageId } }
+            ?: throw IllegalStateException("The original send payload is unavailable. Reconcile the server record before retrying this message.")
+        val entry = original.copy(failed = false, message = original.message.copy(deliveryState = DeliveryState.sending))
+        check(withAuthScope(expected) {
+            synchronized(outboxLock) {
+                val index = outbox.indexOfFirst { it.tempId == messageId }
+                check(index >= 0 && !outbox[index].requiresReconciliation)
+                check(!outbox[index].held && !heldConversations.contains(original.conversationId)) { "This chat's queued messages are held and cannot be retried." }
+                val previous = outbox[index]; outbox[index] = entry
+                if (!persistOutboxLocked()) { outbox[index] = previous; throw java.io.IOException("Retry was not saved. Nothing was sent.") }
+            }
+            setLocalDeliveryState(msg.conversationId, msg.id, DeliveryState.sending)
+        }) { "Account changed. Message was not retried." }
+        scheduleOutboxRecovery(expected)
         flushOutbox()
         synchronized(outboxLock) { rejectedSends.remove(msg.id); confirmedSends.remove(msg.id) }
         // Still queued = no internet yet; it will go out by itself, so the retry itself worked.
@@ -2236,7 +2995,8 @@ class ApiBackendService(
         _conversations.add(
             0,
             old.copy(
-                lastMessageText = if (message.text.isNotEmpty()) message.text
+                lastMessageText = if (com.example.chat.core.messages.ViewOnceTextPolicy.restricted(message.metadata)) com.example.chat.core.messages.ViewOnceTextPolicy.PLACEHOLDER
+                            else if (message.text.isNotEmpty()) message.text
                 else if (message.type == MessageType.image) "📷 Photo" else "📎 Attachment",
                 lastMessageTime = message.createdAt,
                 lastMessageSenderId = message.senderId,
@@ -2263,6 +3023,11 @@ class ApiBackendService(
     var unregisterFcmHook: (() -> Unit)? = null
     /** Optional process-wide ledger for visible message-transfer progress and payload usage. */
     @Volatile var transferMonitor: com.example.chat.data.network.TransferMonitor? = null
+    /** Cross-plane per-conversation dispatch lock, shared with
+     *  ConversationsRepository (see ConversationDispatchLocks for the
+     *  invariants and the lock-order rules). Wired by ServiceLocator; null in
+     *  tests = unlocked (old behavior). */
+    @Volatile var conversationDispatchLocks: com.example.chat.data.messaging.ConversationDispatchLocks? = null
 
     /** Offline demo: returns true when any real GoTrue identity is live or
      *  persisted (wired by ServiceLocator). Demo entry FAILS CLOSED in that
@@ -2283,6 +3048,18 @@ class ApiBackendService(
         return withContext(Dispatchers.IO) {
             mediaUpload.uploadMedia(expected, { authSnapshot() === expected }, file, onProgress)
         }
+    }
+
+    /** Scope-bound File upload: callers that registered an upload with
+     *  AttachmentUploadTracker under a captured identity must upload under
+     *  THAT SAME identity - a fresh authSnapshot() here could silently ride
+     *  the next account after a mid-start switch. */
+    suspend fun uploadMediaForScope(
+        expected: ApiAccountScope,
+        file: java.io.File,
+        onProgress: (transferred: Long, total: Long) -> Unit,
+    ): Map<String, Any> = withContext(Dispatchers.IO) {
+        mediaUpload.uploadMedia(expected, { authSnapshot() === expected }, file, onProgress)
     }
 
     /** Byte-array form used by ChatMediaService's post-compression payload;
@@ -2381,7 +3158,7 @@ class ApiBackendService(
                 chatScope.launch { ensureFreshToken() }
                 realtime.connect()
                 startBackgroundSync()
-                chatScope.launch { ensureOutboxLoaded(); flushOutbox() }
+                chatScope.launch { val scopeNow = authSnapshot(); ensureOutboxLoaded(scopeNow); flushOutbox() }
                 chatScope.launch {
                     hydrateLocalStateForScope(expected)
                     ensureInitialSyncIfNeeded()
@@ -2432,22 +3209,49 @@ class ApiBackendService(
         }
     }
 
-    suspend fun login(identifier: String, password: String, tenant: String?, isDefaultTenant: Boolean): ApiUserProfile =
+    data class EmailCodeAttempt internal constructor(
+        val challenge: ApiEmailCodeClient.Challenge,
+        internal val expectedScope: ApiAccountScope,
+        internal val targetTenant: String,
+        internal val baseUrl: String,
+        internal val webSocketTemplate: String,
+        internal val routingGeneration: Long,
+        internal val isDefaultTenant: Boolean,
+    )
+
+    suspend fun requestEmailLoginCode(email: String, tenant: String?, isDefaultTenant: Boolean): EmailCodeAttempt =
         withContext(Dispatchers.IO) {
-            val value = identifier.trim().replace(Regex("^@+"), "")
-            if (isDefaultTenant) {
-                config.setTenantId(null, useDefault = true)
-            } else if (!tenant.isNullOrBlank()) {
-                config.setTenantId(tenant.trim(), useDefault = false)
-            }
-            val result = auth.login(value, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
-            lastAdoptEpochMs = System.currentTimeMillis()
-            session.adopt(result)
-            saveRefreshToken(result.refreshToken)
-            runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
-            afterAuthAdoptedAndSync()
-            result.user
+            val expected = authSnapshot()
+            val routing = config.snapshot()
+            val target = if (isDefaultTenant) config.defaultTenantId else tenant?.trim()?.takeIf { it.isNotBlank() }
+                ?: throw IllegalArgumentException("Enter a workspace ID.")
+            val challenge = ApiEmailCodeClient(expected.baseUrl, target, OkHttpApiTransport(allowRedirects = false)) {
+                authSnapshot() === expected
+            }.requestCode(email)
+            EmailCodeAttempt(challenge, expected, target, expected.baseUrl, routing.webSocketTemplate,
+                routing.generation, isDefaultTenant)
         }
+
+    suspend fun verifyEmailLoginCode(attempt: EmailCodeAttempt, code: String): ApiUserProfile = accountSwitchMutex.withLock {
+        check(authSnapshot() === attempt.expectedScope) { "Account or workspace changed. Start sign-in again." }
+        val result = withContext(Dispatchers.IO) {
+            ApiEmailCodeClient(attempt.baseUrl, attempt.targetTenant, OkHttpApiTransport(allowRedirects = false)) {
+                authSnapshot() === attempt.expectedScope
+            }.verifyCode(attempt.challenge, code, requireNotNull(deviceIdentity) { "Installation identity is not ready." }
+                .challengeHeaders(attempt.baseUrl, attempt.targetTenant, OkHttpApiTransport(allowRedirects = false)) { authSnapshot() === attempt.expectedScope })
+        }
+        check(authSnapshot() === attempt.expectedScope) { "Account changed. Start sign-in again." }
+        adoptCodeOrAddedAccount(result, attempt.targetTenant, attempt.baseUrl, attempt.webSocketTemplate,
+            attempt.routingGeneration, attempt.isDefaultTenant)
+        result.user
+    }
+
+    suspend fun login(identifier: String, password: String, tenant: String?, isDefaultTenant: Boolean): ApiUserProfile {
+        // Use the same register-before-adopt path as Add account; never sign in an unregistered third account.
+        val registered = loginForAddAccount(identifier, password, tenant, isDefaultTenant)
+        return session.currentUser?.takeIf { it.id == registered.userId }
+            ?: throw ApiScopeChangedException()
+    }
 
     /** Dart _parseAuthResponse tail (api_backend_service.dart:565-572), shared by login, register,
      *  registerOrganization and oauth: connect the socket, load conversations/users/tasks, sync FCM. */
@@ -2486,16 +3290,52 @@ class ApiBackendService(
     @Volatile var registrationVerificationMessage: String? = null
         private set
 
-    suspend fun register(email: String, username: String, password: String): ApiUserProfile =
-        withContext(Dispatchers.IO) {
-            val result = auth.register(email, username, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
+    suspend fun register(email: String, username: String, password: String, phoneProof: PhoneVerificationProof? = null): ApiUserProfile =
+        accountSwitchMutex.withLock { withContext(Dispatchers.IO) {
+            check(!isCallActive()) { "Finish the current call before registering another account." }
+            check(multiAccount.accounts().size < MultiAccountRegistryCoordinator.DEFAULT_MAX_ACCOUNTS) { "Remove an account before registering another on this app installation." }
+            val owner = authSnapshot()
+            val routingAtStart = config.snapshot()
+            val proof = requireNotNull(deviceIdentity) { "Installation identity is not ready." }.challengeHeaders(
+                routingAtStart.baseUrl, routingAtStart.tenantId, OkHttpApiTransport(allowRedirects = false)) { authSnapshot() === owner }
+            val result = scopedAuthClient(routingAtStart.baseUrl, routingAtStart.tenantId).register(email, username, password, extraHeaders = proof, phoneProof = phoneProof)
+            if (authSnapshot() !== owner) throw ApiScopeChangedException()
             registrationVerificationMessage = result.verificationMessage
-            lastAdoptEpochMs = System.currentTimeMillis()
-            session.adopt(result)
-            saveRefreshToken(result.refreshToken)
-            runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
-            afterAuthAdoptedAndSync()
+            val routing = config.snapshot()
+            adoptCodeOrAddedAccount(result, routing.tenantId, routing.baseUrl, routing.webSocketTemplate,
+                routing.generation, config.isUsingDefaultTenant)
             result.user
+        } }
+
+    suspend fun acknowledgeAudioPlayed(messageId: String, conversationId: String, expected: ApiAccountScope): Boolean = withContext(Dispatchers.IO) {
+        if (authSnapshot() !== expected) return@withContext false
+        val message = synchronized(chatLock) { _messages[conversationId]?.firstOrNull { it.id == messageId } } ?: return@withContext false
+        if (message.type != MessageType.audio || message.senderId == expected.userId || message.isDeletedForEveryone || message.isRevokedBySender) return@withContext false
+        try { ApiMessageReceiptsClient(expected, OkHttpApiTransport(allowRedirects = false)) { authSnapshot() === expected }.acknowledge(messageId, "played") }
+        catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+        catch (_: Exception) { false }
+    }
+
+    suspend fun requestPhoneVerification(number: String, tenant: String?, isDefaultTenant: Boolean, expected: ApiAccountScope = authSnapshot()): PhoneVerificationChallenge = withContext(Dispatchers.IO) {
+        check(authSnapshot() === expected) { "Account changed. Start phone verification again." }
+        val target = if (isDefaultTenant) config.defaultTenantId else tenant?.trim()?.takeIf { it.isNotBlank() } ?: error("Enter a workspace ID.")
+        ApiPhoneVerificationClient(expected.baseUrl, target, OkHttpApiTransport(allowRedirects = false), isCurrent = { authSnapshot() === expected }).challenge(number)
+    }
+
+    suspend fun verifyPhoneNumber(challenge: PhoneVerificationChallenge, code: String, expected: ApiAccountScope): PhoneVerificationProof = withContext(Dispatchers.IO) {
+        check(authSnapshot() === expected) { "Account changed. Start phone verification again." }
+        ApiPhoneVerificationClient(challenge.baseUrl, challenge.tenantId, OkHttpApiTransport(allowRedirects = false), isCurrent = { authSnapshot() === expected }).verify(challenge, code)
+    }
+
+    suspend fun groupUiDefaults(expected: ApiAccountScope = authSnapshot()): com.example.chat.core.config.GroupUiConfig = withContext(Dispatchers.IO) {
+        val hash = accountHashFor(expected)
+        val cache = hash?.let { com.example.chat.core.config.EncryptedGroupUiValidatedCache(appContext, it) }
+        ApiGroupUiConfigClient(expected, OkHttpApiTransport(allowRedirects = false), { authSnapshot() === expected }, cache).fetch()
+    }
+
+    suspend fun messageInfo(messageId: String, afterUserId: String? = null, expected: ApiAccountScope = authSnapshot()): MessageInfoPage =
+        withContext(Dispatchers.IO) {
+            ApiMessageReceiptsClient(expected, OkHttpApiTransport(allowRedirects = false)) { authSnapshot() === expected }.info(messageId, afterUserId)
         }
 
     suspend fun forgotPassword(email: String): String = withContext(Dispatchers.IO) {
@@ -2519,6 +3359,18 @@ class ApiBackendService(
      *  unverified-email banner disappears without a fresh login. */
     fun markEmailVerified() = session.markEmailVerified()
 
+    /** Prepared public registration preflight. Captures target workspace without
+     *  changing active account routing. Missing deployment throws, never Available. */
+    suspend fun registrationUsernameAvailability(username: String, tenant: String?, isDefaultTenant: Boolean): ApiAuthClient.UsernameAvailability =
+        withContext(Dispatchers.IO) {
+            val expected = authSnapshot()
+            val target = if (isDefaultTenant) config.defaultTenantId else tenant?.trim()?.takeIf { it.isNotBlank() }
+                ?: throw IllegalArgumentException("Enter a workspace ID.")
+            ApiRegistrationUsernameClient(expected.baseUrl, target, OkHttpApiTransport()) {
+                authSnapshot() === expected
+            }.check(username)
+        }
+
     /** Live username availability for the edit-profile field (report 5.1). */
     suspend fun usernameAvailability(username: String): ApiAuthClient.UsernameAvailability =
         withContext(Dispatchers.IO) { auth.usernameAvailability(username) }
@@ -2537,7 +3389,10 @@ class ApiBackendService(
         adminPassword: String,
         adminFullName: String,
         allowUserRegistration: Boolean = true,
-    ): Triple<ApiUserProfile, String, String> = withContext(Dispatchers.IO) {
+    ): Triple<ApiUserProfile, String, String> = accountSwitchMutex.withLock { withContext(Dispatchers.IO) {
+        check(!isCallActive()) { "Finish the current call before registering another organization." }
+        check(multiAccount.accounts().size < MultiAccountRegistryCoordinator.DEFAULT_MAX_ACCOUNTS) { "Remove an account before registering another organization account." }
+        val owner = authSnapshot()
         val (result, orgMap) = auth.registerOrganization(
             tenantId = tenantId,
             organizationName = organizationName,
@@ -2546,7 +3401,13 @@ class ApiBackendService(
             adminPassword = adminPassword,
             adminFullName = adminFullName,
             allowUserRegistration = allowUserRegistration,
+            extraHeaders = requireNotNull(deviceIdentity) { "Installation identity is not ready." }
+                .challengeHeaders(owner.baseUrl, "", OkHttpApiTransport(allowRedirects = false)) { authSnapshot() === owner },
         )
+        if (authSnapshot() !== owner) throw ApiScopeChangedException()
+        val registeredRouting = config.snapshot()
+        adoptCodeOrAddedAccount(result, tenantId.trim(), registeredRouting.baseUrl, registeredRouting.webSocketTemplate,
+            registeredRouting.generation, false)
         var orgId = tenantId.trim()
         var resolvedOrgName = organizationName.trim()
         if (orgMap != null) {
@@ -2560,13 +3421,8 @@ class ApiBackendService(
             } catch (_: Exception) {
             }
         }
-        config.setTenantId(tenantId.trim())
-        session.adopt(result)
-        saveRefreshToken(result.refreshToken)
-        runCatching { multiAccount.registerAuthenticatedAccount(result, config.snapshot(), config.isUsingDefaultTenant) }
-        afterAuthAdoptedAndSync()
         Triple(result.user, orgId, resolvedOrgName)
-    }
+    } }
 
     /** ApiBackendService.updateProfile: PUT profile, then apply the local
      *  user update (effective name + first-char initials) and persist. */
@@ -2669,6 +3525,13 @@ class ApiBackendService(
         if (applied) notifyChatListeners()
     }
 
+    private fun retireRemovedAccountRecovery(hash: String) {
+        // Cancellation is scoped and best effort. Workers independently revalidate stored credentials.
+        runCatching { CallInboxRetryWorker.cancel(appContext, hash) }
+        runCatching { MessageOutboxRetryWorker.cancel(appContext, hash) }
+        runCatching { com.example.chat.notifications.ChatyNotifications.cancelRemovedAccountAlerts(appContext, hash) }
+    }
+
     fun signOut() {
         resetSyncTracking()
         val activeKey = currentAccountKey()
@@ -2692,6 +3555,7 @@ class ApiBackendService(
         } catch (_: Exception) { false }
         if (!signingOutDemo && activeKey != null) {
             runCatching { multiAccount.removeAccount(activeKey) }
+            oldHash?.let(::retireRemovedAccountRecovery)
         }
         if (signingOutDemo && !storedStrictDemo) {
             session.clearInMemoryOnly()
@@ -2700,7 +3564,7 @@ class ApiBackendService(
         }
         saveRefreshToken(null)
         SessionRefreshWorker.cancel(appContext)
-        onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
+        onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear(); presenceRevisions.clear()
         // Queued messages stay saved for this account and are sent after its next login.
         synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
         synchronized(localStateLock) { localStateCache.clear() }
@@ -2769,6 +3633,8 @@ class ApiBackendService(
             return@withLock AccountSwitchResult.AlreadyActive(targetMeta)
         }
 
+        if (isCallActive()) return@withLock AccountSwitchResult.Failed("The current call is still active. End it before switching accounts; a call-retaining switch is not ready.")
+
         // Snapshot outgoing account state cleanly before teardown
         persistAccountConversationSnapshot()
         val oldHash = currentAccountHash()
@@ -2834,7 +3700,7 @@ class ApiBackendService(
                 suppressTransitionCallback = true,
             )
             lastAdoptEpochMs = System.currentTimeMillis()
-            onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
+            onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear(); presenceRevisions.clear()
             synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
             synchronized(localStateLock) { localStateCache.clear() }
             activeConversationId = null
@@ -2859,7 +3725,7 @@ class ApiBackendService(
         realtime.connect()
         startBackgroundSync()
         chatScope.launch(Dispatchers.IO) { runCatching { serverConfig.fetch() } }
-        chatScope.launch { ensureOutboxLoaded(); flushOutbox() }
+        chatScope.launch { val scopeNow = authSnapshot(); ensureOutboxLoaded(scopeNow); flushOutbox() }
         chatScope.launch {
             hydrateLocalStateForScope(nextExpected)
             loadConversationsIfNeeded(force = true)
@@ -2883,6 +3749,9 @@ class ApiBackendService(
         tenant: String?,
         isDefaultTenant: Boolean,
     ): ApiRegisteredAccountMeta = accountSwitchMutex.withLock {
+        check(!isCallActive()) { "Finish the current call before adding or re-authenticating an account." }
+        val owner = authSnapshot()
+        val routing = config.snapshot()
         val value = identifier.trim().replace(Regex("^@+"), "")
         val targetTenant = if (isDefaultTenant) config.defaultTenantId else (tenant?.trim().takeIf { !it.isNullOrEmpty() } ?: config.tenantId)
         val baseUrl = config.restApiBaseUrl
@@ -2890,19 +3759,31 @@ class ApiBackendService(
             scopedAuthClient(baseUrl, targetTenant).login(
                 identifier = value,
                 password = password,
-                extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap(),
+                extraHeaders = requireNotNull(deviceIdentity) { "Installation identity is not ready." }
+                    .challengeHeaders(baseUrl, targetTenant, OkHttpApiTransport(allowRedirects = false)) { authSnapshot() === owner },
             )
         }
+        if (authSnapshot() !== owner) throw ApiScopeChangedException()
+        adoptCodeOrAddedAccount(result, targetTenant, baseUrl, routing.webSocketTemplate,
+            routing.generation, isDefaultTenant)
+    }
+
+    /** Common adoption path preserves existing multi-account snapshot, socket and
+     *  namespace isolation for both password-added accounts and real code login. */
+    private suspend fun adoptCodeOrAddedAccount(
+        result: ApiAuthResult, targetTenant: String, baseUrl: String,
+        webSocketTemplate: String, routingGeneration: Long, isDefaultTenant: Boolean,
+    ): ApiRegisteredAccountMeta {
         val oldHash = currentAccountHash()
         persistAccountConversationSnapshot()
         val routingSnapshot = ApiRoutingSnapshot(
             tenantId = targetTenant,
             baseUrl = baseUrl,
-            webSocketTemplate = config.snapshot().webSocketTemplate,
-            generation = config.snapshot().generation,
+            webSocketTemplate = webSocketTemplate,
+            generation = routingGeneration,
         )
         val registered = multiAccount.registerAuthenticatedAccount(result, routingSnapshot, isDefaultTenant)
-            ?: throw IllegalStateException("Maximum number of signed-in accounts (${MultiAccountRegistryCoordinator.DEFAULT_MAX_ACCOUNTS}) reached or demo session rejected.")
+            ?: throw IllegalStateException("This app installation supports two signed-in accounts. Remove an account before adding another.")
 
         realtime.disconnect()
         resetSessionCoroutineScope()
@@ -2920,7 +3801,7 @@ class ApiBackendService(
             )
             session.adoptForSwitch(result, suppressTransitionCallback = true)
             lastAdoptEpochMs = System.currentTimeMillis()
-            onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
+            onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear(); presenceRevisions.clear()
             synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
             synchronized(localStateLock) { localStateCache.clear() }
             activeConversationId = null
@@ -2939,7 +3820,7 @@ class ApiBackendService(
         runCatching { onAfterAccountSwitch?.invoke(oldHash, registered.accountHash) }
         afterAuthAdoptedAndSync()
         notifyChatListeners()
-        registered
+        return registered
     }
 
     /** Independently signs out/removes [targetAccountKey]. If active and fallback accounts exist,
@@ -2949,6 +3830,7 @@ class ApiBackendService(
         val targetMeta = multiAccount.accountByKey(targetAccountKey)
             ?: return@withLock AccountSwitchResult.Failed("Account not found.")
         val remaining = multiAccount.removeAccount(targetAccountKey)
+        retireRemovedAccountRecovery(targetMeta.accountHash)
         if (currentKey != targetAccountKey) {
             notifyChatListeners()
             return@withLock remaining?.let { AccountSwitchResult.AlreadyActive(it) }
@@ -2977,7 +3859,7 @@ class ApiBackendService(
                         suppressTransitionCallback = true,
                     )
                     lastAdoptEpochMs = System.currentTimeMillis()
-                    onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear()
+                    onlineIds.clear(); lastSeenById.clear(); approxPresenceById.clear(); typingUntil.clear(); presenceRevisions.clear()
                     synchronized(outboxLock) { outbox.clear(); outboxLoadedFor = null; confirmedSends.clear(); rejectedSends.clear() }
                     synchronized(localStateLock) { localStateCache.clear() }
                     activeConversationId = null

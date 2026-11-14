@@ -19,7 +19,11 @@ data class MediaTimelineRow(val messages: List<ChatMessage>) {
 }
 
 /** Incomplete, malformed, mixed or protected batches remain ordinary individual bubbles. */
-fun mediaTimelineRows(messages: List<ChatMessage>, expand: Boolean = false): List<MediaTimelineRow> {
+fun mediaTimelineRows(
+    messages: List<ChatMessage>,
+    expand: Boolean = false,
+    zone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
+): List<MediaTimelineRow> {
     if (expand) return messages.map { MediaTimelineRow(listOf(it)) }
     fun number(m: ChatMessage, key: String): Int? = (m.metadata[key] as? Number)?.let {
         it.toInt().takeIf { n -> n.toDouble() == it.toDouble() }
@@ -30,6 +34,26 @@ fun mediaTimelineRows(messages: List<ChatMessage>, expand: Boolean = false): Lis
         m.replyToMessageId == null && m.replyToPreviewText == null && m.replyToSenderName == null && m.linkedTaskId == null && m.reactions.isEmpty() &&
         !m.isPinned && !m.isStarred && m.editedAt == null &&
         m.deliveryState !in setOf(DeliveryState.failed, DeliveryState.queued, DeliveryState.sending)
+    // WhatsApp parity (Bandi, 2026-11-14): separate single-image sends with no text
+    // between them group into one album bubble. Display-only: the group is rebuilt on
+    // every projection, keeps each real message/attachment id, and never merges across
+    // explicit album envelopes, senders, conversations, delivery states or day headers.
+    fun unstamped(m: ChatMessage): Boolean = m.metadata.keys.none { it in MediaAlbumContract.keys }
+    fun localRun(start: Int): Int {
+        val first = messages[start]
+        if (!eligible(first) || !unstamped(first)) return 0
+        val day = first.createdAt.atZone(zone).toLocalDate()
+        var end = start + 1
+        while (end < messages.size) {
+            val m = messages[end]
+            if (!eligible(m) || !unstamped(m) || m.text.isNotBlank() ||
+                m.senderId != first.senderId || m.conversationId != first.conversationId ||
+                m.deliveryState != first.deliveryState ||
+                m.createdAt.atZone(zone).toLocalDate() != day) break
+            end++
+        }
+        return if (end - start >= 2) end - start else 0
+    }
     val rows = mutableListOf<MediaTimelineRow>()
     var i = 0
     while (i < messages.size) {
@@ -47,8 +71,14 @@ fun mediaTimelineRows(messages: List<ChatMessage>, expand: Boolean = false): Lis
                 m.deliveryState == first.deliveryState && (index == 0 || m.text.isBlank()) &&
                 number(m, MediaAlbumContract.VERSION) == 1 && m.metadata[MediaAlbumContract.ID] == id &&
                 number(m, MediaAlbumContract.INDEX) == index && number(m, MediaAlbumContract.COUNT) == count }
-        rows += MediaTimelineRow(if (valid) candidate else listOf(first))
-        i += if (valid) count else 1
+        when {
+            valid -> { rows += MediaTimelineRow(candidate); i += count }
+            else -> {
+                val run = localRun(i)
+                if (run >= 2) { rows += MediaTimelineRow(messages.subList(i, i + run)); i += run }
+                else { rows += MediaTimelineRow(listOf(first)); i += 1 }
+            }
+        }
     }
     return rows
 }

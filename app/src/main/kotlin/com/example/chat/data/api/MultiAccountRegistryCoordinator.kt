@@ -341,7 +341,7 @@ class MultiAccountRegistryCoordinator(
     }
 
     companion object {
-        const val DEFAULT_MAX_ACCOUNTS = 5
+        const val DEFAULT_MAX_ACCOUNTS = 2
         const val MAX_RECENT_CARDS_PER_ACCOUNT = 6
 
         fun summarizeConversations(

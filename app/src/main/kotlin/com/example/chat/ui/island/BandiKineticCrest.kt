@@ -69,10 +69,12 @@ fun BandiKineticCrest(
     isAnimated: Boolean = true,
     onTap: (() -> Unit)? = null,
 ) {
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val animateCrest = isAnimated && !reduceMotion && rememberIslandHostResumed()
     val progress = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(isAnimated) {
-        if (isAnimated) {
+    LaunchedEffect(animateCrest) {
+        if (animateCrest) {
             progress.animateTo(
                 targetValue = 1f,
                 animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing)),
@@ -95,7 +97,7 @@ fun BandiKineticCrest(
                 // _triggerSnap: restart from 0 like _controller.forward(from: 0).
                 scope.launch {
                     progress.snapTo(0f)
-                    if (isAnimated) {
+                    if (animateCrest) {
                         progress.animateTo(
                             1f,
                             infiniteRepeatable(tween(3200, easing = LinearEasing)),

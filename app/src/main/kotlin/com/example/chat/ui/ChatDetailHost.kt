@@ -91,6 +91,43 @@ fun ChatDetailHost(
     onOpenConversation: (Conversation) -> Unit = {},
     localOverrideAccountKey: String? = null,
 ) {
+    val api = ServiceLocator.apiBackend
+    val themes = ServiceLocator.themeController
+    var visualRevision by remember { mutableIntStateOf(0) }
+    DisposableEffect(api, themes) {
+        val changed: () -> Unit = { visualRevision++ }
+        api.addListener(changed)
+        themes.addListener(changed)
+        onDispose { api.removeListener(changed); themes.removeListener(changed) }
+    }
+    @Suppress("UNUSED_EXPRESSION") visualRevision
+    val account = api.authSnapshot()
+    val accountKey = com.example.chat.core.messages.LocalMessageOverridePolicy.accountKey(
+        account.tenantId, account.baseUrl, api.currentUser?.id.orEmpty(),
+    )
+    val chatThemeKey = accountKey?.let {
+        com.example.chat.core.messages.LocalMessageOverridePolicy.key(it, conversation.id, "chat-theme")
+    }
+    val scopedTheme = chatThemeKey?.let(themes::getChatThemeOverride)
+    com.example.chat.ui.theme.ChatyTheme(config = scopedTheme ?: LocalThemeConfig.current) {
+        androidx.compose.runtime.key(chatThemeKey, account) {
+            ChatDetailHostContent(conversation, initialMessageId, onBack, onOpenConversation,
+                localOverrideAccountKey, chatThemeKey, scopedTheme != null)
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatDetailHostContent(
+    conversation: Conversation,
+    initialMessageId: String?,
+    onBack: () -> Unit,
+    onOpenConversation: (Conversation) -> Unit,
+    localOverrideAccountKey: String?,
+    chatThemeKey: String?,
+    hasChatThemeOverride: Boolean,
+) {
     val vaultProtection = ServiceLocator.hiddenVaultController
     var vaultPrivacyRevision by remember { mutableIntStateOf(0) }
     DisposableEffect(vaultProtection) {
@@ -138,13 +175,57 @@ fun ChatDetailHost(
     var loadingMessages by remember(conversation.id) { mutableStateOf(true) }
     var loadError by remember(conversation.id) { mutableStateOf<String?>(null) }
     var loadNonce by remember(conversation.id) { mutableIntStateOf(0) }
-    LaunchedEffect(conversation.id, loadNonce) {
-        loadError = null
-        loadingMessages = api.getMessages(conversation.id).isEmpty()
+    // Phase 1 per-conversation encryption flag: when on, this chat's send/read
+    // path rides the MLS plane (ConversationsRepository -> SecureMessageTransport
+    // -> MlsE2eeService -> /e2ee/*) instead of the plaintext REST plane.
+    val secureRoutingAccount = api.authSnapshot()
+    var secureChannel by remember(conversation.id, secureRoutingAccount) { mutableStateOf(false) }
+    var secureChannelResolved by remember(conversation.id, secureRoutingAccount) { mutableStateOf(false) }
+    val secureRoutingAvailable = com.example.chat.ReleaseFeatures.EXPERIMENTAL_MLS_CHAT_ROUTING
+    fun requireSendRouting() {
+        check(api.authSnapshot() === secureRoutingAccount) { "Account changed. Open the chat again." }
+        check(secureChannelResolved) { "Encryption preference could not be checked. Sending is blocked; reopen this chat to retry." }
+        check(!secureChannel || secureRoutingAvailable) { "Secure routing is not available in this build. Nothing was sent." }
+    }
+    LaunchedEffect(conversation.id, secureRoutingAccount) {
         try {
-            if (api.isAuthenticated) api.loadMessagesIfNeeded(conversation.id, force = loadNonce > 0)
+            val requested = repo.isSecureChannel(conversation.id)
+            api.withAuthScope(secureRoutingAccount) {
+                secureChannel = requested
+                secureChannelResolved = true
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            api.withAuthScope(secureRoutingAccount) {
+                loadError = "Could not check encryption preference. Sending is blocked; reopen this chat to retry."
+                loadingMessages = false
+            }
+        }
+    }
+    LaunchedEffect(conversation.id, loadNonce, secureChannel, secureChannelResolved) {
+        // Wait for the flag so a flagged chat never flashes a plaintext fetch.
+        if (!secureChannelResolved) return@LaunchedEffect
+        if (secureChannel && !secureRoutingAvailable) {
+            loadError = "Secure routing is unavailable in this build."
+            loadingMessages = false
+            return@LaunchedEffect
+        }
+        loadError = null
+        loadingMessages = if (secureChannel) {
+            repo.messagesByChatId[conversation.id].isNullOrEmpty()
+        } else {
+            api.getMessages(conversation.id).isEmpty()
+        }
+        try {
+            if (secureChannel) {
+                repo.loadMessages(conversation.id)
+                repo.markAsRead(conversation.id)
+            } else {
+                if (api.isAuthenticated) api.loadMessagesIfNeeded(conversation.id, force = loadNonce > 0)
+            }
             rt.trackConversation(conversation.id)
-            rt.markConversationDelivered(conversation.id)
+            if (!secureChannel) rt.markConversationDelivered(conversation.id)
             loadingMessages = false
         } catch (e: Exception) {
             loadingMessages = false
@@ -219,7 +300,13 @@ fun ChatDetailHost(
     val effectiveLocalOverrideAccountKey = localOverrideAccountKey ?: detectedLocalOverrideAccountKey
 
     val live = api.conversations.firstOrNull { it.id == conversation.id } ?: conversation
-    val messages = api.getMessages(conversation.id)
+    // Secure chats read decrypted MLS rows; other chats read the REST plane.
+    // Recomposition is driven by the existing rev tick and post-action rev++.
+    val messages = if (!secureChannelResolved) emptyList() else if (secureChannel) {
+        repo.messagesByChatId[conversation.id] ?: emptyList()
+    } else {
+        api.getMessages(conversation.id)
+    }
     // Refresh epoch outside the auth lock, then confirm the SAME captured account and pure epoch together.
     fun captureMediaBinding(): com.example.chat.ui.chats.detail.AttachmentConsumerBinding? {
         val account = api.authSnapshot()
@@ -292,6 +379,8 @@ fun ChatDetailHost(
             var sourceOwner: android.os.ParcelFileDescriptor.AutoCloseInputStream? = null
             var transferId: String? = null
             try {
+                requireSendRouting()
+                check(!secureChannel) { "Direct transfer invitations are not supported in secure-routing chats yet." }
                 val sourceReadPermissionPersisted = runCatching {
                     context.contentResolver.takePersistableUriPermission(
                         selectedUri,
@@ -339,6 +428,8 @@ fun ChatDetailHost(
                     throw IllegalStateException("This file is empty, not seekable, or larger than 100 GB.")
                 }
                 check(api.authSnapshot() === sendAccount) { "Account changed. Select the media again." }
+                requireSendRouting()
+                check(!secureChannel) { "Direct transfers are unavailable in secure-routing chats." }
                 val link = p2pTransfers.offerFile(
                     otherId, channel, safeName, size, mime,
                     sourceOwner = sourceOwner,
@@ -367,6 +458,8 @@ fun ChatDetailHost(
                     url = "chaty://transfer/" + transferId,
                 )
                 check(api.authSnapshot() === sendAccount) { "Account changed. Select the media again." }
+                requireSendRouting()
+                check(!secureChannel) { "Direct transfers are unavailable in secure-routing chats." }
                 val sent = api.sendMessage(
                     conversation.id,
                     "",
@@ -382,6 +475,7 @@ fun ChatDetailHost(
                         "p2p_invite_epoch" to encryptedInvite.epoch,
                         "p2p_transfer_version" to 1,
                     ),
+                    expectedScope = sendAccount,
                 )
                 if (sent == null) throw IllegalStateException("The transfer offer was created but the chat message could not be sent.")
                 if (directOriginal) {
@@ -401,7 +495,6 @@ fun ChatDetailHost(
             }
         }
     }
-    var gateOpen by remember { mutableStateOf(false) }
     var blockConfirm by remember { mutableStateOf(false) }
     var blockTarget by remember(conversation.id, messageAccountScope) { mutableStateOf<String?>(null) }
     var reportTarget by remember(conversation.id, messageAccountScope) { mutableStateOf<ChatMessage?>(null) }
@@ -422,6 +515,12 @@ fun ChatDetailHost(
     var infoBusy by remember(conversation.id, messageAccountScope) { mutableStateOf(false) }
     var infoConnection by remember(conversation.id, messageAccountScope) { mutableStateOf(ContactConnectionStatus()) }
     var infoBlocked by remember(conversation.id, messageAccountScope) { mutableStateOf(false) }
+    val senderSafetyStore = remember(context) { context.getSharedPreferences("chaty_sender_safety_v1", android.content.Context.MODE_PRIVATE) }
+    val senderSafetyKey = "continued:$effectiveLocalOverrideAccountKey:${conversation.id}:$otherId"
+    var senderContinued by remember(senderSafetyKey, messageAccountScope) {
+        mutableStateOf(effectiveLocalOverrideAccountKey.isNotBlank() && senderSafetyStore.getBoolean(senderSafetyKey, false))
+    }
+
     var infoLoading by remember(conversation.id, messageAccountScope) { mutableStateOf(false) }
     var infoError by remember(conversation.id, messageAccountScope) { mutableStateOf<String?>(null) }
     var infoProfile by remember(conversation.id, messageAccountScope) { mutableStateOf<com.example.chat.domain.models.UserProfile?>(null) }
@@ -435,24 +534,34 @@ fun ChatDetailHost(
     // Presence plane (research 5.2): one-shot privacy-filtered fetch on open,
     // then presence.changed keeps it live. Fail-closed: a pre-plane server
     // (or a hidden user) shows no line at all.
-    var fetchedPresence by remember(conversation.id, otherId) { mutableStateOf<ApiPresenceClient.PresenceView?>(null) }
-    LaunchedEffect(conversation.id, otherId) {
-        if (isDirect && otherId != null) {
-            fetchedPresence = try {
-                api.fetchPresence(otherId)
+    var fetchedPresence by remember(conversation.id, otherId, messageAccountScope) { mutableStateOf<ApiPresenceClient.PresenceView?>(null) }
+    var fetchedPresenceRevision by remember(conversation.id, otherId, messageAccountScope) { androidx.compose.runtime.mutableLongStateOf(-1L) }
+    LaunchedEffect(conversation.id, otherId, messageAccountScope) {
+        if (isDirect && otherId != null && api.authSnapshot() === messageAccountScope) {
+            val revision = api.presenceRevisionOf(otherId)
+            val result = try {
+                api.fetchPresence(otherId, messageAccountScope)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 ApiPresenceClient.PresenceView.Unavailable
             }
+            if (api.authSnapshot() === messageAccountScope && revision == api.presenceRevisionOf(otherId)) {
+                fetchedPresence = result
+                fetchedPresenceRevision = revision
+            }
         }
     }
+    // Any newer socket privacy shape, including all-hidden, supersedes the one-shot fetch.
+    val currentFetchedPresence = fetchedPresence.takeIf { otherId != null && fetchedPresenceRevision == api.presenceRevisionOf(otherId) }
     val presenceOnline = isDirect && otherId != null &&
-        (api.isUserOnline(otherId) || fetchedPresence is ApiPresenceClient.PresenceView.Online)
+        (api.isUserOnline(otherId) || (currentFetchedPresence is ApiPresenceClient.PresenceView.Online &&
+            api.lastSeenOf(otherId) == null && api.approxPresenceOf(otherId) == null))
     val presenceText: String? = if (isDirect) {
-        val fetchedLastSeen = (fetchedPresence as? ApiPresenceClient.PresenceView.LastSeen)?.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
-        val fetchedApprox = (fetchedPresence as? ApiPresenceClient.PresenceView.Approx)?.bucket
+        val fetchedLastSeen = (currentFetchedPresence as? ApiPresenceClient.PresenceView.LastSeen)?.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
+        val fetchedApprox = (currentFetchedPresence as? ApiPresenceClient.PresenceView.Approx)?.bucket
         when {
             activity?.isRecording == true -> "recording voice message…"
-            otherTyping -> "typing…"
             otherId == null -> null
             else -> com.example.chat.ui.chats.PresenceLineLogic.headerText(
                 presenceOnline,
@@ -475,7 +584,7 @@ fun ChatDetailHost(
                 ?: if (wallpaperKey == conversation.id) null else obj.optString(conversation.id, "").ifEmpty { null }
         } catch (_: Exception) { null }
     }
-    val colorOverrides = com.example.chat.ui.chats.detail.BubbleColorOverrides(
+    val colorOverrides = if (hasChatThemeOverride) com.example.chat.ui.chats.detail.BubbleColorOverrides() else com.example.chat.ui.chats.detail.BubbleColorOverrides(
         rightBubbleColor = conv.rightBubbleColor, leftBubbleColor = conv.leftBubbleColor,
         rightChatBubbleTextColor = conv.rightChatBubbleTextColor, leftChatBubbleTextColor = conv.leftChatBubbleTextColor,
         rightBubbleTimeColor = conv.rightBubbleTimeColor, leftBubbleTimeColor = conv.leftBubbleTimeColor,
@@ -497,7 +606,7 @@ fun ChatDetailHost(
     val lookup: (String) -> com.example.chat.domain.models.UserProfile? = { id -> api.users.firstOrNull { it.id == id } }
 
     val stickerScope = api.authSnapshot()
-    val attachments = rememberChatAttachments(conversation.id) { rev++ }
+    val attachments = rememberChatAttachments(conversation.id, afterSend = { rev++ }, secureChannel = { !secureChannelResolved || secureChannel })
     fun closeChatCamera() {
         videoHoldRequest?.close()
         videoHoldRequest = null
@@ -508,6 +617,7 @@ fun ChatDetailHost(
         cameraEntryAuth = null
     }
     fun openChatCamera(preset: com.example.chat.ui.camera.CameraEntryPreset) {
+        if (!secureChannelResolved || secureChannel) { toast("Camera media cannot be sent until secure-media support is ready."); return }
         closeChatCamera()
         var openedFlow: com.example.chat.ui.AttachFlow? = null
         val flow = attachments.openCaptureSession {
@@ -534,10 +644,10 @@ fun ChatDetailHost(
         callStarting = true
         scope.launch {
             try {
-                val status = ServiceLocator.contactRelationships.connectionStatus(targetId, api.contactsPlane(expected))
+                // Keep the explicit outgoing block check. The server separately enforces
+                // callee privacy and bidirectional blocks before forwarding the offer.
+                check(!ServiceLocator.contactRelationships.isBlocked(targetId, api.contactsPlane(expected))) { "Unblock this contact before calling." }
                 check(api.authSnapshot() === expected) { "Account changed. Call cancelled." }
-                connection = status
-                if (!status.callsAllowed) { gateOpen = true; return@launch }
                 ServiceLocator.callPresentationController.showFullScreen()
                 ServiceLocator.callSignaling.initiateCall(
                     targetId, other?.displayName ?: live.title,
@@ -554,7 +664,8 @@ fun ChatDetailHost(
     val voice = rememberChatVoice(
         conversation.id,
         afterSend = { rev++ },
-        clearTyping = { api.sendTyping(conversation.id, false) },
+        clearTyping = { api.sendTyping(conversation.id, false, messageAccountScope) },
+        secureChannel = { !secureChannelResolved || secureChannel },
     )
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
     androidx.compose.runtime.key(mediaStamp, conversation.id) {
@@ -562,31 +673,89 @@ fun ChatDetailHost(
         conversation = live,
         ghostModeEnabled = prefs.home.ghostMode,
         onToggleGhostMode = { prefs.updateHome(prefs.home.copy(ghostMode = !prefs.home.ghostMode)) },
+        secureChannelEnabled = secureChannel,
+        onToggleSecureChannel = if (!secureRoutingAvailable || !secureChannelResolved) null else {
+            val next = !secureChannel
+            // Close the send gate synchronously, before any suspended setup/storage work.
+            secureChannelResolved = false
+            voice.cancelActiveRecording()
+            closeChatCamera()
+            scope.launch {
+                try {
+                    check(api.authSnapshot() === secureRoutingAccount) { "Account changed. Open the chat again." }
+                    if (next) repo.ensureSecureConversationReady(conversation.id)
+                    check(api.authSnapshot() === secureRoutingAccount) { "Account changed. Open the chat again." }
+                    val transition = repo.setSecureChannel(conversation.id, next, secureRoutingAccount)
+                    val heldCount = transition.heldCount
+                    api.withAuthScope(secureRoutingAccount) {
+                        secureChannel = next
+                        secureChannelResolved = true
+                        rev++
+                        toast(
+                            if (next) "Experimental routing requested; delivery is unverified. $heldCount regular messages held, not sent. Earlier messages unchanged."
+                            else "Secure routing is off on this device. New messages use the regular server-readable route."
+                        )
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    // Re-read the durable truth after any failed setup/write. If unreadable,
+                    // retain unknown and keep sending blocked rather than assume the old flag.
+                    try {
+                        val actual = repo.isSecureChannel(conversation.id)
+                        api.withAuthScope(secureRoutingAccount) {
+                            secureChannel = actual
+                            secureChannelResolved = true
+                        }
+                    } catch (_: Exception) { /* Remain unresolved: no plaintext fallback. */ }
+                    if (api.authSnapshot() === secureRoutingAccount) toast(e.message ?: "Could not change secure routing.")
+                }
+            }
+        },
         messages = messages,
         initialMessageId = initialMessageId,
         currentUserId = myId,
+        currentUserMentionHandles = listOfNotNull(me?.username?.takeIf { it.isNotBlank() }),
         localOverrideAccountKey = effectiveLocalOverrideAccountKey,
         messageSessionIdentity = messageAccountScope,
         isMessageSessionCurrent = { com.example.chat.core.messages.LocalMessageOverridePolicy.sessionCurrent(messageAccountScope, api.authSnapshot()) },
         onBack = onBack,
         onSend = { text ->
-            api.sendMessage(conversation.id, text)
+            requireSendRouting()
+            if (secureChannel) {
+                // Fail closed: an encrypted chat never falls back to plaintext.
+                try {
+                    repo.sendMessage(conversation.id, text)
+                } catch (e: com.example.chat.data.messaging.SecureSendPendingException) {
+                    toast("Encryption for this chat is still being set up. The message is queued and sends automatically when ready.")
+                } catch (e: Exception) {
+                    throw Exception("Secure send failed: ${e.message ?: e.toString()}. Nothing was sent - there is no plaintext fallback.")
+                }
+                rev++
+            } else {
+                api.sendMessage(conversation.id, text)
+            }
             rt.trackConversation(conversation.id)
         },
         resolveSenderName = { id ->
             if (id == myId) "You" else (api.users.firstOrNull { it.id == id }?.displayName ?: "Team Member")
         },
         resolveQuoteSender = { id -> api.users.firstOrNull { it.id == id } },
+        useScopedChatTheme = hasChatThemeOverride,
         presenceText = presenceText,
         presenceIsOnline = presenceOnline,
+        peerTyping = isDirect && otherTyping && !infoBlocked && !conv.disableContactStatus && gbB("statuschat", true),
+        typingAvatarInitials = if (conv.hideProfilePicture || !gbB("PicProf", true)) "" else other?.avatarInitials ?: live.avatarInitials.orEmpty(),
+        typingAvatarUrl = other?.avatarUrl.takeUnless { conv.hideProfilePicture || !gbB("PicProf", true) },
+        typingAvatarColorHex = other?.avatarColorHex ?: live.avatarColorHex,
         showHeaderAvatar = !conv.hideProfilePicture && gbB("PicProf", true),
         showHeaderName = !conv.hideContactName && gbB("NameProf", true),
         showHeaderCalls = !conv.hideCallButton && gbB("Conv_call_btn", true),
         showPresenceLine = !conv.disableContactStatus && gbB("statuschat", true),
-        headerBarColor = conv.actionBarColor,
-        presencePillColor = conv.contactStatusBgColor ?: prefs.gbColor("ModChatGStatusB"),
-        presenceTextColor = conv.contactStatusTextColor ?: prefs.gbColor("ModChatGStatusT"),
-        callsAllowed = connection?.callsAllowed ?: false,
+        headerBarColor = conv.actionBarColor.takeUnless { hasChatThemeOverride },
+        presencePillColor = (conv.contactStatusBgColor ?: prefs.gbColor("ModChatGStatusB")).takeUnless { hasChatThemeOverride },
+        presenceTextColor = (conv.contactStatusTextColor ?: prefs.gbColor("ModChatGStatusT")).takeUnless { hasChatThemeOverride },
+        callsAllowed = isDirect && !infoBlocked,
         onStartCall = { startContactCall(it) },
         connectionState = ServiceLocator.connectionHealth.state,
         networkStatus = liveNetworkStatus,
@@ -608,7 +777,8 @@ fun ChatDetailHost(
         },
         onTypingChanged = { typing ->
             val allowed = privacy.typingIndicators && !prefs.home.ghostMode && !gbB("yo_want_ghostmode", false)
-            if (allowed) api.sendTyping(conversation.id, typing)
+            // A privacy change emits only a best-effort stop, never a final positive heartbeat.
+            api.sendTyping(conversation.id, typing && allowed, messageAccountScope)
         },
         quickReplies = prefs.automation.quickReplies,
         wallpaperType = conv.wallpaperType,
@@ -626,6 +796,18 @@ fun ChatDetailHost(
         onToggleMute = { api.setConversationLocalState(conversation.id, "muted", !live.isMuted) },
         // Blocking needs a block-list API; deferred to the next release (ReleaseFeatures).
         onBlockContact = if (ReleaseFeatures.BLOCK_CONTACTS && isDirect && otherId != null) ({ blockTarget = otherId; safetyError = null; blockConfirm = true }) else null,
+        showUnknownSenderSafety = isDirect && connection?.myAccepted == false && !senderContinued &&
+            !infoBlocked && messages.any { it.senderId == otherId },
+        onContinueUnknownSender = {
+            api.withAuthScope(messageAccountScope) {
+                if (effectiveLocalOverrideAccountKey.isNotBlank()) senderSafetyStore.edit().putBoolean(senderSafetyKey, true).apply()
+                senderContinued = true
+            }
+        },
+        onReportUnknownSender = {
+            reportTarget = messages.lastOrNull { it.senderId == otherId && !it.isDeletedForEveryone && !it.isDeletedForMe }
+            if (reportTarget == null) toast("Open a received message to report it.")
+        },
         onReportMessage = { reportTarget = it },
         onBlockMessageSender = { blockTarget = it; safetyError = null; blockConfirm = true },
         hideDateAndName = conv.hideDateAndName,
@@ -640,11 +822,33 @@ fun ChatDetailHost(
         showGroupAvatar = ServiceLocator.templateController.conversation.showAvatarInGroup,
         colorOverrides = colorOverrides,
         onEditMessage = { id, newText ->
-            if (api.isAuthenticated) api.editMessage(conversation.id, id, newText)
+            requireSendRouting()
+            if (secureChannel) {
+                // MLS messages are re-encrypted at the current epoch; the
+                // repository never writes their plaintext to the legacy plane.
+                try {
+                    repo.editMessage(conversation.id, id, newText)
+                } catch (e: Exception) {
+                    throw Exception("Secure edit failed: ${e.message ?: e.toString()}. The message was not changed.")
+                }
+                rev++
+            } else if (api.isAuthenticated) {
+                api.editMessage(conversation.id, id, newText)
+            }
         },
         onDeleteMessage = { id, forEveryone ->
             scope.launch {
-                if (api.isAuthenticated) { try { api.deleteMessage(conversation.id, id) } catch (_: Exception) {} }
+                try { requireSendRouting() } catch (e: Exception) { toast(e.message ?: "Action blocked."); return@launch }
+                if (secureChannel) {
+                    try {
+                        repo.deleteMessage(conversation.id, id, forEveryone)
+                    } catch (e: Exception) {
+                        toast("Secure delete failed: ${e.message ?: e.toString()}")
+                    }
+                    rev++
+                } else if (api.isAuthenticated) {
+                    try { api.deleteMessage(conversation.id, id) } catch (_: Exception) {}
+                }
             }
         },
         onToggleStar = { id ->
@@ -656,8 +860,17 @@ fun ChatDetailHost(
             if (m != null) api.setMessageLocalState(conversation.id, id, "pinned", !m.isPinned)
         },
         onToggleReaction = { id, emoji ->
-            repo.optimisticToggleReaction(conversation.id, id, emoji)
-            scope.launch { try { repo.toggleReactionAsync(conversation.id, id, emoji) } catch (_: Exception) {} }
+            if (!secureChannelResolved || secureChannel) toast("Reactions are not supported for secure-routing chats yet.")
+            else {
+                val owner = api.authSnapshot()
+                scope.launch {
+                    try { api.toggleServerReaction(conversation.id, id, emoji, owner) }
+                    catch (e: Exception) {
+                        if (e is kotlinx.coroutines.CancellationException) throw e
+                        if (api.authSnapshot() === owner) toast(e.message ?: "Could not update reaction.")
+                    }
+                }
+            }
         },
         onForward = { forwardScope = api.authSnapshot(); forwardMessages = listOf(it) },
         onForwardSelection = { forwardScope = api.authSnapshot(); forwardMessages = it.toList() },
@@ -670,9 +883,18 @@ fun ChatDetailHost(
         },
         onRetryMessage = { id ->
             scope.launch {
-                // Re-queues the failed message on the REST outbox (was the old Supabase queue).
-                val ok = try { api.retryMessage(id) } catch (_: Exception) { false }
-                if (!ok) toast("Retry failed — check your connection.")
+                try { requireSendRouting() } catch (e: Exception) { toast(e.message ?: "Retry blocked."); return@launch }
+                if (secureChannel) {
+                    // Queued MLS sends retry through the secure outbox only.
+                    try { ServiceLocator.outgoingQueue.processQueue() } catch (_: Exception) {}
+                    rev++
+                } else {
+                    // Re-queues the failed message on the REST outbox (was the old Supabase queue).
+                    val ok = try { api.retryMessage(id) }
+                    catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                    catch (error: Exception) { toast(error.message ?: "Retry could not be completed."); return@launch }
+                    if (!ok) toast("Retry could not be completed. Check the connection or the message's reconciliation state.")
+                }
             }
         },
         onCreateTask = { title -> taskEditor = Triple(true, null, title) },
@@ -704,13 +926,13 @@ fun ChatDetailHost(
         },
         translateOption = ServiceLocator.preferencesController.universal.translateOption,
         translationLanguage = ServiceLocator.preferencesController.universal.translationLanguage,
-        composerColors = com.example.chat.ui.chats.detail.ComposerColors.resolve(
+        composerColors = if (hasChatThemeOverride) com.example.chat.ui.chats.detail.ComposerColors.resolve(theme) else com.example.chat.ui.chats.detail.ComposerColors.resolve(
             theme, conv.uiButtonsColor, conv.emojiButtonColor, conv.sendButtonColor,
             conv.micSendBgCircleColor, conv.textEntryBackgroundColor, conv.textEntryColor,
         ),
         composerTemplate = ServiceLocator.templateController.composer,
         onAttachmentAction = { action ->
-            when (action) {
+            if (!secureChannelResolved || secureChannel) toast("Attachments are unavailable until secure-media support is ready.") else when (action) {
                 com.example.chat.ui.chats.detail.AttachmentAction.image -> attachments.onMedia("image")
                 com.example.chat.ui.chats.detail.AttachmentAction.video -> attachments.onMedia("video")
                 com.example.chat.ui.chats.detail.AttachmentAction.chatyDirect -> {
@@ -769,7 +991,10 @@ fun ChatDetailHost(
                 }
             }
         },
-        onOpenAppearance = { appearanceOpen = true },
+        onOpenAppearance = {
+            if (chatThemeKey != null && api.authSnapshot() === messageAccountScope) appearanceOpen = true
+            else toast("Sign in to customize this chat's theme.")
+        },
         onPollTap = { m -> pollViewId = m.id },
         loadingMessages = loadingMessages,
         loadError = loadError,
@@ -797,6 +1022,12 @@ fun ChatDetailHost(
         onStickerSend = { sticker ->
             val expected = stickerScope
             scope.launch {
+                // Stickers travel as unencrypted media; blocked in a secure chat
+                // until the encrypted-media plane (Phase 2) is wired.
+                if (!secureChannelResolved || secureChannel) {
+                    toast("Encrypted media is not wired yet, so stickers are not sent in an encrypted chat.")
+                    return@launch
+                }
                 try {
                     check(api.authSnapshot() === expected) { "Account changed. Open the sticker picker again." }
                     check(!expected.userId.isNullOrBlank() && !expected.token.isNullOrBlank()) { "Sign in to send stickers." }
@@ -813,11 +1044,16 @@ fun ChatDetailHost(
                     check(bytes.size in 1..(2 * 1024 * 1024)) { "Sticker is too large." }
                     val actualSha = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
                     check(com.example.chat.core.stickers.BundledStickerPacks.expectedSha256[sticker.id] == actualSha) { "Sticker asset is damaged." }
+                    requireSendRouting()
+                    check(!secureChannel) { "Sticker upload blocked in secure-routing chat." }
                     val uploaded = api.uploadMedia("${sticker.id}.webp", bytes, expectedScope = expected)
                     val attachment = com.example.chat.domain.models.MessageAttachment(
                         id = java.util.UUID.randomUUID().toString(), type = "image", name = "${sticker.label}.webp",
                         size = com.example.chat.data.services.ChatMediaService.formatBytes(bytes.size.toLong()),
                         url = uploaded["url"]?.toString()?.takeIf { it.isNotBlank() } ?: error("Upload did not return a media URL."))
+                    requireSendRouting()
+                    check(!secureChannel) { "Sticker send blocked in secure-routing chat." }
+                    check(api.authSnapshot() === expected) { "Account changed. Open the sticker picker again." }
                     api.sendMessage(conversation.id, "", com.example.chat.domain.models.MessageType.image,
                         attachment, com.example.chat.core.stickers.StickerMessagePolicy.metadata(sticker), expectedScope = expected)
                     rev++
@@ -830,7 +1066,10 @@ fun ChatDetailHost(
         onContactTap = { attachments.onContact() },
         onLocationTap = { attachments.onLocation() },
         onVoiceTap = voice.onVoiceTap,
-        onVoiceHoldStart = voice.onVoiceHoldStart,
+        onVoiceHoldStart = {
+            if (!secureChannelResolved || secureChannel) toast("Voice notes are not sent in an encrypted chat yet; encrypted media is not wired.")
+            else voice.onVoiceHoldStart()
+        },
         onVoiceMove = voice.onVoiceMove,
         onVoiceHoldEnd = voice.onVoiceHoldEnd,
         onVideoHoldStart = { id ->
@@ -956,8 +1195,11 @@ fun ChatDetailHost(
                     loading = infoLoading,
                     loadError = infoError,
                     busy = infoBusy,
-                    isOnline = { id -> rt.isOnline(id) },
-                    lastSeenFor = { id -> rt.lastSeenFor(id) },
+                    // Use the same privacy-filtered API presence as the chat header,
+                    // not the stale legacy realtime timestamp fallback.
+                    presenceLabelOverride = presenceText,
+                    isOnline = { id -> id == otherId && presenceOnline },
+                    lastSeenFor = { _ -> null },
                     activityFor = { cid, uid -> rt.activityFor(cid, uid) },
                     hydrateMessage = { m -> rt.hydrateMessage(m) },
                     onAccept = {
@@ -1002,7 +1244,7 @@ fun ChatDetailHost(
             }
         }
     }
-    if (pollCreateOpen) {
+    if (pollCreateOpen && secureChannelResolved && !secureChannel) {
         CreatePollDialog(
             onCancel = { pollCreateOpen = false },
             onCreate = { draft ->
@@ -1012,24 +1254,99 @@ fun ChatDetailHost(
         )
     }
     val pv = pollViewId
-    if (pv != null) {
+    if (pv != null && secureChannelResolved && !secureChannel) {
         PollViewerSheet(
             messageId = pv,
             controller = attachments.controller,
             onDismiss = { pollViewId = null; scope.launch { try { api.loadMessages(conversation.id) } catch (_: Exception) {} } },
         )
     }
-    if (appearanceOpen) {
+    if (appearanceOpen && chatThemeKey != null) {
         androidx.activity.compose.BackHandler { appearanceOpen = false }
-        val customization = com.example.chat.ui.core.customization.rememberLoadedCustomizationController()
-        val overlayController = com.example.chat.ui.core.components.overlays.rememberChatyOverlayController()
+        var jsonWaiter by remember(messageAccountScope) { mutableStateOf<kotlinx.coroutines.CompletableDeferred<String?>?>(null) }
+        var imageWaiter by remember(messageAccountScope) { mutableStateOf<kotlinx.coroutines.CompletableDeferred<File?>?>(null) }
+        DisposableEffect(messageAccountScope) {
+            onDispose { jsonWaiter?.cancel(); imageWaiter?.cancel() }
+        }
+        val jsonLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            val waiting = jsonWaiter
+            jsonWaiter = null
+            scope.launch {
+                val text = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    try {
+                        uri?.let { value -> context.contentResolver.openInputStream(value)?.use { input ->
+                            val output = java.io.ByteArrayOutputStream()
+                            val buffer = ByteArray(8192)
+                            while (true) {
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                require(output.size() + count <= 1_048_576) { "Theme file is too large." }
+                                output.write(buffer, 0, count)
+                            }
+                            output.toByteArray().toString(Charsets.UTF_8)
+                        } }
+                    } catch (_: Exception) { null }
+                }
+                if (api.authSnapshot() === messageAccountScope) waiting?.complete(text) else waiting?.cancel()
+            }
+        }
+        val imageLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+        ) { uri ->
+            val waiting = imageWaiter
+            imageWaiter = null
+            scope.launch {
+                val file = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    var output: File? = null
+                    try {
+                        uri?.let { value ->
+                            output = File.createTempFile("chat_theme_", ".image", context.cacheDir)
+                            context.contentResolver.openInputStream(value)?.use { input ->
+                                output!!.outputStream().use { stream ->
+                                    val buffer = ByteArray(8192)
+                                    var total = 0L
+                                    while (true) {
+                                        val count = input.read(buffer)
+                                        if (count < 0) break
+                                        total += count
+                                        require(total <= 32L * 1024 * 1024) { "Image is too large." }
+                                        stream.write(buffer, 0, count)
+                                    }
+                                }
+                            } ?: error("Could not read image.")
+                            output
+                        }
+                    } catch (_: Exception) { output?.delete(); null }
+                }
+                if (api.authSnapshot() === messageAccountScope) waiting?.complete(file)
+                else { file?.delete(); waiting?.cancel() }
+            }
+        }
         androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-            com.example.chat.ui.settings.appearance.ComponentStylesScreen(
-                controller = customization,
-                overlayController = overlayController,
-                onBack = { appearanceOpen = false },
-                conversationId = conversation.id,
+            com.example.chat.ui.settings.theme.ThemeEditorScreen(
+                themeController = ServiceLocator.themeController,
+                preferences = prefs,
+                templateController = ServiceLocator.templateController,
+                appearance = ServiceLocator.appearanceVariantController,
+                exportDirectory = context.getExternalFilesDir(null) ?: context.filesDir,
+                pickJsonText = {
+                    val waiting = kotlinx.coroutines.CompletableDeferred<String?>()
+                    jsonWaiter?.cancel(); jsonWaiter = waiting
+                    jsonLauncher.launch(arrayOf("application/json", "text/plain"))
+                    waiting.await()
+                },
+                pickImageFile = {
+                    val waiting = kotlinx.coroutines.CompletableDeferred<File?>()
+                    imageWaiter?.cancel(); imageWaiter = waiting
+                    imageLauncher.launch("image/*")
+                    waiting.await()
+                },
+                conversationKey = chatThemeKey,
                 conversationTitle = live.title,
+                isScopeCurrent = { api.authSnapshot() === messageAccountScope },
+                onBack = { appearanceOpen = false },
             )
         }
     }
@@ -1196,38 +1513,6 @@ fun ChatDetailHost(
             },
         )
     }
-    if (gateOpen) {
-        val st = connection ?: ContactConnectionStatus()
-        AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
-            onDismissRequest = { gateOpen = false },
-            title = { Text(if (st.callsAllowed) "Calls are unlocked" else "Contact acceptance required") },
-            text = {
-                Text(
-                    if (st.callsAllowed) "Both people accepted this contact connection."
-                    else if (st.isWaitingForOther) "You accepted ${other?.displayName ?: live.title}. Calls will unlock after they accept you too."
-                    else "Chatting is available now. Voice and video calls unlock only after both people accept the contact request.",
-                )
-            },
-            confirmButton = {
-                if (st.isPendingIncoming) {
-                    TextButton(onClick = {
-                        gateOpen = false
-                        scope.launch {
-                            try {
-                                val id = otherId ?: return@launch
-                                check(api.authSnapshot() === messageAccountScope) { "Account changed." }
-                                val plane = api.contactsPlane(messageAccountScope)
-                                check(ServiceLocator.contactRelationships.connectionStatus(id, plane).isPendingIncoming) { "There is no incoming request to accept." }
-                                ServiceLocator.contactRelationships.acceptConnection(id, plane)
-                                refreshConnection()
-                            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-                            catch (e: Exception) { if (api.authSnapshot() === messageAccountScope) toast(e.message ?: "Could not accept contact.") }
-                        }
-                    }) { Text("Accept contact") }
-                } else TextButton(onClick = { gateOpen = false }) { Text("Done") }
-            },
-        )
-    }
     reportTarget?.let { target ->
         com.example.chat.ui.chats.detail.ReportMessageDialog(
             onDismiss = { reportTarget = null },
@@ -1338,17 +1623,37 @@ fun ChatDetailHost(
                                                 check(api.withAuthScope(captured) {}) { "Account changed; messages not forwarded." }
                                                 var confirmedCount = 0
                                                 for (fm in batch) {
+                                                    check(api.authSnapshot() === captured) { "Account changed; forwarding stopped." }
                                                     val payload = ForwardSend.payload(fm, labelAllowed)
-                                                    val forwarded = api.sendMessage(
-                                                        item.conversation.id,
-                                                        payload.text,
-                                                        payload.type,
-                                                        payload.attachment,
-                                                        payload.extraMetadata,
-                                                        expectedScope = captured,
-                                                    )
-                                                    if (forwarded != null && forwarded.deliveryState != com.example.chat.domain.models.DeliveryState.queued &&
-                                                        forwarded.deliveryState != com.example.chat.domain.models.DeliveryState.sending) confirmedCount++
+                                                    if (repo.isSecureChannel(item.conversation.id)) {
+                                                        check(secureRoutingAvailable) { "Secure routing is unavailable in this build. Nothing was forwarded." }
+                                                        // Encrypted target chat: text forwards ride the MLS
+                                                        // plane; media forwards are refused (never plaintext).
+                                                        if (payload.attachment != null || payload.type != com.example.chat.domain.models.MessageType.text) {
+                                                            throw IllegalStateException("Media cannot be forwarded into an encrypted chat yet; encrypted media is not wired.")
+                                                        }
+                                                        try {
+                                                            repo.sendMessage(
+                                                                item.conversation.id,
+                                                                payload.text,
+                                                                extraMetadata = payload.extraMetadata,
+                                                            )
+                                                            confirmedCount++
+                                                        } catch (e: com.example.chat.data.messaging.SecureSendPendingException) {
+                                                            // Queued until MLS setup completes; counts as queued, not confirmed.
+                                                        }
+                                                    } else {
+                                                        val forwarded = api.sendMessage(
+                                                            item.conversation.id,
+                                                            payload.text,
+                                                            payload.type,
+                                                            payload.attachment,
+                                                            payload.extraMetadata,
+                                                            expectedScope = captured,
+                                                        )
+                                                        if (forwarded != null && forwarded.deliveryState != com.example.chat.domain.models.DeliveryState.queued &&
+                                                            forwarded.deliveryState != com.example.chat.domain.models.DeliveryState.sending) confirmedCount++
+                                                    }
                                                 }
                                                 if (confirmedCount == batch.size) toast("Forwarded ${batch.size} message(s) to ${item.conversation.title}.")
                                                 else toast("${batch.size - confirmedCount} message(s) queued for ${item.conversation.title}.")
@@ -1387,7 +1692,7 @@ fun ChatDetailHost(
         }
     }
     val ed = taskEditor
-    if (ed != null && taskUser != null) {
+    if (ed != null && taskUser != null && secureChannelResolved && !secureChannel) {
         com.example.chat.ui.tasks.TaskCreateEditModal(
             controller = tasksController,
             colors = com.example.chat.ui.tasks.TaskColors(ServiceLocator.themeController.globalTheme),
@@ -1403,7 +1708,7 @@ fun ChatDetailHost(
         )
     }
     val td = taskDetail
-    if (td != null && taskUser != null) {
+    if (td != null && taskUser != null && secureChannelResolved && !secureChannel) {
         com.example.chat.ui.tasks.TaskDetailScreen(
             task = td,
             controller = tasksController,

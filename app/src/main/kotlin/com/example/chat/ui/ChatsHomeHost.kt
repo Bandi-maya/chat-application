@@ -117,6 +117,7 @@ fun ChatsHomeHost(
     } else null
     ChatsHomeScreen(
         accountSessionIdentity = api.authSnapshot(),
+        folderAccountKey = api.currentAccountHash().orEmpty(),
         headerBottom = headerBottom,
         // Email-verification nudge (research 4a.4): signed-in but unverified
         // users get a banner with one-tap resend; verification is never forced

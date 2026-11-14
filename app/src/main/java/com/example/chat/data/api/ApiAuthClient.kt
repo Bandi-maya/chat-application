@@ -57,11 +57,17 @@ class ApiAuthClient(
 
     /** ApiBackendService.register — no displayName is sent; the display name
      *  comes back from the server response (see parseAuthResponse). */
-    fun register(email: String, username: String, password: String, extraHeaders: Map<String, String> = emptyMap()): ApiAuthResult {
+    fun register(email: String, username: String, password: String, extraHeaders: Map<String, String> = emptyMap(), phoneProof: PhoneVerificationProof? = null): ApiAuthResult {
         val body = JSONObject()
             .put("email", email)
             .put("username", username)
             .put("password", password)
+            .apply {
+                phoneProof?.let { proof ->
+                    require(proof.tenantId == tenantId() && proof.baseUrl.trimEnd('/') == baseUrl().trimEnd('/') && proof.expiresAt.isAfter(java.time.Instant.now())) { "Phone verification expired or workspace changed." }
+                    put("phoneChallengeId", proof.challengeId); put("phoneVerificationToken", proof.token)
+                }
+            }
             .toString()
         val response = postWithFallback("auth/register", body, extraHeaders = extraHeaders)
         val result = parseAuthResponse(response.first, response.second)
@@ -215,6 +221,7 @@ class ApiAuthClient(
         adminFullName: String,
         tenantType: String = "chat",
         allowUserRegistration: Boolean = true,
+        extraHeaders: Map<String, String> = emptyMap(),
     ): Pair<ApiAuthResult, Map<String, Any?>?> {
         val payload = JSONObject()
             .put("tenant_id", tenantId.trim())
@@ -226,7 +233,7 @@ class ApiAuthClient(
             .put("tenant_type", tenantType)
             .put("allow_user_registration", allowUserRegistration)
             .toString()
-        val response = postWithFallbackNoTenant("organization/admin/create", payload)
+        val response = postWithFallbackNoTenant("organization/admin/create", payload, extraHeaders)
         var org: Map<String, Any?>? = null
         if (response.first == 200) {
             try {
@@ -242,8 +249,8 @@ class ApiAuthClient(
     }
 
     /** The organization endpoints do NOT carry the x-tenant-id header. */
-    private fun postWithFallbackNoTenant(path: String, body: String): Pair<Int, String> {
-        val headers = mapOf("Content-Type" to "application/json")
+    private fun postWithFallbackNoTenant(path: String, body: String, extraHeaders: Map<String, String> = emptyMap()): Pair<Int, String> {
+        val headers = mapOf("Content-Type" to "application/json") + extraHeaders
         val response = transport.execute("POST", "${baseUrl()}/$path", headers, body)
         if (response.first == 404) {
             return transport.execute("POST", "${baseUrl()}/api/v1/$path", headers, body)
@@ -648,6 +655,13 @@ class ApiAuthClient(
             val parsed = JSONObject(responseBody)
             detail = parsed.optString("detail").ifEmpty { parsed.optString("message").ifEmpty { detail } }
         } catch (_: Exception) {
+        }
+        val error = runCatching { JSONObject(responseBody).optJSONObject("detail") }.getOrNull()
+        val code = error?.optString("code")
+        detail = when (code) {
+            "DEVICE_ACCOUNT_LIMIT" -> "This installation already has two accounts. Remove one before adding another."
+            "DEVICE_PROOF_REQUIRED" -> "Installation verification is required. Start sign-in again."
+            else -> error?.optString("message")?.takeIf { it.isNotBlank() } ?: detail
         }
         throw Exception(detail)
     }

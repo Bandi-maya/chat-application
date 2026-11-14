@@ -378,6 +378,12 @@ fun AppRoot() {
                     ServiceLocator.apiBackend.config.getSavedTenantId() to
                         ServiceLocator.apiBackend.config.isUsingDefaultTenant
                 },
+                requestEmailCode = { email, tenant, isDefaultTenant ->
+                    com.example.chat.ServiceLocator.apiBackend.requestEmailLoginCode(email, tenant, isDefaultTenant)
+                },
+                verifyEmailCode = { attempt, code ->
+                    com.example.chat.ServiceLocator.apiBackend.verifyEmailLoginCode(attempt, code).id
+                },
                 login = { identifier, password, tenant, isDefaultTenant ->
                     val user = ServiceLocator.apiBackend.login(identifier, password, tenant, isDefaultTenant)
                     user.id
@@ -422,6 +428,19 @@ fun AppRoot() {
                     pendingRegisterEmail = email.trim()
                     val user = ServiceLocator.apiBackend.register(email, username, password)
                     user.id to user.displayName
+                },
+                registerWithPhone = { email, username, password, tenant, isDefaultTenant, proof ->
+                    if (isDefaultTenant) ServiceLocator.apiBackend.config.setTenantId(null, useDefault = true)
+                    else if (!tenant.isNullOrBlank()) ServiceLocator.apiBackend.config.setTenantId(tenant, useDefault = false)
+                    pendingRegisterEmail = email.trim()
+                    val user = ServiceLocator.apiBackend.register(email, username, password, phoneProof = proof)
+                    user.id to user.displayName
+                },
+                checkUsernameAvailability = { username, tenant, isDefaultTenant ->
+                    val result = ServiceLocator.apiBackend.registrationUsernameAvailability(username, tenant, isDefaultTenant)
+                    check(result.valid) { result.reason ?: "Invalid username." }
+                    if (result.available) com.example.chat.ui.auth.UsernameAvailabilityLogic.Probe.Available
+                    else com.example.chat.ui.auth.UsernameAvailabilityLogic.Probe.Taken
                 },
                 checkOrganization = { workspace ->
                     val data = ServiceLocator.apiBackend.checkOrganization(workspace)
@@ -696,6 +715,70 @@ fun AppRoot() {
                         accountSwitcherOpen = true
                     }
                     com.example.chat.notifications.ChatyNotifications.pendingAccountAlert.value = null
+                }
+                val accountCallRoute by com.example.chat.notifications.ChatyNotifications.pendingAccountCall.collectAsState()
+                var waitingCallChoice by remember { mutableStateOf<com.example.chat.notifications.ChatyNotifications.AccountCallRoute?>(null) }
+                var accountCallBusy by remember { mutableStateOf(false) }
+                suspend fun answerAccountCall(route: com.example.chat.notifications.ChatyNotifications.AccountCallRoute, endCurrent: Boolean) {
+                    if (accountCallBusy || lockRequired) return
+                    accountCallBusy = true
+                    try {
+                        if (!ServiceLocator.hasPendingAccountCall(route.accountHash, route.callId)) {
+                            settingsNotice = "That waiting call has ended or expired."
+                            return
+                        }
+                        val api = ServiceLocator.apiBackend
+                        val currentCall = ServiceLocator.callSignaling.currentSession
+                        if (currentCall != null && !currentCall.state.isTerminal && currentCall.callId != route.callId) {
+                            if (!endCurrent) { waitingCallChoice = route; return }
+                            ServiceLocator.callSignaling.endCall("user_end_and_answer")
+                            val ended = kotlinx.coroutines.withTimeoutOrNull(2_000) {
+                                while (ServiceLocator.callSignaling.currentSession?.let { it.callId == currentCall.callId && !it.state.isTerminal } == true) kotlinx.coroutines.delay(20)
+                                true
+                            } ?: false
+                            if (!ended) { settingsNotice = "The current call has not ended yet. The waiting call was not answered."; return }
+                        }
+                        val target = api.multiAccount.accounts().firstOrNull { it.accountHash == route.accountHash && !it.sessionExpired }
+                            ?: run { settingsNotice = "Sign in to that account again before answering its call."; return }
+                        when (api.switchToAccount(target.accountKey)) {
+                            is com.example.chat.data.api.ApiBackendService.AccountSwitchResult.Switched,
+                            is com.example.chat.data.api.ApiBackendService.AccountSwitchResult.AlreadyActive -> {
+                                settingsSub = null; pushedSettings = false; accountSwitcherOpen = false; accountRecentsOpen = false
+                                val owner = api.authSnapshot()
+                                ServiceLocator.replayAccountCallInbox(route.accountHash)
+                                if (api.authSnapshot() === owner && ServiceLocator.callSignaling.currentSession?.callId == route.callId)
+                                    com.example.chat.notifications.ChatyNotifications.requestCallAction(com.example.chat.notifications.ChatyNotifications.PendingCallAction(route.callId, true, owner))
+                            }
+                            else -> { settingsNotice = "Could not switch to the waiting call's account. The call was not answered." }
+                        }
+                    } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                    catch (_: Exception) { settingsNotice = "Could not answer the waiting call. Please try again if it is still ringing." }
+                    finally { accountCallBusy = false }
+                }
+                androidx.compose.runtime.LaunchedEffect(accountCallRoute, lockRequired) {
+                    val route = accountCallRoute ?: return@LaunchedEffect
+                    if (lockRequired) return@LaunchedEffect
+                    com.example.chat.notifications.ChatyNotifications.pendingAccountCall.value = null
+                    answerAccountCall(route, false)
+                }
+                waitingCallChoice?.let { route ->
+                    androidx.compose.material3.AlertDialog(onDismissRequest = { if (!accountCallBusy) waitingCallChoice = null },
+                        title = { androidx.compose.material3.Text("Another call is waiting") },
+                        text = { androidx.compose.material3.Text("Your current call stays connected until you choose. Hold and answer is not available until independent call connections are ready.") },
+                        confirmButton = { androidx.compose.material3.TextButton(enabled = !accountCallBusy, onClick = {
+                            scope.launch { waitingCallChoice = null; answerAccountCall(route, true) }
+                        }) { androidx.compose.material3.Text("End current and answer") } },
+                        dismissButton = { androidx.compose.material3.TextButton(enabled = !accountCallBusy, onClick = {
+                            scope.launch {
+                                accountCallBusy = true
+                                try {
+                                    if (ServiceLocator.declinePendingAccountCall(route.accountHash, route.callId)) waitingCallChoice = null
+                                    else settingsNotice = "The waiting call could not be declined. It may have ended, or the connection is unavailable."
+                                } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                                catch (_: Exception) { settingsNotice = "Could not decline the waiting call. Your current call is unchanged." }
+                                finally { accountCallBusy = false }
+                            }
+                        }) { androidx.compose.material3.Text("Decline waiting call") } })
                 }
                 var splitChatState by androidx.compose.runtime.saveable.rememberSaveable(ServiceLocator.apiBackend.currentAccountKey(), stateSaver = com.example.chat.ui.split.SplitChatSessionState.Saver) {
                     mutableStateOf(com.example.chat.ui.split.SplitChatSessionState())
@@ -1754,15 +1837,16 @@ fun AppRoot() {
                 },
             )
             AuthRoute.NewChat -> {
+                val lookupOwner = remember { ServiceLocator.apiBackend.authSnapshot() }
                 val repoN = ServiceLocator.conversationsRepository
                 com.example.chat.ui.chats.NewChatScreen(
                     contacts = ServiceLocator.apiBackend.users,
                     startInGroupMode = newChatGroup,
                     startInBroadcastMode = newChatBroadcast,
-                    searchUsersRemote = { q -> ServiceLocator.apiBackend.searchUsers(q) },
-                    openDirectConversation = { u -> ServiceLocator.apiBackend.createOrGetDirectConversation(u.id) },
-                    createGroup = { title, ids -> repoN.createGroup(title, ids) },
-                    deleteUser = { id -> ServiceLocator.apiBackend.deleteUser(id) },
+                    searchUsersRemote = { q -> ServiceLocator.apiBackend.findExactUsername(q, lookupOwner) },
+                    openDirectConversation = { u -> ServiceLocator.apiBackend.createOrGetDirectConversation(u.id, expectedScope = lookupOwner) },
+                    createGroup = { title, ids -> ServiceLocator.apiBackend.createGroupRoom(title, ids.distinct(), expectedScope = lookupOwner) },
+                    deleteUser = { id -> ServiceLocator.apiBackend.deleteUser(id, expectedScope = lookupOwner) },
                     onOpenConversation = { conversation ->
                         ServiceLocator.apiBackend.setActiveConversation(conversation.id)
                         selectedConversation = conversation
@@ -1771,18 +1855,18 @@ fun AppRoot() {
                     onBack = { navigation.goBack() },
                     loadContactRelations = {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            val plane = ServiceLocator.apiBackend.contactsPlane()
+                            val plane = ServiceLocator.apiBackend.contactsPlane(lookupOwner)
                             plane.contacts() to plane.inbox()
                         }
                     },
                     sendContactRequest = { username ->
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            ServiceLocator.apiBackend.contactsPlane().sendRequest(username)
+                            ServiceLocator.apiBackend.contactsPlane(lookupOwner).sendRequest(username)
                         }
                     },
                     respondContactRequest = { requestId, accept ->
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            ServiceLocator.apiBackend.contactsPlane().respond(requestId, if (accept) "accept" else "decline")
+                            ServiceLocator.apiBackend.contactsPlane(lookupOwner).respond(requestId, if (accept) "accept" else "decline")
                         }
                     },
                 )

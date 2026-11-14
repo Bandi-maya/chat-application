@@ -27,6 +27,27 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AttachmentSourceResolverTest {
+    @Test fun resolverReadsResponseAndCacheOffCallerThread() = runBlocking {
+        val caller = Thread.currentThread()
+        val readThread = java.util.concurrent.atomic.AtomicReference<Thread>()
+        val ref = AttachmentRef("chat", "message", "audio")
+        val store = FakeStore()
+        val resolver = AttachmentSourceResolver(store, { true }, { TrustedAttachment("audio", false, false) }, {
+            object : ByteArrayInputStream(byteArrayOf(1, 2, 3)) {
+                override fun read(b: ByteArray, off: Int, len: Int): Int {
+                    readThread.set(Thread.currentThread())
+                    return super.read(b, off, len)
+                }
+            }
+        })
+        val result = resolver.resolve(AttachmentSourceRequest(ref, true, "s1") { "https://example.test/audio.m4a" })
+        try {
+            assertTrue(result is ResolvedSource.Leased)
+            assertNotNull(readThread.get())
+            assertNotSame(caller, readThread.get())
+        } finally { (result as? ResolvedSource.Leased)?.lease?.release() }
+    }
+
     private class FakeStore : AttachmentStore {
         val data = HashMap<String, ByteArray>()
         val corrupt = HashSet<String>()

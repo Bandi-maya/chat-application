@@ -18,7 +18,8 @@ data class AccountRecentsPage(
 object AccountRecentsPages {
     fun build(accounts: List<ApiRegisteredAccountMeta>): List<AccountRecentsPage> =
         accounts.map { AccountRecentsPage(AccountRecentsPageKind.Account, it) } +
-            AccountRecentsPage(AccountRecentsPageKind.AddAccount, null)
+            (if (accounts.size < com.example.chat.data.api.MultiAccountRegistryCoordinator.DEFAULT_MAX_ACCOUNTS)
+                listOf(AccountRecentsPage(AccountRecentsPageKind.AddAccount, null)) else emptyList())
 
     fun initialPage(accounts: List<ApiRegisteredAccountMeta>, activeAccountKey: String?): Int {
         val idx = accounts.indexOfFirst { it.accountKey == activeAccountKey }

@@ -51,3 +51,13 @@ internal fun ResolvedSource.consumerUri(): String? = when (this) {
     is ResolvedSource.Leased -> lease.file.toURI().toString()
     else -> null
 }
+
+/** Non-sensitive playback status. Never includes private URLs, paths, tokens or transport exceptions. */
+internal fun ResolvedSource.audioUnavailableMessage(): String = when ((this as? ResolvedSource.Unavailable)?.reason) {
+    ResolvedSource.Reason.OFFLINE -> "Audio is not downloaded. Connect to the internet and try again."
+    ResolvedSource.Reason.SIGNED_OUT -> "Your account changed. Reopen this chat and try again."
+    ResolvedSource.Reason.CORRUPT -> "The downloaded audio could not be verified. Try downloading it again."
+    ResolvedSource.Reason.DOWNLOAD_FAILED -> "Audio could not be downloaded. Try again when the connection is available."
+    ResolvedSource.Reason.NOT_ALLOWED -> "This audio is no longer available to this account."
+    null -> "Audio could not be opened."
+}

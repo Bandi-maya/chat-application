@@ -53,6 +53,7 @@ object ChatyEmojiPack {
     val OPENMOJI_PACK = AssetPack(OPENMOJI, "emoji/openmoji", "png", animated = false, upperHex = true)
 
     fun assetPack(style: String): AssetPack? = when (style) {
+        CHATY -> OPENMOJI_PACK // Lightweight bundled subset; uncovered Unicode uses the system glyph.
         TELEGRAM -> TELEGRAM_PACK
         MICROSOFT -> MICROSOFT_PACK
         OPENMOJI -> OPENMOJI_PACK

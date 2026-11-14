@@ -82,7 +82,10 @@ private fun DrawScope.drawDeliveryStatus(
     val h = size.height
     var strokeWidth = 1.6f
 
-    fun strokeOf(width: Float = strokeWidth) = Stroke(width = width,
+    // Geometry is normalized to the icon size; stroke weight must scale too
+    // or high-density phones render nearly invisible hairlines.
+    val strokeScale = min(w, h) / 15f
+    fun strokeOf(width: Float = strokeWidth) = Stroke(width = width * strokeScale,
         cap = androidx.compose.ui.graphics.StrokeCap.Round,
         join = androidx.compose.ui.graphics.StrokeJoin.Round)
 

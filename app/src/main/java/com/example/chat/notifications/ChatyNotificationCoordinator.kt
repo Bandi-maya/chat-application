@@ -130,6 +130,16 @@ class ChatyNotificationCoordinator(
         lane.cancelMessageFor(api.authSnapshot(), conversationId)
     }
 
+    /** Content-free watched-read alert; the existing lane revalidates scope at OS dispatch. */
+    fun showReadAlert(accountKey: String, roomId: String) {
+        val owner = api.authSnapshot()
+        val actualKey = com.example.chat.core.messages.LocalMessageOverridePolicy.accountKey(owner.tenantId, owner.baseUrl, owner.userId.orEmpty())
+        if (actualKey != accountKey || !prefs.notification.enableGlobalNotifications) return
+        val locked = isChatVaultLocked(roomId) || prefs.security.lockedConversationIds.contains(roomId) || prefs.security.isAppLockEnabled
+        val body = if (locked) "A watched message was read" else "${api.conversationTitle(roomId) ?: "Your contact"} read your message"
+        lane.postMessage(owner, roomId, "Chaty", body, System.currentTimeMillis(), null, null)
+    }
+
     private fun foreground() = ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
 
     private fun onMessage(message: ChatMessage, convoTitle: String?, convoMuted: Boolean) {
@@ -147,10 +157,10 @@ class ChatyNotificationCoordinator(
         val chatLocked = isChatVaultLocked(message.conversationId) ||
             prefs.security.lockedConversationIds.contains(message.conversationId)
         val detail = ChatyNotificationPolicy.detail(chatLocked, prefs.security.isAppLockEnabled)
-        val raw = message.text.ifBlank { if (message.type == MessageType.image) "Photo" else "Attachment" }
+        val raw = com.example.chat.core.messages.ViewOnceTextPolicy.preview(message).ifBlank { if (message.type == MessageType.image) "Photo" else "Attachment" }
         val plan = ChatyNotificationPolicy.plan(detail, convoTitle, raw) { channelManager.formatPrivacyBody(convoTitle ?: "Chaty", it) }
         val id = message.conversationId
-        val reply = if (plan.offerReply) registry.register(account, ChatyNotificationPolicy.ACTION_REPLY, conversationId = id) else null
+        val reply = if (plan.offerReply && !com.example.chat.core.messages.ViewOnceTextPolicy.restricted(message.metadata)) registry.register(account, ChatyNotificationPolicy.ACTION_REPLY, conversationId = id) else null
         val dismiss = if (plan.offerDismiss) registry.register(account, ChatyNotificationPolicy.ACTION_DISMISS, conversationId = id) else null
         // Build-outside rule: gates/prefs/nonces resolved here holding NO auth lock; stale-scope text lives
         // only in a dropped record. Admission is re-checked on the lane thread at execution time - a stale

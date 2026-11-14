@@ -36,7 +36,7 @@ class CallActionReceiver : BroadcastReceiver() {
         }
         if (intent.action != ChatyNotifications.ACTION_DECLINE_CALL) return
         val callId = intent.getStringExtra(ChatyNotifications.EXTRA_CALL_ID).orEmpty()
-        val callerId = intent.getStringExtra(ChatyNotifications.EXTRA_CALLER_ID).orEmpty()
+        val owner = ChatyNotifications.incomingActionOwner(intent) ?: return
         ChatyNotifications.cancelIncomingCall(context, callId)
         ChatyNotifications.forgetCall(callId)
         declineProbe?.let { it(); return }
@@ -44,16 +44,14 @@ class CallActionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         ServiceLocator.appScope.launch {
             try {
+                if (ServiceLocator.apiBackend.authSnapshot() !== owner) return@launch
                 val calls = ServiceLocator.callSignaling
                 val session = calls.currentSession
                 if (session != null && session.callId == callId && session.state == CallSessionState.incoming) {
-                    calls.declineCall()
-                } else if (callerId.isNotEmpty() && ServiceLocator.apiBackend.isAuthenticated) {
-                    // The offer has not reached this device yet: decline straight to the caller.
-                    ServiceLocator.apiBackend.sendCallSignal(
-                        callerId, mapOf("signal_type" to "decline", "call_id" to callId),
-                    )
+                    calls.declineCall(expectedCallId = callId)
                 }
+                // Never send a decline via whichever account happens to be active.
+                // An offer not yet authenticated must be fetched by its own account first.
             } catch (e: Exception) {
                 android.util.Log.w("CallActionReceiver", "decline failed: $e")
             } finally {

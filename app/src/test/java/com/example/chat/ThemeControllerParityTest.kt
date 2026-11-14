@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -177,6 +178,34 @@ class ThemeControllerParityTest {
         assertNotEquals("rose", c.getThemeForChat("chat2").id)
         c.setChatTheme("chat1", null)
         assertEquals(c.globalTheme, c.getThemeForChat("chat1"))
+    }
+
+    @Test
+    fun accountScopedChatThemesDoNotChangeGlobalOrOtherChatsAndPersist() {
+        val store = FakeStore()
+        val c = controller(store)
+        c.initSync()
+        val policy = com.example.chat.core.messages.LocalMessageOverridePolicy
+        val a = policy.accountKey("tenant-a", "https://chat.test", "user-a")!!
+        val b = policy.accountKey("tenant-a", "https://chat.test", "user-b")!!
+        val keyA = policy.key(a, "same-room", "chat-theme")!!
+        val keyB = policy.key(b, "same-room", "chat-theme")!!
+        val otherChat = policy.key(a, "other-room", "chat-theme")!!
+        val global = c.globalTheme
+        assertNotEquals(keyA, keyB)
+        assertNull(c.getChatThemeOverride(keyA))
+        c.setChatTheme(keyA, ThemePresets.rose)
+        assertEquals("rose", c.getChatThemeOverride(keyA)?.id)
+        assertNull(c.getChatThemeOverride(keyB))
+        assertNull(c.getChatThemeOverride(otherChat))
+        assertEquals(global, c.globalTheme)
+        val restored = controller(FakeStore(store.saves.last()))
+        restored.initSync()
+        assertEquals("rose", restored.getChatThemeOverride(keyA)?.id)
+        assertNull(restored.getChatThemeOverride(keyB))
+        restored.setChatTheme(keyA, null)
+        assertNull(restored.getChatThemeOverride(keyA))
+        assertEquals(restored.globalTheme, restored.getThemeForChat(keyA))
     }
 
     @Test

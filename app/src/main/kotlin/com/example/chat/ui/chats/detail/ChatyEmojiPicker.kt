@@ -100,6 +100,9 @@ fun ChatyEmojiPickerSheet(
     backgroundColor: Color? = null,
     onStickerSend: ((com.example.chat.core.stickers.StickerAsset) -> Unit)? = null,
     stickerSessionKey: Any? = null,
+    /** G1: Own-server GIF setup draft. External requests and sends are disabled. */
+    gifApiKey: String = "",
+    onGifSend: ((com.example.chat.core.gif.GifResult) -> Unit)? = null,
 ) {
     // Dart ChatyEmojiPicker: backgroundColor ?? surface, headerColor as the header
     // container color (null = none), headerIconsColor ?? onSurface for the header
@@ -121,6 +124,7 @@ fun ChatyEmojiPickerSheet(
         )
     }
     var stickerTab by remember { mutableStateOf(false) }
+    var gifTab by remember { mutableStateOf(false) }
     var newsSection by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchOpen by remember { mutableStateOf(false) }
@@ -223,11 +227,20 @@ fun ChatyEmojiPickerSheet(
 
         if (composerMode && !reactionMode) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                TextButton(onClick = { stickerTab = false }) { Text(if (!stickerTab) "EMOJI •" else "EMOJI") }
-                TextButton(onClick = { stickerTab = true }) { Text(if (stickerTab) "STICKER •" else "STICKER") }
+                TextButton(onClick = { stickerTab = false; gifTab = false }) { Text(if (!stickerTab && !gifTab) "EMOJI •" else "EMOJI") }
+                TextButton(onClick = { stickerTab = true; gifTab = false }) { Text(if (stickerTab && !gifTab) "STICKER •" else "STICKER") }
+                TextButton(onClick = { stickerTab = false; gifTab = true }) { Text(if (gifTab) "GIF •" else "GIF") }
             }
         }
-        if (stickerTab && composerMode && !reactionMode) {
+        if (gifTab && composerMode && !reactionMode) {
+            GifPicker(
+                theme = theme,
+                apiKey = gifApiKey,
+                onConfirmSend = onGifSend,
+                modifier = Modifier.weight(1f),
+                unavailableReason = if (onGifSend == null) "GIF sending is not connected yet. Preview only." else null,
+            )
+        } else if (stickerTab && composerMode && !reactionMode) {
             androidx.compose.runtime.key(stickerSessionKey) {
             ClusteredStickerPicker(com.example.chat.core.stickers.BundledStickerPacks.packs, theme,
                 onConfirmSend = onStickerSend,

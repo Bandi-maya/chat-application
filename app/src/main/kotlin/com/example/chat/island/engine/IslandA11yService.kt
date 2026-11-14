@@ -43,22 +43,26 @@ class IslandA11yService : AccessibilityService() {
         IslandController.attach(applicationContext)
         binding = Binding()
         connected.value = true
+        // The accessibility host is live; a second foreground keep-alive/overlay host is redundant.
+        stopService(Intent(this, IslandService::class.java))
     }
 
-    private fun releaseWindow() {
+    private fun releaseWindow(allowFallback: Boolean = false) {
+        val wasConnected = connected.value
         val previous = binding
         binding = null
         previous?.close()
         connected.value = false
+        if (allowFallback && wasConnected) com.example.chat.island.core.IslandControl.ensureHost(applicationContext)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        releaseWindow()
+        releaseWindow(allowFallback = true)
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
-        releaseWindow()
+        releaseWindow(allowFallback = true)
         super.onDestroy()
     }
 

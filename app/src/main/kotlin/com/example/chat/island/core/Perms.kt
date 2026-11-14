@@ -1,5 +1,6 @@
 package com.example.chat.island.core
 
+import com.example.chat.island.engine.IslandController
 import android.Manifest
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
@@ -21,7 +22,6 @@ object Perms {
         Overlay(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, true),
         Accessibility(Settings.ACTION_ACCESSIBILITY_SETTINGS),
         Notifications(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),
-        BatteryRequest(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, true),
         BatteryList(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
         App(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, true)
     }
@@ -81,26 +81,37 @@ object Perms {
     fun openListenerSettings(c: Context) { open(c, Destination.Notifications) }
     fun openAppInfo(c: Context) { open(c, Destination.App) }
     fun openBatterySettings(c: Context) {
-        if (!open(c, Destination.BatteryRequest)) open(c, Destination.BatteryList)
+        open(c, Destination.BatteryList)
     }
 }
 
 object IslandControl {
     private fun record(context: Context, enabled: Boolean) {
-        IslandSettings.enabled.value = enabled
-        IslandSettings.save()
         context.getSharedPreferences("chaty_dynamic_island", Context.MODE_PRIVATE).edit().run {
             putBoolean("enabled", enabled)
             apply()
         }
+        // The accessibility collector must see the new master value before its enabled emission.
+        IslandSettings.enabled.value = enabled
+        IslandSettings.save()
     }
 
     fun start(c: Context) {
         record(c, true)
         if (!Perms.overlay(c) && !Perms.accessibility(c)) {
-            Perms.openAccessibilitySettings(c)
+            return // Only the UI may open settings, after its permission disclosure.
+        }
+        ensureHost(c)
+    }
+
+    /** Accessibility already hosts the overlay. Keep a foreground service only for the fallback host. */
+    fun ensureHost(c: Context) {
+        if (!IslandSettings.enabled.value || !com.example.chat.DynamicIslandNotificationListener.isEnabled(c)) return
+        if (IslandA11yService.connected.value) {
+            c.stopService(Intent(c, IslandService::class.java))
             return
         }
+        if (!Perms.overlay(c)) return
         try {
             ContextCompat.startForegroundService(c, Intent(c, IslandService::class.java))
         } catch (_: Exception) {
@@ -110,6 +121,13 @@ object IslandControl {
 
     fun stop(c: Context) {
         record(c, false)
+        // Clear even if the notification listener is not currently bound.
+        IslandController.clearAll()
+        IslandController.clearCall()
+        IslandController.clearLive()
+        IslandController.clearDownload()
+        IslandController.dropClockTimerSilently()
+        IslandController.setMedia(null)
         c.stopService(Intent(c, IslandService::class.java))
     }
 }

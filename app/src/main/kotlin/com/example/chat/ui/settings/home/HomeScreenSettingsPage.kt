@@ -181,6 +181,32 @@ fun HomeScreenSettingsPage(
             }
             Spacer(Modifier.height(16.dp))
             card {
+                sectionDivider("Home menu actions")
+                switchRow(Icons.Outlined.Group, "New group / chat / call", "Show creation actions in the home menu", home.menuShowNewActions) {
+                    preferences.updateHome(preferences.home.copy(menuShowNewActions = it), logTitle = "Home menu new actions")
+                }
+                switchRow(Icons.Outlined.ViewAgenda, "Starred / archived messages", "Show saved-chat shortcuts", home.menuShowSavedChats) {
+                    preferences.updateHome(preferences.home.copy(menuShowSavedChats = it), logTitle = "Home menu saved chats")
+                }
+                switchRow(Icons.Outlined.ChatBubbleOutline, "Mark all as read", "Show the bulk read action", home.menuShowMarkRead) {
+                    preferences.updateHome(preferences.home.copy(menuShowMarkRead = it), logTitle = "Home menu mark read")
+                }
+                switchRow(Icons.Outlined.ChatBubbleOutline, "Share Chaty", "Show the app sharing shortcut", home.menuShowShare) {
+                    preferences.updateHome(preferences.home.copy(menuShowShare = it), logTitle = "Home menu share")
+                }
+                switchRow(Icons.Outlined.Call, "Message a number", "Off by default; enable to show in the home menu", home.menuShowMessageNumber) {
+                    preferences.updateHome(preferences.home.copy(menuShowMessageNumber = it), logTitle = "Home menu message number")
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Mass message", color = secondaryText, fontWeight = FontWeight.SemiBold)
+                        Text("Unavailable until a real action is connected", color = secondaryText, fontSize = 12.sp)
+                    }
+                    Switch(checked = false, onCheckedChange = null, enabled = false)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            card {
                 sectionDivider("Mods")
                 switchRow(Icons.Rounded.HorizontalRule, "Hide Chats Divider", "Removes grey line between chats in Main Screen", home.hideChatsDivider) {
                     preferences.updateHome(preferences.home.copy(hideChatsDivider = it), logTitle = "Hide Chats Divider")

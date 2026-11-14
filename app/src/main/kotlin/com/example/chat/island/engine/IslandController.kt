@@ -35,11 +35,17 @@ sealed interface IslandMode {
     data class Device(val name: String, val headphones: Boolean) : IslandMode
     data class Toggle(val kind: ToggleKind, val on: Boolean) : IslandMode
     data class Call(val name: String, val incoming: Boolean, val since: Long,
-        val canAnswer: Boolean = true, val canDecline: Boolean = true) : IslandMode
+        val canAnswer: Boolean = false, val canDecline: Boolean = false,
+        val canMute: Boolean = false, val canSpeaker: Boolean = false) : IslandMode
     data class Timer(val remainingSec: Int, val totalSec: Int, val external: Boolean = false) : IslandMode
     data class Media(val title: String, val artist: String, val playing: Boolean,
         val art: Bitmap? = null, val accent: Int? = null, val durationMs: Long = 0,
-        val positionMs: Long = 0, val updatedAt: Long = 0, val speed: Float = 1f) : IslandMode
+        val positionMs: Long = 0, val updatedAt: Long = 0, val speed: Float = 1f,
+        // Source player identity, only ever populated from a live MediaController.
+        // Previews and demos leave both empty so the card never claims a real session.
+        val appPackage: String? = null, val hasSession: Boolean = false,
+        val canPlayPause: Boolean = false, val canPrevious: Boolean = false,
+        val canNext: Boolean = false, val canSeek: Boolean = false) : IslandMode
     data class Live(val kind: LiveKind, val app: String, val title: String, val text: String,
         val progress: Int = -1) : IslandMode
 }
@@ -129,6 +135,8 @@ object IslandController {
     private var callId: String? = null
     private var answer: PendingIntent? = null
     private var decline: PendingIntent? = null
+    private var callMute: PendingIntent? = null
+    private var callSpeaker: PendingIntent? = null
     private var countdown: IslandMode.Timer? = null
     private var activity: Pair<String, IslandMode.Live>? = null
     private var activitySource = Source()
@@ -219,10 +227,14 @@ object IslandController {
     }
 
     fun setPrivacySuppressed(suppressed: Boolean) {
+        if (privacy.value == suppressed) return
         privacy.value = suppressed
         if (suppressed) {
             editor.value = false
+            clock?.let { runClock(it) } // A single deadline wait replaces second-by-second rendering.
             setLevel(IslandLevel.Compact)
+        } else {
+            clock?.let { runClock(it) } // Recompute from the original deadline on screen/user-present.
         }
         render()
     }
@@ -445,13 +457,19 @@ object IslandController {
     }
 
     fun setCall(name: String, incoming: Boolean, answer: PendingIntent?, decline: PendingIntent?,
-        key: String? = null, canAnswer: Boolean = answer != null) {
+        key: String? = null, canAnswer: Boolean = answer != null,
+        connectedSince: Long? = null, mute: PendingIntent? = null, speaker: PendingIntent? = null) {
         val old = call
         this.answer = answer
         this.decline = decline
+        this.callMute = mute
+        this.callSpeaker = speaker
         if (key != null) callId = key
-        val start = old?.takeIf { it.incoming == incoming }?.since ?: SystemClock.elapsedRealtime()
-        call = IslandMode.Call(name, incoming, start, canAnswer, decline != null)
+        // External notifications must provide an actual running chronometer.
+        // Non-incoming alone can mean outgoing ringing, never start a timer from it.
+        val start = connectedSince?.takeIf { !incoming && it > 0L } ?: 0L
+        call = IslandMode.Call(name, incoming, start, canAnswer && answer != null, decline != null,
+            mute != null, speaker != null)
         val held = notice
         if (held?.persistent == true) waiting.offer(held, park = true)
         waiting.discardTransients()
@@ -472,6 +490,8 @@ object IslandController {
         callId = null
         answer = null
         decline = null
+        callMute = null
+        callSpeaker = null
         setLevel(IslandLevel.Compact)
         val next = waiting.take()
         queueChanged()
@@ -479,11 +499,14 @@ object IslandController {
     }
     fun answerCall() { send(answer) }
     fun declineCall() { send(decline) }
+    fun toggleCallMute() { send(callMute) }
+    fun toggleCallSpeaker() { send(callSpeaker) }
 
     fun markRead() {
-        send(notice?.readAction)
-        editor.value = false
-        finishNotice()
+        if (send(notice?.readAction)) {
+            editor.value = false
+            finishNotice()
+        }
     }
     fun startReply() {
         if (notice?.replyAction == null || privacy.value) return
@@ -520,6 +543,19 @@ object IslandController {
     private fun runClock(value: Clock) {
         cancel("timer")
         clock = value
+        if (privacy.value) {
+            // No polling and no wakelock. Android may delay this while asleep.
+            tasks["timer"] = dispatcher.launch {
+                delay((value.deadline - SystemClock.elapsedRealtime()).coerceAtLeast(1))
+                if (clock === value) {
+                    clock = null
+                    countdown = null
+                    render()
+                    if (!value.heartbeat) flash(IslandMode.Notification("Timer", "Time's up!", "Timer complete"))
+                }
+            }
+            return
+        }
         tasks["timer"] = dispatcher.launch {
             while (clock === value) {
                 val now = SystemClock.elapsedRealtime()

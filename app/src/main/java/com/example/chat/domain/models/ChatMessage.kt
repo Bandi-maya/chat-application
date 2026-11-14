@@ -64,6 +64,8 @@ data class ChatMessage(
     val isDeletedForEveryone: Boolean = false,
     val isDeletedForMe: Boolean = false,
     val isRevokedBySender: Boolean = false,
+    val readAt: Instant? = null,
+    val recipientReceipts: Map<String, com.example.chat.data.api.MessageReceiptTimes> = emptyMap(),
 ) {
     companion object {
         /** Exact port of ChatMessage.fromApi (lib/domain/models/chat_message.dart). */
@@ -172,6 +174,14 @@ data class ChatMessage(
                 }
             }
 
+            if (json["view_once"] == true || json["view_once"] == "true") {
+                attachmentMetadata["view_once"] = true
+                json["view_once_state"]?.let { attachmentMetadata["view_once_state"] = it }
+                if (json["encrypted"] == true) attachmentMetadata["encrypted"] = true
+            }
+            if (com.example.chat.core.messages.ViewOnceTextPolicy.restricted(attachmentMetadata) && parsedType == MessageType.text) {
+                effectiveText = com.example.chat.core.messages.ViewOnceTextPolicy.PLACEHOLDER
+            }
             return ChatMessage(
                 id = json["uid"]?.toString() ?: json["id"]?.toString() ?: "",
                 conversationId = json["room_id"]?.toString() ?: "",
@@ -180,16 +190,25 @@ data class ChatMessage(
                 text = effectiveText,
                 attachment = parsedAttachment,
                 createdAt = parseIsoOrNow(json["created_at"]?.toString()),
+                editedAt = json["edited_at"]?.toString()?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() },
+                isDeletedForEveryone = json["is_deleted"] == true || json["deleted_at"] != null,
+                reactions = (json["reactions"] as? List<*>)?.mapNotNull { item ->
+                    val row = item as? Map<*, *> ?: return@mapNotNull null
+                    val emoji = row["emoji"] as? String ?: return@mapNotNull null
+                    val ids = (row["user_ids"] as? List<*>)?.filterIsInstance<String>()?.distinct() ?: return@mapNotNull null
+                    MessageReaction(emoji, ids)
+                }.orEmpty(),
+                readAt = (json["read_at"] as? String)?.let { runCatching { Instant.parse(it) }.getOrNull() },
                 // Ticks for messages the caller sent: is_read = blue, is_delivered = two grey ticks,
                 // otherwise the server has it but the other phone does not yet (one tick).
-                // Older servers send no is_delivered: keep the previous "delivered" default.
+                // Older servers without delivery proof must not fabricate device delivery.
                 deliveryState = when {
                     json["is_read"] == true || json["is_read"]?.toString() == "true" -> DeliveryState.read
-                    !json.containsKey("is_delivered") -> DeliveryState.delivered
+                    !json.containsKey("is_delivered") -> DeliveryState.sent
                     json["is_delivered"] == true || json["is_delivered"]?.toString() == "true" -> DeliveryState.delivered
                     else -> DeliveryState.sent
                 },
-                metadata = buildMap { if (senderName.isNotEmpty()) put("sender_name", senderName); putAll(attachmentMetadata) },
+                metadata = buildMap { if (senderName.isNotEmpty()) put("sender_name", senderName); putAll(attachmentMetadata); json["updated_at"]?.let { put("reaction_updated_at", it.toString()) } },
             )
         }
     }

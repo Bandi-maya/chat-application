@@ -104,6 +104,13 @@ class ChatyPreferencesController(
 
     private val listeners = mutableListOf<() -> Unit>()
 
+    private var lastLocalMutation: Long = 0L
+    private val localChoiceFields = mutableMapOf<String, Set<String>>()
+    private var choiceBaseline: Map<String, Any?> = emptyMap()
+    private val preferenceGroups = setOf(PreferenceKeys.privacy, PreferenceKeys.security, PreferenceKeys.home,
+        PreferenceKeys.conversation, PreferenceKeys.notification, PreferenceKeys.automation, PreferenceKeys.effects,
+        PreferenceKeys.universal, PreferenceKeys.status, PreferenceKeys.toasts, PreferenceKeys.gbFeatures)
+
     private val authListener: (String?) -> Unit = { newUserId -> handleAuthStateChange(newUserId) }
 
     init {
@@ -204,7 +211,23 @@ class ChatyPreferencesController(
         if (gen != loadGeneration.get()) return
 
         val migration = PreferencesMigrator.migrate(raw)
+        // Restore persisted time, not process startup time. Starting the app is not a user edit.
+        lastLocalMutation = (raw["local_updated_at"] as? Number)?.toLong()?.coerceAtLeast(0L) ?: 0L
         if (raw.isNotEmpty()) applyMap(migration.data)
+        localChoiceFields.clear()
+        val markers = raw[LocalPreferenceChoicePolicy.KEY] as? Map<*, *>
+        if (markers != null) markers.forEach { (group, fields) ->
+            if (group is String && group in preferenceGroups + PreferenceKeys.favorites && fields is List<*>)
+                localChoiceFields[group] = fields.filterIsInstance<String>().toSet()
+        } else if (raw.isNotEmpty()) {
+            // Older local blobs cannot distinguish an explicit choice from a saved default.
+            // Preserve existing visible values rather than silently replacing them during this upgrade.
+            preferenceGroups.forEach { group ->
+                (raw[group] as? Map<*, *>)?.keys?.filterIsInstance<String>()?.toSet()?.let { localChoiceFields[group] = it }
+            }
+            if (raw.containsKey(PreferenceKeys.favorites)) localChoiceFields[PreferenceKeys.favorites] = setOf("*")
+        }
+        choiceBaseline = snapshot()
         if (migration.migratedSecrets) migrateLegacySecrets(migration, gen)
         if (gen != loadGeneration.get()) return
 
@@ -283,6 +306,8 @@ class ChatyPreferencesController(
     }
 
     private fun resetInMemory() {
+        localChoiceFields.clear(); choiceBaseline = emptyMap(); lastLocalMutation = 0L
+        universal = UniversalPreferences(); status = StatusPreferences(); toasts = NotificationToastPreferences()
         privacy = PrivacyPreferences()
         security = SecurityPreferences()
         home = HomePreferences()
@@ -346,7 +371,7 @@ class ChatyPreferencesController(
             }
             mutable[visibilityHealMarker] = true
             gbFeatures = mutable
-            if (healedAny) persist()
+            if (healedAny) persist(userInitiated = false)
         }
         val favorites = data[PreferenceKeys.favorites]
         if (favorites is List<*>) {
@@ -355,11 +380,11 @@ class ChatyPreferencesController(
         }
     }
 
-    private var lastLocalMutation: Long = now()
 
     fun snapshot(): Map<String, Any?> = mapOf(
         PreferenceKeys.schemaVersion to PreferenceKeys.currentSchemaVersion,
         "local_updated_at" to lastLocalMutation,
+        LocalPreferenceChoicePolicy.KEY to localChoiceFields.mapValues { it.value.toList() },
         PreferenceKeys.privacy to privacy.toMap(),
         PreferenceKeys.security to security.toMap(),
         PreferenceKeys.home to home.toMap(),
@@ -375,11 +400,20 @@ class ChatyPreferencesController(
     )
 
     /** Re-saves the current settings (used by an inline Retry action). */
-    fun retrySave() { if (preferencesReady) persist() }
+    fun retrySave() { if (preferencesReady) persist(userInitiated = false) }
 
-    private fun persist() {
-        lastLocalMutation = now()
+    private fun persist(userInitiated: Boolean = true, explicitGroup: String? = null) {
+        if (userInitiated) {
+            val current = snapshot()
+            val changes = LocalPreferenceChoicePolicy.captureFields(choiceBaseline, current, preferenceGroups)
+            changes.forEach { (group, fields) -> localChoiceFields[group] = localChoiceFields[group].orEmpty() + fields }
+            if (explicitGroup != null && changes[explicitGroup].isNullOrEmpty())
+                localChoiceFields[explicitGroup] = localChoiceFields[explicitGroup].orEmpty() + "*"
+            if (choiceBaseline[PreferenceKeys.favorites] != current[PreferenceKeys.favorites]) localChoiceFields[PreferenceKeys.favorites] = setOf("*")
+        }
+        if (userInitiated) lastLocalMutation = now()
         val snap = snapshot()
+        choiceBaseline = snap
         // Capture the account at call time (not when the coroutine runs) and order
         // writes so an older snapshot can never overwrite a newer one.
         val uid = scopeUserId
@@ -393,7 +427,7 @@ class ChatyPreferencesController(
         if (remote != null) {
             remoteSyncDebounce = scope.launch {
                 delay(remoteSyncDebounceMs)
-                pushRemote(snap)
+                if (scopeUserId == uid && auth.currentUserId() == uid) pushRemote(snap, uid)
             }
         }
     }
@@ -401,8 +435,12 @@ class ChatyPreferencesController(
     suspend fun syncFromRemote() {
         val remoteStore = remote ?: return
         val userId = auth.currentUserId() ?: return
+        val generation = loadGeneration.get()
+        fun current() = generation == loadGeneration.get() && scopeUserId == userId && auth.currentUserId() == userId
+        if (!current()) return
         try {
             val row = remoteStore.fetch(userId)
+            if (!current()) return
             if (row == null || row.settings !is Map<*, *>) {
                 pushRemote(snapshot())
                 return
@@ -425,8 +463,10 @@ class ChatyPreferencesController(
 
             val needsPurge = PreferencesMigrator.rawHasLegacySecrets(remoteRaw)
             val migration = PreferencesMigrator.migrate(remoteRaw)
-            applyMap(migration.data)
+            applyMap(LocalPreferenceChoicePolicy.merge(migration.data, snapshot(), localChoiceFields))
+            choiceBaseline = snapshot()
             if (migration.migratedSecrets) migrateLegacySecrets(migration)
+            if (!current()) return
             run {
                 // Same enqueue-time capture as persist(); tracker ignores it if the account changed.
                 val gen = saveTracker.currentGeneration()
@@ -434,6 +474,7 @@ class ChatyPreferencesController(
                 val wrote = localWriter.write(localWriter.nextSeq(), uid, snapshot())
                 saveTracker.onWriteFinished(gen, uid, wrote, localWriter.hasUnsavedFailure(uid))
             }
+            if (!current()) return
             // Overwrite any cloud-stored plaintext or stale-schema blob with
             // the clean one.
             if (needsPurge || migration.fromVersion < PreferenceKeys.currentSchemaVersion) {
@@ -446,11 +487,12 @@ class ChatyPreferencesController(
         }
     }
 
-    private suspend fun pushRemote(snap: Map<String, Any?>) {
+    private suspend fun pushRemote(snap: Map<String, Any?>, expectedUserId: String? = scopeUserId) {
         val remoteStore = remote ?: return
-        val userId = auth.currentUserId() ?: return
+        val userId = expectedUserId ?: return
+        if (auth.currentUserId() != userId || scopeUserId != userId) return
         try {
-            remoteStore.push(userId, snap)
+            remoteStore.push(userId, snap - LocalPreferenceChoicePolicy.KEY)
         } catch (_: Exception) {
             // Keep the local copy; the next mutation retries the account sync.
         }
@@ -557,61 +599,61 @@ class ChatyPreferencesController(
     fun updatePrivacy(newPrefs: PrivacyPreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         privacy = newPrefs
         if (logTitle != null) logHistory("privacy", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.privacy); notifyListeners()
     }
 
     fun updateSecurity(newPrefs: SecurityPreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         security = newPrefs
         if (logTitle != null) logHistory("security", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.security); notifyListeners()
     }
 
     fun updateHome(newPrefs: HomePreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         home = newPrefs
         if (logTitle != null) logHistory("home", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.home); notifyListeners()
     }
 
     fun updateConversation(newPrefs: ConversationPreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         conversation = newPrefs
         if (logTitle != null) logHistory("conversation", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.conversation); notifyListeners()
     }
 
     fun updateNotification(newPrefs: NotificationPreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         notification = newPrefs
         if (logTitle != null) logHistory("notification", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.notification); notifyListeners()
     }
 
     fun updateAutomation(newPrefs: MessageAutomationPreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         automation = newPrefs
         if (logTitle != null) logHistory("automation", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.automation); notifyListeners()
     }
 
     fun updateUniversal(newPrefs: UniversalPreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         universal = newPrefs
         if (logTitle != null) logHistory("universal", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.universal); notifyListeners()
     }
 
     fun updateStatus(newPrefs: StatusPreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         status = newPrefs
         if (logTitle != null) logHistory("status", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.status); notifyListeners()
     }
 
     fun updateToasts(newPrefs: NotificationToastPreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         toasts = newPrefs
         if (logTitle != null) logHistory("toasts", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.toasts); notifyListeners()
     }
 
     fun updateEffects(newPrefs: NavigationEffectPreferences, logTitle: String? = null, prevVal: Any? = null, newVal: Any? = null) {
         effects = newPrefs
         if (logTitle != null) logHistory("effects", logTitle, prevVal, newVal)
-        persist(); notifyListeners()
+        persist(explicitGroup = PreferenceKeys.effects); notifyListeners()
     }
 
     // ── favorites ─────────────────────────────────────────────────────────

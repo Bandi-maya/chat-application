@@ -9,6 +9,13 @@ interface SnapshotCacheStore {
     suspend fun readJson(userId: String, scope: String): Any?
     suspend fun writeJson(userId: String, scope: String, value: Any?)
 
+    /** Strict variants for security-critical scopes (e.g. secure_channels):
+     *  storage/decrypt failures THROW instead of degrading to a cache miss or
+     *  a silently dropped write, so callers can fail closed. Defaults reject use unless the store explicitly implements the strict contract;
+     *  ordinary readJson/writeJson remain lenient for every other scope. */
+    suspend fun readJsonStrict(userId: String, scope: String): Any? = throw UnsupportedOperationException("Strict secure-settings reads are not supported by this store.")
+    suspend fun writeJsonStrict(userId: String, scope: String, value: Any?): Unit = throw UnsupportedOperationException("Strict secure-settings writes are not supported by this store.")
+
     /** Read-only listing of this account's stored snapshot scope names, for
      *  backup research. Default: none. Names may be filename-sanitised, so every
      *  returned scope MUST still be verified by readJson (which authenticates the

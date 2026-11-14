@@ -154,6 +154,24 @@ class EncryptedMultiAccountStore(
         }
     }
 
+    /** Strict quarantine contract (see OutboxStoreStrict): null ONLY when no
+     *  outbox was ever saved; a present-but-unreadable value throws instead
+     *  of silently reading as empty (which would drop holds on restart). */
+    override fun loadEncryptedOutboxJsonStrict(accountHash: String): String? = synchronized(lock) {
+        require(accountHash.isNotBlank()) { "accountHash must not be blank" }
+        OutboxStoreStrict.readStrict(securePrefs(), outboxKey(accountHash))
+    }
+
+    /** Strict quarantine contract: returns only after commit() reported the
+     *  write durable; a false result or exception propagates (the lenient
+     *  variant above swallows both and must not be used for holds). */
+    override fun saveEncryptedOutboxJsonStrict(accountHash: String, json: String?) {
+        synchronized(lock) {
+            require(accountHash.isNotBlank()) { "accountHash must not be blank" }
+            OutboxStoreStrict.writeStrict(securePrefs(), outboxKey(accountHash), json)
+        }
+    }
+
     override fun loadEncryptedDrafts(accountHash: String): Map<String, String> = synchronized(lock) {
         if (accountHash.isBlank()) return emptyMap()
         val raw = runCatching { securePrefs().getString(draftsKey(accountHash), null) }.getOrNull() ?: return emptyMap()

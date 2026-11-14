@@ -40,7 +40,20 @@ internal object ApiMessageDeliveryMerge {
      * so REST reloads (which may report `is_delivered=false` on the backend) never
      * downgrade an already-delivered or already-read message back to a single tick.
      */
-    fun preserveMonotonicDelivery(existing: ChatMessage?, incoming: ChatMessage): ChatMessage {
+    fun preserveMonotonicDelivery(existing: ChatMessage?, source: ChatMessage): ChatMessage {
+        val lifecycleSafe = if (existing != null && existing.id == source.id && existing.metadata["view_once_state"] == "consumed")
+            com.example.chat.core.messages.ViewOnceTextPolicy.redact(source.copy(metadata = source.metadata + mapOf("view_once" to true, "view_once_state" to "consumed")))
+        else source
+        fun version(message: ChatMessage): Instant? = message.metadata["reaction_updated_at"]?.toString()?.let {
+            runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull()
+        }
+        val previousReactionAt = existing?.let(::version)
+        val newReactionAt = version(lifecycleSafe)
+        val incoming = if (existing != null && (existing.metadata["reaction_pending_token"] != null ||
+            (previousReactionAt != null && (newReactionAt == null || previousReactionAt > newReactionAt)))) {
+            lifecycleSafe.copy(reactions = existing.reactions,
+                metadata = lifecycleSafe.metadata + existing.metadata.filterKeys { it == "reaction_updated_at" || it == "reaction_pending_token" || it == "reaction_before" })
+        } else lifecycleSafe
         if (existing != null &&
             existing.id == incoming.id &&
             existing.deliveryState.isConfirmedServerState() &&

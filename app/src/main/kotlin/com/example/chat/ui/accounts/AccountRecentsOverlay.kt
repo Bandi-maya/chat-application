@@ -49,7 +49,7 @@ import com.example.chat.ui.theme.LocalAppColors
 
 /**
  * Recents-style full-screen account switcher, matching the approved preview:
- * dimmed backdrop, an avatar + name label above each card, large rounded
+ * opaque theme backdrop, an avatar + name label above each card, large rounded
  * mini-snapshot cards of each account's home screen in a horizontally
  * swipeable pager where the next card peeks in from the right edge, a trailing
  * "+ Add account" card, and a wide "Manage accounts" pill near the bottom that
@@ -95,11 +95,12 @@ fun AccountRecentsOverlay(
         val cardHeight = screenH * 0.597f
         val cardShape = RoundedCornerShape(16.dp)
 
-        // Dimmed backdrop; tap outside dismisses, like the classic overlay.
+        // Approved plain backdrop: never expose home content behind account cards.
+        // Outside taps still dismiss, like the classic overlay.
         Box(
             Modifier
                 .fillMaxSize()
-                .background(colors.foreground.copy(alpha = 0.55f))
+                .background(colors.background)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,

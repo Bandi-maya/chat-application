@@ -21,6 +21,6 @@ class MessageTicksTest {
     @Test fun `read - blue ticks`() =
         assertEquals(DeliveryState.read, msg("is_read" to true, "is_delivered" to true).deliveryState)
 
-    @Test fun `older server without is_delivered keeps the previous default`() =
-        assertEquals(DeliveryState.delivered, msg("is_read" to false).deliveryState)
+    @Test fun `older server without is_delivered does not fabricate delivery`() =
+        assertEquals(DeliveryState.sent, msg("is_read" to false).deliveryState)
 }

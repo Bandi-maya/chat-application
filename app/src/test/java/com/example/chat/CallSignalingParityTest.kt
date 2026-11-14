@@ -18,6 +18,7 @@ import com.example.chat.ui.calls.CallScreenTemplate
 import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -952,4 +953,55 @@ class CallSignalingParityTest {
         assertFalse(controller.mode == CallPresentationMode.systemPip)
         controller.dispose()
     }
+    @Test fun duplicateAnswerWhileDispositionSuspendsDoesNotCancelFirstAttempt() = runTest {
+        val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var dispositions = 0
+        val sent = mutableListOf<Map<String, Any?>>()
+        val service = CallSignalingService(scope = backgroundScope, currentUserId = { "me" },
+            signalSender = com.example.chat.data.services.CallSignalSender { _, data -> sent += data },
+            mediaFactory = { FakeMediaController() }, beforeIncomingDisposition = { _, _ ->
+                dispositions++; entered.complete(Unit); release.await()
+            })
+        service.handleRemoteSignal(mapOf("signal_type" to "offer", "call_id" to "incoming", "sender_id" to "peer", "sdp" to "offer"))
+        val first = kotlinx.coroutines.CoroutineScope(coroutineContext).async { service.acceptCall() }
+        entered.await()
+        try { service.acceptCall(); org.junit.Assert.fail("Second answer must be rejected") }
+        catch (_: IllegalStateException) { }
+        assertEquals(1, dispositions)
+        assertEquals(CallSessionState.incoming, service.currentSession?.state)
+        release.complete(Unit)
+        first.await()
+        assertEquals(1, sent.count { it["signal_type"] == "answer" })
+        assertEquals(CallSessionState.connecting, service.currentSession?.state)
+    }
+
+    @Test fun failedDurableAnswerDispositionDoesNotAcquireMediaOrSendAnswer() = runTest {
+        val media = FakeMediaController(); val sent = mutableListOf<Map<String, Any?>>()
+        val service = CallSignalingService(scope = backgroundScope, currentUserId = { "me" },
+            signalSender = com.example.chat.data.services.CallSignalSender { _, data -> sent += data },
+            mediaFactory = { media }, beforeIncomingDisposition = { _, _ -> throw java.io.IOException("save failed") })
+        service.handleRemoteSignal(mapOf("signal_type" to "offer", "call_id" to "incoming", "sender_id" to "peer", "sdp" to "offer"))
+        try { service.acceptCall(); org.junit.Assert.fail("Must not answer") } catch (_: java.io.IOException) { }
+        assertFalse(media.prepared)
+        assertFalse(sent.any { it["signal_type"] == "answer" })
+        assertEquals(CallSessionState.incoming, service.currentSession?.state)
+    }
+    @Test fun failedDurableDeclineDispositionDoesNotSendDecline() = runTest {
+        val sent = mutableListOf<Map<String, Any?>>()
+        val service = CallSignalingService(scope = backgroundScope, currentUserId = { "me" },
+            signalSender = com.example.chat.data.services.CallSignalSender { _, data -> sent += data },
+            mediaFactory = { FakeMediaController() }, beforeIncomingDisposition = { _, _ -> throw java.io.IOException("save failed") })
+        service.handleRemoteSignal(mapOf("signal_type" to "offer", "call_id" to "incoming", "sender_id" to "peer", "sdp" to "offer"))
+        try { service.declineCall(); org.junit.Assert.fail("Must not decline") } catch (_: java.io.IOException) { }
+        assertFalse(sent.any { it["signal_type"] == "decline" })
+        assertEquals(CallSessionState.incoming, service.currentSession?.state)
+    }
+
+    @Test fun orphanIceRestartCannotBecomeANewRingingCall() = runTest {
+        val service = newService(backgroundScope)
+        service.handleRemoteSignal(mapOf("signal_type" to "offer", "call_id" to "old-call", "sender_id" to "peer", "sdp" to "restart", "ice_restart" to true))
+        assertNull(service.currentSession)
+    }
+
 }

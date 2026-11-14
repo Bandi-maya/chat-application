@@ -43,6 +43,7 @@ fun SettingsSubHost(
     onBack: () -> Unit,
     onSwitch: (SettingsDestination) -> Unit = {},
 ): Boolean {
+    val screenAccountScope = androidx.compose.runtime.remember { ServiceLocator.apiBackend.authSnapshot() }
     val prefs = ServiceLocator.preferencesController
     val theme = ServiceLocator.themeController
     val context = LocalContext.current
@@ -53,12 +54,12 @@ fun SettingsSubHost(
             preferences = prefs, onBack = onBack,
             // Server privacy planes (research 5.2/5.3); fail-closed lambdas
             // let the screen keep its legacy local look on pre-plane servers.
-            loadPresencePrivacy = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.presencePrivacy() } },
-            savePresencePrivacy = { ls, ol, ex -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.putPresencePrivacy(ls ?: "everyone", ol ?: "same_as_last_seen", ex) } },
-            loadCallPolicy = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().callPolicy() } },
-            saveCallPolicy = { policy, ex -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().putCallPolicy(policy, ex) } },
-            loadBlocked = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().blocks() } },
-            unblockUser = { id -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane().unblock(id) } },
+            loadPresencePrivacy = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.presencePrivacy(screenAccountScope) } },
+            savePresencePrivacy = { ls, ol, ex -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.putPresencePrivacy(ls ?: "everyone", ol ?: "same_as_last_seen", ex, screenAccountScope) } },
+            loadCallPolicy = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane(screenAccountScope).callPolicy() } },
+            saveCallPolicy = { policy, ex -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane(screenAccountScope).putCallPolicy(policy, ex) } },
+            loadBlocked = { withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane(screenAccountScope).blocks() } },
+            unblockUser = { id -> withContext(Dispatchers.IO) { ServiceLocator.apiBackend.contactsPlane(screenAccountScope).unblock(id) } },
         )
         SettingsDestination.Effects -> NavigationEffectsScreen(preferences = prefs, onBack = onBack)
         // Dart settings_root_screen '/settings/notifications' => NotificationSettingsPage (the toast-only screen is not

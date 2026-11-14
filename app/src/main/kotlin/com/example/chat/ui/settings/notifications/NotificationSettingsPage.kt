@@ -249,7 +249,7 @@ fun NotificationSettingsPage(
         AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { result.complete(false) },
             title = { Text(if (na) "Allow notification access" else "Allow display over other apps") },
-            text = { Text(if (na) "Android lets Chaty read notification content only after you explicitly enable Chaty Dynamic Island in Notification access settings. This is required to show notifications from other apps." else "Android requires display-over-other-apps access so the island can float above your current app. Chaty only draws the temporary notification pill.") },
+            text = { Text(if (na) "Optional notification access lets Chaty read other apps' notification text and actions and media-session information for the cross-app island and perform actions you choose. Ordinary messaging still works without it. Turn the island off in Chaty; revoke special access in Android Settings." else "Optional overlay access lets the island float above other apps. The accessibility host is an alternative. Ordinary messaging still works without either. Turn the island off in Chaty; revoke special access in Android Settings.") },
             dismissButton = { TextButton(onClick = { result.complete(false) }) { Text("Not now") } },
             confirmButton = { Button(onClick = { result.complete(true) }) { Text("Open Settings") } },
         )

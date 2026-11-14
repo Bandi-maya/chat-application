@@ -31,9 +31,8 @@
     <!-- Android 8-11: Bluetooth connect event + device name need the old BLUETOOTH permission -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <!-- Lets the island Apps tab list apps that have no launcher icon, so they can be blocked too -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Battery exemption is user-controlled through ordinary Android Settings; no direct exemption request. -->
+    <!-- Only launcher-visible packages are listed. No broad installed-app inventory permission. -->
 
     <!-- Launcher apps must be visible to list apps and open media apps (Android 11+) -->
     <queries>

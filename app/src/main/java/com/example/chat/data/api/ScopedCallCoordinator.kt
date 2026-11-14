@@ -12,6 +12,8 @@ class ScopedCallCoordinator(
     private val cancelRequests: () -> Unit,
     private val deliver: (ApiAccountScope, Map<String, Any?>) -> Unit,
     private val clock: () -> Long,
+    private val legacyAllowed: (ApiAccountScope) -> Boolean = { true },
+    private val inboxWake: (ApiAccountScope) -> Unit = {},
 ) {
     private val stateLock = Any()
     private var account: ApiAccountScope? = null
@@ -36,12 +38,13 @@ class ScopedCallCoordinator(
     private fun prepare(expected: ApiAccountScope): Pair<ApiCallSignalClient, CallSignalScope>? = synchronized(stateLock) {
         if (account !== expected || expected.userId.isNullOrBlank() || expected.token.isNullOrBlank()) return@synchronized null
         if (client == null) {
-            requestScope = CallSignalScope(expected.userId!!, expected.baseUrl, expected.token!!, expected.generation)
+            requestScope = CallSignalScope(expected.userId!!, expected.baseUrl, expected.token!!, expected.generation, expected.tenantId)
             client = clientFor(expected, requestScope!!)
         }
         client!! to requestScope!!
     }
     fun socketSignal(expected: ApiAccountScope, signal: Map<String, Any?>) {
+        if (!legacyAllowed(expected)) { inboxWake(expected); return }
         guarded(expected) {
             synchronized(stateLock) {
                 if (account === expected && dedup.accept(expected.generation, signal, clock())) deliver(expected, signal)
@@ -64,8 +67,8 @@ class ScopedCallCoordinator(
      *  ring when socket is down"): the app may be backgrounded when FCM wakes
      *  it, so this bypasses the foreground gate and the backoff clock. Shares
      *  the same single-flight slot and dedup as the foreground cadence. */
-    fun pollNow(): Job? {
-        val expected = current()
+    fun pollNow(expected: ApiAccountScope = current()): Job? {
+        if (!legacyAllowed(expected)) { inboxWake(expected); return null }
         var active: Job? = null
         guarded(expected) {
             val prepared = prepare(expected) ?: return@guarded
@@ -100,6 +103,7 @@ class ScopedCallCoordinator(
     /** Invoke from existing cadence; never creates another loop. */
     fun tick() {
         val expected = current()
+        if (!legacyAllowed(expected)) { inboxWake(expected); return }
         guarded(expected) {
             val prepared = prepare(expected) ?: return@guarded
             synchronized(stateLock) {

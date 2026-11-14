@@ -78,6 +78,9 @@ class ApiRealtimeClient(
         /** new_message: payload['data'] ?? payload['message'] parsed with
          *  ChatMessage.fromApi. */
         fun onNewMessage(message: ChatMessage) {}
+        /** Content-free invalidation, captured owner is mandatory for later reconciliation. */
+        fun onReactionAggregate(data: Map<String, Any?>, capturedScope: Any?) {}
+        fun onMessageLifecycleChanged(roomId: String, messageId: String?, consumed: Boolean, capturedScope: Any?) {}
         /** message_edited: uid ?? id, room_id, content, editedAt =
          *  DateTime.tryParse(updated_at) ?? DateTime.now(). */
         fun onMessageEdited(roomId: String, messageId: String, newContent: String, editedAt: Instant) {}
@@ -103,6 +106,8 @@ class ApiRealtimeClient(
         fun onScopedCallSignal(data: Map<String, Any?>, capturedScope: Any?) { onCallSignal(data) }
         /** messages_read: another participant read [messageIds] in [roomId]. */
         fun onMessagesRead(roomId: String, messageIds: List<String>, readerId: String) {}
+        fun onMessageReceiptUpdated(event: MessageReceiptEvent) {}
+        fun onScopedMessageReceiptUpdated(event: MessageReceiptEvent, capturedScope: Any?) { onMessageReceiptUpdated(event) }
         /** initial_presence: ids online in the tenant right after connecting. */
         fun onInitialPresence(onlineUserIds: List<String>) {}
         /** user_presence: one user went online/offline (lastSeen is ISO-8601 or null when hidden). */
@@ -113,9 +118,16 @@ class ApiRealtimeClient(
         fun onPresenceChanged(userId: String, online: Boolean, lastSeenAt: String?, approx: String?) {}
         /** typing: [userId] started/stopped typing in [roomId]. */
         fun onTyping(roomId: String, userId: String, isTyping: Boolean) {}
+        fun onScopedInitialPresence(ids: List<String>, capturedScope: Any?) { onInitialPresence(ids) }
+        fun onScopedPresence(userId: String, online: Boolean, lastSeen: String?, capturedScope: Any?) { onPresence(userId, online, lastSeen) }
+        fun onScopedPresenceChanged(userId: String, online: Boolean, lastSeen: String?, approx: String?, capturedScope: Any?) { onPresenceChanged(userId, online, lastSeen, approx) }
+        fun onScopedTyping(roomId: String, userId: String, typing: Boolean, capturedScope: Any?) { onTyping(roomId, userId, typing) }
         /** messages_delivered: my messages in [roomId] created at or before [deliveredUpTo]
          *  (ISO-8601) reached every other participant's device. */
         fun onMessagesDelivered(roomId: String, deliveredUpTo: String) {}
+        /** Distinct bounded event: never interpret as a timestamp watermark. */
+        fun onScopedMessagesDelivered(roomId: String, messageIds: List<String>, receiverId: String, capturedScope: Any?) {}
+
     }
 
     @Volatile
@@ -418,6 +430,16 @@ class ApiRealtimeClient(
                 "security.new_device" -> {
                     listener?.onSecurityNewDevice(payload)
                 }
+                "message_reactions_changed" -> {
+                    val raw = dataOrMessage(payload) ?: payload
+                    listener?.onReactionAggregate(ApiChatClient.deepMap(raw), socketScope)
+                }
+                "messages_changed", "view_once_consumed" -> {
+                    val raw = dataOrMessage(payload) ?: payload
+                    val roomId = str(raw, "room_id") ?: return
+                    listener?.onMessageLifecycleChanged(roomId, str(raw, "message_id") ?: str(raw, "id"),
+                        payload.optString("type") == "view_once_consumed", socketScope)
+                }
                 "new_message" -> {
                     val raw = dataOrMessage(payload) ?: return
                     val mapped = ApiChatClient.deepMap(raw)
@@ -456,6 +478,10 @@ class ApiRealtimeClient(
                     val roomId = raw?.let { str(it, "room_id") } ?: ""
                     if (roomId.isNotEmpty()) listener?.onMessagesCleared(roomId)
                 }
+                "message_receipt_updated" -> {
+                    val raw = dataOrMessage(payload) ?: return
+                    MessageReceiptEvent.parse(raw)?.let { listener?.onScopedMessageReceiptUpdated(it, socketScope) }
+                }
                 "messages_read" -> {
                     val raw = dataOrMessage(payload) ?: return
                     val roomId = str(raw, "room_id") ?: return
@@ -471,6 +497,15 @@ class ApiRealtimeClient(
                     val reader = str(raw, "reader_id") ?: str(raw, "user_id") ?: ""
                     listener?.onMessagesRead(roomId, list, reader)
                 }
+                "messages_delivered_scoped" -> {
+                    val raw = dataOrMessage(payload) ?: return
+                    val roomId = str(raw, "room_id") ?: return
+                    val receiver = str(raw, "user_id") ?: return
+                    val ids = raw.optJSONArray("message_ids") ?: return
+                    if (ids.length() !in 1..100) return
+                    val list = (0 until ids.length()).mapNotNull { ids.optString(it, "").ifBlank { null } }
+                    listener?.onScopedMessagesDelivered(roomId, list, receiver, socketScope)
+                }
                 "messages_delivered" -> {
                     val raw = dataOrMessage(payload) ?: return
                     val roomId = str(raw, "room_id") ?: return
@@ -480,28 +515,28 @@ class ApiRealtimeClient(
                 "initial_presence" -> {
                     val raw = dataOrMessage(payload) ?: return
                     val ids = raw.optJSONArray("online_user_ids") ?: return
-                    listener?.onInitialPresence((0 until ids.length()).mapNotNull { i -> ids.optString(i, "").ifEmpty { null } })
+                    listener?.onScopedInitialPresence((0 until ids.length()).mapNotNull { i -> ids.optString(i, "").ifEmpty { null } }, socketScope)
                 }
                 "user_presence" -> {
                     val raw = dataOrMessage(payload) ?: return
                     val userId = str(raw, "user_id") ?: return
-                    listener?.onPresence(userId, raw.optBoolean("is_online", false), str(raw, "last_seen"))
+                    listener?.onScopedPresence(userId, raw.optBoolean("is_online", false), str(raw, "last_seen"), socketScope)
                 }
                 "presence.changed" -> {
                     val raw = dataOrMessage(payload) ?: return
                     val userId = str(raw, "user_id") ?: return
-                    listener?.onPresenceChanged(
+                    listener?.onScopedPresenceChanged(
                         userId,
                         raw.optBoolean("online", false),
                         str(raw, "last_seen_at"),
-                        str(raw, "approx"),
+                        str(raw, "approx"), socketScope,
                     )
                 }
                 "typing" -> {
                     val raw = dataOrMessage(payload) ?: return
                     val roomId = str(raw, "room_id") ?: return
                     val userId = str(raw, "user_id") ?: return
-                    listener?.onTyping(roomId, userId, raw.optBoolean("is_typing", true))
+                    listener?.onScopedTyping(roomId, userId, raw.optBoolean("is_typing", true), socketScope)
                 }
             }
         } catch (_: Exception) {

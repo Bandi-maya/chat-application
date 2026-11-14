@@ -26,25 +26,16 @@ class ChatyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         ServiceLocator.ensurePushReady(applicationContext)
         val handler = PushWakeHolder.handler ?: return
+        if (message.notification != null) return
+        val binding = message.data["account_binding"]?.takeIf { it.isNotBlank() } ?: return
+        // An opaque binding is only a hint. The router validates it with the mapped account's token.
         when (message.data["type"]) {
             "sync" -> runBlocking {
-                withTimeoutOrNull(PUSH_WAKE_TIMEOUT_MS) {
-                    handler.onSyncNudgeAndWait()
-                }
+                withTimeoutOrNull(PUSH_WAKE_TIMEOUT_MS) { handler.onAccountSyncNudgeAndWait(binding) }
             }
-            // Content-free ring: only the call id routing handle. The handler
-            // pulls the queued offer over the authenticated channel (REST
-            // /chat/call/signals fallback); we never render push-provided
-            // content such as caller names from the nudge.
-            "incoming_call" -> message.data["call_id"]
-                ?.takeIf { it.isNotBlank() }
-                ?.let { callId ->
-                    runBlocking {
-                        withTimeoutOrNull(PUSH_WAKE_TIMEOUT_MS) {
-                            handler.onIncomingCallNudgeAndWait(callId)
-                        }
-                    }
-                }
+            "incoming_call" -> message.data["call_id"]?.takeIf { it.isNotBlank() }?.let { callId ->
+                runBlocking { withTimeoutOrNull(PUSH_WAKE_TIMEOUT_MS) { handler.onAccountIncomingCallNudgeAndWait(binding, callId) } }
+            }
         }
     }
 

@@ -7,7 +7,7 @@ import java.security.MessageDigest
 /** Local presentation only. Never mutate canonical text or server edit/delivery metadata. */
 object LocalMessageOverridePolicy {
     fun editable(message: ChatMessage): Boolean = message.type == MessageType.text && !message.text.startsWith("[POLL] ") && !message.text.startsWith("[TASK] ") &&
-        !message.isDeletedForEveryone && !message.isDeletedForMe && !message.isRevokedBySender && message.metadata["view_once"] != true
+        !message.isDeletedForEveryone && !message.isDeletedForMe && !message.isRevokedBySender && !ViewOnceTextPolicy.restricted(message.metadata)
     fun accountKey(tenant: String, baseUrl: String, userId: String): String? {
         if (tenant.isBlank() || baseUrl.isBlank() || userId.isBlank()) return null
         return listOf(tenant, baseUrl.trimEnd('/'), userId).joinToString("") { "${it.length}:$it" }

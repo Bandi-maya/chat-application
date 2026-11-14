@@ -68,7 +68,8 @@ data class DynamicIslandPayload(
     val senderInitials: String? = null,
     val accentColor: Color = Color(0xFF3B82F6),
     val isVerified: Boolean = false,
-    val isE2ee: Boolean = true,
+    // A local routing preference is never proof this message was encrypted.
+    val isE2ee: Boolean = false,
 
     // Media & Call properties
     val isPlaying: Boolean = false,
@@ -79,7 +80,7 @@ data class DynamicIslandPayload(
     val isSpeaker: Boolean = false,
     /** Actual call-state label; null for older/non-call producers. */
     val callStatusLabel: String? = null,
-    val callShowsDuration: Boolean = true,
+    val callShowsDuration: Boolean = false,
     val onToggleCallMute: (() -> Unit)? = null,
     val onToggleCallSpeaker: (() -> Unit)? = null,
     val mediaArtist: String? = null,

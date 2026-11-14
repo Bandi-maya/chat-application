@@ -50,3 +50,21 @@ read receipts), and location sharing from within the app.
 
 ## Contact
 [Pending: official customer-care address - Bandi to supply.]
+
+## Optional cross-app island (local wording approved 14 November 2026)
+
+If you turn this feature on and grant Android notification access, Chaty can
+read notification text and actions and media-session information to show the
+island and perform actions you choose. The optional accessibility host places
+a tappable island above other apps; its current configuration does not retrieve
+screen content or inject gestures. Overlay access lets the island float above
+other apps. Turn the island off in Chaty and revoke special access in Android
+Settings. Battery settings are optional troubleshooting controls, not a promise
+of always-on delivery. Ordinary messaging does not require the cross-app island.
+
+[OWNER-TO-CONFIRM before publication: storage/transmission of notification text,
+app inventory and media metadata, including logging, crash reports and SDKs.
+No broad no-telemetry, never-uploaded or never-collected promise is made.]
+
+Standard chats are not end-to-end encrypted in the current routing configuration.
+App Lock is local access control, not encryption of messages held by the service.

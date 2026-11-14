@@ -203,10 +203,16 @@ fun AnimatedEmojiView(
     emojiStyle: String? = null,
 ) {
     val view = LocalView.current
-    val pack = ChatyEmojiPack.rememberStyle(emojiStyle)
+    val savedPack = ChatyEmojiPack.rememberStyle(emojiStyle)
+    val pack = if (com.example.chat.data.packs.ChatyPackServer.DOWNLOADABLE_PACKS_ENABLED) savedPack else ChatyEmojiPack.CHATY
     val packAnimated = ChatyEmojiPack.needsAnimatedDecoder(pack)
     val packPath = if (!packAnimated || ChatyEmojiPack.iosSupported()) ChatyEmojiPack.assetPathFor(pack, unicode) else null
-    var packUnavailable by remember(packPath) { mutableStateOf(false) }
+    // Own-server on-demand packs: a downloaded file wins over the bundled
+    // asset; an uninstalled pack keeps the bundled path and the normal
+    // fallback chain (Noto animated -> system glyph) if the APK no longer
+    // ships it.
+    val downloadedPath = rememberDownloadedEmojiArt(pack, unicode)
+    var packUnavailable by remember(packPath, downloadedPath) { mutableStateOf(false) }
     val scale = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
 
@@ -260,28 +266,25 @@ fun AnimatedEmojiView(
         // Resolve the selected source before any fallback. Supplied Telegram packs
         // keep normal Unicode glyphs where their partial artwork set has no entry.
         val animationsOn = animate && !animationsDisabled()
-        val notoId = if (animationsOn) ChatyEmojiAssetRegistry.findNotoId(unicode) else null
         val lottiePath = if (pack == ChatyEmojiPack.TELEGRAM_LOTTIE) ChatyEmojiPack.lottieAssetPath(unicode) else null
-        if (lottiePath != null) {
-            val composition by com.airbnb.lottie.compose.rememberLottieComposition(com.airbnb.lottie.compose.LottieCompositionSpec.Asset(lottiePath))
+        if (lottiePath != null && downloadedPath != null) {
+            val composition by com.airbnb.lottie.compose.rememberLottieComposition(com.airbnb.lottie.compose.LottieCompositionSpec.File(downloadedPath))
             if (composition != null) com.airbnb.lottie.compose.LottieAnimation(
                 composition = composition, isPlaying = animationsOn,
                 iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
                 modifier = Modifier.size(size.dp),
             ) else Text(unicode, fontSize = (size * 0.82f).sp, lineHeight = (size * 0.82f).sp, maxLines = 1)
+        } else if (downloadedPath != null && !packUnavailable && packAnimated) {
+            // Downloaded animated pack (own server), same decode policy as bundled.
+            FileAnimatedEmoji(downloadedPath, size, animate = animationsOn) { packUnavailable = true }
+        } else if (downloadedPath != null && !packUnavailable && !packAnimated) {
+            FileStaticEmoji(downloadedPath, size) { packUnavailable = true }
         } else if (packPath != null && !packUnavailable && packAnimated) {
             // Chosen animated pack keeps its identity under reduced motion: static first frame, not the system glyph.
             IosAnimatedEmoji(packPath, size, animate = animationsOn) { packUnavailable = true }
         } else if (packPath != null && !packUnavailable && !packAnimated) {
             // Static pack (OpenMoji): shown in every mode; never animated.
             StaticAssetEmoji(packPath, size) { packUnavailable = true }
-        } else if (notoId != null && pack != ChatyEmojiPack.TELEGRAM && pack != ChatyEmojiPack.TELEGRAM_LOTTIE && pack != ChatyEmojiPack.DRIVE_MOV) {
-            ChatyAnimatedEmojiAsset(
-                notoId = notoId,
-                unicode = unicode,
-                size = size,
-                repeat = emojiLoopsForever(mode),
-            )
         } else {
             Text(
                 unicode,

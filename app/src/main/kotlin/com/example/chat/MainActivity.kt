@@ -65,6 +65,12 @@ class MainActivity : FragmentActivity() {
     private fun handleNotificationIntent(intent: android.content.Intent?) {
         val N = com.example.chat.notifications.ChatyNotifications
         when (intent?.action) {
+            N.ACTION_OPEN_ACCOUNT_CALL -> {
+                val hash = intent.getStringExtra("account_hash") ?: return
+                val call = intent.getStringExtra(N.EXTRA_CALL_ID) ?: return
+                // Hints only. AppRoot validates the encrypted pending offer before any switch/answer.
+                N.pendingAccountCall.value = N.AccountCallRoute(hash, call)
+            }
             N.ACTION_OPEN_ACCOUNTS -> {
                 val hash = intent.getStringExtra("account_hash")
                 if (ServiceLocator.apiBackend.multiAccount.accounts().any { it.accountHash == hash }) {
@@ -80,6 +86,7 @@ class MainActivity : FragmentActivity() {
                 }
             }
             N.ACTION_INCOMING_CALL, N.ACTION_ANSWER_CALL -> {
+                val owner = N.incomingActionOwner(intent) ?: return
                 showOverLockScreen()
                 val callId = intent.getStringExtra(N.EXTRA_CALL_ID).orEmpty()
                 if (callId.isEmpty()) return
@@ -87,7 +94,7 @@ class MainActivity : FragmentActivity() {
                 N.cancelIncomingCall(this, callId)
                 ServiceLocator.apiBackend.onPushMessage(null) // make sure the socket is up for the offer
                 if (intent.action == N.ACTION_ANSWER_CALL) {
-                    N.requestCallAction(com.example.chat.notifications.ChatyNotifications.PendingCallAction(callId, answer = true))
+                    N.requestCallAction(com.example.chat.notifications.ChatyNotifications.PendingCallAction(callId, answer = true, owner = owner))
                 }
             }
             else -> intent?.getStringExtra(N.EXTRA_ROOM_ID)?.let { N.requestOpenRoom(it) }

@@ -40,7 +40,10 @@ class IslandService : Service() {
             combine(IslandA11yService.connected, IslandSettings.enabled) { preferredHost, enabled ->
                 enabled && !preferredHost && Perms.overlay(this@IslandService)
             }.collect { shouldShow ->
-                if (shouldShow) window?.show() else window?.hide()
+                if (shouldShow) window?.show() else {
+                    window?.hide()
+                    stopSelf() // Disabled, permission lost, or accessibility now owns the window.
+                }
             }
         }
         running.value = true

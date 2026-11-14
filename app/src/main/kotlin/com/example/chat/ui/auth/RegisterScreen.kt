@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,8 +39,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,6 +51,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -80,14 +87,24 @@ fun RegisterScreen(
     onRegisterOrganization: () -> Unit,
     register: suspend (email: String, username: String, password: String, tenant: String?, isDefaultTenant: Boolean) -> Pair<String, String>,
     checkOrganization: suspend (workspace: String) -> OrgCheckResult,
+    /** Public registration preflight for the selected workspace. Missing or
+     *  unavailable endpoint shows "could not check", never Available. */
+    checkUsernameAvailability: (suspend (username: String, tenant: String?, isDefaultTenant: Boolean) -> UsernameAvailabilityLogic.Probe)? = null,
     /** Dart initState: getSavedTenantId + isUsingDefaultTenant. */
     loadSavedTenant: suspend () -> Pair<String?, Boolean>,
+    registerWithPhone: (suspend (String, String, String, String?, Boolean, com.example.chat.data.api.PhoneVerificationProof) -> Pair<String, String>)? = null,
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
 
     var email by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
+    // Approved preview 7 step 1: optional contact number. Collected in UI
+    // only - it is NOT sent to the backend (the register seam is unchanged;
+    // account-contact semantics are an open backend decision).
+    var contactNumber by remember { mutableStateOf("") }
+    var normalizedContactNumber by remember { mutableStateOf<String?>(null) }
+    var phoneProof by remember { mutableStateOf<com.example.chat.data.api.PhoneVerificationProof?>(null) }
     var password by remember { mutableStateOf("") }
     var workspace by remember { mutableStateOf("") }
     var obscurePassword by remember { mutableStateOf(true) }
@@ -97,11 +114,19 @@ fun RegisterScreen(
 
     var emailError by remember { mutableStateOf<String?>(null) }
     var usernameError by remember { mutableStateOf<String?>(null) }
+    var contactNumberError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
     var workspaceError by remember { mutableStateOf<String?>(null) }
     // Play UGC policy (P-06): account creation is gated on explicit acceptance.
     var acceptedTerms by remember { mutableStateOf(false) }
     var legalDialogAsset by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    // Username availability indicator (approved preview 8).
+    var usernameCheckJob by remember { mutableStateOf<Job?>(null) }
+    var usernameCheckState by remember { mutableStateOf(UsernameAvailabilityLogic.State.Idle) }
+    var usernameFormatRule by remember { mutableStateOf<String?>(null) }
+    // Generation counter so a slow probe cannot overwrite a newer edit.
+    var usernameCheckGeneration by remember { mutableIntStateOf(0) }
 
     var orgCheckJob by remember { mutableStateOf<Job?>(null) }
     var isCheckingOrg by remember { mutableStateOf(false) }
@@ -131,6 +156,60 @@ fun RegisterScreen(
         }
     }
 
+    /** Debounced availability probe. Any probe failure or missing endpoint
+     *  lands on CouldNotCheck - never Available (approved preview 8). */
+    fun launchUsernameProbe(clean: String) {
+        usernameCheckJob?.cancel()
+        val generation = ++usernameCheckGeneration
+        val checkedWorkspace = workspace.trim()
+        val checkedOrganization = useOrganization
+        usernameCheckState = UsernameAvailabilityLogic.State.Checking
+        usernameCheckJob = scope.launch {
+            delay(UsernameAvailabilityLogic.DEBOUNCE_MS)
+            val probe = checkUsernameAvailability
+            val result = if (probe == null) {
+                UsernameAvailabilityLogic.State.CouldNotCheck
+            } else {
+                try {
+                    UsernameAvailabilityLogic.stateForProbe(probe(clean, checkedWorkspace.takeIf { checkedOrganization }, !checkedOrganization))
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    UsernameAvailabilityLogic.State.CouldNotCheck
+                }
+            }
+            if (generation == usernameCheckGeneration && workspace.trim() == checkedWorkspace && useOrganization == checkedOrganization) usernameCheckState = result
+        }
+    }
+
+    LaunchedEffect(workspace, useOrganization) {
+        usernameCheckJob?.cancel()
+        usernameCheckGeneration++
+        val value = username.trim()
+        if (value.isNotEmpty() && UsernameAvailabilityLogic.localFormatError(value) == null) launchUsernameProbe(value)
+        else usernameCheckState = UsernameAvailabilityLogic.State.Idle
+    }
+
+    fun onUsernameChanged(value: String) {
+        username = value
+        usernameError = null
+        usernameCheckJob?.cancel()
+        val clean = value.trim()
+        val formatError = UsernameAvailabilityLogic.localFormatError(clean)
+        usernameFormatRule = formatError
+        when {
+            clean.isEmpty() -> {
+                ++usernameCheckGeneration
+                usernameCheckState = UsernameAvailabilityLogic.State.Idle
+            }
+            formatError != null -> {
+                ++usernameCheckGeneration
+                usernameCheckState = UsernameAvailabilityLogic.State.Invalid
+            }
+            else -> launchUsernameProbe(clean)
+        }
+    }
+
     fun onWorkspaceChanged(value: String) {
         workspace = value
         orgCheckJob?.cancel()
@@ -155,6 +234,8 @@ fun RegisterScreen(
         if (isLoading) return
         emailError = ChatyValidators.validateEmail(email.trim())
         usernameError = ChatyValidators.validateUsername(username.trim(), forRegistration = true)
+        // Optional: phone is attached only with a live server verification proof.
+        contactNumberError = if (contactNumber.isBlank() || normalizedContactNumber != null) null else "Check your phone number and country."
         passwordError = when {
             password.isEmpty() -> "Please enter a password"
             password.length < 6 -> "Password must be at least 6 characters"
@@ -162,7 +243,18 @@ fun RegisterScreen(
         }
         workspaceError =
             if (useOrganization && workspace.trim().isEmpty()) "Please enter your Workspace ID" else null
-        if (emailError != null || usernameError != null || passwordError != null || workspaceError != null) return
+        if (emailError != null || usernameError != null || passwordError != null || contactNumberError != null || workspaceError != null) return
+
+        // The indicator is advisory; the server's final Create still enforces
+        // uniqueness. Block only states the user must act on first.
+        if (usernameCheckState == UsernameAvailabilityLogic.State.Checking) {
+            errorMessage = "Checking username availability, please wait..."
+            return
+        }
+        if (usernameCheckState == UsernameAvailabilityLogic.State.Taken) {
+            errorMessage = "This username is taken. Choose a different username."
+            return
+        }
 
         if (com.example.chat.ReleaseFeatures.LEGAL_ACCEPTANCE_GATE && !acceptedTerms) {
             errorMessage = "Please accept the Terms of Use and Privacy Policy to create your account."
@@ -181,19 +273,25 @@ fun RegisterScreen(
             }
         }
 
+        val selectedProof = phoneProof
+        if (selectedProof != null && (!selectedProof.expiresAt.isAfter(java.time.Instant.now()) || selectedProof.normalizedNumber != normalizedContactNumber)) {
+            phoneProof = null
+            errorMessage = "Phone verification expired or the number changed. Verify it again, or clear the number to continue with email only."
+            return
+        }
         isLoading = true
         errorMessage = null
         scope.launch {
             try {
-                val (userId, displayName) = register(
-                    email.trim(),
-                    username.trim(),
-                    password,
-                    if (useOrganization) workspace.trim() else null,
-                    !useOrganization,
-                )
+                val proof = selectedProof
+                check(proof == null || proof.expiresAt.isAfter(java.time.Instant.now())) { "Phone verification expired. Verify it again before creating your account." }
+                val result = if (proof != null && registerWithPhone != null) registerWithPhone(
+                    email.trim(), username.trim(), password, if (useOrganization) workspace.trim() else null, !useOrganization, proof)
+                else register(email.trim(), username.trim(), password, if (useOrganization) workspace.trim() else null, !useOrganization)
+                val (userId, displayName) = result
                 onRegistered(userId, displayName)
-            } catch (e: Exception) {
+            } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (e: Exception) {
                 errorMessage = friendlyRegisterError(e)
                 isLoading = false
             }
@@ -293,13 +391,21 @@ fun RegisterScreen(
                         error = emailError,
                     )
                     Spacer(Modifier.height(18.dp))
+                    PhoneNumberEntry(contactNumber,
+                        onValueChange = { contactNumber = it; normalizedContactNumber = null; phoneProof = null; contactNumberError = null },
+                        onNormalized = { if (it != normalizedContactNumber) phoneProof = null; normalizedContactNumber = it })
+                    if (registerWithPhone != null) PhoneVerificationSection(normalizedContactNumber,
+                        if (useOrganization) workspace.trim() else null, !useOrganization, !isLoading,
+                        onProof = { phoneProof = it })
+                    contactNumberError?.let { Text(it, color = Color(0xFFD32F2F)) }
+                    Spacer(Modifier.height(18.dp))
                     AuthTextField(
                         label = "Username",
                         hintText = "Choose a unique username",
                         capsule = true,
                         theme = theme,
                         value = username,
-                        onValueChange = { username = it },
+                        onValueChange = { onUsernameChanged(it) },
                         error = usernameError,
                         prefixIcon = {
                             Icon(
@@ -308,6 +414,17 @@ fun RegisterScreen(
                                 tint = Color(argbWithAlpha(theme.secondaryTextColor, 0.7)),
                                 modifier = Modifier.size(20.dp),
                             )
+                        },
+                    )
+                    UsernameAvailabilityIndicator(
+                        theme = theme,
+                        state = usernameCheckState,
+                        formatRule = usernameFormatRule,
+                        onRetry = {
+                            val clean = username.trim()
+                            if (clean.isNotEmpty() && UsernameAvailabilityLogic.localFormatError(clean) == null) {
+                                launchUsernameProbe(clean)
+                            }
                         },
                     )
                     Spacer(Modifier.height(18.dp))
@@ -392,6 +509,115 @@ fun RegisterScreen(
                     }
                     Spacer(Modifier.height(16.dp))
                 }
+            }
+        }
+    }
+}
+
+/** Approved preview 8 username-availability indicator. Checking / Available
+ *  / Taken / Invalid / CouldNotCheck under the username field. Announced via
+ *  a polite live region; Retry keeps a 48dp target. CouldNotCheck never
+ *  claims availability and never blocks Create. */
+@Composable
+private fun UsernameAvailabilityIndicator(
+    theme: ThemeConfig,
+    state: UsernameAvailabilityLogic.State,
+    formatRule: String?,
+    onRetry: () -> Unit,
+) {
+    if (state == UsernameAvailabilityLogic.State.Idle) return
+
+    val title: String
+    val body: String?
+    val tint: Color
+    when (state) {
+        UsernameAvailabilityLogic.State.Checking -> {
+            title = "Checking..."
+            body = "Wait for the server result."
+            tint = Color(theme.secondaryTextColor)
+        }
+        UsernameAvailabilityLogic.State.Available -> {
+            title = "Username available"
+            body = null
+            tint = Color(theme.successColor)
+        }
+        UsernameAvailabilityLogic.State.Taken -> {
+            title = "Username taken"
+            body = "Choose a different username."
+            tint = Color(theme.dangerColor)
+        }
+        UsernameAvailabilityLogic.State.Invalid -> {
+            title = "Invalid username"
+            body = formatRule
+            tint = Color(theme.dangerColor)
+        }
+        UsernameAvailabilityLogic.State.CouldNotCheck -> {
+            title = "Could not check"
+            body = "Availability isn't confirmed. You can retry; the final Create still enforces uniqueness."
+            tint = Color(theme.secondaryTextColor)
+        }
+        UsernameAvailabilityLogic.State.Idle -> return
+    }
+
+    Column(
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            when (state) {
+                UsernameAvailabilityLogic.State.Checking -> CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = Color(theme.accentColor),
+                )
+                UsernameAvailabilityLogic.State.Available ->
+                    com.example.chat.ui.icons.ChatyIcon(
+                        com.example.chat.ui.icons.ChatyIconId.checkCircle,
+                        semanticLabel = null,
+                        color = tint,
+                        modifier = Modifier.size(16.dp),
+                    )
+                UsernameAvailabilityLogic.State.Taken, UsernameAvailabilityLogic.State.Invalid ->
+                    com.example.chat.ui.icons.ChatyIcon(
+                        com.example.chat.ui.icons.ChatyIconId.errorOutline,
+                        semanticLabel = null,
+                        color = tint,
+                        modifier = Modifier.size(16.dp),
+                    )
+                else ->
+                    com.example.chat.ui.icons.ChatyIcon(
+                        com.example.chat.ui.icons.ChatyIconId.info,
+                        semanticLabel = null,
+                        color = tint,
+                        modifier = Modifier.size(16.dp),
+                    )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(title, color = tint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        if (body != null) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                body,
+                color = Color(theme.secondaryTextColor),
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(start = 24.dp),
+            )
+        }
+        if (state == UsernameAvailabilityLogic.State.CouldNotCheck) {
+            TextButton(
+                onClick = onRetry,
+                modifier = Modifier.heightIn(min = AuthCapsuleTokens.tapTarget),
+            ) {
+                Text(
+                    "Retry",
+                    color = Color(theme.accentColor),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }

@@ -79,6 +79,17 @@ class ApiChatClient(
         }
     }
 
+    /** Read-only active-member snapshot. No invented cap, total or pagination. */
+    fun listGroupMembers(roomId: String): ApiGroupMembers? {
+        if (token() == null) return null
+        val roomPath = safePathSegment(roomId) ?: return null
+        return try {
+            val response = getWithFallback("chat/rooms/$roomPath/members")
+            if (response.first != 200) null else ApiGroupMembers.decode(response.second)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { null }
+    }
+
     /** GET /chat/rooms/<id>/messages -> ChatMessage.fromApi list, or null when
      *  the load failed (Dart keeps prior messages on error). */
     fun listMessages(roomId: String): List<ChatMessage>? {
@@ -114,12 +125,13 @@ class ApiChatClient(
 
     /** POST /chat/rooms/<id>/messages {content, client_id} (+ /api/v1 fallback). [clientId] lets
      *  the server drop a duplicate when a retry follows a send whose response was lost. */
-    fun sendMessageResult(roomId: String, content: String, clientId: String?): SendResult {
+    fun sendMessageResult(roomId: String, content: String, clientId: String?, messageType: String = "text"): SendResult {
         if (token() == null) return SendResult.Offline
+        if (messageType !in setOf("text", "audio", "voice", "voice_note")) return SendResult.Rejected(400, "Unsupported declared message type.")
         val roomPath = safePathSegment(roomId)
             ?: return SendResult.Rejected(400, "Invalid conversation identifier.")
         return try {
-            val payload = JSONObject().put("content", content)
+            val payload = JSONObject().put("content", content).put("msg_type", messageType)
             if (!clientId.isNullOrEmpty()) payload.put("client_id", clientId)
             val body = payload.toString()
             var response = transport.execute(
@@ -135,7 +147,12 @@ class ApiChatClient(
                 code == 200 || code == 201 -> {
                     val json = JSONObject(response.second)
                     val raw = if (json.has("data") && !json.isNull("data")) json.get("data") else json
-                    if (raw is JSONObject) SendResult.Ok(ChatMessage.fromApi(deepMap(raw))) else SendResult.Offline
+                    if (raw is JSONObject) {
+                        val confirmed = ChatMessage.fromApi(deepMap(raw))
+                        // Reduced dedup responses can omit content, but must identify the committed message.
+                        if (confirmed.id.isBlank() || (confirmed.conversationId.isNotBlank() && confirmed.conversationId != roomId)) SendResult.Offline
+                        else SendResult.Ok(confirmed)
+                    } else SendResult.Offline
                 }
                 // 401 = token expired: the refresh logic renews it, then the outbox retries.
                 code <= 0 || code == 401 || code == 408 || code == 429 || code >= 500 -> SendResult.Offline
@@ -266,35 +283,55 @@ class ApiChatClient(
      *  the ids the server marked, or null on failure. */
     /** POST /chat/rooms/<id>/delivered (+ /api/v1 fallback): messages reached this device
      *  without the WebSocket (push). Returns true when the server accepted it. */
-    fun markRoomDelivered(roomId: String): Boolean {
-        if (token() == null) return false
-        val roomPath = safePathSegment(roomId) ?: return false
+    /** Explicit-ID endpoint only. Failure never falls back to legacy room-wide ACK. */
+    fun markFetchedMessagesDelivered(roomId: String, messageIds: List<String>): Set<String>? {
+        if (token().isNullOrBlank() || messageIds.isEmpty() || messageIds.size > 100) return null
+        val roomPath = safePathSegment(roomId) ?: return null
+        val ids = messageIds.distinct()
+        if (ids.any { runCatching { java.util.UUID.fromString(it).toString() == it }.getOrDefault(false).not() }) return null
         return try {
-            var response = transport.execute("POST", "${base()}/chat/rooms/$roomPath/delivered", authHeaders(json = true), "{}")
-            if (response.first == 404) {
-                response = transport.execute("POST", "${base()}/api/v1/chat/rooms/$roomPath/delivered", authHeaders(json = true), "{}")
-            }
-            response.first in 200..299
-        } catch (_: Exception) {
-            false
-        }
+            val body = JSONObject().put("message_ids", JSONArray(ids)).toString()
+            var response = transport.execute("POST", "${base()}/chat/rooms/$roomPath/delivered-scoped", authHeaders(json = true), body)
+            if (response.first == 404) response = transport.execute("POST", "${base()}/api/v1/chat/rooms/$roomPath/delivered-scoped", authHeaders(json = true), body)
+            if (response.first !in 200..299) return null
+            val accepted = JSONObject(response.second).optJSONObject("data")?.optJSONArray("acknowledged_ids") ?: return null
+            (0 until accepted.length()).map { accepted.optString(it) }.filter { it in ids }.toSet()
+        } catch (_: Exception) { null }
     }
 
-    fun markRoomRead(roomId: String): List<String>? {
-        if (token() == null) return null
+    fun markRoomDelivered(roomId: String): Boolean = acknowledgeRoomPages(roomId, "delivered") != null
+
+    fun markRoomRead(roomId: String): List<String>? = acknowledgeRoomPages(roomId, "read")
+
+    /** Server caps each acknowledgement at 500 rows. Do not mistake one page for completion. */
+    private fun acknowledgeRoomPages(roomId: String, kind: String): List<String>? {
+        val capturedToken = token()?.takeIf { it.isNotBlank() } ?: return null
+        val capturedBase = base(); val capturedTenant = tenantId()
         val roomPath = safePathSegment(roomId) ?: return null
+        val headers = mapOf("Authorization" to "Bearer $capturedToken", "Content-Type" to "application/json", "x-tenant-id" to capturedTenant)
+        fun current() = token() == capturedToken && base() == capturedBase && tenantId() == capturedTenant
+        val accepted = linkedSetOf<String>()
         return try {
-            var response = transport.execute("POST", "${base()}/chat/rooms/$roomPath/read", authHeaders(json = true), "{}")
-            if (response.first == 404) {
-                response = transport.execute("POST", "${base()}/api/v1/chat/rooms/$roomPath/read", authHeaders(json = true), "{}")
+            repeat(20) { // Bounded work per wake. An unfinished 10,000+ receipt backlog is not reported complete.
+                if (!current()) return null
+                var response = transport.execute("POST", "$capturedBase/chat/rooms/$roomPath/$kind", headers, "{}")
+                if (!current()) return null
+                if (response.first == 404) {
+                    response = transport.execute("POST", "$capturedBase/api/v1/chat/rooms/$roomPath/$kind", headers, "{}")
+                    if (!current()) return null
+                }
+                if (response.first !in 200..299) return null
+                val data = JSONObject(response.second).optJSONObject("data") ?: return null
+                data.optJSONArray("message_ids")?.let { ids ->
+                    for (index in 0 until ids.length()) ids.optString(index).takeIf { it.isNotBlank() }?.let(accepted::add)
+                }
+                if (data.opt("has_more") != true) return accepted.toList()
+                val updated = data.opt("updated") as? Number ?: return null
+                if (updated.toInt() !in 1..500) return null // Malformed/non-advancing cursor must not spin.
             }
-            if (response.first != 200) return null
-            val data = JSONObject(response.second).optJSONObject("data") ?: return emptyList()
-            val ids = data.optJSONArray("message_ids") ?: return emptyList()
-            (0 until ids.length()).map { ids.optString(it, "") }.filter { it.isNotEmpty() }
-        } catch (_: Exception) {
             null
-        }
+        } catch (cancel: java.util.concurrent.CancellationException) { throw cancel }
+        catch (_: Exception) { null }
     }
 
     /** GET /chat/settings (+ /api/v1 fallback): the generic client-preferences

@@ -676,6 +676,11 @@ data class NotificationToastPreferences(
 // ── HomePreferences ──────────────────────────────────────────────────────
 
 data class HomePreferences(
+    val menuShowNewActions: Boolean = true,
+    val menuShowSavedChats: Boolean = true,
+    val menuShowMarkRead: Boolean = true,
+    val menuShowShare: Boolean = true,
+    val menuShowMessageNumber: Boolean = false,
     val homeStyle: String = "Chaty Default",
     val enableStoriesStrip: Boolean = false,
     val storiesStyle: String = "Circular",
@@ -732,6 +737,11 @@ data class HomePreferences(
     val tabBubbleStyle: String = "Capsule Pill",
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
+        "menuShowNewActions" to menuShowNewActions,
+        "menuShowSavedChats" to menuShowSavedChats,
+        "menuShowMarkRead" to menuShowMarkRead,
+        "menuShowShare" to menuShowShare,
+        "menuShowMessageNumber" to menuShowMessageNumber,
         "homeStyle" to homeStyle,
         "enableStoriesStrip" to enableStoriesStrip,
         "storiesStyle" to storiesStyle,
@@ -789,6 +799,11 @@ data class HomePreferences(
 
     companion object {
         fun fromMap(map: Map<String, Any?>): HomePreferences = HomePreferences(
+            menuShowNewActions = map["menuShowNewActions"] as? Boolean ?: true,
+            menuShowSavedChats = map["menuShowSavedChats"] as? Boolean ?: true,
+            menuShowMarkRead = map["menuShowMarkRead"] as? Boolean ?: true,
+            menuShowShare = map["menuShowShare"] as? Boolean ?: true,
+            menuShowMessageNumber = map["menuShowMessageNumber"] as? Boolean ?: false,
             homeStyle = map["homeStyle"] as String? ?: "Chaty Default",
             enableStoriesStrip = map["enableStoriesStrip"] as Boolean? ?: false,
             storiesStyle = map["storiesStyle"] as String? ?: "Circular",

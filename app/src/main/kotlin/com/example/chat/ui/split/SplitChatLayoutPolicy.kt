@@ -7,6 +7,13 @@ import androidx.compose.ui.unit.dp
  * Pure, JVM-testable layout computation for Split Chat Workspace.
  */
 object SplitChatLayoutPolicy {
+    /** Snap only near a useful target, preserving free movement otherwise. */
+    fun snapNear(value: Float, targets: List<Float>, tolerance: Float): Float {
+        if (!value.isFinite() || tolerance < 0f) return value
+        return targets.filter { it.isFinite() && kotlin.math.abs(it - value) <= tolerance }
+            .minByOrNull { kotlin.math.abs(it - value) } ?: value
+    }
+
 
     /**
      * Resolves the presentation mode based on pane count and available window dimensions.

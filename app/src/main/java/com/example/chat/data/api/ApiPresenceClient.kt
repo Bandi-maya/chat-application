@@ -40,13 +40,15 @@ class ApiPresenceClient(
         val base = baseUrl()
         val response = try {
             transport.execute(method, "$base/$path", headers(), body)
-        } catch (e: Exception) {
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (e: Exception) {
             throw Exception("Unable to reach server. Please check your internet connection.")
         }
         if (response.first == 404) {
             return try {
                 transport.execute(method, "$base/api/v1/$path", headers(), body)
-            } catch (e: Exception) {
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (e: Exception) {
                 throw Exception("Unable to reach server. Please check your internet connection.")
             }
         }
@@ -56,7 +58,8 @@ class ApiPresenceClient(
     /** GET /presence/{user_id}. Fail-closed: 404 (old server OR unknown
      *  user) -> Unavailable, and the header shows nothing. */
     fun presence(userId: String): PresenceView {
-        val response = execute("GET", "presence/$userId", null)
+        val id = ApiPathSegments.safe(userId) ?: return PresenceView.Unavailable
+        val response = execute("GET", "presence/$id", null)
         if (response.first == 404) return PresenceView.Unavailable
         if (response.first != 200) return PresenceView.Unavailable
         val data = try {
@@ -82,7 +85,8 @@ class ApiPresenceClient(
         val body = JSONObject().put("online", online).toString()
         val response = try {
             execute("POST", "presence/heartbeat", body)
-        } catch (_: Exception) {
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) {
             return false
         }
         return response.first == 200

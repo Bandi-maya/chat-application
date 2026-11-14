@@ -96,6 +96,15 @@ import java.time.Instant
  *  - [pickImageFile]: system image picker, returns a readable local File (copy of the content URI) or null.
  *  - [exportDirectory]: getApplicationDocumentsDirectory().
  *  - templateController / appearance / preferences: the registered services (nullable like Dart's isRegistered).
+ *
+ * Scoped "This chat only" mode: when [conversationKey] is non-null the editor stages every
+ * control locally and writes ONLY through ThemeController.setChatTheme:
+ *  - "Apply to this chat" persists the staged config for that conversation.
+ *  - "Use app default for this chat" clears the per-chat override (setChatTheme(key, null)).
+ * No global updateThemeConfig / preferences.updateConversation / resetToDefaults / import
+ * auto-apply runs in scoped mode. Presets stage locally; global reset controls are hidden.
+ * [isScopeCurrent] guards every write (scoped or not): when it returns false the write is
+ * skipped silently. Depends on ThemeController.getChatThemeOverride (added with the route wiring).
  * Uncompiled; no pixel check.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -108,14 +117,25 @@ fun ThemeEditorScreen(
     exportDirectory: File,
     pickJsonText: suspend () -> String?,
     pickImageFile: suspend () -> File?,
-    onBack: () -> Unit,
+    onBack: () -> Unit = {},
+    conversationKey: String? = null,
+    conversationTitle: String? = null,
+    isScopeCurrent: () -> Boolean = { true },
 ) {
     val colors = LocalAppColors.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var snackColor by remember { mutableStateOf<Color?>(null) }
-    var current by remember { mutableStateOf(themeController.globalTheme) }
+    val scoped = conversationKey != null
+    var current by remember(conversationKey) {
+        mutableStateOf(
+            conversationKey?.let { themeController.getThemeForChat(it) } ?: themeController.globalTheme,
+        )
+    }
+    var hasChatOverride by remember(conversationKey) {
+        mutableStateOf(conversationKey != null && themeController.getChatThemeOverride(conversationKey) != null)
+    }
     var menuOpen by remember { mutableStateOf(false) }
     var guideOpen by remember { mutableStateOf(false) }
     var resetOpen by remember { mutableStateOf(false) }
@@ -136,9 +156,38 @@ fun ThemeEditorScreen(
         }
     }
 
+    /** Every controller write (scoped or global) goes through the scope guard:
+     *  when the account/key this screen was opened for is no longer current,
+     *  skip with no write. */
+    fun writeAllowed(): Boolean = isScopeCurrent()
+
+    /** Global-mode live apply. In scoped mode controls stage [current] only. */
+    fun stageGlobal(config: ThemeConfig) {
+        if (scoped) return
+        if (!writeAllowed()) return
+        themeController.updateThemeConfig(config)
+    }
+
     fun applyAndSave() {
-        themeController.updateThemeConfig(current)
-        show("Theme customization saved!", colors.success)
+        val key = conversationKey
+        if (!writeAllowed()) return
+        if (key != null) {
+            themeController.setChatTheme(key, current)
+            hasChatOverride = true
+            show("Theme applied to this chat.", colors.success)
+        } else {
+            themeController.updateThemeConfig(current)
+            show("Theme customization saved!", colors.success)
+        }
+    }
+
+    fun useAppDefaultForChat() {
+        val key = conversationKey ?: return
+        if (!writeAllowed()) return
+        themeController.setChatTheme(key, null)
+        hasChatOverride = false
+        current = themeController.globalTheme
+        show("This chat now uses the app default theme.", colors.success)
     }
 
     fun exportTheme() {
@@ -159,9 +208,14 @@ fun ThemeEditorScreen(
             try {
                 val content = pickJsonText() ?: return@launch
                 val theme = ChatyThemeManager.validateAndImportTheme(content)
+                if (!writeAllowed()) return@launch
                 current = theme
-                themeController.updateThemeConfig(theme)
-                show("Imported and applied \"${theme.name}\" successfully.", colors.success)
+                if (!scoped && writeAllowed()) themeController.updateThemeConfig(theme)
+                show(
+                    if (scoped) "Imported. Tap \"Apply to this chat\" to use it here."
+                    else "Imported and applied \"${theme.name}\" successfully.",
+                    colors.success,
+                )
             } catch (e: Exception) {
                 show("Import failed: ${if (e is ThemeFormatException) e.message else "Invalid theme JSON"}", colors.error)
             }
@@ -175,9 +229,14 @@ fun ThemeEditorScreen(
                 val generated = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                     ImageThemeGenerator.generateFromImageFile(file, isDark = current.isDark)
                 }
+                if (!writeAllowed()) return@launch
                 current = generated
-                themeController.updateThemeConfig(generated)
-                show("Palette extracted and applied from photo!", colors.success)
+                if (!scoped && writeAllowed()) themeController.updateThemeConfig(generated)
+                show(
+                    if (scoped) "Palette extracted. Tap \"Apply to this chat\" to use it here."
+                    else "Palette extracted and applied from photo!",
+                    colors.success,
+                )
             } catch (e: Exception) {
                 show("Could not generate a theme from that image. Try another image.")
             }
@@ -192,7 +251,12 @@ fun ThemeEditorScreen(
 
     Box(Modifier.fillMaxSize()) {
     ChatySettingsPage(
-        title = "Theme & Design Studio",
+        title = if (scoped) "Theme for this chat" else "Theme & Design Studio",
+        subtitle = if (scoped) {
+            "Applies only to this chat on this account" + (conversationTitle?.let { " · $it" } ?: "")
+        } else {
+            null
+        },
         onBack = onBack,
         trailingHeaderWidget = {
             IconButton(onClick = { generateFromImage() }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.palette, semanticLabel = "Extract from photo", color = colors.foreground) }
@@ -203,16 +267,18 @@ fun ThemeEditorScreen(
                 IconButton(onClick = { menuOpen = true }) { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.moreOptions, semanticLabel = "More options", color = colors.foreground) }
                 DropdownMenu(shape = com.example.chat.ui.kit.ChatyModalShape, expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text("Save Theme", color = colors.foreground) },
+                        text = { Text(if (scoped) "Apply to this chat" else "Save Theme", color = colors.foreground) },
                         leadingIcon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.check, semanticLabel = null, modifier = Modifier.size(20.dp), color = colors.foreground) },
                         onClick = { menuOpen = false; applyAndSave() },
                     )
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text("Reset to Defaults", color = Color(0xFFFF5252)) },
-                        leadingIcon = { Icon(Icons.Rounded.RestartAlt, null, Modifier.size(20.dp), tint = Color(0xFFFF5252)) },
-                        onClick = { menuOpen = false; confirmReset() },
-                    )
+                    if (!scoped) {
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Reset to Defaults", color = Color(0xFFFF5252)) },
+                            leadingIcon = { Icon(Icons.Rounded.RestartAlt, null, Modifier.size(20.dp), tint = Color(0xFFFF5252)) },
+                            onClick = { menuOpen = false; confirmReset() },
+                        )
+                    }
                 }
             }
         },
@@ -258,21 +324,21 @@ fun ThemeEditorScreen(
                             LabeledSlider(
                                 label = "${current.cornerRadius.toInt()}px",
                                 value = current.cornerRadius.coerceIn(4.0, 28.0).toFloat(),
-                                onValueChange = { v -> current = current.copy(cornerRadius = v.toDouble()); themeController.updateThemeConfig(current) },
+                                onValueChange = { v -> current = current.copy(cornerRadius = v.toDouble()); stageGlobal(current) },
                                 valueRange = 4f..28f, steps = 11,
                             )
                             label("Font Scale (${(current.fontScale * 100).toInt()}%)")
                             LabeledSlider(
                                 label = "${(current.fontScale * 100).toInt()}%",
                                 value = current.fontScale.coerceIn(0.85, 1.30).toFloat(),
-                                onValueChange = { v -> current = current.copy(fontScale = v.toDouble()); themeController.updateThemeConfig(current) },
+                                onValueChange = { v -> current = current.copy(fontScale = v.toDouble()); stageGlobal(current) },
                                 valueRange = 0.85f..1.30f, steps = 8,
                             )
                             label("UI Density (${(current.density * 100).toInt()}%)")
                             LabeledSlider(
                                 label = "${(current.density * 100).toInt()}%",
                                 value = current.density.coerceIn(0.8, 1.2).toFloat(),
-                                onValueChange = { v -> current = current.copy(density = v.toDouble()); themeController.updateThemeConfig(current) },
+                                onValueChange = { v -> current = current.copy(density = v.toDouble()); stageGlobal(current) },
                                 valueRange = 0.8f..1.2f, steps = 7,
                             )
                             Spacer(Modifier.height(6.dp))
@@ -291,12 +357,14 @@ fun ThemeEditorScreen(
                                                 onClick = {
                                                     tickMenu = false
                                                     current = current.copy(deliveryTickStyle = style, tickStyle = style.displayName)
-                                                    themeController.updateThemeConfig(current)
-                                                    if (preferences.conversation.tickStyle != style.displayName) {
-                                                        preferences.updateConversation(
-                                                            preferences.conversation.copy(tickStyle = style.displayName),
-                                                            logTitle = "Ticks Style",
-                                                        )
+                                                    if (!scoped && writeAllowed()) {
+                                                        themeController.updateThemeConfig(current)
+                                                        if (preferences.conversation.tickStyle != style.displayName) {
+                                                            preferences.updateConversation(
+                                                                preferences.conversation.copy(tickStyle = style.displayName),
+                                                                logTitle = "Ticks Style",
+                                                            )
+                                                        }
                                                     }
                                                 },
                                             )
@@ -307,74 +375,98 @@ fun ThemeEditorScreen(
                         }
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "Each preview shows that theme's colours on your current layout, including component overrides.",
-                    color = colors.foregroundSecondary,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                )
-                Spacer(Modifier.height(8.dp))
+                if (scoped) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { applyAndSave() },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        contentPadding = PaddingValues(vertical = 14.dp),
+                    ) {
+                        Icon(Icons.Rounded.Check, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Apply to this chat", fontWeight = FontWeight.SemiBold)
+                    }
+                    OutlinedButton(
+                        onClick = { useAppDefaultForChat() },
+                        enabled = hasChatOverride,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        contentPadding = PaddingValues(vertical = 14.dp),
+                    ) {
+                        Icon(Icons.Rounded.RestartAlt, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Use app default for this chat", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                run {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        if (scoped) "Choose a theme, then apply it to this chat only. Other chats stay unchanged."
+                        else "Each preview shows that theme's colours on your current layout, including component overrides.",
+                        color = colors.foregroundSecondary,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    )
+                    Spacer(Modifier.height(8.dp))
 
-                val light = ThemePresets.all.filter { !it.isDark }
-                val dark = ThemePresets.all.filter { it.isDark }
-                @Composable
-                fun grid(presets: List<ThemeConfig>) {
-                    Box(Modifier.padding(12.dp)) {
-                        BoxWithConstraints(Modifier.fillMaxWidth()) {
-                            val w = maxWidth
-                            val isWide = w >= 600.dp
-                            val cols = if (isWide) (if (w >= 900.dp) 3 else 2) else 1
-                            // mainAxisExtent = 284 * textScaler.scale(1).clamp(1.0, 1.6)
-                            val fontScale = LocalDensity.current.fontScale.coerceIn(1.0f, 1.6f)
-                            val layout = remember(layoutTick, current) { currentSetupLayout(templateController, preferences, appearance) }
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                presets.chunked(cols).forEach { rowItems ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        rowItems.forEach { preset ->
-                                            Box(Modifier.weight(1f).height((284 * fontScale).dp)) {
-                                                ThemePreviewCard(
-                                                    themeConfig = preset,
-                                                    layout = layout,
-                                                    isSelected = preset.id == current.id,
-                                                    onTap = { current = preset; themeController.updateThemeConfig(preset) },
-                                                    modifier = Modifier.fillMaxSize(),
-                                                )
+                    val light = ThemePresets.all.filter { !it.isDark }
+                    val dark = ThemePresets.all.filter { it.isDark }
+                    @Composable
+                    fun grid(presets: List<ThemeConfig>) {
+                        Box(Modifier.padding(12.dp)) {
+                            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                val w = maxWidth
+                                val isWide = w >= 600.dp
+                                val cols = if (isWide) (if (w >= 900.dp) 3 else 2) else 1
+                                // mainAxisExtent = 284 * textScaler.scale(1).clamp(1.0, 1.6)
+                                val fontScale = LocalDensity.current.fontScale.coerceIn(1.0f, 1.6f)
+                                val layout = remember(layoutTick, current) { currentSetupLayout(templateController, preferences, appearance) }
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    presets.chunked(cols).forEach { rowItems ->
+                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            rowItems.forEach { preset ->
+                                                Box(Modifier.weight(1f).height((284 * fontScale).dp)) {
+                                                    ThemePreviewCard(
+                                                        themeConfig = preset,
+                                                        layout = layout,
+                                                        isSelected = preset.id == current.id,
+                                                        onTap = { current = preset; stageGlobal(preset) },
+                                                        modifier = Modifier.fillMaxSize(),
+                                                    )
+                                                }
                                             }
+                                            repeat(cols - rowItems.size) { Spacer(Modifier.weight(1f)) }
                                         }
-                                        repeat(cols - rowItems.size) { Spacer(Modifier.weight(1f)) }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                if (light.isNotEmpty()) ChatySettingsSection(title = "Light themes (${light.size})") { ChatySettingsCard { grid(light) } }
-                if (light.isNotEmpty() && dark.isNotEmpty()) Spacer(Modifier.height(12.dp))
-                if (dark.isNotEmpty()) ChatySettingsSection(title = "Dark themes (${dark.size})") { ChatySettingsCard { grid(dark) } }
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = { confirmReset() },
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    border = BorderStroke(1.2.dp, Color(0xFFFF5252)),
-                    contentPadding = PaddingValues(vertical = 14.dp),
-                ) {
-                    Icon(Icons.Rounded.RestartAlt, null, tint = Color(0xFFFF5252))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Reset to Default System Theme", color = Color(0xFFFF5252), fontWeight = FontWeight.SemiBold)
+                    if (light.isNotEmpty()) ChatySettingsSection(title = "Light themes (${light.size})") { ChatySettingsCard { grid(light) } }
+                    if (light.isNotEmpty() && dark.isNotEmpty()) Spacer(Modifier.height(12.dp))
+                    if (dark.isNotEmpty()) ChatySettingsSection(title = "Dark themes (${dark.size})") { ChatySettingsCard { grid(dark) } }
+                    Spacer(Modifier.height(12.dp))
+                    if (!scoped) OutlinedButton(
+                        onClick = { confirmReset() },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        border = BorderStroke(1.2.dp, Color(0xFFFF5252)),
+                        contentPadding = PaddingValues(vertical = 14.dp),
+                    ) {
+                        Icon(Icons.Rounded.RestartAlt, null, tint = Color(0xFFFF5252))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reset to Default System Theme", color = Color(0xFFFF5252), fontWeight = FontWeight.SemiBold)
+                    }
                 }
                 Spacer(Modifier.height(48.dp))
             }
         }
     }
 
-    if (resetOpen) {
+    if (resetOpen && !scoped) {
         AlertDialog(shape = com.example.chat.ui.kit.ChatyModalShape,
             onDismissRequest = { resetOpen = false },
             title = { Text("Reset Theme to Defaults?") },
             text = {
                 Text(
-                    "This will restore the factory default theme and clear your custom studio settings. " +
-                        "Per-conversation themes are preserved.",
+                    "This will restore the factory default theme and clear custom studio settings, including saved per-chat themes.",
                 )
             },
             dismissButton = { TextButton(onClick = { resetOpen = false }) { Text("Cancel") } },
@@ -382,9 +474,11 @@ fun ThemeEditorScreen(
                 Button(
                     onClick = {
                         resetOpen = false
-                        themeController.resetToDefaults()
-                        current = themeController.globalTheme
-                        show("Theme reset to system defaults.", colors.success)
+                        if (writeAllowed()) {
+                            themeController.resetToDefaults()
+                            current = themeController.globalTheme
+                            show("Theme reset to system defaults.", colors.success)
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = colors.error),
                 ) { Text("Reset") }

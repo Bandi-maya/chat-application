@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -99,16 +100,43 @@ fun NewChatScreen(
     val colors = LocalAppColors.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    val configContext = androidx.compose.ui.platform.LocalContext.current
+    val configApi = com.example.chat.ServiceLocator.apiBackend
+    val configOwner = remember { configApi.authSnapshot() }
+    // Never let an old contact selection become an operation on a newly selected account.
+    val currentOnBack by androidx.compose.runtime.rememberUpdatedState(onBack)
+    androidx.compose.runtime.DisposableEffect(configApi, configOwner) {
+        val listener: (com.example.chat.data.api.ApiAccountScope) -> Unit = { next ->
+            if (next !== configOwner) scope.launch { currentOnBack() }
+        }
+        configApi.addAuthScopeListener(listener)
+        onDispose { configApi.removeAuthScopeListener(listener) }
+    }
+    val choiceStore = remember(configOwner) { configApi.currentAccountHash()?.let { hash ->
+        runCatching { com.example.chat.core.config.GroupUiChoicesStore(configContext, hash) }.getOrNull()
+    } }
+    var groupUi by remember(configOwner) { mutableStateOf(com.example.chat.core.config.GroupUiConfigPolicy.defaults) }
+    LaunchedEffect(configOwner) {
+        val defaults = configApi.groupUiDefaults(configOwner)
+        val choices = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { choiceStore?.read() }
+        if (configApi.authSnapshot() === configOwner) groupUi = choices?.applyTo(defaults) ?: defaults
+    }
 
     var searchText by remember { mutableStateOf("") }
+    var groupDetails by remember { mutableStateOf(false) }
+    var createError by remember { mutableStateOf<String?>(null) }
+    val memberNames = remember { mutableMapOf<String, String>() }
     var groupName by remember { mutableStateOf("") }
     var selectedMembers by remember { mutableStateOf(setOf<String>()) }
     var results by remember { mutableStateOf(emptyList<UserProfile>()) }
     var acceptedContacts by remember { mutableStateOf(emptyList<UserProfile>()) }
     var contactLoadError by remember { mutableStateOf<String?>(null) }
+    var searchError by remember { mutableStateOf<String?>(null) }
     var isCreatingGroup by remember { mutableStateOf(startInGroupMode || startInBroadcastMode) }
     var isBroadcast by remember { mutableStateOf(startInBroadcastMode) }
-    var isLoading by remember { mutableStateOf(false) }
+    var queryLoading by remember { mutableStateOf(false) }
+    var isSubmittingGroup by remember { mutableStateOf(false) }
+    val isLoading = queryLoading || isSubmittingGroup
     var epoch by remember { mutableIntStateOf(0) }
     var debounceJob by remember { mutableStateOf<Job?>(null) }
     var sheetUser by remember { mutableStateOf<UserProfile?>(null) }
@@ -141,11 +169,12 @@ fun NewChatScreen(
 
     // Empty search is the accepted-contacts list, never the workspace directory.
     suspend fun refreshAcceptedContacts() {
-        isLoading = true
+        queryLoading = true
         contactLoadError = null
         try {
             if (loadContactRelations != null) {
                 val (entries, inbox) = loadContactRelations()
+                if (configApi.authSnapshot() !== configOwner) return
                 contactIds = entries.map { it.userId }.toSet()
                 contactUsernames = entries.map { it.username.lowercase() }.toSet()
                 acceptedContacts = entries.map(::contactProfile)
@@ -154,10 +183,11 @@ fun NewChatScreen(
                 contactLoadError = "The contacts list is unavailable on this server. Search a username explicitly."
             }
             if (searchText.isBlank()) results = acceptedContacts
-        } catch (error: Exception) {
+        } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+        catch (error: Exception) {
             contactLoadError = "Could not load contacts. ${errorText(error)}"
         } finally {
-            isLoading = false
+            queryLoading = false
         }
     }
 
@@ -191,13 +221,17 @@ fun NewChatScreen(
         scope.launch {
             try {
                 val users = searchUsersRemote(query)
+                if (configApi.authSnapshot() !== configOwner) return@launch
                 if (!NewChatRules.isCurrentEpoch(searchEpoch, epoch)) return@launch
                 results = users
-                isLoading = false
-            } catch (error: Exception) {
+                queryLoading = false
+            } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (error: Exception) {
                 if (!NewChatRules.isCurrentEpoch(searchEpoch, epoch)) return@launch
-                isLoading = false
-                snackbar.showSnackbar(errorText(error))
+                queryLoading = false
+                results = emptyList()
+                searchError = errorText(error)
+                snackbar.showSnackbar(searchError!!)
             }
         }
     }
@@ -206,15 +240,17 @@ fun NewChatScreen(
     // otherwise epoch++ + 250ms debounce before the remote search.
     fun onSearchChanged(value: String) {
         searchText = value
+        searchError = null
         debounceJob?.cancel()
         val query = value.trim()
         val nextEpoch = ++epoch // Also invalidate an in-flight search when cleared.
         if (query.isEmpty()) {
             results = acceptedContacts
-            isLoading = false
+            queryLoading = false
             return
         }
-        isLoading = true
+        results = emptyList() // Never leave a stale result actionable while a new username is checked.
+        queryLoading = true
         debounceJob = scope.launch {
             delay(NewChatRules.SEARCH_DEBOUNCE_MS)
             runSearch(query, nextEpoch)
@@ -224,112 +260,64 @@ fun NewChatScreen(
     fun finishGroupCreation() {
         val title = NewChatRules.effectiveGroupTitle(groupName, isBroadcast, selectedMembers.size)
         if (!NewChatRules.canCreateGroup(groupName, isBroadcast, selectedMembers.size, isLoading)) return
+        if (!groupDetails || isSubmittingGroup || configApi.authSnapshot() !== configOwner) return
+        if (groupName.length > groupUi.nameMaxLength) { createError = "Group name must be at most ${groupUi.nameMaxLength} characters."; return }
+        val capturedMembers = selectedMembers.toList()
+        isSubmittingGroup = true // Independent of search/contact loaders, which may finish concurrently.
+        createError = null
         scope.launch {
-            isLoading = true
             try {
-                val conversation = createGroup(title, selectedMembers.toList())
-                onOpenConversation(conversation)
-            } catch (error: Exception) {
-                isLoading = false
+                val conversation = createGroup(title, capturedMembers)
+                if (configApi.authSnapshot() === configOwner) onOpenConversation(conversation)
+            } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (error: Exception) {
+                createError = errorText(error)
                 snackbar.showSnackbar(errorText(error))
-            }
+            } finally { isSubmittingGroup = false }
         }
     }
 
     fun openDirectChat(user: UserProfile) {
-        if (isLoading) return
+        if (isLoading || configApi.authSnapshot() !== configOwner) return
         scope.launch {
-            isLoading = true
+            queryLoading = true
             try {
                 val conversation = openDirectConversation(user)
-                onOpenConversation(conversation)
+                if (configApi.authSnapshot() === configOwner) onOpenConversation(conversation)
             } catch (error: Exception) {
-                isLoading = false
+                queryLoading = false
                 snackbar.showSnackbar(errorText(error))
             }
         }
     }
 
-    Scaffold(
-        containerColor = colors.background,
-        snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = {
-                    if (isCreatingGroup) {
-                        isCreatingGroup = false
-                        isBroadcast = false
-                        selectedMembers = emptySet()
-                    } else {
-                        onBack()
-                    }
-                }) {
-                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
-                }
-                Text(
-                    if (isCreatingGroup) {
-                        if (isBroadcast) "New Broadcast (${selectedMembers.size})" else "New Group (${selectedMembers.size})"
-                    } else {
-                        "New Conversation"
-                    },
-                    color = colors.foreground,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        strokeWidth = 2.2.dp,
-                        color = colors.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp).size(18.dp),
-                    )
-                }
-                if (isCreatingGroup && !isLoading) {
-                    TextButton(
-                        onClick = { finishGroupCreation() },
-                        enabled = selectedMembers.isNotEmpty(),
-                    ) {
-                        Text(
-                            "Create",
-                            color = if (selectedMembers.isNotEmpty()) colors.primary else colors.foregroundTertiary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                        )
-                    }
-                }
-            }
-        },
-    ) { padding ->
-        // R2/R3: lists capped at 720dp centered on larger windows (approved
-        // responsive plan 8 Nov 2026).
-        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
-        Column(Modifier.fillMaxWidth().widthIn(max = 720.dp)) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    val selectedSection: @Composable () -> Unit = {
                 if (isCreatingGroup) {
-                    NewChatInput(
-                        value = groupName,
-                        onValueChange = { groupName = it },
-                        hint = if (isBroadcast) "Enter broadcast list name..." else "Enter group subject...",
-                        leading = {
-                            Icon(
-                                if (isBroadcast) Icons.Rounded.Cast else Icons.Rounded.GroupWork,
-                                contentDescription = null,
-                                tint = if (isBroadcast) colors.info else colors.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        },
-                    )
-                    Spacer(Modifier.height(8.dp))
+                    Text(if (groupDetails) "2 of 2 · Review group" else "1 of 2 · Select people", color = colors.foregroundSecondary)
+                    if (groupUi.showSelectedCount) Text("${selectedMembers.size} people selected", color = colors.foregroundSecondary)
+                    val selectedNames: @Composable () -> Unit = {
+                        selectedMembers.forEach { id ->
+                            TextButton(onClick = { if (!isLoading) selectedMembers = selectedMembers - id }) {
+                                Text("${memberNames[id] ?: contacts.firstOrNull { it.id == id }?.displayName ?: "Selected member"} · Remove")
+                            }
+                        }
+                    }
+                    if (groupUi.selectedDisplay == "list") Column { selectedNames() }
+                    else androidx.compose.foundation.lazy.LazyRow {
+                        items(selectedMembers.toList(), key = { it }) { id ->
+                            TextButton(onClick = { if (!isLoading) selectedMembers = selectedMembers - id }) {
+                                Text("${memberNames[id] ?: contacts.firstOrNull { it.id == id }?.displayName ?: "Selected member"} · Remove")
+                            }
+                        }
+                    }
+                    createError?.let { Text(it, color = colors.error) }
                 }
-                NewChatInput(
+    }
+    val searchSection: @Composable () -> Unit = {
+                if (!groupDetails) NewChatInput(
                     value = searchText,
                     onValueChange = { onSearchChanged(it) },
-                    hint = "Search @username or name...",
+                    hint = if (isCreatingGroup) groupUi.searchLabel else "Enter exact @username...",
                     leading = {
                         com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.search,
                             semanticLabel = null,
@@ -351,11 +339,252 @@ fun NewChatScreen(
                         null
                     },
                 )
+    }
+    val contactsSection: @Composable () -> Unit = {
+            when {
+                groupDetails -> Unit
+                isLoading && results.isEmpty() -> {
+                    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
+                        items(8) { SkeletonTile() }
+                    }
+                }
+                results.isEmpty() && searchText.trim().isNotEmpty() -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                    ) {
+                        Text(
+                            searchError?.let { "Could not check username" } ?: "No account with that exact username",
+                            color = colors.foreground,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            searchError ?: "Check the full username. Names and email addresses are not searched.",
+                            color = colors.foregroundSecondary,
+                            fontSize = 13.sp,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        TextButton(onClick = { onSearchChanged("") }) {
+                            Text("Clear search", color = colors.primary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                results.isEmpty() -> {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                    ) {
+                        Icon(
+                            Icons.Rounded.PersonSearch,
+                            contentDescription = null,
+                            tint = colors.foregroundTertiary,
+                            modifier = Modifier.size(44.dp),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            if (contactLoadError == null) "No contacts yet" else "Contacts unavailable",
+                            color = colors.foreground,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            contactLoadError ?: "Accepted contacts appear here. Search a username to send a request.",
+                            color = colors.foregroundSecondary,
+                            fontSize = 13.sp,
+                        )
+                        if (contactLoadError != null && loadContactRelations != null) {
+                            TextButton(onClick = { scope.launch { refreshAcceptedContacts() } }) {
+                                Text("Retry", color = colors.accent)
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
+                        itemsIndexed(results, key = { index, u -> "${u.id}_$index" }) { index, user ->
+                            val isSelected = selectedMembers.contains(user.id)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (isLoading || groupDetails) return@clickable
+                                        if (isCreatingGroup) {
+                                            memberNames[user.id] = user.displayName
+                                            selectedMembers = NewChatRules.toggleMember(selectedMembers, user.id)
+                                        } else if (loadContactRelations != null && !isContact(user)) {
+                                            // Contacts plane: non-contacts go
+                                            // through the request flow first.
+                                            sheetUser = user
+                                        } else {
+                                            openDirectChat(user)
+                                        }
+                                    }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                NewChatAvatar(user)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        user.displayName,
+                                        color = colors.foreground,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = (-0.2).sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        "@${user.username}" +
+                                            (if (isContact(user)) " • contact" else if (user.username.lowercase() in requestedUsernames) " • requested" else "") +
+                                            (if (user.about.isNotEmpty()) " • ${user.about}" else ""),
+                                        color = colors.foregroundSecondary,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                if (isCreatingGroup) {
+                                    Checkbox(
+                                        checked = isSelected,
+                                        enabled = !isLoading && !groupDetails,
+                                        onCheckedChange = {
+                                            memberNames[user.id] = user.displayName
+                                            selectedMembers = NewChatRules.toggleMember(selectedMembers, user.id)
+                                        },
+                                        colors = androidx.compose.material3.CheckboxDefaults.colors(
+                                            checkedColor = colors.primary,
+                                        ),
+                                    )
+                                } else {
+                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
+                                        semanticLabel = null,
+                                        color = colors.foregroundTertiary,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                            if (index < results.size - 1) {
+                                Box(
+                                    Modifier
+                                        .padding(start = 64.dp)
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(colors.divider),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+    }
+    Scaffold(
+        containerColor = colors.background,
+        snackbarHost = { SnackbarHost(snackbar) },
+        topBar = {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = {
+                    if (isLoading) return@IconButton
+                    if (isCreatingGroup && groupDetails) {
+                        groupDetails = false
+                    } else if (isCreatingGroup) {
+                        isCreatingGroup = false
+                        isBroadcast = false
+                        selectedMembers = emptySet()
+                    } else {
+                        onBack()
+                    }
+                }) {
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.back, semanticLabel = "Back", color = colors.foreground)
+                }
+                Text(
+                    if (isCreatingGroup) {
+                        if (isBroadcast) "New Broadcast (${selectedMembers.size})" else "${groupUi.title} (${selectedMembers.size})"
+                    } else {
+                        "New Conversation"
+                    },
+                    color = colors.foreground,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.2.dp,
+                        color = colors.primary,
+                        modifier = Modifier.padding(horizontal = 16.dp).size(18.dp),
+                    )
+                }
+                if (isCreatingGroup && !isLoading) {
+                    TextButton(
+                        onClick = {
+                            if (!groupDetails) {
+                                debounceJob?.cancel(); epoch++; queryLoading = false
+                                groupDetails = true; createError = null
+                            } else finishGroupCreation()
+                        },
+                        enabled = selectedMembers.isNotEmpty() && (!groupDetails || NewChatRules.canCreateGroup(groupName, isBroadcast, selectedMembers.size, isLoading)),
+                    ) {
+                        Text(
+                            if (groupDetails) groupUi.createLabel else groupUi.nextLabel,
+                            color = if (selectedMembers.isNotEmpty()) colors.primary else colors.foregroundTertiary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                        )
+                    }
+                }
+            }
+        },
+    ) { padding ->
+        // R2/R3: lists capped at 720dp centered on larger windows (approved
+        // responsive plan 8 Nov 2026).
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.fillMaxWidth().widthIn(max = 720.dp)) {
+            if (isCreatingGroup && !groupDetails) {
+                groupUi.order.forEach { section ->
+                    when (section) {
+                        "search" -> Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { searchSection() }
+                        "selected" -> Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) { selectedSection() }
+                        "contacts" -> Box(Modifier.fillMaxWidth().weight(1f)) { contactsSection() }
+                    }
+                }
+            } else {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                selectedSection()
+                if (isCreatingGroup && groupDetails) {
+                    Text("Review the people and name before creating. This sends one group-creation request. Standard chats are not end-to-end encrypted in this build.", color = colors.foregroundSecondary)
+                    NewChatInput(
+                        value = groupName,
+                        onValueChange = { groupName = it.take(groupUi.nameMaxLength); createError = null },
+                        hint = if (isBroadcast) "Enter broadcast list name..." else groupUi.nameLabel,
+                        leading = {
+                            Icon(
+                                if (isBroadcast) Icons.Rounded.Cast else Icons.Rounded.GroupWork,
+                                contentDescription = null,
+                                tint = if (isBroadcast) colors.info else colors.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                searchSection()
+
             }
             if (!isCreatingGroup) {
                 NewChatEntryCard(
                     title = "Create New Group",
-                    subtitle = "Start an encrypted group with multiple members",
+                    subtitle = "Choose people, then review the group name",
                     icon = { tint ->
                         Icon(Icons.Rounded.GroupAdd, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
                     },
@@ -419,141 +648,7 @@ fun NewChatScreen(
                     Spacer(Modifier.height(4.dp))
                 }
             }
-            when {
-                isLoading && results.isEmpty() -> {
-                    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
-                        items(8) { SkeletonTile() }
-                    }
-                }
-                results.isEmpty() && searchText.trim().isNotEmpty() -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-                    ) {
-                        Text(
-                            "No results for \"${searchText.trim()}\"",
-                            color = colors.foreground,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "No contacts or users matched your search keyword.",
-                            color = colors.foregroundSecondary,
-                            fontSize = 13.sp,
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        TextButton(onClick = { onSearchChanged("") }) {
-                            Text("Clear search", color = colors.primary, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-                results.isEmpty() -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-                    ) {
-                        Icon(
-                            Icons.Rounded.PersonSearch,
-                            contentDescription = null,
-                            tint = colors.foregroundTertiary,
-                            modifier = Modifier.size(44.dp),
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            if (contactLoadError == null) "No contacts yet" else "Contacts unavailable",
-                            color = colors.foreground,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            contactLoadError ?: "Accepted contacts appear here. Search a username to send a request.",
-                            color = colors.foregroundSecondary,
-                            fontSize = 13.sp,
-                        )
-                        if (contactLoadError != null && loadContactRelations != null) {
-                            TextButton(onClick = { scope.launch { refreshAcceptedContacts() } }) {
-                                Text("Retry", color = colors.accent)
-                            }
-                        }
-                    }
-                }
-                else -> {
-                    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)) {
-                        itemsIndexed(results, key = { index, u -> "${u.id}_$index" }) { index, user ->
-                            val isSelected = selectedMembers.contains(user.id)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        if (isCreatingGroup) {
-                                            selectedMembers = NewChatRules.toggleMember(selectedMembers, user.id)
-                                        } else if (loadContactRelations != null && !isContact(user)) {
-                                            // Contacts plane: non-contacts go
-                                            // through the request flow first.
-                                            sheetUser = user
-                                        } else {
-                                            openDirectChat(user)
-                                        }
-                                    }
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                NewChatAvatar(user)
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        user.displayName,
-                                        color = colors.foreground,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        letterSpacing = (-0.2).sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        "@${user.username}" +
-                                            (if (isContact(user)) " • contact" else if (user.username.lowercase() in requestedUsernames) " • requested" else "") +
-                                            (if (user.about.isNotEmpty()) " • ${user.about}" else ""),
-                                        color = colors.foregroundSecondary,
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                if (isCreatingGroup) {
-                                    Checkbox(
-                                        checked = isSelected,
-                                        onCheckedChange = {
-                                            selectedMembers = NewChatRules.toggleMember(selectedMembers, user.id)
-                                        },
-                                        colors = androidx.compose.material3.CheckboxDefaults.colors(
-                                            checkedColor = colors.primary,
-                                        ),
-                                    )
-                                } else {
-                                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight,
-                                        semanticLabel = null,
-                                        color = colors.foregroundTertiary,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                            }
-                            if (index < results.size - 1) {
-                                Box(
-                                    Modifier
-                                        .padding(start = 64.dp)
-                                        .fillMaxWidth()
-                                        .height(1.dp)
-                                        .background(colors.divider),
-                                )
-                            }
-                        }
-                    }
-                }
+            contactsSection()
             }
         }
         }
@@ -635,7 +730,7 @@ fun NewChatScreen(
                 TextButton(onClick = {
                     deleteCandidate = null
                     scope.launch {
-                        isLoading = true
+                        queryLoading = true
                         try {
                             deleteUser(deleteTarget.id)
                             acceptedContacts = acceptedContacts.filterNot { it.id == deleteTarget.id }
@@ -644,7 +739,7 @@ fun NewChatScreen(
                         } catch (error: Exception) {
                             snackbar.showSnackbar("Failed to delete user: $error")
                         } finally {
-                            isLoading = false
+                            queryLoading = false
                         }
                     }
                 }) {

@@ -60,7 +60,8 @@ object ChatyNotifications {
     fun consumeOpenRoom() { _pendingRoomId.value = null }
 
     /** Call the user acted on from the notification (consumed by MainActivity once the offer is in). */
-    data class PendingCallAction(val callId: String, val answer: Boolean)
+    data class PendingCallAction(val callId: String, val answer: Boolean,
+        val owner: com.example.chat.data.api.ApiAccountScope? = null)
     private val _pendingCallAction = MutableStateFlow<PendingCallAction?>(null)
     val pendingCallAction: StateFlow<PendingCallAction?> = _pendingCallAction
     fun requestCallAction(action: PendingCallAction) { _pendingCallAction.value = action }
@@ -79,6 +80,7 @@ object ChatyNotifications {
             shownMessageIds.clear()
         }
         synchronized(ringInfo) { ringInfo.clear() }
+        incomingActions.clear()
         ringingCallId = null
         NotificationManagerCompat.from(context).cancelAll()
     }
@@ -187,8 +189,44 @@ object ChatyNotifications {
     // Inactive alerts contain no peer, room, message text or call action.
     const val ACTION_OPEN_ACCOUNTS = "com.example.chat.action.OPEN_ACCOUNTS"
     val pendingAccountAlert = MutableStateFlow<String?>(null)
+    /** Only account-routed alerts are retired; never erase the other account's notifications. */
+    fun cancelRemovedAccountAlerts(context: Context, accountHash: String) {
+        require(accountHash.matches(Regex("[a-f0-9]{64}")))
+        cancelInactiveAccountMessage(context, accountHash)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager?.activeNotifications?.forEach { notice ->
+            if (notice.tag?.startsWith("account-call:$accountHash:") == true) {
+                manager.cancel(notice.tag, notice.id)
+            }
+        }
+        if (pendingAccountAlert.value == accountHash) pendingAccountAlert.value = null
+        if (pendingAccountCall.value?.accountHash == accountHash) pendingAccountCall.value = null
+    }
     fun cancelInactiveAccountMessage(context: Context, accountHash: String) {
         NotificationManagerCompat.from(context).cancel("inactive:$accountHash", 1)
+    }
+    data class AccountCallRoute(val accountHash: String, val callId: String)
+    val pendingAccountCall = MutableStateFlow<AccountCallRoute?>(null)
+    const val ACTION_OPEN_ACCOUNT_CALL = "com.example.chat.action.OPEN_ACCOUNT_CALL"
+    fun cancelAccountIncomingCall(context: Context, accountHash: String, callId: String) {
+        NotificationManagerCompat.from(context).cancel("account-call:$accountHash:$callId", 1)
+    }
+    fun showAccountIncomingCall(context: Context, accountHash: String, callId: String, expiresInMs: Long = 60_000): Boolean {
+        if (expiresInMs <= 0 || !canPost(context) || !NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
+        ChatyNotificationPoster.ensureChannels(context)
+        val open = Intent(context, MainActivity::class.java).apply {
+            action = ACTION_OPEN_ACCOUNT_CALL
+            putExtra("account_hash", accountHash); putExtra(EXTRA_CALL_ID, callId)
+            data = android.net.Uri.Builder().scheme("chaty").authority("account-call").appendPath(accountHash).appendPath(callId).build()
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val notice = NotificationCompat.Builder(context, ChatyNotificationPolicy.CH_INCOMING_CALL)
+            .setSmallIcon(android.R.drawable.stat_sys_phone_call).setContentTitle("Incoming call")
+            .setContentText("Open the app to answer in this account").setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setCategory(NotificationCompat.CATEGORY_CALL).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOnlyAlertOnce(true).setTimeoutAfter(expiresInMs.coerceAtMost(60_000)).setAutoCancel(true)
+            .setContentIntent(PendingIntent.getActivity(context, 31 * accountHash.hashCode() + callId.hashCode(), open, flags())).build()
+        return try { NotificationManagerCompat.from(context).notify("account-call:$accountHash:$callId", 1, notice); true } catch (_: SecurityException) { false }
     }
     fun showInactiveAccountMessage(context: Context, accountHash: String, label: String): Boolean {
         if (!canPost(context) || !NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
@@ -231,12 +269,24 @@ object ChatyNotifications {
     @Volatile private var ringingCallId: String? = null
     private data class RingInfo(val callerId: String, val callerName: String, val isVideo: Boolean)
     private val ringInfo = HashMap<String, RingInfo>()
+    private val incomingActions = ChatyActionRegistry<com.example.chat.data.api.ApiAccountScope>()
+    private const val EXTRA_INCOMING_NONCE = "incoming_action_nonce"
+
+    /** Fail closed after process death, sign-out, token/routing change, or a stale PendingIntent. */
+    fun incomingActionOwner(intent: Intent): com.example.chat.data.api.ApiAccountScope? {
+        val entry = incomingActions.resolve(intent.getStringExtra(EXTRA_INCOMING_NONCE)) ?: return null
+        val current = ServiceLocator.apiBackend.authSnapshot()
+        return entry.scope.takeIf { it === current && !it.token.isNullOrBlank() &&
+            entry.action == intent.action && entry.callId == intent.getStringExtra(EXTRA_CALL_ID) }
+    }
 
     val currentlyRingingCallId: String? get() = ringingCallId
 
     fun showIncomingCall(context: Context, callId: String, callerId: String, callerName: String, isVideo: Boolean) {
         if (callId.isBlank() || !canPost(context)) return
         if (ringingCallId == callId) return
+        val owner = ServiceLocator.apiBackend.authSnapshot()
+        if (owner.token.isNullOrBlank()) return
         ensureChannels(context)
         synchronized(ringInfo) { ringInfo[callId] = RingInfo(callerId, callerName, isVideo) }
         ringingCallId = callId
@@ -249,6 +299,7 @@ object ChatyNotifications {
 
         fun activityIntent(action: String) = Intent(context, MainActivity::class.java).apply {
             this.action = action
+            putExtra(EXTRA_INCOMING_NONCE, incomingActions.register(owner, action, callId = callId))
             putExtra(EXTRA_CALL_ID, callId)
             putExtra(EXTRA_CALLER_ID, callerId)
             putExtra(EXTRA_CALLER_NAME, callerName)
@@ -268,6 +319,7 @@ object ChatyNotifications {
         val answer = PendingIntent.getActivity(context, requestCode(ACTION_ANSWER_CALL), answerIntent, flags())
         val declineIntent = Intent(context, CallActionReceiver::class.java).apply {
             action = ACTION_DECLINE_CALL
+            putExtra(EXTRA_INCOMING_NONCE, incomingActions.register(owner, ACTION_DECLINE_CALL, callId = callId))
             data = android.net.Uri.Builder().scheme("chaty").authority("incoming-call")
                 .appendPath(callId).appendPath("decline").build()
             putExtra(EXTRA_CALL_ID, callId)
@@ -356,7 +408,10 @@ object ChatyNotifications {
         } catch (_: SecurityException) {}
     }
 
-    fun forgetCall(callId: String) { synchronized(ringInfo) { ringInfo.remove(callId) } }
+    fun forgetCall(callId: String) {
+        incomingActions.clearCall(callId)
+        synchronized(ringInfo) { ringInfo.remove(callId) }
+    }
 
     // ── in-app ringing (app open: the call screen shows, this plays the ringtone) ──
 

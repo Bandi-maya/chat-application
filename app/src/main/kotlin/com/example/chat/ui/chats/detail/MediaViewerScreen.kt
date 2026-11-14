@@ -123,7 +123,8 @@ fun MediaViewerScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val reduceMotion = !android.animation.ValueAnimator.areAnimatorsEnabled()
+    // Live policy also works on minSdk24; direct areAnimatorsEnabled() is API26+.
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val opening = remember(storagePath) { Animatable(if (reduceMotion) 1f else 0f) }
     var targetBounds by remember { mutableStateOf<Rect?>(null) }
     var imageReady by remember(storagePath) { mutableStateOf(false) }

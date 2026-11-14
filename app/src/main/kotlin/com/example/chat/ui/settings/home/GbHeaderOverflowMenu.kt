@@ -94,6 +94,15 @@ data class GbHeaderOverflowActions(
 @Composable
 fun GbHeaderOverflowMenuDialog(t: ThemeConfig, actions: GbHeaderOverflowActions, onDismiss: () -> Unit) {
     val colors = LocalAppColors.current
+    val preferences = com.example.chat.ServiceLocator.preferencesController
+    var prefsRevision by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    androidx.compose.runtime.DisposableEffect(preferences) {
+        val changed: () -> Unit = { prefsRevision++ }
+        preferences.addListener(changed)
+        onDispose { preferences.removeListener(changed) }
+    }
+    @Suppress("UNUSED_EXPRESSION") prefsRevision
+    val menuPreferences = preferences.home
     val presentation = com.example.chat.ui.kit.LocalReferenceLayoutPresentation.current
     val layoutShape = androidx.compose.foundation.shape.RoundedCornerShape(presentation.menuCornerDp.dp)
     var shown by remember { mutableStateOf(false) }
@@ -129,20 +138,19 @@ fun GbHeaderOverflowMenuDialog(t: ThemeConfig, actions: GbHeaderOverflowActions,
                     .padding(vertical = 8.dp),
             ) {
                 Item(t, Icons.Rounded.Tune, "Header & Navigation", pick(actions.onGbSettings))
+                if (menuPreferences.menuShowMessageNumber && actions.onMessageNumber != null) {
+                    Item(t, Icons.Rounded.ForwardToInbox, "Message a number", pick(actions.onMessageNumber))
+                }
                 // Scheduler / Auto Reply / Linked devices: deferred to the next release (ReleaseFeatures).
                 if (ReleaseFeatures.MESSAGE_AUTOMATION) {
                     Item(t, Icons.Outlined.ScheduleSend, "Message Scheduler", pick(actions.onMessageScheduler))
                     Item(t, Icons.Outlined.ReplyAll, "Auto Reply", pick(actions.onAutoReply))
                 }
-                Item(t, Icons.Rounded.RestartAlt, "Restart Chaty", pick(actions.onRestart))
-                Item(t, Icons.Rounded.EditNote, "Message a number", pick(actions.onMessageNumber))
-                Item(t, Icons.Rounded.ForwardToInbox, "Mass Message Sender", pick(actions.onMassMessage))
-                Item(t, Icons.Outlined.GroupAdd, "New group", pick(actions.onNewGroup))
-                Item(t, Icons.Outlined.Groups, "New community", pick(actions.onNewCommunity))
+                if (menuPreferences.menuShowNewActions) Item(t, Icons.Outlined.GroupAdd, "New group", pick(actions.onNewGroup))
+                if (menuPreferences.menuShowNewActions) Item(t, Icons.Outlined.Groups, "New community", pick(actions.onNewCommunity))
                 if (ReleaseFeatures.LINKED_DEVICES) Item(t, Icons.Rounded.Devices, "Linked devices", pick(actions.onLinkedDevices))
-                Item(t, Icons.Outlined.StarOutline, "Starred", pick(actions.onStarred))
-                Item(t, Icons.Rounded.DoneAll, "Read all", pick(actions.onReadAll))
-                Item(t, Icons.Outlined.Settings, "Settings", pick(actions.onSettings))
+                if (menuPreferences.menuShowSavedChats) Item(t, Icons.Outlined.StarOutline, "Starred", pick(actions.onStarred))
+                if (menuPreferences.menuShowMarkRead) Item(t, Icons.Rounded.DoneAll, "Read all", pick(actions.onReadAll))
             }
         }
     }

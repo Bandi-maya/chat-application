@@ -456,6 +456,7 @@ internal fun AuthRoleIcon(role: String, theme: ThemeConfig, label: String? = nul
         "eye" -> com.example.chat.ui.icons.ChatyIconId.eye
         "eyeOff" -> com.example.chat.ui.icons.ChatyIconId.eyeOff
         "info" -> com.example.chat.ui.icons.ChatyIconId.info
+        "phone" -> com.example.chat.ui.icons.ChatyIconId.phone
         else -> com.example.chat.ui.icons.ChatyIconId.mail
     }
     com.example.chat.ui.icons.ChatyIcon(id, size = 20.dp, color = color, semanticLabel = label)

@@ -10,7 +10,7 @@ import org.junit.Test
 
 /**
  * JVM proofs for the recents-style account switcher page model:
- * one page per registered account plus a trailing "+ Add account" page,
+ * one page per registered account plus a trailing "+ Add account" page only below the two-account cap,
  * which is also the only page when no account is registered yet.
  */
 class AccountRecentsPagesTest {
@@ -34,16 +34,16 @@ class AccountRecentsPagesTest {
     }
 
     @Test
-    fun `every account gets a page and the Add page trails`() {
+    fun `existing excess accounts remain visible but no Add page is offered`() {
         val accounts = listOf(meta("a"), meta("b"), meta("c"))
         val pages = AccountRecentsPages.build(accounts)
-        assertEquals(4, pages.size)
+        assertEquals(3, pages.size)
         accounts.forEachIndexed { index, account ->
             assertEquals(AccountRecentsPageKind.Account, pages[index].kind)
             assertSame(account, pages[index].account)
         }
-        assertEquals(AccountRecentsPageKind.AddAccount, pages[3].kind)
-        assertNull(pages[3].account)
+        assertEquals(2, AccountRecentsPages.build(accounts.take(2)).size)
+        assertEquals(AccountRecentsPageKind.AddAccount, AccountRecentsPages.build(accounts.take(1)).last().kind)
     }
 
     @Test

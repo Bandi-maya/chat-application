@@ -148,7 +148,39 @@ private fun ChatyDefaultIncomingCall(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
 ) {
-    AppleIosIncomingCall(tokens, session, onAccept, onDecline)
+    // The default family uses the approved named capsules. Other selectable
+    // families keep their reference gestures; changing the default is not a
+    // permission to replace every bundle's interaction.
+    Box(Modifier.fillMaxSize().background(tokens.surfaceBackground)
+        .padding(horizontal = 24.dp, vertical = 24.dp)) {
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+                .padding(top = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                CallTypeCenterIcon(session, tint = tokens.secondaryText, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.height(8.dp))
+                Text(if (session.isVideo) "Incoming video call" else "Incoming voice call",
+                    color = tokens.secondaryText, fontSize = 16.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Text(session.remoteDisplayName, color = tokens.primaryText, fontSize = 28.sp,
+                    fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+                    maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() })
+            }
+            Row(Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Button(onClick = onDecline, shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = tokens.declineColor),
+                    modifier = Modifier.weight(1f).heightIn(min = 56.dp)) {
+                    Text("Decline", color = Color.White, maxLines = 2, textAlign = TextAlign.Center)
+                }
+                Button(onClick = onAccept, shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = tokens.acceptColor),
+                    modifier = Modifier.weight(1f).heightIn(min = 56.dp)) {
+                    Text("Answer", color = Color.White, maxLines = 2, textAlign = TextAlign.Center)
+                }
+            }
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

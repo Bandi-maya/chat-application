@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -115,7 +116,9 @@ fun IslandWaveform(
 ) {
     val count = barCount.coerceIn(1, waveformBaseHeights.size)
     // 900ms repeat(reverse: true) phase driver.
-    val phase = rememberIslandWaveformPhase(active)
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val hostResumed = rememberIslandHostResumed()
+    val phase = rememberIslandWaveformPhase(active && !reduceMotion && hostResumed)
     Row(verticalAlignment = Alignment.Bottom) {
         for (i in 0 until count) {
             val barH = islandWaveformBarHeight(i, active, phase, height)
@@ -700,37 +703,19 @@ fun ExpandedChatMessageView(
                 }
             }
         } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
-                        .clickable {
-                            ChatyHapticsPort.light(view)
-                            showInput = true
-                            controller.pinOpen(true)
-                        }
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ChatyIcon(ChatyIconId.reply, color = Color.White, size = 16.dp)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Quick Reply", color = Color.White, fontSize = 12.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (payload.canQuickReply && payload.onQuickReply != null) {
+                    androidx.compose.material3.Button(onClick = {
+                        ChatyHapticsPort.light(view)
+                        showInput = true
+                        controller.pinOpen(true)
+                    }, shape = CircleShape, modifier = Modifier.heightIn(min = 48.dp)) { Text("Reply") }
                 }
-                Spacer(Modifier.width(8.dp))
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable {
-                            ChatyHapticsPort.selection(view)
-                            payload.onMarkAsRead?.invoke()
-                            controller.dismissActive()
-                        }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    Text("Mark Read", color = Color(0x99FFFFFF), fontSize = 12.sp)
+                if (payload.onMarkAsRead != null) {
+                    androidx.compose.material3.OutlinedButton(onClick = {
+                        ChatyHapticsPort.selection(view)
+                        payload.onMarkAsRead.invoke()
+                    }, shape = CircleShape, modifier = Modifier.heightIn(min = 48.dp)) { Text("Mark as read") }
                 }
             }
         }
@@ -776,7 +761,7 @@ fun ExpandedCallView(
                     if (isIncoming) {
                         "Incoming ${if (payload.isVideo) "Video" else "Audio"} Call…"
                     } else {
-                        payload.callStatusLabel ?: "Ongoing Call • ${islandFormatTime(payload.durationSeconds)}"
+                        payload.callStatusLabel ?: if (payload.callShowsDuration) "Connected • ${islandFormatTime(payload.durationSeconds)}" else "Calling"
                     },
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 12.sp,
@@ -791,48 +776,49 @@ fun ExpandedCallView(
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             if (isIncoming) {
-                CallActionButton(
+                if (payload.onDeclineCall != null) CallActionButton(
                     kind = "callEnd",
                     color = Color(0xFFEF4444),
                     label = "Decline",
                 ) {
                     ChatyHapticsPort.error(view)
                     payload.onDeclineCall?.invoke()
-                    controller.dismissActive()
                 }
-                CallActionButton(
+                if (payload.onAcceptCall != null) CallActionButton(
                     kind = "voiceCall",
                     color = Color(0xFF22C55E),
-                    label = "Accept",
+                    label = "Answer",
                 ) {
                     ChatyHapticsPort.error(view)
                     payload.onAcceptCall?.invoke()
                 }
             } else {
-                CallActionButton(
+                if (payload.callShowsDuration && payload.onToggleCallMute != null) CallActionButton(
+                    showLabel = false,
                     kind = if (payload.isMuted) "micOff" else "mic",
                     color = if (payload.isMuted) Color(0x4DFFFFFF) else Color(0x1FFFFFFF),
                     label = if (payload.isMuted) "Unmute" else "Mute",
                 ) {
                     ChatyHapticsPort.light(view)
-                    (payload.onToggleCallMute ?: payload.onTap)?.invoke()
+                    payload.onToggleCallMute?.invoke()
                 }
-                CallActionButton(
+                if (payload.callShowsDuration && payload.onToggleCallSpeaker != null) CallActionButton(
+                    showLabel = false,
                     kind = if (payload.isSpeaker) "speaker" else "earpiece",
                     color = if (payload.isSpeaker) Color(0xFF3B82F6) else Color(0x1FFFFFFF),
                     label = "Speaker",
                 ) {
                     ChatyHapticsPort.light(view)
-                    (payload.onToggleCallSpeaker ?: payload.onTap)?.invoke()
+                    payload.onToggleCallSpeaker?.invoke()
                 }
-                CallActionButton(
+                if (payload.onDeclineCall != null) CallActionButton(
+                    showLabel = false,
                     kind = "callEnd",
                     color = Color(0xFFEF4444),
-                    label = "End",
+                    label = "Hang up",
                 ) {
                     ChatyHapticsPort.error(view)
                     payload.onDeclineCall?.invoke()
-                    controller.dismissActive()
                 }
             }
         }
@@ -844,30 +830,27 @@ private fun CallActionButton(
     kind: String,
     color: Color,
     label: String,
+    showLabel: Boolean = true,
     onTap: () -> Unit,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onTap),
-    ) {
-        Box(
-            Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(color),
-            contentAlignment = Alignment.Center,
-        ) {
-            when (kind) {
-                "callEnd" -> ChatyIcon(ChatyIconId.callEnd, color = Color.White, size = 22.dp)
-                "voiceCall" -> ChatyIcon(ChatyIconId.voiceCall, color = Color.White, size = 22.dp)
-                "mic" -> ChatyIcon(ChatyIconId.microphone, color = Color.White, size = 22.dp)
-                "micOff" -> ChatyIcon(ChatyIconId.microphoneOff, color = Color.White, size = 22.dp)
-                "speaker" -> ChatyIcon(ChatyIconId.speaker, color = Color.White, size = 22.dp)
-                "earpiece" -> ChatyIcon(ChatyIconId.earpiece, color = Color.White, size = 22.dp)
-            }
+    if (showLabel) {
+        androidx.compose.material3.Button(onClick = onTap, shape = CircleShape,
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = color),
+            modifier = Modifier.heightIn(min = 48.dp)) {
+            Text(label, color = Color.White)
         }
-        Spacer(Modifier.height(4.dp))
-        Text(label, color = Color(0xB3FFFFFF), fontSize = 11.sp)
+    } else {
+        androidx.compose.material3.IconButton(onClick = onTap,
+            modifier = Modifier.size(56.dp).background(color, CircleShape)) {
+            ChatyIcon(when (kind) {
+                "callEnd" -> ChatyIconId.callEnd
+                "voiceCall" -> ChatyIconId.voiceCall
+                "mic" -> ChatyIconId.microphone
+                "micOff" -> ChatyIconId.microphoneOff
+                "speaker" -> ChatyIconId.speaker
+                else -> ChatyIconId.earpiece
+            }, color = Color.White, size = 24.dp, semanticLabel = label)
+        }
     }
 }
 

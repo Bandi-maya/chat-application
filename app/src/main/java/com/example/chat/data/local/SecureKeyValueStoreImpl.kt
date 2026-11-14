@@ -15,7 +15,7 @@ class SecureKeyValueStoreImpl(context: Context) : SecureKeyValueStore {
 
     private val prefs = EncryptedSharedPreferences.create(
         context.applicationContext,
-        "chaty_secure_store",
+        com.example.chat.core.security.SecureStrings.secureStoreFileName,
         MasterKey.Builder(context.applicationContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,

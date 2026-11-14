@@ -38,13 +38,21 @@ class AndroidPreferencesBlobStore(
 class ApiRemoteSettingsStore(
     private val apiBackend: ApiBackendService,
 ) : RemoteSettingsStore {
+    private fun captureOwner(userId: String): com.example.chat.data.api.ApiAccountScope {
+        val owner = apiBackend.authSnapshot()
+        // REST preference identities use the canonical tenant+server+user hash, not bare UUID.
+        check(userId == apiBackend.currentAccountHash() && apiBackend.authSnapshot() === owner) { "Preferences account changed." }
+        return owner
+    }
     override suspend fun fetch(userId: String): RemoteSettingsRow? {
-        val (settings, updatedAt) = apiBackend.remoteSettingsFetch() ?: return null
+        val owner = captureOwner(userId)
+        val (settings, updatedAt) = apiBackend.remoteSettingsFetch(owner) ?: return null
         return RemoteSettingsRow(settings = settings, updatedAt = updatedAt)
     }
 
     override suspend fun push(userId: String, snapshot: Map<String, Any?>) {
-        if (!apiBackend.remoteSettingsPush(snapshot)) {
+        val owner = captureOwner(userId)
+        if (!apiBackend.remoteSettingsPush(snapshot, owner)) {
             throw IllegalStateException("Remote settings push failed.")
         }
     }

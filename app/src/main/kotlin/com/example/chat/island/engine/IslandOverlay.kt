@@ -93,17 +93,18 @@ class IslandOverlay(private val host: Context, private val windowType: Int) {
             lifetime.launch {
                 IslandController.privacySuppressed.collect { privateContent ->
                     val secure = WindowManager.LayoutParams.FLAG_SECURE
-                    layout.flags = if (privateContent) layout.flags or secure else layout.flags and secure.inv()
-                    update()
+                    val nextFlags = if (privateContent) layout.flags or secure else layout.flags and secure.inv()
+                    if (layout.flags != nextFlags) { layout.flags = nextFlags; update() }
                 }
             }
+            lifetime.launch { IslandSettings.triggers.collect { signals.refreshSubscriptions() } }
             lifetime.launch {
                 IslandController.replying.collect { typing ->
                     val focus = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                     val outside = WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
-                    layout.flags = if (typing) (layout.flags and focus.inv()) or outside
+                    val nextFlags = if (typing) (layout.flags and focus.inv()) or outside
                         else (layout.flags or focus) and outside.inv()
-                    update()
+                    if (layout.flags != nextFlags) { layout.flags = nextFlags; update() }
                 }
             }
         }
@@ -162,6 +163,8 @@ private fun OverlayContent() {
     if (privateScreen || !enabled || (mode == IslandMode.Idle && !idle)) return
     val notificationFrame by IslandController.displayedNotificationFrame.collectAsState()
     val view = LocalView.current
+    val acknowledged = androidx.compose.runtime.remember(view) { arrayOfNulls<IslandController.NotificationFrame>(1) }
+    val pending = androidx.compose.runtime.remember(view) { arrayOfNulls<IslandController.NotificationFrame>(1) }
     val level by IslandController.level.collectAsState()
     val scale by IslandSettings.scale.collectAsState()
     val width by IslandSettings.widthScale.collectAsState()
@@ -180,9 +183,15 @@ private fun OverlayContent() {
         // Posting runs after this draw pass. Revalidate at callback time: a
         // privacy/settings/call transition may have replaced the payload.
         val frame = notificationFrame
-        if (frame != null && size.width > 0 && size.height > 0) view.post {
-            if (view.isAttachedToWindow && view.isShown && view.windowVisibility == android.view.View.VISIBLE) {
-                IslandController.acknowledgeNotificationDrawn(frame)
+        if (frame != null && frame != acknowledged[0] && frame != pending[0] && size.width > 0 && size.height > 0) {
+            pending[0] = frame
+            view.post {
+                if (pending[0] == frame) pending[0] = null
+                if (view.isAttachedToWindow && view.isShown && view.windowVisibility == android.view.View.VISIBLE &&
+                    IslandController.displayedNotificationFrame.value == frame && !IslandController.privacySuppressed.value) {
+                    acknowledged[0] = frame
+                    IslandController.acknowledgeNotificationDrawn(frame)
+                }
             }
         }
     }, mode = mode, level = level, scale = scale, widthScale = width, heightScale = height,
@@ -191,7 +200,8 @@ private fun OverlayContent() {
         onDismiss = { IslandController.dismiss() }, onOpenNotification = { IslandController.openNotification() }, onPrev = { IslandController.prev() },
         onNext = { IslandController.next() }, onPlayPause = { IslandController.playPause() },
         onSeek = { IslandController.seekTo(it) }, onAnswer = { IslandController.answerCall() },
-        onDecline = { IslandController.declineCall() }, onMarkRead = { IslandController.markRead() },
+        onDecline = { IslandController.declineCall() },
+        onCallMute = { IslandController.toggleCallMute() }, onCallSpeaker = { IslandController.toggleCallSpeaker() }, onMarkRead = { IslandController.markRead() },
         onReply = { IslandController.startReply() }, onSendReply = { IslandController.sendReply(it) },
         onCancelReply = { IslandController.cancelReply() }, replying = editor,
         secondary = music, queued = waiting, onOpenMedia = { IslandController.openMedia() },
@@ -239,6 +249,20 @@ private class SystemSignals(private val context: Context, private val configurat
         val awake = service(PowerManager::class.java)?.isInteractive == true
         val locked = service(KeyguardManager::class.java)?.isKeyguardLocked != false
         IslandController.setPrivacySuppressed(!awake || locked)
+        refreshSubscriptions()
+    }
+
+    fun refreshSubscriptions() {
+        val needed = registered && IslandSettings.enabled.value && IslandSettings.isOn(Trigger.Toggles) &&
+            !IslandController.privacySuppressed.value
+        if (needed == torchRegistered) return
+        try {
+            val manager = service(CameraManager::class.java) ?: return
+            if (needed) manager.registerTorchCallback(torch, Handler(Looper.getMainLooper()))
+            else manager.unregisterTorchCallback(torch)
+            torchRegistered = needed
+            lamps.clear()
+        } catch (_: Exception) {}
     }
     private fun emit(trigger: Trigger, mode: IslandMode, duration: Long = 3500) {
         if (IslandSettings.enabled.value && !IslandController.privacySuppressed.value && IslandSettings.isOn(trigger)) {
@@ -258,10 +282,7 @@ private class SystemSignals(private val context: Context, private val configurat
         // Bluetooth broadcasts come from a privileged system process, not necessarily the system UID.
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
         registered = true
-        try {
-            service(CameraManager::class.java)?.registerTorchCallback(torch, Handler(Looper.getMainLooper()))
-            torchRegistered = true
-        } catch (_: Exception) {}
+        refreshSubscriptions()
     }
 
     fun close() {
@@ -287,7 +308,7 @@ private class SystemSignals(private val context: Context, private val configurat
             Intent.ACTION_HEADSET_PLUG -> if (intent.getIntExtra("state", 0) == 1 && !intent.getBooleanExtra("initial", false)) {
                 emit(Trigger.Devices, IslandMode.Device(intent.getStringExtra("name") ?: "Wired headphones", true), 3000)
             }
-            BluetoothDevice.ACTION_ACL_CONNECTED -> bluetooth(intent)
+            BluetoothDevice.ACTION_ACL_CONNECTED -> if (IslandSettings.isOn(Trigger.Devices) && !IslandController.privacySuppressed.value) bluetooth(intent)
             AudioManager.RINGER_MODE_CHANGED_ACTION -> {
                 val value = service(AudioManager::class.java)?.ringerMode ?: return
                 if (value == ringer) return

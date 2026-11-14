@@ -39,6 +39,7 @@ import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -135,6 +136,7 @@ fun ChatsHomeScreen(
     currentUserId: String = "",
     /** Opaque auth generation, not merely uid: resets pending selection/dialog state across account transitions. */
     accountSessionIdentity: Any? = currentUserId,
+    folderAccountKey: String = "",
     identity: HomeIdentity = HomeIdentity(),
     contacts: List<UserProfile> = emptyList(),
     homePreferences: HomePreferences = HomePreferences(),
@@ -203,21 +205,10 @@ fun ChatsHomeScreen(
     } else {
         nav
     }).copy(onOpenCameraEffects = { nav.onOpenCameraEffects(); showEffects = true })
-    // Connection UI defaults to the shared detail-slice components once the
-    // owner wires the health snapshot; explicit slots still win.
-    // No Home strip banner: connection state is shown only by the signal icon in the header (headerExtras),
-    // the single tap target for Connection Health. An explicitly supplied slot is still honored.
+    // Connection health is available in the overflow, not the header signal lane.
+    // Preserve explicit non-connection host slots.
     val effectiveConnectionBanner: (@Composable () -> Unit)? = connectionBanner
     val effectiveHeaderExtras: (@Composable () -> Unit)? = headerExtras
-        ?: connectionHealthState?.let { state ->
-            @Composable {
-                com.example.chat.ui.chats.detail.ConnectionHealthIndicator(
-                    health = state.health,
-                    size = 24.dp,
-                    onTap = onOpenConnectionDetail,
-                )
-            }
-        }
 
     val isSelectionMode = selectedIds.isNotEmpty()
 
@@ -255,10 +246,22 @@ fun ChatsHomeScreen(
     // Snapshot privacy values on every composition. Captured mutable controller state may
     // change without changing a lambda's identity, especially with strong skipping enabled.
     val hiddenConversationIds = conversations.asSequence().map { it.id }.filter(isConversationHidden).toSet()
-    val visibleConversations = remember(accountSessionIdentity, conversations, searchQuery, selectedFilter, forcedType, hiddenConversationIds) {
-        filterHomeConversations(
+
+    // G7: local, account-scoped chat folders. Membership never leaves the
+    // device; the folder filter applies after the stock filter/search pass.
+    val folderStoreContext = androidx.compose.ui.platform.LocalContext.current
+    val chatFolderStore = remember(accountSessionIdentity, folderAccountKey) {
+        com.example.chat.data.local.ChatFolderStore(folderStoreContext, folderAccountKey.ifBlank { "unavailable" })
+    }
+    val chatFolderRevision by chatFolderStore.revision.collectAsState()
+    var selectedFolderId by remember(accountSessionIdentity, folderAccountKey) { mutableStateOf<String?>(null) }
+
+    val visibleConversations = remember(accountSessionIdentity, folderAccountKey, chatFolderStore, conversations, searchQuery, selectedFilter, forcedType, hiddenConversationIds, selectedFolderId, chatFolderRevision) {
+        val base = filterHomeConversations(
             conversations, searchQuery, selectedFilter, forcedType, hiddenConversationIds::contains,
         )
+        val folderId = selectedFolderId
+        if (folderId == null) base else chatFolderStore.memberIds(folderId).let { ids -> base.filter { it.id in ids } }
     }
     val gbHideArchiveHome = gbBool("key_mas_hide_archive_home", false)
     val entries = remember(
@@ -450,16 +453,18 @@ fun ChatsHomeScreen(
             }
             // Header swap with the Dart AnimatedSwitcher timing (230ms,
             // easeOutCubic in / easeInCubic out, slight upward slide).
+            val headerReduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+            val headerSwapMs = if (headerReduceMotion) 0 else 230
             AnimatedContent(
                 targetState = isSelectionMode,
                 transitionSpec = {
                     (
-                        fadeIn(tween(230, easing = CubicBezierEasing(0.33f, 1f, 0.68f, 1f))) +
+                        fadeIn(tween(headerSwapMs, easing = CubicBezierEasing(0.33f, 1f, 0.68f, 1f))) +
                             slideInVertically(
-                                tween(230, easing = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)),
+                                tween(headerSwapMs, easing = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)),
                             ) { (it * 0.035f).toInt() }
                         ) togetherWith
-                        fadeOut(tween(230, easing = CubicBezierEasing(0.64f, 0f, 0.92f, 0f)))
+                        fadeOut(tween(headerSwapMs, easing = CubicBezierEasing(0.64f, 0f, 0.92f, 0f)))
                 },
                 label = "home-header",
             ) { selectionMode ->
@@ -542,11 +547,13 @@ fun ChatsHomeScreen(
                                 onDismiss = { overflowOpen = false },
                                 theme = theme,
                                 nav = effectiveNav,
+                                menuPreferences = homePrefs,
                                 onMarkAllAsRead = {
                                     onMarkAllRead()
                                     onSnack("Marked all chats as read")
                                 },
                                 onMessageANumber = { showMessageNumber = true },
+                                onOpenConnectionDetail = onOpenConnectionDetail.takeIf { connectionHealthState != null },
                                 onOpenArchived = { showArchived = true },
                             )
                         }
@@ -677,6 +684,13 @@ fun ChatsHomeScreen(
                             filters = filters,
                             selectedFilter = selectedFilter,
                             onSelect = { filter -> selectedFilter = filter },
+                        )
+                        if (folderAccountKey.isNotBlank()) com.example.chat.ui.chats.folders.ChatFolderChips(
+                            theme = theme,
+                            store = chatFolderStore,
+                            conversations = conversations.filter { it.id !in hiddenConversationIds },
+                            selectedFolderId = selectedFolderId,
+                            onSelect = { selectedFolderId = it },
                         )
                     }
                 }
@@ -840,10 +854,13 @@ private fun HomeConversationList(
         items(
             count = entries.size,
             key = { index ->
+                // Stable identities, never index-derived (Compose best practices):
+                // an insert/archive/reorder must not change another row's key, or
+                // Compose discards its state and replays entrance animations.
                 when (val entry = entries[index]) {
-                    is HomeEntry.Section -> "section_${entry.label}_$index"
-                    is HomeEntry.Archived -> "archived_entry_$index"
-                    is HomeEntry.Item -> "${entry.conversation.id}_$index"
+                    is HomeEntry.Section -> "section_${entry.label}"
+                    is HomeEntry.Archived -> "archived_entry"
+                    is HomeEntry.Item -> entry.conversation.id
                 }
             },
         ) { index ->

@@ -137,7 +137,8 @@ class GbFeatureBackendService(
         body: String,
         scheduledAt: Instant,
     ): String {
-        val raw = rpcClient!!.rpc(
+        val client = rpcClient ?: throw IllegalStateException("Scheduled sending is not supported on this server yet. Nothing was scheduled.")
+        val raw = client.rpc(
             "schedule_message",
             mapOf(
                 "p_conversation_id" to conversationId,

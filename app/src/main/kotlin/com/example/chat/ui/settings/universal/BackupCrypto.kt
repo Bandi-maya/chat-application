@@ -20,7 +20,9 @@ import org.json.JSONObject
  */
 @OptIn(ExperimentalEncodingApi::class)
 object BackupCrypto {
-    private const val KEY_ALIAS = "chaty_local_backup_v1"
+    // Obfuscated via SecureStrings (patch 26): not a const, so the alias no
+    // longer sits readable in the DEX constant pool.
+    private val KEY_ALIAS: String get() = com.example.chat.core.security.SecureStrings.backupKeyAlias
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
     private const val GCM_TAG_BITS = 128
 

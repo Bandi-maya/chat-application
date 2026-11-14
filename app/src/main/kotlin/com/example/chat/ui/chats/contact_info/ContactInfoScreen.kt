@@ -112,6 +112,7 @@ fun ContactInfoScreen(
     onShareContact: () -> Unit,
     onDeletedPopToRoot: () -> Unit,
     onBack: () -> Unit,
+    presenceLabelOverride: String? = null,
 ) {
     var showAllMedia by remember(conversation.id, contact.id) { mutableStateOf(false) }
     if (showAllMedia) ConversationMediaDialog(messages.map(hydrateMessage), onOpenMedia, onClose = { showAllMedia = false })
@@ -157,33 +158,28 @@ fun ContactInfoScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
-            // Header avatar + online dot.
+            // Use the same image loader and fallback as profile/home.
+            if (!contact.bannerUrl.isNullOrBlank()) {
+                com.example.chat.ui.theme.ChatyAsyncImage(
+                    url = contact.bannerUrl,
+                    contentDescription = "Contact banner",
+                    modifier = Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(18.dp)),
+                    placeholder = { Box(Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(18.dp)).background(colors.surface)) },
+                    error = { Box(Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(18.dp)).background(colors.surface)) },
+                )
+                Spacer(Modifier.height(12.dp))
+            }
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Box {
-                    Box(
-                        modifier = Modifier.size(92.dp).background(
-                            Color(parseAvatarColorArgbKit(contact.avatarColorHex)),
-                            CircleShape,
-                        ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            contact.avatarInitials,
-                            color = colors.onPrimary,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                    com.example.chat.ui.chats.home.HomeAvatar(
+                        initials = contact.avatarInitials,
+                        color = Color(parseAvatarColorArgbKit(contact.avatarColorHex)),
+                        size = 92f, shape = "circle", url = contact.avatarUrl,
+                    )
                     if (online) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(2.dp)
-                                .size(16.dp)
-                                .background(colors.background, CircleShape)
-                                .padding(2.5.dp)
-                                .background(colors.success, CircleShape),
-                        )
+                        Box(Modifier.align(Alignment.TopEnd).padding(2.dp).size(16.dp)
+                            .background(colors.background, CircleShape).padding(2.5.dp)
+                            .background(colors.success, CircleShape))
                     }
                 }
             }
@@ -206,7 +202,7 @@ fun ContactInfoScreen(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                ContactInfoLogic.presenceLabel(
+                presenceLabelOverride ?: ContactInfoLogic.presenceLabel(
                     isRecording = activity.isRecording,
                     isTyping = activity.isTyping,
                     isOnline = online,
@@ -270,63 +266,13 @@ fun ContactInfoScreen(
                 Spacer(Modifier.height(12.dp))
             }
 
-            // Connection & Calls.
-            SectionTitle("Connection & Calls", colors)
-            Box(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        if (connection.callsAllowed) Icons.Rounded.VerifiedUser else Icons.Rounded.PersonAddAlt1,
-                        contentDescription = null,
-                        tint = if (connection.callsAllowed) colors.success else colors.primary,
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (connection.callsAllowed) "Mutual contact verified"
-                            else if (connection.isPendingIncoming) "Accept contact request"
-                            else if (connection.isWaitingForOther) "Waiting for ${contact.displayName}"
-                            else "Accept this contact",
-                            color = colors.foreground,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
-                        )
-                        Text(
-                            if (connection.callsAllowed) "Encrypted voice and video calls are unlocked."
-                            else "Messaging stays open. Direct calls unlock when both accept.",
-                            color = colors.foregroundSecondary,
-                            fontSize = 12.sp,
-                        )
-                    }
-                    if (!connection.myAccepted) {
-                        androidx.compose.material3.Button(
-                            onClick = {
-                                scope.launch {
-                                    try {
-                                        onAccept()
-                                    } catch (error: Exception) {
-                                        snackbar.showSnackbar("$error")
-                                    }
-                                }
-                            },
-                            enabled = !busy,
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = colors.primary,
-                                contentColor = colors.onPrimary,
-                            ),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                            modifier = Modifier.height(36.dp).width(88.dp),
-                        ) {
-                            Text("Accept", fontWeight = FontWeight.Bold)
-                        }
-                    } else {
-                        Icon(
-                            if (connection.callsAllowed) Icons.Rounded.CheckCircle else Icons.Rounded.Schedule,
-                            contentDescription = null,
-                            tint = if (connection.callsAllowed) colors.success else colors.foregroundTertiary,
-                        )
-                    }
-                }
-            }
+            // Calling is authorized by server block/privacy policy at signaling time.
+            // Contact acceptance is not a second, client-only call permission gate.
+            Text(
+                "Calls follow this contact's privacy settings. Blocked contacts cannot call.",
+                color = colors.foregroundSecondary, fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            )
             Spacer(Modifier.height(12.dp))
 
             // GB "Media, links, and docs" row: label left, total count + chevron right.

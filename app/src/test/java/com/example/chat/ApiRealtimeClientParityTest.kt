@@ -159,6 +159,31 @@ class ApiRealtimeClientParityTest {
         assertTrue(factory.sockets.last().sent.any { it.contains("new-call") })
     }
 
+    @Test fun presenceAndTypingCarryOriginalSocketOwner() {
+        val scheduler = FakeScheduler()
+        val factory = FakeFactory()
+        var current: Any = Any()
+        val original = current
+        val owners = mutableListOf<Any?>()
+        val client = ApiRealtimeClient({ "wss://example.invalid/same" }, { "same-token" }, factory, scheduler,
+            connectionScopeIdentity = { current })
+        client.listener = object : ApiRealtimeClient.Listener {
+            override fun onScopedPresenceChanged(userId: String, online: Boolean, lastSeen: String?, approx: String?, capturedScope: Any?) { owners.add(capturedScope) }
+            override fun onScopedTyping(roomId: String, userId: String, typing: Boolean, capturedScope: Any?) { owners.add(capturedScope) }
+        }
+        client.connect(); scheduler.drain()
+        val socket = factory.sockets.single()
+        socket.incoming("""{"type":"presence.changed","data":{"user_id":"u","online":false,"last_seen_at":null,"approx":null}}""")
+        socket.incoming("""{"type":"typing","data":{"room_id":"r","user_id":"u","is_typing":true}}""")
+        scheduler.drain()
+        assertEquals(2, owners.size)
+        assertTrue(owners.all { it === original })
+        current = Any()
+        socket.incoming("""{"type":"typing","data":{"room_id":"r","user_id":"u","is_typing":true}}""")
+        scheduler.drain()
+        assertEquals(2, owners.size)
+    }
+
     // ── URL resolution (backend_config.dart getWebSocketUrl) ─────────────
 
     @Test

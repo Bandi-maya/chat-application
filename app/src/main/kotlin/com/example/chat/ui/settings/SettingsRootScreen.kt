@@ -388,6 +388,7 @@ fun SettingsRootScreen(
                     Text("Your Privacy is Our Priority", color = colors.foreground, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Spacer(Modifier.height(8.dp))
                     Text(
+                        "Optional cross-app island:\nIf you turn this feature on and grant Android notification access, Chaty can read notification text and actions and media-session information to show the island and perform actions you choose. The optional accessibility host places a tappable island above other apps; its configuration does not retrieve screen content or inject gestures. Overlay access lets the island float over other apps. Turn the island off in Chaty or revoke special access in Android Settings. Battery settings are optional troubleshooting controls, not a promise of always-on delivery.\n\n" +
                         "\u2022 Message and call transport:\nStandard chat messages use HTTPS to reach the configured service. In this Kotlin release they are not end-to-end encrypted; the service can access their content. Calls and realtime features also exchange required signaling data with the service.\n\n" +
                             "\u2022 File transfer:\nLarge peer-to-peer transfers encrypt file chunks with AES-GCM and protect the invitation through the MLS path. This does not mean ordinary chat messages or standard cloud uploads are end-to-end encrypted.\n\n" +
                             "\u2022 Local App Lock:\nPIN, Pattern, Password, biometric, or device credential can restrict access to this device. App Lock does not encrypt content stored by the service.\n\n" +
@@ -415,13 +416,13 @@ fun SettingsRootScreen(
                 }
             },
             text = {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text("Chaty", color = colors.foreground, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
                     Text("Version ${context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"} · Build ${if (android.os.Build.VERSION.SDK_INT >= 28) context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode else context.packageManager.getPackageInfo(context.packageName, 0).versionCode.toLong()}", color = colors.foregroundSecondary, fontSize = 12.sp)
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "Messaging, calling, and personalization in one place. Review the security status and permissions available in this build before relying on a protection feature.",
+                        "Chaty is a messaging app with optional cross-app island features. Notification access lets the island show other apps' notifications and media controls. Overlay access, or the optional accessibility host, lets it appear above other apps. These are your choices, not requirements for ordinary messaging. Open the island permission settings to see access status and turn it off. Standard chats are not end-to-end encrypted in this version.\n\nPackage: ${context.packageName}",
                         color = colors.foregroundSecondary, fontSize = 13.sp, lineHeight = 16.9.sp,
                     )
                 }

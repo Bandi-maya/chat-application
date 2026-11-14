@@ -13,6 +13,8 @@ import com.example.chat.data.local.StoreRead
 import java.io.IOException
 import java.io.InputStream
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * What the trusted message state says about an attachment. Supplied by [AttachmentSourceResolver]'s `lookup`
@@ -90,6 +92,22 @@ class AttachmentSourceResolver(
         ref.conversationId.isNotBlank() && ref.messageId.isNotBlank() && ref.attachmentId.isNotBlank()
 
     suspend fun resolve(r: AttachmentSourceRequest): ResolvedSource {
+        var produced: ResolvedSource? = null
+        try {
+            return withContext(Dispatchers.IO) { resolveOnIo(r).also { produced = it } }
+        } catch (cancel: CancellationException) {
+            // withContext can discard a result when dispatching back to a cancelled UI consumer.
+            when (val result = produced) {
+                is ResolvedSource.Leased -> result.lease.release()
+                is ResolvedSource.Bytes -> result.bytes.fill(0)
+                else -> Unit
+            }
+            throw cancel
+        }
+    }
+
+    /** HTTP response bodies, encrypted store writes and lease reads must stay off the UI thread. */
+    private suspend fun resolveOnIo(r: AttachmentSourceRequest): ResolvedSource {
         val stamp = r.expectedSession
         if (store.session() != stamp) return un(ResolvedSource.Reason.SIGNED_OUT)   // binding is stale or signed out
         if (!validRef(r.ref)) return un(ResolvedSource.Reason.NOT_ALLOWED)

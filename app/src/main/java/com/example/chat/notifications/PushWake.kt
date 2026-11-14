@@ -9,6 +9,9 @@ package com.example.chat.notifications
  *  real handler; tests install a fake.
  */
 interface PushWakeHandler {
+    suspend fun onAccountSyncNudgeAndWait(bindingId: String) {}
+    suspend fun onAccountIncomingCallNudgeAndWait(bindingId: String, callId: String) {}
+
     fun onSyncNudge()
 
     /** Bounded-wait variant for FCM worker threads so Android keeps the wake

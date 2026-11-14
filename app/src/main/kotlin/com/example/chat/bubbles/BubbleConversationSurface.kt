@@ -76,7 +76,17 @@ internal fun BubbleConversationSurface(ticket: ChatBubbleController.Ticket, open
                         try {
                             // Original entry scope remains the authority even if a queued tap runs after switching.
                             if (ChatBubbleController.resolve(ticket.id) == null) return@launch
-                            api.sendMessage(ticket.roomId, body, expectedScope = ticket.scope)
+                            val repo = ServiceLocator.conversationsRepository
+                            if (repo.isSecureChannel(ticket.roomId)) {
+                                // Encrypted chat: the bubble reply rides the
+                                // MLS plane. An unreadable flag throws here
+                                // and the reply is NOT sent (never plaintext).
+                                check(com.example.chat.ReleaseFeatures.EXPERIMENTAL_MLS_CHAT_ROUTING) { "Secure routing unavailable." }
+                                if (ChatBubbleController.resolve(ticket.id) == null) return@launch
+                                repo.sendMessage(ticket.roomId, body)
+                            } else {
+                                api.sendMessage(ticket.roomId, body, expectedScope = ticket.scope)
+                            }
                             if (ChatBubbleController.resolve(ticket.id) != null) { text = ""; error = null }
                         } catch (_: Exception) {
                             if (ChatBubbleController.resolve(ticket.id) != null) error = "Could not send. Open Chaty to check the message."

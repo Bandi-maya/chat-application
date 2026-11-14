@@ -362,7 +362,7 @@ fun UniversalStylesScreen(
             onApply = { chosen -> preferences.updateUniversal(preferences.universal.copy(fontStyle = chosen)); sheet = 0 },
             previewBuilder = { name ->
                 val entry = UniversalStylesCatalog.fontStyles.first { it.name == name }
-                Text("Impossible can be achieved", fontFamily = entry.composeFamily(), fontWeight = FontWeight(entry.weight),
+                Text("Impossible can be achieved", color = colors.foreground, fontFamily = entry.composeFamily(), fontWeight = FontWeight(entry.weight),
                     fontStyle = if (entry.italic) FontStyle.Italic else FontStyle.Normal, letterSpacing = entry.letterSpacing.sp)
             },
         )

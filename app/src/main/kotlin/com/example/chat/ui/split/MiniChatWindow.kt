@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -64,6 +65,7 @@ fun MiniChatWindow(
         val windowWidthPx = with(density) { maxWidth.toPx() }
         val windowHeightPx = with(density) { maxHeight.toPx() }
 
+        var showSnapGuides by remember(paneKey) { mutableStateOf(false) }
         var requestedWidth by rememberSaveable(paneKey) { mutableFloatStateOf(initialWidthDp) }
         var requestedHeight by rememberSaveable(paneKey) { mutableFloatStateOf(initialHeightDp) }
         val maxMiniWidth = (maxWidth - 24.dp).coerceAtLeast(1.dp)
@@ -98,6 +100,15 @@ fun MiniChatWindow(
             offsetY = next.second
         }
 
+        fun snapWindow() {
+            val margin = with(density) { 12.dp.toPx() }
+            val tolerance = with(density) { 12.dp.toPx() }
+            val right = (windowWidthPx - miniWidthPx - margin).coerceAtLeast(margin)
+            val bottom = (windowHeightPx - miniHeightPx - margin).coerceAtLeast(margin)
+            offsetX = SplitChatLayoutPolicy.snapNear(offsetX, listOf(margin, (windowWidthPx - miniWidthPx) / 2f, right), tolerance)
+            offsetY = SplitChatLayoutPolicy.snapNear(offsetY, listOf(margin, (windowHeightPx - miniHeightPx) / 2f, bottom), tolerance)
+        }
+
         // Clamping inside box boundaries
         val clampedOffset = SplitChatLayoutPolicy.clampOffset(
             currentX = offsetX,
@@ -110,6 +121,13 @@ fun MiniChatWindow(
         )
 
         val windowShape = RoundedCornerShape(16.dp)
+        if (showSnapGuides) {
+            Canvas(Modifier.fillMaxSize()) {
+                val guideColor = colors.accent.copy(alpha = .55f)
+                drawLine(guideColor, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), 1.dp.toPx())
+                drawLine(guideColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 1.dp.toPx())
+            }
+        }
 
         if (isMinimized) {
             // Minimized Floating Pill
@@ -164,7 +182,9 @@ fun MiniChatWindow(
                         .background(colors.surface)
                         .clickable { focusCurrent() }
                         .pointerInput(paneKey, windowWidthPx, windowHeightPx, miniWidthPx, miniHeightPx, isMinimized) {
-                            detectDragGestures(onDragStart = { focusCurrent() }) { change, dragAmount ->
+                            detectDragGestures(onDragStart = { focusCurrent(); showSnapGuides = true },
+                                onDragEnd = { showSnapGuides = false; snapWindow() },
+                                onDragCancel = { showSnapGuides = false }) { change, dragAmount ->
                                 change.consume()
                                 moveWindow(dragAmount)
                             }
@@ -202,8 +222,33 @@ fun MiniChatWindow(
                     }
                 }
 
-                // Window Pane Content
-                Box(Modifier.weight(1f).fillMaxWidth()) { content() }
+                // Reserve a side resize lane, never overlay the message content.
+                Row(Modifier.weight(1f).fillMaxWidth()) {
+                    Box(Modifier.weight(1f).fillMaxHeight()) { content() }
+                    Box(Modifier.width(48.dp).fillMaxHeight().background(colors.surface)
+                        .semantics {
+                            contentDescription = "Resize chat width"
+                            customActions = listOf(
+                                CustomAccessibilityAction("Make wider") { requestedWidth = (requestedWidth + 32f).coerceIn(minMiniWidth.value, maxMiniWidth.value); true },
+                                CustomAccessibilityAction("Make narrower") { requestedWidth = (requestedWidth - 32f).coerceIn(minMiniWidth.value, maxMiniWidth.value); true },
+                            )
+                        }
+                        .pointerInput(density, maxMiniWidth) {
+                            detectDragGestures(onDragStart = { focusCurrent(); showSnapGuides = true },
+                                onDragCancel = { showSnapGuides = false }, onDragEnd = {
+                                showSnapGuides = false
+                                requestedWidth = SplitChatLayoutPolicy.snapNear(requestedWidth,
+                                    listOf(minMiniWidth.value, maxMiniWidth.value / 2f, maxMiniWidth.value), 12f)
+                                    .coerceIn(minMiniWidth.value, maxMiniWidth.value)
+                            }) { change, amount ->
+                                change.consume()
+                                requestedWidth = (requestedWidth.coerceIn(minMiniWidth.value, maxMiniWidth.value) +
+                                    with(density) { amount.x.toDp().value }).coerceIn(minMiniWidth.value, maxMiniWidth.value)
+                            }
+                        }, contentAlignment = Alignment.Center) {
+                        Box(Modifier.width(4.dp).height(40.dp).background(colors.foregroundSecondary, CircleShape))
+                    }
+                }
                 // Dedicated resize lane, never covering the message Send/Mic button.
                 Row(Modifier.fillMaxWidth().height(48.dp), horizontalArrangement = Arrangement.End) {
                     Box(
@@ -219,7 +264,17 @@ fun MiniChatWindow(
                             }
                             .background(colors.surface.copy(alpha = 0.9f), RoundedCornerShape(topStart = 12.dp))
                             .pointerInput(density, maxMiniWidth, maxMiniHeight) {
-                                detectDragGestures { change, amount ->
+                                detectDragGestures(onDragStart = { focusCurrent(); showSnapGuides = true },
+                                onDragCancel = { showSnapGuides = false }, onDragEnd = {
+                                showSnapGuides = false
+                                    requestedWidth = SplitChatLayoutPolicy.snapNear(requestedWidth,
+                                        listOf(minMiniWidth.value, maxMiniWidth.value / 2f, maxMiniWidth.value), 12f)
+                                        .coerceIn(minMiniWidth.value, maxMiniWidth.value)
+                                    requestedHeight = SplitChatLayoutPolicy.snapNear(requestedHeight,
+                                        listOf(minMiniHeight.value, maxMiniHeight.value / 2f, maxMiniHeight.value), 12f)
+                                        .coerceIn(minMiniHeight.value, maxMiniHeight.value)
+                                    snapWindow()
+                                }) { change, amount ->
                                     change.consume()
                                     requestedWidth = (requestedWidth.coerceIn(minMiniWidth.value, maxMiniWidth.value) + with(density) { amount.x.toDp().value })
                                         .coerceIn(minMiniWidth.value, maxMiniWidth.value)

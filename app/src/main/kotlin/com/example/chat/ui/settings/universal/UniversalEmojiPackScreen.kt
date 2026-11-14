@@ -15,6 +15,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,6 +42,7 @@ import com.example.chat.ui.theme.LocalThemeConfig
  * reaction badges read it live. Colors come from the theme config.
  * Source integration requires compile-only CI validation.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun UniversalEmojiPackScreen(
     preferences: ChatyPreferencesController,
@@ -52,28 +58,45 @@ fun UniversalEmojiPackScreen(
     val primaryText = Color(config.primaryTextColor)
     val secondaryText = Color(config.secondaryTextColor)
 
+    var downloadsOpen by remember { mutableStateOf(false) }
+    if (com.example.chat.data.packs.ChatyPackServer.DOWNLOADABLE_PACKS_ENABLED && downloadsOpen) androidx.compose.material3.ModalBottomSheet(onDismissRequest = { downloadsOpen = false }) {
+        com.example.chat.ui.chats.detail.EmojiPackManagerSheet(config, { downloadsOpen = false }, Modifier.height(480.dp))
+    }
     val context = androidx.compose.ui.platform.LocalContext.current
-    val iosState = remember { ChatyEmojiPack.iosState(context) }
-    val iosBundled = remember { ChatyEmojiPack.iosBundledCount(context) }
+    val packStore = com.example.chat.ui.chats.detail.rememberPackStore()
+    val revision = packStore?.revision?.collectAsState()?.value ?: 0
+    val remoteCounts by produceState<Map<String, Int>>(emptyMap(), packStore, revision) {
+        val store = packStore
+        value = if (store == null) emptyMap() else store.manifest.associate { pack ->
+            pack.id to (if (store.installedVersion(pack.id) == pack.version) pack.files.size else 0)
+        }
+    }
+    val iosBundled = remoteCounts["ios_animated"] ?: 0
+    val iosState = when {
+        !ChatyEmojiPack.iosSupported() -> ChatyEmojiPack.IosState.Unsupported
+        iosBundled == 0 -> ChatyEmojiPack.IosState.AssetsMissing
+        iosBundled < ChatyEmojiPack.coverage -> ChatyEmojiPack.IosState.Partial
+        else -> ChatyEmojiPack.IosState.Ready
+    }
     val sdkOk = ChatyEmojiPack.iosSupported()
-    val msBundled = remember { ChatyEmojiPack.packBundledCount(context, ChatyEmojiPack.MICROSOFT_PACK) }
-    val driveBundled = remember { ChatyEmojiPack.driveBundledCount(context) }
-    val lottieBundled = remember { ChatyEmojiPack.lottieBundledCount(context) }
-    val telegramBundled = remember { ChatyEmojiPack.packBundledCount(context, ChatyEmojiPack.TELEGRAM_PACK) }
-    val omBundled = remember { ChatyEmojiPack.packBundledCount(context, ChatyEmojiPack.OPENMOJI_PACK) }
+    val msBundled = remoteCounts["fluent_animated"] ?: 0
+    val driveBundled = remoteCounts["drive_mov132"] ?: 0
+    val lottieBundled = remoteCounts["telegram_lottie"] ?: 0
+    val telegramBundled = remoteCounts["telegram19"] ?: 0
+    val omBundled = 50 // This lightweight subset is retained in the APK.
 
     class Entry(val id: String, val title: String, val subtitle: String, val enabled: Boolean)
     val entries = listOf(
         Entry(
             ChatyEmojiPack.CHATY, "Chaty",
-            "Default animated emojis (609 emoji ids, streamed from Google when online)", true,
+            "Light default: 50 bundled static OpenMoji glyphs; all other emojis use the device's Unicode glyphs. No network download.", true,
         ),
         Entry(
             ChatyEmojiPack.IOS, "iOS - supplied 50",
             when (iosState) {
                 ChatyEmojiPack.IosState.Ready -> "iOS style animated faces (${ChatyEmojiPack.coverage} emojis)"
                 ChatyEmojiPack.IosState.Partial -> "iOS style animated faces ($iosBundled of ${ChatyEmojiPack.coverage} emojis installed)"
-                ChatyEmojiPack.IosState.AssetsMissing -> "Unavailable: the iOS emoji animation files are not installed in this build"
+                ChatyEmojiPack.IosState.AssetsMissing -> "Not downloaded. Use Download or manage extra packs."
                 ChatyEmojiPack.IosState.Unsupported -> "Unavailable: animated iOS emojis need Android 9 or newer"
             },
             iosState == ChatyEmojiPack.IosState.Ready || iosState == ChatyEmojiPack.IosState.Partial,
@@ -82,15 +105,15 @@ fun UniversalEmojiPackScreen(
             ChatyEmojiPack.MICROSOFT, "Microsoft",
             when {
                 !sdkOk -> "Unavailable: animated Microsoft emojis need Android 9 or newer"
-                msBundled == 0 -> "Unavailable: the Microsoft (Fluent) animation files are not installed in this build"
-                else -> "Microsoft Fluent animated emojis ($msBundled installed, others use the Chaty style)"
+                msBundled == 0 -> "Not downloaded. Use Download or manage extra packs."
+                else -> "Microsoft Fluent animated emojis ($msBundled installed, others use normal Unicode glyphs)"
             },
             sdkOk && msBundled > 0,
         ),
         Entry(
             ChatyEmojiPack.OPENMOJI, "OpenMoji",
             if (omBundled == 0) "Unavailable: the OpenMoji files are not installed in this build"
-            else "OpenMoji static emojis, not animated ($omBundled installed, others use the Chaty style)",
+            else "OpenMoji static emojis, not animated ($omBundled installed, others use normal Unicode glyphs)",
             omBundled > 0,
         ),
         Entry(ChatyEmojiPack.DRIVE_MOV, "Drive MOV animations", if (!sdkOk) "Unavailable: these animations need Android 9 or newer" else "$driveBundled of 132 source animations installed. This separate source overlaps the iOS ZIP's first 50 designs; missing animations use normal glyphs.", sdkOk && driveBundled > 0),
@@ -115,7 +138,9 @@ fun UniversalEmojiPackScreen(
 
     UniversalScaffold(title = "Emoji pack", onBack = onBack) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            for (e in entries) {
+            if (com.example.chat.data.packs.ChatyPackServer.DOWNLOADABLE_PACKS_ENABLED) androidx.compose.material3.TextButton(onClick = { downloadsOpen = true }) { Text("Download or manage extra packs") }
+            // Extra entries are paused, not deleted; saved style preferences are not rewritten.
+            for (e in entries.filter { com.example.chat.data.packs.ChatyPackServer.DOWNLOADABLE_PACKS_ENABLED || it.id == ChatyEmojiPack.CHATY }) {
                 PackCard(
                     title = e.title, subtitle = e.subtitle, enabled = e.enabled,
                     pack = e.id, selected = effective == e.id,
