@@ -2395,8 +2395,8 @@ class ApiBackendService(
     private fun accountHashFor(scope: ApiAccountScope): String? {
         val uid = scope.userId?.takeIf { it.isNotBlank() } ?: return null
         if (DemoMode.isDemoUser(uid)) return null
-        return ApiAccountRoutingCanonicalizer.accountHash(
-            ApiAccountRoutingCanonicalizer.accountKey(scope.tenantId, scope.baseUrl, uid))
+        val key = ApiAccountRoutingCanonicalizer.accountKey(scope.tenantId, scope.baseUrl, uid) ?: return null
+        return ApiAccountRoutingCanonicalizer.accountHash(key)
     }
 
     /** Loads the outbox for [expected]'s identity. The slow I/O touches only

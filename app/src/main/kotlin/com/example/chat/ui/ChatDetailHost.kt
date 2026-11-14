@@ -674,7 +674,7 @@ private fun ChatDetailHostContent(
         ghostModeEnabled = prefs.home.ghostMode,
         onToggleGhostMode = { prefs.updateHome(prefs.home.copy(ghostMode = !prefs.home.ghostMode)) },
         secureChannelEnabled = secureChannel,
-        onToggleSecureChannel = if (!secureRoutingAvailable || !secureChannelResolved) null else {
+        onToggleSecureChannel = if (!secureRoutingAvailable || !secureChannelResolved) null else ({
             val next = !secureChannel
             // Close the send gate synchronously, before any suspended setup/storage work.
             secureChannelResolved = false
@@ -711,7 +711,8 @@ private fun ChatDetailHostContent(
                     if (api.authSnapshot() === secureRoutingAccount) toast(e.message ?: "Could not change secure routing.")
                 }
             }
-        },
+            Unit
+        }),
         messages = messages,
         initialMessageId = initialMessageId,
         currentUserId = myId,

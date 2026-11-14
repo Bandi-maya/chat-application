@@ -69,7 +69,7 @@ class MainActivity : FragmentActivity() {
                 val hash = intent.getStringExtra("account_hash") ?: return
                 val call = intent.getStringExtra(N.EXTRA_CALL_ID) ?: return
                 // Hints only. AppRoot validates the encrypted pending offer before any switch/answer.
-                N.pendingAccountCall.value = N.AccountCallRoute(hash, call)
+                N.pendingAccountCall.value = com.example.chat.notifications.ChatyNotifications.AccountCallRoute(hash, call)
             }
             N.ACTION_OPEN_ACCOUNTS -> {
                 val hash = intent.getStringExtra("account_hash")

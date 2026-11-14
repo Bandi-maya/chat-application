@@ -263,7 +263,7 @@ class ConversationsRepository(
      *  flag was off stay on the server unencrypted; enabling does not
      *  re-encrypt history. */
     suspend fun setSecureChannel(conversationId: String, enabled: Boolean, expectedScope: Any? = scopeSnapshot()): SecureChannelTransition {
-        secureChannelMutex.withLock {
+        return secureChannelMutex.withLock {
         // Hold the conversation's dispatch lock for the whole toggle: no
         // plane on this device can be mid-delivery while the flag changes
         // (lock order: flag mutex first, dispatch lock second; flushMutex is
@@ -362,7 +362,7 @@ class ConversationsRepository(
             releaseRestSends?.invoke(expectedScope, conversationId)
         }
         notifyChanged()
-        return SecureChannelTransition(conversationId, enabled, heldCount)
+        SecureChannelTransition(conversationId, enabled, heldCount)
         }
         }
     }
@@ -497,9 +497,8 @@ class ConversationsRepository(
     @Suppress("UNCHECKED_CAST")
     suspend fun loadMessages(conversationId: String) {
         val expectedScope = scopeSnapshot()
-        val messages: MutableList<ChatMessage>
         var fromSnapshot = false
-        try {
+        val messages: MutableList<ChatMessage> = try {
             val raw = rpc.rpc(
                 "get_conversation_messages",
                 mapOf(
@@ -515,7 +514,7 @@ class ConversationsRepository(
                 noteSeq(conversationId, row)
                 hydratedRows.add(hydrateEncryptedMessageRow(conversationId, row))
             }
-            messages = hydratedRows.map { transport.messageFromRow(it, currentUserId()) }
+            hydratedRows.map { transport.messageFromRow(it, currentUserId()) }
                 .sortedBy { it.createdAt }
                 .toMutableList()
         } catch (error: Exception) {
@@ -526,8 +525,8 @@ class ConversationsRepository(
             // re-persisted. Nothing cached -> keep the old error path.
             val cached = snapshotFallback.read(conversationId, expectedScope)
             if (cached == null) throw error
-            messages = cached.toMutableList()
             fromSnapshot = true
+            cached.toMutableList()
         }
 
         // Retain any optimistic / queued messages currently in memory so they
