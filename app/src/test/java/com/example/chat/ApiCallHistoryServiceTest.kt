@@ -34,6 +34,8 @@ class ApiCallHistoryServiceTest {
         assertEquals(listOf("me", "user-b"), r.participantIds)
         assertEquals(95L, r.durationSeconds)
         assertEquals("log-1", r.id)
+        assertEquals("Bob", r.remoteDisplayName)
+        assertEquals("bob", r.remoteUsername)
         assertEquals(1794123000L, r.timestamp.epochSecond)
     }
 
@@ -53,6 +55,14 @@ class ApiCallHistoryServiceTest {
                 ApiCallHistoryService.mapEntry(entry("incoming", status), "me")!!.direction,
             )
         }
+    }
+
+    @Test
+    fun `blank server names are absent rather than blank call titles`() {
+        val r = ApiCallHistoryService.mapEntry(entry("outgoing", "answered").copy(
+            otherDisplayName = "  ", otherUsername = "  "), "me")!!
+        assertNull(r.remoteDisplayName)
+        assertNull(r.remoteUsername)
     }
 
     @Test

@@ -416,9 +416,9 @@ fun AppRoot() {
                     ServiceLocator.apiBackend.config.getSavedTenantId() to
                         ServiceLocator.apiBackend.config.isUsingDefaultTenant
                 },
-                register = { email, username, password, tenant, isDefaultTenant ->
+                register = { email, username, password, phoneNumber, tenant, isDefaultTenant ->
                     // Dart _handleRegister: apply the tenant selection, then
-                    // ApiBackendService.register sends only the three fields;
+                    // ApiBackendService.register sends required contact phone too;
                     // the display name arrives in the server response.
                     if (isDefaultTenant) {
                         ServiceLocator.apiBackend.config.setTenantId(null, useDefault = true)
@@ -426,14 +426,14 @@ fun AppRoot() {
                         ServiceLocator.apiBackend.config.setTenantId(tenant, useDefault = false)
                     }
                     pendingRegisterEmail = email.trim()
-                    val user = ServiceLocator.apiBackend.register(email, username, password)
+                    val user = ServiceLocator.apiBackend.register(email, username, password, phoneNumber)
                     user.id to user.displayName
                 },
-                registerWithPhone = { email, username, password, tenant, isDefaultTenant, proof ->
+                registerWithPhone = { email, username, password, phoneNumber, tenant, isDefaultTenant, proof ->
                     if (isDefaultTenant) ServiceLocator.apiBackend.config.setTenantId(null, useDefault = true)
                     else if (!tenant.isNullOrBlank()) ServiceLocator.apiBackend.config.setTenantId(tenant, useDefault = false)
                     pendingRegisterEmail = email.trim()
-                    val user = ServiceLocator.apiBackend.register(email, username, password, phoneProof = proof)
+                    val user = ServiceLocator.apiBackend.register(email, username, password, phoneNumber, phoneProof = proof)
                     user.id to user.displayName
                 },
                 checkUsernameAvailability = { username, tenant, isDefaultTenant ->
@@ -1080,14 +1080,7 @@ fun AppRoot() {
                             onNotify = shellToast,
                         )
                     },
-                    currentUser = ServiceLocator.apiBackend.currentUser?.let { u ->
-                        com.example.chat.domain.models.UserProfile(
-                            id = u.id, displayName = u.displayName, username = u.username,
-                            avatarInitials = u.avatarInitials, avatarColorHex = u.avatarColorHex,
-                            about = u.about, lastSeenAt = java.time.Instant.now(),
-                            email = u.email, phone = u.phone,
-                        )
-                    },
+                    currentUser = ServiceLocator.apiBackend.currentUser?.let { toDomainUser(it) },
                     screenContent = { destinationId ->
                         when (destinationId) {
                             com.example.chat.core.templates.ChatyNavigationDestinationIds.settings -> {
@@ -1096,17 +1089,10 @@ fun AppRoot() {
                                     com.example.chat.ui.settings.SettingsRootScreen(
                                         preferences = ServiceLocator.preferencesController,
                                         themeController = themeController,
-                                        user = com.example.chat.domain.models.UserProfile(
-                                            id = apiUser.id, displayName = apiUser.displayName,
-                                            username = apiUser.username, avatarInitials = apiUser.avatarInitials,
-                                            avatarColorHex = apiUser.avatarColorHex, about = apiUser.about,
-                                            lastSeenAt = java.time.Instant.now(),
-                                            email = apiUser.email, phone = apiUser.phone,
-                                        ),
+                                        user = toDomainUser(apiUser),
                                         canGoBack = false,
                                         onBack = { },
                                         onNavigate = settingsNavigate,
-                                        // Avatar/banner upload hosts are not wired yet.
                                         onPickAvatar = { source -> rootPhoto.avatar(source) },
                                         onPickBanner = { source -> rootPhoto.banner(source) },
                                         // Dart logout: ApiBackendService.signOut; the signed-out
@@ -1257,7 +1243,7 @@ fun AppRoot() {
                                 val history = ServiceLocator.apiCallHistory
                                 val callScope = androidx.compose.runtime.rememberCoroutineScope()
                                 var callRev by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
-                                androidx.compose.runtime.LaunchedEffect(Unit) { if (ReleaseFeatures.CALL_HISTORY) { history.start(); callRev++ } }
+                                androidx.compose.runtime.LaunchedEffect(ServiceLocator.apiBackend.authSnapshot()) { if (ReleaseFeatures.CALL_HISTORY) { history.start(); callRev++ } }
                                 if (showCallPicker) {
                                     androidx.compose.ui.window.Dialog(
                                         onDismissRequest = { showCallPicker = false },
@@ -2178,7 +2164,7 @@ private fun toDomainUser(u: com.example.chat.data.api.ApiUserProfile): com.examp
         id = u.id, displayName = u.displayName, username = u.username,
         avatarInitials = u.avatarInitials, avatarColorHex = u.avatarColorHex, about = u.about,
         lastSeenAt = java.time.Instant.now(), email = u.email, phone = u.phone, avatarUrl = u.avatarUrl,
-        bannerUrl = u.bannerUrl,
+        bannerUrl = u.bannerUrl, phoneVerified = u.phoneVerified,
     )
 
 /** settings_root_screen.dart _editAccountAvatar/_editAccountBanner: pick (camera/gallery), upload through

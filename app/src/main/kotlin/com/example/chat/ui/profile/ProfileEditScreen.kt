@@ -430,7 +430,7 @@ fun ProfileEditScreen(
                 )
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
-                    value = user.phone.ifEmpty { "Not set" },
+                    value = if (user.phone.isBlank()) "Not set" else "${user.phone} · ${if (user.phoneVerified) "Verified" else "Unverified"}",
                     onValueChange = {},
                     enabled = false,
                     label = { Text("Phone Number") },

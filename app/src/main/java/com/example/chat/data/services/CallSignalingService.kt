@@ -215,7 +215,12 @@ class CallSignalingService(
     /** Feature-specific authenticated relay AND peer support. Never inferred from ordinary calls. */
     private val callExtrasCapability: (String, String, String) -> Boolean = { _, _, _ -> false },
     private val monotonicMillis: () -> Long = { android.os.SystemClock.elapsedRealtime() },
+    private val remoteNameFor: (String) -> String? = { null },
 ) {
+    private fun remoteName(userId: String, supplied: String?): String =
+        remoteNameFor(userId)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: supplied?.trim()?.takeIf { it.isNotEmpty() } ?: "Contact"
+
     var currentSession: ChatyCallSession? = null
         private set
     var callDurationSeconds: Int = 0
@@ -546,7 +551,7 @@ class CallSignalingService(
                         "call_id" to callId,
                         "reason" to "already_in_call",
                     ))
-                    onCallWaiting(signal["caller_name"]?.toString() ?: "Contact")
+                    onCallWaiting(remoteName(senderId, signal["caller_name"]?.toString()))
                     callWaitingListeners.forEach { it() }
                     return@offerGuard
                 }
@@ -591,7 +596,7 @@ class CallSignalingService(
                 currentSession = ChatyCallSession(
                     callId = callId,
                     remoteUserId = senderId,
-                    remoteDisplayName = signal["caller_name"]?.toString() ?: "Contact",
+                    remoteDisplayName = remoteName(senderId, signal["caller_name"]?.toString()),
                     remoteAvatarInitials = signal["caller_avatar_initials"]?.toString(),
                     remoteAvatarColorHex = signal["caller_avatar_color_hex"]?.toString(),
                     isVideo = isVideo,
@@ -752,7 +757,7 @@ class CallSignalingService(
         currentSession = ChatyCallSession(
             callId = callId,
             remoteUserId = remoteUserId,
-            remoteDisplayName = remoteDisplayName,
+            remoteDisplayName = remoteName(remoteUserId, remoteDisplayName),
             remoteAvatarInitials = remoteAvatarInitials,
             remoteAvatarColorHex = remoteAvatarColorHex,
             isVideo = isVideo,
@@ -990,7 +995,7 @@ class CallSignalingService(
         currentSession = ChatyCallSession(
             callId = callId,
             remoteUserId = remoteUserId,
-            remoteDisplayName = remoteDisplayName,
+            remoteDisplayName = remoteName(remoteUserId, remoteDisplayName),
             remoteAvatarInitials = remoteAvatarInitials,
             remoteAvatarColorHex = remoteAvatarColorHex,
             isVideo = isVideo,

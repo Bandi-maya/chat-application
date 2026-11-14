@@ -74,13 +74,6 @@ class ApiBackendService(
         baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
         transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
     )
-    private val callHistoryClient = ApiCallHistoryClient(
-        baseUrl = { config.restApiBaseUrl },
-        tenantId = { config.tenantId },
-        transport = OkHttpApiTransport(allowRedirects = false),
-        token = { session.token },
-    )
-
     /** Phase 5: server-controlled configuration, revalidated with ETag on
      *  login and app start (never polled). Failures keep the last cache. */
     val serverConfig = ApiConfigClient(
@@ -566,7 +559,7 @@ class ApiBackendService(
             schedulePersistRoomMessages(roomId, expected)
             schedulePersistConversations(expected)
             notifyChatListeners()
-            if (isNewToList) runCatching { onIncomingMessage?.invoke(normalized, convoTitle, convoMuted) }
+            if (isNewToList && notifiedPushMessageIds.add(normalized.id)) runCatching { onIncomingMessage?.invoke(normalized, convoTitle, convoMuted) }
         }
 
         override fun onMessageEdited(roomId: String, messageId: String, newContent: String, editedAt: Instant) {
@@ -873,7 +866,10 @@ class ApiBackendService(
 
     // --- Call history plane (research 5.4) ---------------------------------
 
-    fun callHistoryPlane(): ApiCallHistoryClient = callHistoryClient
+    fun callHistoryPlane(expected: ApiAccountScope = authSnapshot()): ApiCallHistoryClient = ApiCallHistoryClient(
+        baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
+        transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
+    )
 
     /** True while [userId] is typing in [roomId] (expires after a few seconds without updates). */
     fun isTyping(roomId: String, userId: String): Boolean {
@@ -1393,6 +1389,22 @@ class ApiBackendService(
         notifyChatListeners()
     }
     val users: List<UserProfile> get() = synchronized(chatLock) { _users.toList() }
+    /** Short owner+cache snapshot only; signaling callers need no UI thread and no IO. */
+    fun callDisplayNameFor(userId: String): String? {
+        val owner = authSnapshot()
+        var result: String? = null
+        withAuthScope(owner) {
+            synchronized(chatLock) {
+                val profile = _users.firstOrNull { it.id == userId }
+                result = profile?.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: profile?.username?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: _conversations.firstOrNull { it.isDirect && userId in it.participantIds }
+                        ?.title?.trim()?.takeIf { it.isNotEmpty() && it != "Chat" }
+            }
+        }
+        return result
+    }
+
     fun getMessages(chatId: String): List<ChatMessage> {
         val list = synchronized(chatLock) { (_messages[chatId] ?: emptyList()).toList() }
         val state = localState("msg").optJSONObject(chatId) ?: return list
@@ -3290,7 +3302,7 @@ class ApiBackendService(
     @Volatile var registrationVerificationMessage: String? = null
         private set
 
-    suspend fun register(email: String, username: String, password: String, phoneProof: PhoneVerificationProof? = null): ApiUserProfile =
+    suspend fun register(email: String, username: String, password: String, phoneNumber: String, phoneProof: PhoneVerificationProof? = null): ApiUserProfile =
         accountSwitchMutex.withLock { withContext(Dispatchers.IO) {
             check(!isCallActive()) { "Finish the current call before registering another account." }
             check(multiAccount.accounts().size < MultiAccountRegistryCoordinator.DEFAULT_MAX_ACCOUNTS) { "Remove an account before registering another on this app installation." }
@@ -3298,7 +3310,7 @@ class ApiBackendService(
             val routingAtStart = config.snapshot()
             val proof = requireNotNull(deviceIdentity) { "Installation identity is not ready." }.challengeHeaders(
                 routingAtStart.baseUrl, routingAtStart.tenantId, OkHttpApiTransport(allowRedirects = false)) { authSnapshot() === owner }
-            val result = scopedAuthClient(routingAtStart.baseUrl, routingAtStart.tenantId).register(email, username, password, extraHeaders = proof, phoneProof = phoneProof)
+            val result = scopedAuthClient(routingAtStart.baseUrl, routingAtStart.tenantId).register(email, username, password, phoneNumber, extraHeaders = proof, phoneProof = phoneProof)
             if (authSnapshot() !== owner) throw ApiScopeChangedException()
             registrationVerificationMessage = result.verificationMessage
             val routing = config.snapshot()

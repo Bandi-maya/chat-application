@@ -62,7 +62,7 @@ class ApiAuthClientParityTest {
     }
 
     @Test
-    fun registerSendsOnlyThreeFields() {
+    fun registerSendsRequiredUnverifiedPhone() {
         val t = FakeTransport { call ->
             assertEquals("http://10.0.2.2:8000/auth/register", call.url)
             val body = call.body!!
@@ -70,9 +70,11 @@ class ApiAuthClientParityTest {
             assertTrue(body.contains("\"username\":\"maya\""))
             assertTrue(body.contains("\"password\":\"secret\""))
             assertFalse(body.contains("display"))
+            assertTrue(body.contains("\"phoneNumber\":\"+441234567890\""))
+            assertFalse(body.contains("phone_verified"))
             200 to """{"access_token":"${jwt("{}")}","user":{"id":"u3","username":"maya","full_name":"Maya B"}}"""
         }
-        val result = client(t).register("a@b.c", "maya", "secret")
+        val result = client(t).register("a@b.c", "maya", "secret", "+44 (1234) 567890")
         // display name comes from the server response
         assertEquals("Maya B", result.user.displayName)
         assertEquals("MB", result.user.avatarInitials)
@@ -81,7 +83,7 @@ class ApiAuthClientParityTest {
     @Test
     fun registrationKeepsSessionAndExposesVerificationWarning() {
         val t = FakeTransport { 200 to """{"data":{"token":"${jwt("{}")}","user":{"id":"u3","username":"maya"}},"message":"Account created, but verification code could not be sent."}""" }
-        val result = client(t).register("a@b.c", "maya", "secret")
+        val result = client(t).register("a@b.c", "maya", "secret", "+44 (1234) 567890")
         assertEquals("u3", result.user.id)
         assertEquals("Account created, but verification code could not be sent.", result.verificationMessage)
     }

@@ -85,23 +85,21 @@ fun RegisterScreen(
     onBack: () -> Unit,
     onRegistered: (userId: String, displayName: String) -> Unit,
     onRegisterOrganization: () -> Unit,
-    register: suspend (email: String, username: String, password: String, tenant: String?, isDefaultTenant: Boolean) -> Pair<String, String>,
+    register: suspend (email: String, username: String, password: String, phoneNumber: String, tenant: String?, isDefaultTenant: Boolean) -> Pair<String, String>,
     checkOrganization: suspend (workspace: String) -> OrgCheckResult,
     /** Public registration preflight for the selected workspace. Missing or
      *  unavailable endpoint shows "could not check", never Available. */
     checkUsernameAvailability: (suspend (username: String, tenant: String?, isDefaultTenant: Boolean) -> UsernameAvailabilityLogic.Probe)? = null,
     /** Dart initState: getSavedTenantId + isUsingDefaultTenant. */
     loadSavedTenant: suspend () -> Pair<String?, Boolean>,
-    registerWithPhone: (suspend (String, String, String, String?, Boolean, com.example.chat.data.api.PhoneVerificationProof) -> Pair<String, String>)? = null,
+    registerWithPhone: (suspend (String, String, String, String, String?, Boolean, com.example.chat.data.api.PhoneVerificationProof) -> Pair<String, String>)? = null,
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
 
     var email by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
-    // Approved preview 7 step 1: optional contact number. Collected in UI
-    // only - it is NOT sent to the backend (the register seam is unchanged;
-    // account-contact semantics are an open backend decision).
+    // Required contact claim is unverified unless a real matching proof is provided.
     var contactNumber by remember { mutableStateOf("") }
     var normalizedContactNumber by remember { mutableStateOf<String?>(null) }
     var phoneProof by remember { mutableStateOf<com.example.chat.data.api.PhoneVerificationProof?>(null) }
@@ -234,8 +232,8 @@ fun RegisterScreen(
         if (isLoading) return
         emailError = ChatyValidators.validateEmail(email.trim())
         usernameError = ChatyValidators.validateUsername(username.trim(), forRegistration = true)
-        // Optional: phone is attached only with a live server verification proof.
-        contactNumberError = if (contactNumber.isBlank() || normalizedContactNumber != null) null else "Check your phone number and country."
+        val requiredNumber = com.example.chat.data.api.RegistrationPhonePolicy.normalize(contactNumber)
+        contactNumberError = if (requiredNumber != null) null else "Enter a phone number starting with +country code."
         passwordError = when {
             password.isEmpty() -> "Please enter a password"
             password.length < 6 -> "Password must be at least 6 characters"
@@ -276,7 +274,7 @@ fun RegisterScreen(
         val selectedProof = phoneProof
         if (selectedProof != null && (!selectedProof.expiresAt.isAfter(java.time.Instant.now()) || selectedProof.normalizedNumber != normalizedContactNumber)) {
             phoneProof = null
-            errorMessage = "Phone verification expired or the number changed. Verify it again, or clear the number to continue with email only."
+            errorMessage = "Phone verification expired or the number changed. Verify again or continue with an unverified number."
             return
         }
         isLoading = true
@@ -286,8 +284,8 @@ fun RegisterScreen(
                 val proof = selectedProof
                 check(proof == null || proof.expiresAt.isAfter(java.time.Instant.now())) { "Phone verification expired. Verify it again before creating your account." }
                 val result = if (proof != null && registerWithPhone != null) registerWithPhone(
-                    email.trim(), username.trim(), password, if (useOrganization) workspace.trim() else null, !useOrganization, proof)
-                else register(email.trim(), username.trim(), password, if (useOrganization) workspace.trim() else null, !useOrganization)
+                    email.trim(), username.trim(), password, requireNotNull(requiredNumber), if (useOrganization) workspace.trim() else null, !useOrganization, proof)
+                else register(email.trim(), username.trim(), password, requireNotNull(requiredNumber), if (useOrganization) workspace.trim() else null, !useOrganization)
                 val (userId, displayName) = result
                 onRegistered(userId, displayName)
             } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
@@ -323,7 +321,7 @@ fun RegisterScreen(
             ) {
                 Column(modifier = Modifier.widthIn(max = ChatyAdaptiveLogic.AUTH_COLUMN_MAX_DP.dp).fillMaxWidth()) {
                     Text(
-                        "Everything You Need!",
+                        "Create account",
                         color = Color(theme.primaryTextColor),
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -391,14 +389,6 @@ fun RegisterScreen(
                         error = emailError,
                     )
                     Spacer(Modifier.height(18.dp))
-                    PhoneNumberEntry(contactNumber,
-                        onValueChange = { contactNumber = it; normalizedContactNumber = null; phoneProof = null; contactNumberError = null },
-                        onNormalized = { if (it != normalizedContactNumber) phoneProof = null; normalizedContactNumber = it })
-                    if (registerWithPhone != null) PhoneVerificationSection(normalizedContactNumber,
-                        if (useOrganization) workspace.trim() else null, !useOrganization, !isLoading,
-                        onProof = { phoneProof = it })
-                    contactNumberError?.let { Text(it, color = Color(0xFFD32F2F)) }
-                    Spacer(Modifier.height(18.dp))
                     AuthTextField(
                         label = "Username",
                         hintText = "Choose a unique username",
@@ -448,7 +438,15 @@ fun RegisterScreen(
                             }
                         },
                     )
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(18.dp))
+                    PhoneNumberEntry(contactNumber, theme = theme, enabled = !isLoading,
+                        onValueChange = { contactNumber = it; normalizedContactNumber = null; phoneProof = null; contactNumberError = null },
+                        onNormalized = { if (it != normalizedContactNumber) phoneProof = null; normalizedContactNumber = it })
+                    if (registerWithPhone != null) PhoneVerificationSection(normalizedContactNumber,
+                        if (useOrganization) workspace.trim() else null, !useOrganization, !isLoading,
+                        onProof = { phoneProof = it })
+                    contactNumberError?.let { Text(it, color = Color(0xFFD32F2F)) }
+                    Spacer(Modifier.height(18.dp))
 
                     errorMessage?.let { msg ->
                         Row(

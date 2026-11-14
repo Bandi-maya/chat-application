@@ -86,8 +86,10 @@ class ProfileService(
                     isVerified = apiUser.emailVerified,
                     email = apiUser.email.ifEmpty { user.email },
                     phone = apiUser.phone.ifEmpty { user.phone },
+                    phoneVerified = apiUser.phoneVerified,
                     safetyNumber = "",
                     avatarUrl = apiUser.avatarUrl,
+                    bannerUrl = apiUser.bannerUrl,
                 )
             } else {
                 fallback()

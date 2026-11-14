@@ -1009,6 +1009,7 @@ object ServiceLocator {
                 check(apiBackend.authSnapshot() === owner) { "Call account changed." }
             },
             currentUserDisplayName = { apiBackend.currentUser?.displayName ?: "User" },
+            remoteNameFor = { id -> apiBackend.callDisplayNameFor(id) },
             currentUserAvatarInitials = { apiBackend.currentUser?.avatarInitials },
             currentUserAvatarColorHex = { apiBackend.currentUser?.avatarColorHex },
             signalSender = com.example.chat.data.services.CallSignalSender { targetUserId, data ->
@@ -1227,9 +1228,10 @@ object ServiceLocator {
     /** Call history plane (research 5.4): server-backed per-viewer log. */
     val apiCallHistory: com.example.chat.data.services.ApiCallHistoryService by lazy {
         com.example.chat.data.services.ApiCallHistoryService(
-            client = { apiBackend.callHistoryPlane() },
-            currentUserId = currentUserId,
-        )
+            currentScope = { apiBackend.authSnapshot() },
+            clientFor = { owner -> apiBackend.callHistoryPlane(owner) },
+            withScope = { owner, action -> apiBackend.withAuthScope(owner, action) },
+        ).also { history -> apiBackend.addAuthScopeListener { history.stop() } }
     }
 
     val gbFeatures: GbFeatureBackendService by lazy {

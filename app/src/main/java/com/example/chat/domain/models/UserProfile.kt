@@ -23,6 +23,7 @@ data class UserProfile(
      *  user has not uploaded media yet. */
     val avatarUrl: String? = null,
     val bannerUrl: String? = null,
+    val phoneVerified: Boolean = false,
 ) {
     /** Exact port of UserProfile.toJson (same keys, presence as enum name). */
     fun toJson(): Map<String, Any?> = mapOf(
@@ -37,6 +38,7 @@ data class UserProfile(
         "isVerified" to isVerified,
         "email" to email,
         "phone" to phone,
+        "phoneVerified" to phoneVerified,
         "safetyNumber" to safetyNumber,
         "avatarUrl" to avatarUrl,
         "bannerUrl" to bannerUrl,
@@ -57,6 +59,7 @@ data class UserProfile(
             isVerified = json["isVerified"] == true,
             email = json["email"]?.toString() ?: "",
             phone = json["phone"]?.toString() ?: "",
+            phoneVerified = json["phoneVerified"] == true,
             safetyNumber = json["safetyNumber"]?.toString() ?: "",
             avatarUrl = json["avatarUrl"]?.toString(),
             bannerUrl = json["bannerUrl"]?.toString(),

@@ -2,6 +2,10 @@ package com.example.chat.ui.auth
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,27 +39,27 @@ internal fun PhoneVerificationSection(number: String?, tenant: String?, useDefau
         LaunchedEffect(retryAt, challenge, proof) {
             while (true) {
                 now = Instant.now()
-                if (proof?.expiresAt?.isAfter(now) == false) { val expired = proof; proof = null; latestProof(expired); status = "Phone proof expired. Verify again or continue with email only." }
+                if (proof?.expiresAt?.isAfter(now) == false) { proof = null; latestProof(null); status = "Phone proof expired. Verify again or continue unverified." }
                 if (challenge?.expiresAt?.isAfter(now) == false) { challenge = null; code = ""; status = "Code expired. Request a new code." }
                 if (retryAt?.isAfter(now) != true && challenge == null && proof == null) break
                 delay(1_000)
             }
         }
         fun failure(error: Exception) {
-            status = error.message ?: "Verification failed. Continue with email only or try again."
+            status = error.message ?: "Verification failed. Continue with an unverified number or try again."
             (error as? PhoneVerificationFailure)?.retryAfterSeconds?.let { retryAt = Instant.now().plusSeconds(it.toLong()) }
         }
-        Column(Modifier.fillMaxWidth()) {
-            Text("Phone verification is optional. Email-only registration stays available.")
-            TextButton(enabled = enabled && number != null && !busy && proof == null && retryAt?.isAfter(now) != true,
+        if (number != null) Column(Modifier.fillMaxWidth()) {
+            OutlinedButton(modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(24.dp),
+                enabled = enabled && number != null && !busy && proof == null && retryAt?.isAfter(now) != true,
                 onClick = {
-                    val target = number ?: return@TextButton
-                    if (busy || api.authSnapshot() !== owner) return@TextButton
+                    val target = number ?: return@OutlinedButton
+                    if (busy || api.authSnapshot() !== owner) return@OutlinedButton
                     busy = true; status = null; code = ""
                     scope.launch {
                         try {
                             val result = api.requestPhoneVerification(target, tenant, useDefault, owner)
-                            if (api.authSnapshot() === owner) { challenge = result; retryAt = result.resendAt; status = "Code requested. Provider acceptance does not confirm delivery." }
+                            if (api.authSnapshot() === owner) { challenge = result; retryAt = result.resendAt; status = "Enter the code sent by SMS." }
                         } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
                         catch (error: Exception) { failure(error) }
                         finally { busy = false }
@@ -73,7 +77,7 @@ internal fun PhoneVerificationSection(number: String?, tenant: String?, useDefau
                         scope.launch {
                             try {
                                 val result = api.verifyPhoneNumber(pending, captured, owner)
-                                if (api.authSnapshot() === owner) { proof = result; latestProof(result); code = ""; status = "Number verified for registration. Your account is not created yet." }
+                                if (api.authSnapshot() === owner) { proof = result; latestProof(result); code = ""; status = "Number verified" }
                             } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
                             catch (error: Exception) { failure(error) }
                             finally { busy = false }
@@ -82,8 +86,7 @@ internal fun PhoneVerificationSection(number: String?, tenant: String?, useDefau
                 }
             }
             status?.let { Text(it) }
-            if (proof != null) TextButton(onClick = { proof = null; challenge = null; code = ""; latestProof(null); status = "Phone will not be attached. Continue with email only." }, enabled = !busy) { Text("Use email only instead") }
-            Text("SMS availability depends on the service. If SMS is unavailable, no code is sent and the number is not marked verified.")
+            if (proof != null) TextButton(onClick = { proof = null; challenge = null; code = ""; latestProof(null); status = "Number will be stored as unverified." }, enabled = !busy) { Text("Continue unverified") }
         }
     }
 }

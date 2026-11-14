@@ -56,6 +56,7 @@ fun apiUserToJson(user: ApiUserProfile): String = JSONObject()
     .put("avatarUrl", user.avatarUrl ?: JSONObject.NULL)
     .put("bannerUrl", user.bannerUrl ?: JSONObject.NULL)
     .put("emailVerified", user.emailVerified)
+    .put("phoneVerified", user.phoneVerified)
     .toString()
 
 fun apiUserFromJson(raw: String): ApiUserProfile {
@@ -72,6 +73,7 @@ fun apiUserFromJson(raw: String): ApiUserProfile {
         avatarUrl = if (obj.isNull("avatarUrl")) null else obj.optString("avatarUrl"),
         bannerUrl = if (obj.isNull("bannerUrl")) null else obj.optString("bannerUrl"),
         emailVerified = obj.optBoolean("emailVerified", true),
+        phoneVerified = obj.opt("phoneVerified") == true,
     )
 }
 
@@ -181,6 +183,7 @@ class ApiAuthSession(private val store: ApiSessionStore, private val scopeLock: 
             avatarInitials = avatarInitials?.trim()?.takeIf { it.isNotEmpty() } ?: initials,
             avatarColorHex = avatarColorHex?.trim()?.takeIf { it.isNotEmpty() } ?: current.avatarColorHex,
             phone = phone?.trim() ?: current.phone,
+            phoneVerified = if (phone != null && phone.trim() != current.phone) false else current.phoneVerified,
             bannerUrl = bannerUrl?.trim() ?: current.bannerUrl,
         )
         val currentToken = token

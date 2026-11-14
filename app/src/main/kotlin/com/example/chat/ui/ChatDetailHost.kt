@@ -531,32 +531,39 @@ private fun ChatDetailHostContent(
     val activity = otherId?.let { rt.activityFor(conversation.id, it) }
     val otherTyping = otherId != null && api.isTyping(conversation.id, otherId)
 
-    // Presence plane (research 5.2): one-shot privacy-filtered fetch on open,
-    // then presence.changed keeps it live. Fail-closed: a pre-plane server
-    // (or a hidden user) shows no line at all.
+    // REST heartbeats do not always broadcast, and socket presence is limited
+    // to mutual contacts. Refresh only this visible chat while foregrounded.
     var fetchedPresence by remember(conversation.id, otherId, messageAccountScope) { mutableStateOf<ApiPresenceClient.PresenceView?>(null) }
     var fetchedPresenceRevision by remember(conversation.id, otherId, messageAccountScope) { androidx.compose.runtime.mutableLongStateOf(-1L) }
-    LaunchedEffect(conversation.id, otherId, messageAccountScope) {
-        if (isDirect && otherId != null && api.authSnapshot() === messageAccountScope) {
-            val revision = api.presenceRevisionOf(otherId)
-            val result = try {
-                api.fetchPresence(otherId, messageAccountScope)
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                ApiPresenceClient.PresenceView.Unavailable
-            }
-            if (api.authSnapshot() === messageAccountScope && revision == api.presenceRevisionOf(otherId)) {
-                fetchedPresence = result
-                fetchedPresenceRevision = revision
+    LaunchedEffect(conversation.id, otherId, messageAccountScope, trafficOwner) {
+        if (isDirect && otherId != null) {
+            trafficOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                while (api.authSnapshot() === messageAccountScope) {
+                    val revision = api.presenceRevisionOf(otherId)
+                    val result = try {
+                        api.fetchPresence(otherId, messageAccountScope)
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        ApiPresenceClient.PresenceView.Unavailable
+                    }
+                    if (api.authSnapshot() === messageAccountScope && revision == api.presenceRevisionOf(otherId)) {
+                        fetchedPresence = result
+                        fetchedPresenceRevision = revision
+                    }
+                    delay(30_000)
+                }
             }
         }
     }
-    // Any newer socket privacy shape, including all-hidden, supersedes the one-shot fetch.
-    val currentFetchedPresence = fetchedPresence.takeIf { otherId != null && fetchedPresenceRevision == api.presenceRevisionOf(otherId) }
+    // A newer socket privacy event invalidates an older GET. A newer GET
+    // supersedes old socket data, including hidden/unavailable responses.
+    val currentFetchedPresence = fetchedPresence.takeIf {
+        it != ApiPresenceClient.PresenceView.Unavailable && otherId != null && fetchedPresenceRevision == api.presenceRevisionOf(otherId)
+    }
     val presenceOnline = isDirect && otherId != null &&
-        (api.isUserOnline(otherId) || (currentFetchedPresence is ApiPresenceClient.PresenceView.Online &&
-            api.lastSeenOf(otherId) == null && api.approxPresenceOf(otherId) == null))
+        (if (currentFetchedPresence != null) currentFetchedPresence is ApiPresenceClient.PresenceView.Online
+            else api.isUserOnline(otherId))
     val presenceText: String? = if (isDirect) {
         val fetchedLastSeen = (currentFetchedPresence as? ApiPresenceClient.PresenceView.LastSeen)?.at?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() }
         val fetchedApprox = (currentFetchedPresence as? ApiPresenceClient.PresenceView.Approx)?.bucket
@@ -565,8 +572,8 @@ private fun ChatDetailHostContent(
             otherId == null -> null
             else -> com.example.chat.ui.chats.PresenceLineLogic.headerText(
                 presenceOnline,
-                api.lastSeenOf(otherId) ?: fetchedLastSeen,
-                api.approxPresenceOf(otherId) ?: fetchedApprox,
+                if (currentFetchedPresence != null) fetchedLastSeen else api.lastSeenOf(otherId),
+                if (currentFetchedPresence != null) fetchedApprox else api.approxPresenceOf(otherId),
             )
         }
     } else {
@@ -650,7 +657,8 @@ private fun ChatDetailHostContent(
                 check(api.authSnapshot() === expected) { "Account changed. Call cancelled." }
                 ServiceLocator.callPresentationController.showFullScreen()
                 ServiceLocator.callSignaling.initiateCall(
-                    targetId, other?.displayName ?: live.title,
+                    targetId, other?.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                        ?: other?.username?.trim()?.takeIf { it.isNotEmpty() } ?: live.title,
                     other?.avatarInitials, other?.avatarColorHex, isVideo,
                     expectedAccountScope = expected,
                 )

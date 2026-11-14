@@ -189,8 +189,12 @@ fun CallsScreen(
                     val isMissed = call.direction == CallDirection.missed
                     val isVideo = call.type == CallType.video
                     val canCall = remoteUserId.isNotEmpty() && remoteUserId != currentUserId
-                    val name = contact?.displayName?.ifEmpty { null } ?: "Chaty contact"
-                    val initials = contact?.avatarInitials ?: "U"
+                    val name = contact?.displayName?.trim()?.takeIf { it.isNotEmpty() }
+                        ?: call.remoteDisplayName
+                        ?: contact?.username?.trim()?.takeIf { it.isNotEmpty() }
+                        ?: call.remoteUsername
+                        ?: "Chaty contact"
+                    val initials = contact?.avatarInitials ?: name.take(1).uppercase()
                     val colorHex = contact?.avatarColorHex
                     val subtitle = buildString {
                         append(call.timestamp.atZone(ZoneId.systemDefault()).format(timeFormatter))

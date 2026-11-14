@@ -8,82 +8,89 @@ import com.example.chat.domain.models.CallType
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 
 /** Call history plane (research 5.4): the Calls tab reads GET /calls/history
  *  through this service instead of the dead Supabase call_sessions query.
  *  Entries are per-viewer; delete hides a row only for this user. */
 class ApiCallHistoryService(
-    private val client: () -> ApiCallHistoryClient,
-    private val currentUserId: () -> String?,
+    private val currentScope: () -> com.example.chat.data.api.ApiAccountScope,
+    private val clientFor: (com.example.chat.data.api.ApiAccountScope) -> ApiCallHistoryClient,
+    private val withScope: (com.example.chat.data.api.ApiAccountScope, () -> Unit) -> Boolean,
     private val notifyChanged: () -> Unit = {},
 ) {
-    var records: List<CallRecord> = emptyList()
-        private set
-    var lastError: Throwable? = null
-        private set
-    var nextCursor: String? = null
-        private set
+    private data class Snapshot(val owner: com.example.chat.data.api.ApiAccountScope? = null,
+        val records: List<CallRecord> = emptyList(), val error: Throwable? = null, val cursor: String? = null)
+    @Volatile private var snapshot = Snapshot()
+    private val stateLock = Any()
+    private val epoch = java.util.concurrent.atomic.AtomicLong()
+    private val operations = kotlinx.coroutines.sync.Mutex()
+    private fun visible(): Snapshot = snapshot.takeIf { it.owner === currentScope() } ?: Snapshot()
+    val records: List<CallRecord> get() = visible().records
+    val lastError: Throwable? get() = visible().error
+    val nextCursor: String? get() = visible().cursor
 
+    private fun publish(owner: com.example.chat.data.api.ApiAccountScope, version: Long, value: Snapshot): Boolean {
+        var applied = false
+        withScope(owner) { synchronized(stateLock) { if (epoch.get() == version) { snapshot = value; applied = true } } }
+        if (applied) notifyChanged()
+        return applied
+    }
     suspend fun start() = refresh()
     suspend fun retry() = refresh()
-
-    suspend fun refresh() {
-        val uid = currentUserId()
-        if (uid == null) {
-            records = emptyList()
-            lastError = null
-            notifyChanged()
-            return
-        }
+    suspend fun refresh() = operations.withLock {
+        val owner = currentScope()
+        val uid = owner.userId
+        if (uid.isNullOrBlank() || owner.token.isNullOrBlank()) { stop(); return@withLock }
+        val version = epoch.get()
+        val previous = snapshot.takeIf { it.owner === owner } ?: Snapshot(owner)
         try {
-            val page = withContext(Dispatchers.IO) { client().history(limit = 50) }
-            records = page.entries.mapNotNull { mapEntry(it, uid) }
-            nextCursor = page.nextCursor
-            lastError = null
-        } catch (error: Throwable) {
-            lastError = error
+            val client = clientFor(owner)
+            val page = withContext(Dispatchers.IO) { client.history(limit = 50) }
+            publish(owner, version, Snapshot(owner, page.entries.mapNotNull { mapEntry(it, uid) }, cursor = page.nextCursor))
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (failure: Exception) {
+            publish(owner, version, previous.copy(error = failure))
         }
-        notifyChanged()
+        Unit
     }
-
-    /** WhatsApp's "Remove from call log": per-viewer delete, optimistic with
-     *  rollback. An already-gone row is tolerated by the client. */
-    suspend fun deleteEntry(record: CallRecord) {
-        val previous = records
-        records = records.filterNot { it.id == record.id }
-        notifyChanged()
+    suspend fun deleteEntry(record: CallRecord) = operations.withLock {
+        val owner = currentScope()
+        val version = epoch.get()
+        val previous = snapshot
+        check(previous.owner === owner) { "Account or call history changed. Refresh first." }
+        if (previous.records.none { it.id == record.id }) return@withLock
+        check(publish(owner, version, previous.copy(records = previous.records.filterNot { it.id == record.id }, error = null))) { "Account changed." }
         try {
-            withContext(Dispatchers.IO) { client().deleteEntry(record.id) }
-            lastError = null
-        } catch (error: Throwable) {
-            records = previous
-            lastError = error
-            notifyChanged()
-            throw error
+            val client = clientFor(owner)
+            withContext(Dispatchers.IO) { client.deleteEntry(record.id) }
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            publish(owner, version, previous); throw cancel
+        } catch (error: Exception) {
+            publish(owner, version, previous.copy(error = error)); throw error
         }
     }
-
-    /** "Clear call log": per-viewer clear, optimistic with rollback. */
-    suspend fun clearAll() {
-        val previous = records
-        records = emptyList()
-        nextCursor = null
-        notifyChanged()
+    suspend fun clearAll() = operations.withLock {
+        val owner = currentScope()
+        val version = epoch.get()
+        val previous = snapshot
+        check(previous.owner === owner) { "Account changed. Refresh first." }
+        check(publish(owner, version, Snapshot(owner))) { "Account changed." }
         try {
-            withContext(Dispatchers.IO) { client().clear() }
-            lastError = null
-        } catch (error: Throwable) {
-            records = previous
-            lastError = error
-            notifyChanged()
-            throw error
+            val client = clientFor(owner)
+            withContext(Dispatchers.IO) { client.clear() }
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            publish(owner, version, previous); throw cancel
+        } catch (error: Exception) {
+            publish(owner, version, previous.copy(error = error)); throw error
         }
     }
-
     fun stop() {
-        records = emptyList()
-        lastError = null
-        nextCursor = null
+        synchronized(stateLock) {
+            epoch.incrementAndGet()
+            snapshot = Snapshot()
+        }
         notifyChanged()
     }
 
@@ -108,6 +115,8 @@ class ApiCallHistoryService(
                 timestamp = parseIsoToInstant(entry.startedAt) ?: Instant.now(),
                 durationSeconds = entry.durationSec.toLong().coerceIn(0, 86400),
                 isEncrypted = true,
+                remoteDisplayName = entry.otherDisplayName?.trim()?.takeIf { it.isNotEmpty() },
+                remoteUsername = entry.otherUsername?.trim()?.takeIf { it.isNotEmpty() },
             )
         }
     }

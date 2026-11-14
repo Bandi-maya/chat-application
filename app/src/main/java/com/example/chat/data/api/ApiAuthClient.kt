@@ -31,6 +31,7 @@ data class ApiUserProfile(
     /** Server-side users.email_verified; defaults true so profiles parsed from
      *  older backends (or stored sessions) never show a false banner. */
     val emailVerified: Boolean = true,
+    val phoneVerified: Boolean = false,
 )
 
 data class ApiAuthResult(val token: String, val user: ApiUserProfile, val refreshToken: String? = null, val verificationMessage: String? = null)
@@ -57,14 +58,17 @@ class ApiAuthClient(
 
     /** ApiBackendService.register — no displayName is sent; the display name
      *  comes back from the server response (see parseAuthResponse). */
-    fun register(email: String, username: String, password: String, extraHeaders: Map<String, String> = emptyMap(), phoneProof: PhoneVerificationProof? = null): ApiAuthResult {
+    fun register(email: String, username: String, password: String, phoneNumber: String, extraHeaders: Map<String, String> = emptyMap(), phoneProof: PhoneVerificationProof? = null): ApiAuthResult {
+        val number = requireNotNull(RegistrationPhonePolicy.normalize(phoneNumber)) { "Enter an international phone number starting with +country code." }
         val body = JSONObject()
+            .put("phoneNumber", number)
             .put("email", email)
             .put("username", username)
             .put("password", password)
             .apply {
                 phoneProof?.let { proof ->
                     require(proof.tenantId == tenantId() && proof.baseUrl.trimEnd('/') == baseUrl().trimEnd('/') && proof.expiresAt.isAfter(java.time.Instant.now())) { "Phone verification expired or workspace changed." }
+                    require(proof.normalizedNumber == number) { "Phone proof does not match the number." }
                     put("phoneChallengeId", proof.challengeId); put("phoneVerificationToken", proof.token)
                 }
             }
@@ -639,10 +643,11 @@ class ApiAuthClient(
                 avatarColorHex = colorHex,
                 about = extractedAbout,
                 email = firstString(userObj, "email") ?: "",
-                phone = firstString(userObj, "mobile", "phone") ?: "",
+                phone = firstString(userObj, "phone", "mobile") ?: "",
                 avatarUrl = photo,
                 bannerUrl = banner,
                 emailVerified = userObj.optBoolean("email_verified", true),
+                phoneVerified = userObj.opt("phone_verified") == true,
             )
             val refresh = if (dataObj.has("refresh_token") && !dataObj.isNull("refresh_token")) dataObj.get("refresh_token").toString()
                 else if (dataObj.has("refreshToken") && !dataObj.isNull("refreshToken")) dataObj.get("refreshToken").toString() else null

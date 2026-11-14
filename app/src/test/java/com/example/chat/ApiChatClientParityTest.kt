@@ -95,7 +95,7 @@ class ApiChatClientParityTest {
     @Test
     fun listRoomsParsesConversationFields() {
         val t = FakeTransport {
-            200 to """{"data":[{"uid":"r1","room_type":"direct","display_name":"Alice","created_by_id":"me","other_user":{"id":"u2"},"last_message":{"content":"hello","created_at":"2026-10-25T10:00:00Z","sender_name":"Alice"},"updated_at":"2026-10-25T10:00:00Z"}]}"""
+            200 to """{"data":[{"uid":"r1","room_type":"direct","display_name":"Alice","created_by_id":"me","other_user":{"id":"u2"},"last_message":{"content":"hello","created_at":"2026-10-25T10:00:00Z","sender_name":"Alice","sender_id":"u2"},"updated_at":"2026-10-25T10:00:00Z"}]}"""
         }
         val rooms = (client(t).listRooms() as ApiChatClient.RoomsResult.Ok).conversations
         assertEquals(1, rooms.size)
@@ -104,8 +104,16 @@ class ApiChatClientParityTest {
         assertEquals("Alice", c.title)
         assertEquals("AL", c.avatarInitials)
         assertEquals("hello", c.lastMessageText)
-        assertEquals("Alice", c.lastMessageSenderId)
+        assertEquals("u2", c.lastMessageSenderId)
         assertEquals(listOf("me", "u2"), c.participantIds)
+    }
+
+    @Test
+    fun roomSenderNameDoesNotImpersonateUserId() {
+        val c = com.example.chat.domain.models.Conversation.fromApi(mapOf(
+            "id" to "r", "last_message" to mapOf("content" to "hello", "sender_name" to "me"),
+        ))
+        assertEquals("", c.lastMessageSenderId)
     }
 
     @Test

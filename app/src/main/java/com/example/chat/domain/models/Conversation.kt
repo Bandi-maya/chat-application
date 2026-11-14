@@ -64,7 +64,8 @@ data class Conversation(
                 }
                 val created = parseIsoToInstant(lastMsg["created_at"]?.toString())
                 if (created != null) lastTime = created
-                lastSender = lastMsg["sender_name"]?.toString() ?: ""
+                // A display name is never an account ID. Home tick ownership uses this field.
+                lastSender = lastMsg["sender_id"]?.toString()?.trim().orEmpty()
             }
 
             val otherUser = json["other_user"] as? Map<*, *>

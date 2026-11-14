@@ -17,4 +17,6 @@ data class CallRecord(
     val timestamp: Instant,
     val durationSeconds: Long,
     val isEncrypted: Boolean = true,
+    val remoteDisplayName: String? = null,
+    val remoteUsername: String? = null,
 )
