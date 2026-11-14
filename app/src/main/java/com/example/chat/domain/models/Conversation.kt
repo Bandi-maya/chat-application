@@ -32,6 +32,7 @@ data class Conversation(
     // actually implemented and verified. The option remains in the UI.
     val encryptionStatus: EncryptionStatus = EncryptionStatus.verificationNeeded,
     val draftText: String = "",
+    val avatarUrl: String? = null,
 ) {
     val isTask: Boolean get() = roomType == "task" || !taskId.isNullOrEmpty()
     val isGroup: Boolean get() = type == ConversationType.group
@@ -104,6 +105,9 @@ data class Conversation(
                 participantIds = participantIds,
                 avatarInitials = initials,
                 avatarColorHex = "0xFF6366F1",
+                avatarUrl = (otherUser?.get("avatar_url") ?: otherUser?.get("photo")
+                    ?: otherUser?.get("avatarUrl") ?: json["avatar_url"])
+                    ?.toString()?.takeIf { it.isNotBlank() },
                 lastMessageText = lastText,
                 lastMessageTime = lastTime,
                 lastMessageSenderId = lastSender,

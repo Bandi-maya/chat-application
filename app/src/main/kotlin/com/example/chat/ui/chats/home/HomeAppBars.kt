@@ -230,29 +230,47 @@ fun StandardHomeAppBar(
     val headerCollapse = if (largeDefault) com.example.chat.ui.navigation.LocalReferenceHeaderCollapse.current else 0f
     Column(Modifier.fillMaxWidth()) {
     if (largeDefault) {
-        Row(Modifier.fillMaxWidth()
-            // Collapse drives height to exactly 0; the expanded height scales with
-            // font scale (sp->dp) so large text is not cut by clipToBounds.
-            .height(with(LocalDensity.current) { (com.example.chat.ui.navigation.ReferenceLayoutMetrics.compactIdentityHeightDp.toFloat() * theme.fontScale.toFloat()).sp.toDp() } * (1f - headerCollapse))
-            .padding(top = 0.dp)
-            .clipToBounds().alpha(1f - headerCollapse)
-            .padding(horizontal = 24.dp)
-            .combinedClickable(onClick = { if (homePrefs.nameTapOpensLocked) onIdentityTap() }, onLongClick = onIdentityLongPress),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
-            // Use Chaty's selected icon family, never GB branding or a copied contact avatar.
-            com.example.chat.ui.navigation.NavDestinationIcon(
-                if (forcedTypeIsSet) "groups" else "chats",
-                size = com.example.chat.ui.navigation.ReferenceLayoutMetrics.identityIconSizeDp,
-                tint = Color(theme.primaryTextColor),
-            )
-            Spacer(Modifier.width(6.dp))
-            Column(horizontalAlignment = Alignment.Start) {
-                Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .height(with(LocalDensity.current) { (com.example.chat.ui.navigation.ReferenceLayoutMetrics.compactIdentityHeightDp.toFloat() * theme.fontScale.toFloat()).sp.toDp() } * (1f - headerCollapse))
+                .clipToBounds()
+                .alpha(1f - headerCollapse)
+                .padding(horizontal = 24.dp)
+                .combinedClickable(
+                    onClick = { if (homePrefs.nameTapOpensLocked) onIdentityTap() },
+                    onLongClick = onIdentityLongPress,
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                com.example.chat.ui.navigation.NavDestinationIcon(
+                    if (forcedTypeIsSet) "groups" else "chats",
+                    size = com.example.chat.ui.navigation.ReferenceLayoutMetrics.identityIconSizeDp,
+                    tint = Color(theme.primaryTextColor),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    title,
+                    modifier = Modifier.weight(1f, fill = false),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     color = Color(theme.primaryTextColor),
                     fontSize = (com.example.chat.ui.navigation.ReferenceLayoutMetrics.compactIdentityTextSizeSp * theme.fontScale).sp,
-                    fontWeight = FontWeight.W700)
-                if (showStatus) Text(userAbout, color = Color(theme.secondaryTextColor), fontSize = (14 * theme.fontScale).sp)
+                    fontWeight = FontWeight.W700,
+                )
             }
+            if (showStatus) Text(
+                userAbout,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = Color(theme.secondaryTextColor),
+                fontSize = (14 * theme.fontScale).sp,
+            )
         }
     }
     Row(
@@ -547,6 +565,7 @@ fun HomeSearchField(
         modifier = Modifier
             .padding(start = 16.dp, top = 2.dp, end = 16.dp, bottom = 8.dp)
             .fillMaxWidth()
+            .shadow(3.dp, RoundedCornerShape(28.dp), clip = false)
             .focusRequester(focusRequester),
         textStyle = androidx.compose.ui.text.TextStyle(color = Color(theme.primaryTextColor)),
         placeholder = { Text(hint, color = Color(theme.secondaryTextColor)) },
@@ -561,7 +580,7 @@ fun HomeSearchField(
             }
         },
         singleLine = true,
-        shape = RoundedCornerShape(theme.cornerRadius.dp),
+        shape = RoundedCornerShape(28.dp),
         colors = TextFieldDefaults.colors(
             focusedContainerColor = Color(theme.cardColor),
             unfocusedContainerColor = Color(theme.cardColor),

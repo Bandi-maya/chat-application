@@ -251,7 +251,7 @@ fun TaskCreateEditModal(
             Spacer(Modifier.height(16.dp))
             com.example.chat.ui.kit.ChatyTaskField(
                 value = title, onValueChange = { title = it }, placeholder = "Task Title", enabled = !isSaving,
-                leadingIcon = { Icon(Icons.Rounded.CheckBox, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                leadingIcon = { Icon(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.checklist), contentDescription = null, modifier = Modifier.size(20.dp)) },
             )
             Spacer(Modifier.height(12.dp))
             com.example.chat.ui.kit.ChatyTaskField(

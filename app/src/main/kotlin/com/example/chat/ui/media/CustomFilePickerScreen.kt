@@ -317,7 +317,7 @@ fun CustomFilePickerScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            items(items.size) { index ->
+                            items(items.size, key = { items[it].path }) { index ->
                                 val item = items[index]
                                 GridItem(
                                     item = item,
@@ -340,7 +340,7 @@ fun CustomFilePickerScreen(
                                 bottom = if (selectedPaths.isNotEmpty()) 90.dp else 20.dp,
                             ),
                         ) {
-                            items(items.size) { index ->
+                            items(items.size, key = { items[it].path }) { index ->
                                 val item = items[index]
                                 ListItemRow(
                                     item = item,

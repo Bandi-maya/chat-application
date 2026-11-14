@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.EmojiEmotions
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Mic
@@ -52,6 +53,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -151,6 +155,8 @@ fun ChatEntryBar(
     modifier: Modifier = Modifier,
     emojiPickerOpen: Boolean = false,
     onEmoji: () -> Unit = {},
+    textFocusRequester: FocusRequester? = null,
+    onTextInputFocused: () -> Unit = {},
     onAttach: () -> Unit = {},
     onCamera: (() -> Unit)? = null,
     currentUserAvatarUrl: String? = null,
@@ -178,7 +184,7 @@ fun ChatEntryBar(
     @Composable
     fun emojiBtn(iconSize: Dp = 22.dp) = ComposerActionButton(
         semanticsLabel = if (emojiPickerOpen) "Return to keyboard" else "Emoji",
-        icon = Icons.Rounded.EmojiEmotions,
+        icon = if (emojiPickerOpen) Icons.Rounded.Keyboard else Icons.Rounded.EmojiEmotions,
         iconColor = colors.emojiButton,
         iconSize = iconSize,
         onTap = onEmoji,
@@ -289,6 +295,8 @@ fun ChatEntryBar(
         contentPadding = contentPadding,
         prefix = prefix,
         suffix = suffix,
+        textFocusRequester = textFocusRequester,
+        onTextInputFocused = onTextInputFocused,
     )
 
     // GB quick actions (Dart gbQa/gbGallery/gbAudio/gbLocation/gbContact/
@@ -846,6 +854,8 @@ private fun ComposerTextField(
     contentPadding: PaddingValues,
     prefix: (@Composable () -> Unit)?,
     suffix: (@Composable () -> Unit)?,
+    textFocusRequester: FocusRequester?,
+    onTextInputFocused: () -> Unit,
 ) {
     val shape = CircleShape
     val fontSize = (14 * theme.fontScale).sp
@@ -882,7 +892,10 @@ private fun ComposerTextField(
                 textStyle = TextStyle(color = colors.inputText, fontSize = fontSize),
                 cursorBrush = SolidColor(Color(theme.accentColor)),
                 maxLines = 5,
-                modifier = Modifier.fillMaxWidth().testTag("composer-input"),
+                modifier = Modifier.fillMaxWidth()
+                    .then(textFocusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
+                    .onFocusChanged { if (it.isFocused) onTextInputFocused() }
+                    .testTag("composer-input"),
             )
         }
         suffix?.invoke()

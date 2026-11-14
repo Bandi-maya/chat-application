@@ -100,6 +100,8 @@ fun PdfWorkspaceScreen(
         onDispose { library.removeListener(listener) }
     }
     @Suppress("UNUSED_EXPRESSION") tick
+    val files = library.files
+    val pdfs = remember(files) { files.filter { it.category == MediaCategory.pdf } }
 
     var isProcessing by remember { mutableStateOf(false) }
     var processingStatus by remember { mutableStateOf("") }
@@ -221,7 +223,6 @@ fun PdfWorkspaceScreen(
                 }
                 item { Spacer(Modifier.height(8.dp)) }
 
-                val pdfs = library.files.filter { it.category == MediaCategory.pdf }
                 if (pdfs.isEmpty()) {
                     item {
                         Box(
@@ -234,7 +235,7 @@ fun PdfWorkspaceScreen(
                         ) { Text("No PDFs stored in Chaty yet. Convert images or import one above!") }
                     }
                 } else {
-                    items(pdfs.size) { idx ->
+                    items(pdfs.size, key = { pdfs[it].id }) { idx ->
                         val item = pdfs[idx]
                         Box(Modifier.springInteractiveScale(0.98f).clickable { onOpenDocument(item) }) {
                             Row(

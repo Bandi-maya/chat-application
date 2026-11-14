@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 
 /** OkHttp implementation of the ApiAuthClient transport seam. */
 class OkHttpApiTransport : ApiHttpTransport {
-    private val client = OkHttpClient.Builder()
+    private val client = ChatyOkHttp.shared.newBuilder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
@@ -49,7 +49,7 @@ class OkHttpApiTransport : ApiHttpTransport {
 
 /** Binary (multipart) transport for ApiAccountClient.uploadProfilePhoto; the caller sets Content-Type. */
 class OkHttpApiBinaryTransport : ApiBinaryTransport {
-    private val client = OkHttpClient.Builder()
+    private val client = ChatyOkHttp.shared.newBuilder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .build()

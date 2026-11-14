@@ -65,6 +65,12 @@ class MainActivity : FragmentActivity() {
     private fun handleNotificationIntent(intent: android.content.Intent?) {
         val N = com.example.chat.notifications.ChatyNotifications
         when (intent?.action) {
+            N.ACTION_OPEN_ACCOUNTS -> {
+                val hash = intent.getStringExtra("account_hash")
+                if (ServiceLocator.apiBackend.multiAccount.accounts().any { it.accountHash == hash }) {
+                    N.pendingAccountAlert.value = hash
+                }
+            }
             N.ACTION_OPEN_CHAT -> N.requestOpenRoom(intent.getStringExtra(N.EXTRA_ROOM_ID))
             N.ACTION_SHOW_CALL -> {
                 // Ongoing-call notification tap: return to the full call UI. Only for a

@@ -71,12 +71,12 @@ data class ChatyEmojiComposerResult(
 
 private val categoryIcons: List<ImageVector> = listOf(
     Icons.Rounded.TagFaces,
-    Icons.Rounded.Pets,
-    Icons.Rounded.Restaurant,
-    Icons.Rounded.SportsSoccer,
+    com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.paw),
+    com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.food),
+    com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.sportsBall),
     Icons.Rounded.Place,
     Icons.Rounded.Lightbulb,
-    Icons.Rounded.EmojiSymbols,
+    com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.symbols),
     Icons.Rounded.Flag,
 )
 

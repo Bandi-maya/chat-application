@@ -293,7 +293,7 @@ fun SecurityCenterScreen(
                     }
                     rows += {
                         ChatySwitchTile(
-                            icon = Icons.Rounded.NotificationsPaused,
+                            icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.eyeOff),
                             title = "Hide Notification Content when Locked",
                             subtitle = "Conceal message body text while the application is locked",
                             value = security.hideLockNotificationContent,

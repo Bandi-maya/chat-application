@@ -64,8 +64,8 @@ class ContactRelationshipService(
         )
     }
 
-    suspend fun isBlocked(targetUserId: String): Boolean = withContext(Dispatchers.IO) {
-        contacts().blocks().any { it.userId == targetUserId }
+    suspend fun isBlocked(targetUserId: String, scopedPlane: ApiContactsClient? = null): Boolean = withContext(Dispatchers.IO) {
+        (scopedPlane ?: contacts()).blocks().any { it.userId == targetUserId }
     }
 
     /** Silent both ways, exactly like the backend /block semantics. */
@@ -76,8 +76,8 @@ class ContactRelationshipService(
     /** Derive the connection state from the contacts plane. Errors
      *  propagate (callers keep their previous state); a pre-plane server
      *  (no outgoing route) reads as not-connected, never as accepted. */
-    suspend fun connectionStatus(otherUserId: String): ContactConnectionStatus = withContext(Dispatchers.IO) {
-        val plane = contacts()
+    suspend fun connectionStatus(otherUserId: String, scopedPlane: ApiContactsClient? = null): ContactConnectionStatus = withContext(Dispatchers.IO) {
+        val plane = scopedPlane ?: contacts()
         if (plane.contacts().any { it.userId == otherUserId }) {
             return@withContext ContactConnectionStatus(myAccepted = true, otherAccepted = true)
         }
@@ -98,8 +98,8 @@ class ContactRelationshipService(
     /** Accept their pending incoming request. Throws when none exists -
      *  the old path created connections out of thin air; the backend
      *  contact model requires their request first. */
-    suspend fun acceptConnection(otherUserId: String): String = withContext(Dispatchers.IO) {
-        val plane = contacts()
+    suspend fun acceptConnection(otherUserId: String, scopedPlane: ApiContactsClient? = null): String = withContext(Dispatchers.IO) {
+        val plane = scopedPlane ?: contacts()
         val incoming = plane.inbox().firstOrNull { it.from.userId == otherUserId }
             ?: throw IllegalStateException("Unable to create or accept the contact connection.")
         plane.respond(incoming.requestId, "accept")

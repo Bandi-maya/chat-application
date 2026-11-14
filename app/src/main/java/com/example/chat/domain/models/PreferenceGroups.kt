@@ -170,6 +170,47 @@ data class SecurityPreferences(
 
 // ── NotificationPreferences ──────────────────────────────────────────────
 
+/** Per-contact tri-state override for the realtime event popups (online,
+ *  typing, recording), keyed by the contact's user id. Each event follows
+ *  the global toggle ("default") unless pinned "always" or "never".
+ *  Safety guards (locked/hidden, muted or currently open chat) beat
+ *  "always"; see ContactEventAlertPolicy. Unknown persisted modes parse
+ *  back to "default" (fail open to the global toggle, never to spam). */
+data class ContactEventAlertOverride(
+    val online: String = MODE_DEFAULT,
+    val typing: String = MODE_DEFAULT,
+    val recording: String = MODE_DEFAULT,
+) {
+    /** True when every event follows the global toggles; such entries are
+     *  dropped instead of persisted. */
+    val isFullyDefault: Boolean
+        get() = online == MODE_DEFAULT && typing == MODE_DEFAULT && recording == MODE_DEFAULT
+
+    fun toMap(): Map<String, Any?> = mapOf(
+        "online" to online,
+        "typing" to typing,
+        "recording" to recording,
+    )
+
+    companion object {
+        const val MODE_DEFAULT = "default"
+        const val MODE_ALWAYS = "always"
+        const val MODE_NEVER = "never"
+
+        private fun modeOf(value: Any?): String = when (value?.toString()) {
+            MODE_ALWAYS -> MODE_ALWAYS
+            MODE_NEVER -> MODE_NEVER
+            else -> MODE_DEFAULT
+        }
+
+        fun fromMap(map: Map<String, Any?>): ContactEventAlertOverride = ContactEventAlertOverride(
+            online = modeOf(map["online"]),
+            typing = modeOf(map["typing"]),
+            recording = modeOf(map["recording"]),
+        )
+    }
+}
+
 data class NotificationPreferences(
     val enableGlobalNotifications: Boolean = true,
     val showSenderAvatar: Boolean = true,
@@ -180,6 +221,10 @@ data class NotificationPreferences(
     val notifyTypingStarted: Boolean = false,
     val notifyMessageDeleted: Boolean = true,
     val notifyStatusDeleted: Boolean = true,
+    /** Per-contact popup overrides, keyed by contact user id. Stored inside
+     *  the account-scoped preferences blob, so overrides never bleed across
+     *  accounts on a shared device. */
+    val contactEventOverrides: Map<String, ContactEventAlertOverride> = emptyMap(),
 ) {
     fun toMap(): Map<String, Any?> = mapOf(
         "enableGlobalNotifications" to enableGlobalNotifications,
@@ -191,6 +236,7 @@ data class NotificationPreferences(
         "notifyTypingStarted" to notifyTypingStarted,
         "notifyMessageDeleted" to notifyMessageDeleted,
         "notifyStatusDeleted" to notifyStatusDeleted,
+        "contactEventOverrides" to contactEventOverrides.mapValues { it.value.toMap() },
     )
 
     companion object {
@@ -204,6 +250,17 @@ data class NotificationPreferences(
             notifyTypingStarted = map["notifyTypingStarted"] as Boolean? ?: false,
             notifyMessageDeleted = map["notifyMessageDeleted"] as Boolean? ?: true,
             notifyStatusDeleted = map["notifyStatusDeleted"] as Boolean? ?: true,
+            contactEventOverrides = (map["contactEventOverrides"] as? Map<*, *>)
+                ?.mapNotNull { (key, value) ->
+                    val userId = key?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    val raw = (value as? Map<*, *>) ?: return@mapNotNull null
+                    val parsed = ContactEventAlertOverride.fromMap(
+                        raw.entries.associate { (k, v) -> k.toString() to v },
+                    )
+                    if (parsed.isFullyDefault) null else userId to parsed
+                }
+                ?.toMap()
+                ?: emptyMap(),
         )
     }
 }
@@ -281,6 +338,8 @@ data class UniversalPreferences(
     val iconVariants: Map<String, String> = emptyMap(),
     val emojiStyle: String = "Chaty Motion",
     val loadFontEnabled: Boolean = false,
+    /** Local basename only. A restored preference never authorizes an arbitrary filesystem path. */
+    val customFontFileName: String? = null,
     val hidePhotosFromGallery: Boolean = false,
     val hideVideosFromGallery: Boolean = false,
     val hideGifsFromGallery: Boolean = false,
@@ -322,6 +381,7 @@ data class UniversalPreferences(
         "iconVariants" to iconVariants,
         "emojiStyle" to emojiStyle,
         "loadFontEnabled" to loadFontEnabled,
+        "customFontFileName" to customFontFileName,
         "hidePhotosFromGallery" to hidePhotosFromGallery,
         "hideVideosFromGallery" to hideVideosFromGallery,
         "hideGifsFromGallery" to hideGifsFromGallery,
@@ -357,6 +417,7 @@ data class UniversalPreferences(
                 }?.toMap() ?: emptyMap(),
             emojiStyle = map["emojiStyle"] as String? ?: "Chaty Motion",
             loadFontEnabled = map["loadFontEnabled"] as Boolean? ?: false,
+            customFontFileName = (map["customFontFileName"] as? String)?.takeIf { it.startsWith("custom_font_") && !it.contains('/') && !it.contains('\\') },
             hidePhotosFromGallery = map["hidePhotosFromGallery"] as Boolean? ?: false,
             hideVideosFromGallery = map["hideVideosFromGallery"] as Boolean? ?: false,
             hideGifsFromGallery = map["hideGifsFromGallery"] as Boolean? ?: false,

@@ -219,6 +219,7 @@ fun ConversationRow(
                         color = parseAvatarColorHex(conversation.avatarColorHex, Color(theme.accentColor)),
                         size = avatarSize,
                         shape = avatarShape,
+                        url = conversation.avatarUrl,
                     )
                     if (selected) {
                         Box(

@@ -47,6 +47,7 @@ fun ChatsHomeHost(
     onOpenLockedChats: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenAccountSwitcher: () -> Unit = onOpenSettings,
+    onVerifyEmail: (String, String) -> Unit = { _, _ -> },
     onOpenSplitChat: (List<Conversation>) -> Unit = {},
     onOpenNotifications: () -> Unit = {},
     onOpenNewChat: (groupMode: Boolean, broadcastMode: Boolean) -> Unit = { _, _ -> },
@@ -100,6 +101,7 @@ fun ChatsHomeHost(
         api.setConversationLocalState(id, field, value)
     }
     val security = prefs.security
+    val hiddenConversationIds = security.hiddenConversationIds.toSet()
     val headerTabs = com.example.chat.ui.navigation.LocalHomeHeaderTabs.current
     val headerTabsTheme = com.example.chat.ui.theme.LocalThemeConfig.current
     val headerTabsColors = androidx.compose.runtime.remember(headerTabsTheme) {
@@ -114,6 +116,7 @@ fun ChatsHomeHost(
         }
     } else null
     ChatsHomeScreen(
+        accountSessionIdentity = api.authSnapshot(),
         headerBottom = headerBottom,
         // Email-verification nudge (research 4a.4): signed-in but unverified
         // users get a banner with one-tap resend; verification is never forced
@@ -126,7 +129,8 @@ fun ChatsHomeHost(
                         scope.launch {
                             val address = me?.email ?: ""
                             try {
-                                toast(api.sendEmailVerification(address))
+                                val message = api.sendEmailVerification(address)
+                                onVerifyEmail(address, message)
                             } catch (e: Exception) {
                                 toast(com.example.chat.ui.auth.OtpVerificationLogic.displayError(e))
                             }
@@ -166,10 +170,11 @@ fun ChatsHomeHost(
         forcedType = forcedType,
         pageTitle = pageTitle,
         messagesFor = { id -> api.getMessages(id) },
+        lastDeliveryStateFor = { id -> api.lastMessageDeliveryState(id) },
         gbBool = { key, fallback -> prefs.gbBool(key, fallback) },
         gbColor = { key -> prefs.gbColor(key) },
         isConversationLocked = { id -> prefs.isConversationLocked(id) },
-        isConversationHidden = { id -> prefs.isConversationHidden(id) },
+        isConversationHidden = { id -> id in hiddenConversationIds },
         onToggleLockConversation = { id, lock -> prefs.toggleLockConversation(id, lock) },
         onToggleGhostMode = { on -> prefs.updateHome(prefs.home.copy(ghostMode = on)) },
         verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },

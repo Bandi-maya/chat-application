@@ -112,7 +112,14 @@ fun ChatyEventToastOverlay(
     Box(Modifier.fillMaxSize()) {
         content()
         val n = visible
-        val position = preferences.gbString("event_toast_position", "Top").lowercase()
+        val typedStyle = com.example.chat.domain.notifications.ContactToastStyle.resolve(
+            when (n?.icon) {
+                com.example.chat.data.realtime.EventNotificationIcon.onlinePrediction -> "online"
+                com.example.chat.data.realtime.EventNotificationIcon.keyboardAlt -> "typing"
+                else -> "other"
+            }, preferences.toasts,
+        )
+        val position = typedStyle?.position ?: preferences.gbString("event_toast_position", "Top").lowercase()
         val islandMode = preferences.gbBool("dynamic_island_notifications", false)
         val align = when (position) {
             "center" -> Alignment.Center
@@ -132,12 +139,12 @@ fun ChatyEventToastOverlay(
                 // Dart _buildDynamicIsland: the real DynamicIslandOverlayHost is mounted below.
             } else {
                 val avatarSize = preferences.gbDouble("toast_avatar_size", 40.0).coerceIn(24.0, 56.0).dp
-                val corner = preferences.gbDouble("toast_corner_radius", 18.0).coerceIn(4.0, 32.0).dp
-                val elevation = preferences.gbDouble("toast_elevation", 10.0).coerceIn(0.0, 24.0).dp
-                val bg = preferences.gbColor("event_toast_bg")?.let { Color(it.toInt()) } ?: colors.surface
+                val corner = (typedStyle?.radius ?: preferences.gbDouble("toast_corner_radius", 18.0).coerceIn(4.0, 32.0)).dp
+                val elevation = (if (typedStyle?.elevated == false) 0.0 else preferences.gbDouble("toast_elevation", 10.0).coerceIn(0.0, 24.0)).dp
+                val bg = (typedStyle?.background ?: preferences.gbColor("event_toast_bg"))?.let { Color(it.toInt()) } ?: colors.surface
                 val preset = ChatyNotificationIconPresets.forName(preferences.universal.notificationIcon)
                 val presetColor = Color(preset.colorArgb.toInt())
-                val textTint = shown.textColorArgb?.let { Color(it.toInt()) }
+                val textTint = (typedStyle?.text ?: shown.textColorArgb)?.let { Color(it.toInt()) }
                 val pad = when (position) {
                     "bottom" -> Modifier.padding(start = 14.dp, end = 14.dp, bottom = 92.dp)
                     "center" -> Modifier.padding(horizontal = 20.dp, vertical = 20.dp)
@@ -154,7 +161,7 @@ fun ChatyEventToastOverlay(
                         Row(Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             val initials = shown.avatarInitials
-                            if (preferences.notification.showSenderAvatar && initials != null) {
+                            if (preferences.notification.showSenderAvatar && typedStyle?.showAvatar != false && initials != null) {
                                 Box(Modifier.size(avatarSize).clip(CircleShape)
                                     .background(avatarColor(shown)),
                                     contentAlignment = Alignment.Center) {

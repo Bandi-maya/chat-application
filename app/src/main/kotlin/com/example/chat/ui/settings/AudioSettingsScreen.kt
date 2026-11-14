@@ -197,7 +197,7 @@ fun AudioSettingsScreen(
                 availableRoutes.forEachIndexed { i, route ->
                     if (i > 0) AudioDivider()
                     val (icon, name) = when (route) {
-                        AudioOutputRoute.receiver -> Icons.Rounded.PhoneInTalk to "Earpiece Receiver"
+                        AudioOutputRoute.receiver -> com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.earpiece) to "Earpiece Receiver"
                         AudioOutputRoute.speaker -> Icons.Rounded.VolumeUp to "Bottom Loudspeaker"
                         AudioOutputRoute.bluetooth -> Icons.Rounded.BluetoothAudio to "Bluetooth Device"
                         AudioOutputRoute.wiredHeadset -> Icons.Rounded.Headphones to "Wired Headset"
@@ -240,7 +240,7 @@ fun AudioSettingsScreen(
                     val (color, statusIcon) = when (status) {
                         "Verified Dual Output" -> green to Icons.Outlined.CheckCircleOutline
                         "Native Stereo" -> blue to Icons.Rounded.MusicNote
-                        "Standard Single Route" -> gray to Icons.Rounded.RadioButtonChecked
+                        "Standard Single Route" -> gray to com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.radioOn)
                         "Unsupported or Failed" -> red to Icons.Outlined.Cancel
                         else -> orange to Icons.Outlined.HelpOutline
                     }
@@ -317,7 +317,7 @@ private fun AudioRadioRow(title: String, subtitle: String, selected: Boolean, en
             Text(subtitle, color = colors.foregroundSecondary, fontSize = 12.sp)
         }
         Icon(
-            if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked, null, Modifier.size(22.dp),
+            if (selected) Icons.Rounded.CheckCircle else com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.radioOff), null, Modifier.size(22.dp),
             tint = if (selected) colors.accent else colors.foregroundSecondary.copy(alpha = 0.4f),
         )
     }

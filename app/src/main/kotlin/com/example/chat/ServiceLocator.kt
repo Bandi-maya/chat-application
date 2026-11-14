@@ -82,6 +82,7 @@ object ServiceLocator {
         appScope.launch(kotlinx.coroutines.Dispatchers.IO) { runCatching { mediaCache.purgeTransientTemps() } }
         preferencesController // start load + remote reconcile (Dart controller constructor)
         notificationCoordinator.start()
+        com.example.chat.bubbles.ChatBubbleController.install(context)
         // Always wire FcmRegistrarHolder + PushWakeHolder at process init so early
         // onNewToken / onMessageReceived callbacks never drop before UI launches.
         fcmRegistrar
@@ -290,25 +291,34 @@ object ServiceLocator {
 
     /** Push-agnostic wake wiring: a content-free nudge (any transport) runs a
      *  bounded sync over the authenticated channel. */
+    private val inactiveAccountPush by lazy {
+        com.example.chat.data.api.InactiveAccountPushBridge(requireContext(), apiBackend, secureStore)
+    }
+    private suspend fun catchUpInactiveAccounts() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try { inactiveAccountPush.run() } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { /* Inactive catch-up cannot fail the active wake. */ }
+    }
+
     private fun installPushWakeHandler() {
         com.example.chat.notifications.PushWakeHolder.handler =
             object : com.example.chat.notifications.PushWakeHandler {
                 override fun onSyncNudge() {
-                    apiBackend.onPushNudge()
+                    appScope.launch { apiBackend.syncFromPushNudge(); catchUpInactiveAccounts() }
                 }
 
                 override suspend fun onSyncNudgeAndWait() {
                     apiBackend.syncFromPushNudge()
+                    catchUpInactiveAccounts()
                 }
 
                 override fun onIncomingCallNudge(callId: String) {
                     // Fetch the queued offer over the authenticated channel;
                     // the delivered signal surfaces the existing ring UI.
-                    apiBackend.pollCallSignalsNow()
+                    appScope.launch { apiBackend.pollCallSignalsAndAwait(); catchUpInactiveAccounts() }
                 }
 
                 override suspend fun onIncomingCallNudgeAndWait(callId: String) {
                     apiBackend.pollCallSignalsAndAwait()
+                    catchUpInactiveAccounts()
                 }
             }
     }
@@ -327,6 +337,22 @@ object ServiceLocator {
         com.example.chat.data.media.MediaAutoDownloadGate(
             networkMonitor,
             requireContext().getSharedPreferences("chaty_media_rules", android.content.Context.MODE_PRIVATE),
+        )
+    }
+
+    /** Tap-to-download for media from other people: resumable, account-scoped parts, progress state. */
+    val mediaDownloads: com.example.chat.data.media.MediaDownloadManager by lazy {
+        val online = kotlinx.coroutines.flow.MutableStateFlow(networkMonitor.state.value.online)
+        appScope.launch { networkMonitor.state.collect { online.value = it.online } }
+        com.example.chat.data.media.MediaDownloadManager(
+            scope = appScope,
+            resolver = attachmentResolver,
+            downloader = com.example.chat.data.media.ResumableMediaDownloader(
+                client = okhttp3.OkHttpClient(),
+                maxBytes = com.example.chat.data.services.ChatMediaService.STORAGE_LIMIT_MB * 1024L * 1024L,
+            ),
+            partsRoot = java.io.File(requireContext().noBackupFilesDir, "chaty_dl_parts"),
+            online = online,
         )
     }
 
@@ -464,7 +490,11 @@ object ServiceLocator {
             // Custom backend health endpoint. (The Supabase 'profiles' ping measured a backend this
             // build does not sign in to, so the banner reported the wrong server.)
             backendPing = { apiBackend.pingBackend() },
-        )
+        ).apply {
+            // Wire the foreground/pause hooks (previously never attached, so
+            // the 30s probe also ran in the background).
+            attachLifecycle(androidx.lifecycle.ProcessLifecycleOwner.get())
+        }
     }
 
     /** D1 (Supabase retirement): the MLS plane talks to the Chaty backend's
@@ -997,7 +1027,11 @@ object ServiceLocator {
             scope = appScope,
             addListener = { l -> preferencesController.addListener(l) },
             removeListener = { l -> preferencesController.removeListener(l) },
-        )
+        ).apply {
+            // Foreground-gate the 30s retry pass (same pattern as
+            // ConnectionHealthService above).
+            attachLifecycle(androidx.lifecycle.ProcessLifecycleOwner.get())
+        }
     }
 
     val richRealtime: RichChatRealtimeService by lazy {
@@ -1010,6 +1044,11 @@ object ServiceLocator {
                         ?: profileService.currentUser?.takeIf { it.id == userId }
                 override fun isConversationMuted(conversationId: String) =
                     conversationsRepository.conversationsById[conversationId]?.isMuted == true
+                override fun directConversationIdForUser(userId: String) =
+                    conversationsRepository.conversationsById.values
+                        .firstOrNull { it.isDirect && userId in it.participantIds }?.id
+                override fun isConversationProtected(conversationId: String) =
+                    preferencesController.isConversationProtected(conversationId)
             },
             readPlane = com.example.chat.data.realtime.BackendRichChatReadPlane(apiBackend),
             markDeliveredRpc = { id -> apiBackend.markConversationDeliveredBackend(id) },
@@ -1147,7 +1186,7 @@ object ServiceLocator {
                 sessionManager.clearLocal()
             },
             kickPendingSends = { appScope.launch { outgoingQueue.processQueue() } },
-            onSignedOut = { mediaCache.purgeTransientTemps() },
+            onSignedOut = { mediaCache.purgeTransientTemps(); mediaDownloads.purgeAll() },
             apiScopeIdentity = { apiBackend.authSnapshot() },
             onAccountSwitch = { apiBackend.clearChatCachesForAccountSwitch() },
         )
@@ -1191,6 +1230,15 @@ object ServiceLocator {
      *  realtime service observes the same transitions. Call once when the UI
      *  layer is up (Dart does this in ChatyDataStore.start()). */
     suspend fun startSessionLifecycle() {
+        // Wire live socket presence/typing into the event-toast path once
+        // (addIfAbsent dedupes repeat calls). The toast gating itself lives
+        // in RichChatRealtimeService + ContactEventAlertPolicy.
+        apiBackend.addContactEventListener(object : com.example.chat.data.api.ApiBackendService.ContactEventListener {
+            override fun onContactOnlineChanged(userId: String, online: Boolean) =
+                richRealtime.onLivePresenceChanged(userId, online)
+            override fun onContactTypingChanged(roomId: String, userId: String, isTyping: Boolean) =
+                richRealtime.onLiveTypingChanged(roomId, userId, isTyping)
+        })
         sessionLifecycle.currentSessionSnapshot = { currentSessionSnapshot() }
         val snapshots = callbackFlow {
             val listener: (com.example.chat.data.auth.AuthChangeEvent, AuthSessionManager.ActiveSession?) -> Unit =

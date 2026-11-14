@@ -597,7 +597,7 @@ private fun IosBottomBar(t: ThemeConfig) {
     Column {
         Box(Modifier.fillMaxWidth().height(0.8.dp).background(col(t.cardColor)))
         Row(Modifier.fillMaxWidth().background(col(t.surfaceColor)).padding(horizontal = 20.dp, vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            IosTabItem(t, Icons.Rounded.ChatBubble, "Chats", true, "7"); IosTabItem(t, Icons.Outlined.CircleOutlined, "Updates")
+            IosTabItem(t, Icons.Rounded.ChatBubble, "Chats", true, "7"); IosTabItem(t, com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.updates), "Updates")
             IosTabItem(t, Icons.Rounded.Checklist, "Tasks"); IosTabItem(t, Icons.Rounded.Phone, "Calls"); IosTabItem(t, Icons.Rounded.Settings, "Settings")
         }
     }

@@ -52,6 +52,17 @@ internal fun MediaAttachmentPreview(
     var failed by remember(attachment.url) { mutableStateOf(false) }
     var unavailableReason by remember(attachment.url) { mutableStateOf<com.example.chat.data.media.ResolvedSource.Reason?>(null) }
     var retryNonce by remember(attachment.url) { mutableStateOf(0) }
+    // Tap-to-download: set when the media is a plain miss on this device (not view-once/restricted).
+    var dlReq by remember(attachment.url, binding?.session) { mutableStateOf<com.example.chat.data.media.MediaDownloadManager.Request?>(null) }
+    val dlFlow = remember(dlReq) { dlReq?.let { com.example.chat.ServiceLocator.mediaDownloads.stateFlow(it) } }
+    val dlState = dlFlow?.collectAsState()?.value
+    val reduceMotionForTick = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    LaunchedEffect(dlState, dlReq, reduceMotionForTick) {
+        if (dlState == com.example.chat.data.media.MediaDownloadState.Done) {
+            if (!reduceMotionForTick) kotlinx.coroutines.delay(650)
+            dlReq = null; retryNonce++
+        }
+    }
     var thumbnail by remember(attachment.url) { mutableStateOf<Bitmap?>(null) }
     var videoDurationMs by remember(attachment.url) { mutableStateOf<Long?>(null) }
     var ratio by remember(attachment.url) { mutableStateOf(1.35f) }
@@ -68,6 +79,25 @@ internal fun MediaAttachmentPreview(
             val path = attachment.url?.takeIf { it.isNotBlank() } ?: error("No media path")
             if (binding != null && message != null) {
                 val result = binding.resolve(message, retryNonce > 0)
+                if (retryNonce == 0 && result is com.example.chat.data.media.ResolvedSource.Remote) {
+                    val trusted = binding.resolver.trusted(binding.ref(message))
+                    if (trusted != null && !trusted.viewOnce && !trusted.restricted) {
+                        val req = com.example.chat.data.media.MediaDownloadManager.Request(
+                            binding.ref(message), binding.session, binding.currentSession,
+                            { binding.authorizedUrl(message) },
+                            com.example.chat.data.media.MediaDownloadFormat.parseBytes(attachment.size))
+                        dlReq = req
+                        val kind = when (attachment.type) {
+                            "image" -> com.example.chat.data.media.AutoDownloadPolicy.MediaKind.IMAGE
+                            "video" -> com.example.chat.data.media.AutoDownloadPolicy.MediaKind.VIDEO
+                            "audio" -> com.example.chat.data.media.AutoDownloadPolicy.MediaKind.AUDIO
+                            else -> com.example.chat.data.media.AutoDownloadPolicy.MediaKind.DOCUMENT
+                        }
+                        if (com.example.chat.ServiceLocator.mediaAutoDownloadGate.shouldAuto(message.conversationId, kind, req.totalBytes))
+                            com.example.chat.ServiceLocator.mediaDownloads.start(req)
+                        kotlinx.coroutines.awaitCancellation()   // the tile owns this state until Done re-resolves from the store
+                    }
+                }
                 try {
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     check(binding.deliver(result) { ownedSource = result }) { "Session changed" }
@@ -107,7 +137,7 @@ internal fun MediaAttachmentPreview(
     // Install the detector only when the preview is actually actionable so
     // parents (album tile tap/long-press/drag) receive unconsumed events.
     val sticker = message?.let { com.example.chat.core.stickers.StickerMessagePolicy.isSticker(it.type.name, it.metadata) } == true && !video
-    val previewActionable = onTap != null || onTapWithBounds != null || (failed && retryable)
+    val previewActionable = (onTap != null || onTapWithBounds != null || (failed && retryable)) && dlReq == null
     Box(
         Modifier.widthIn(max = 300.dp).fillMaxWidth().aspectRatio(if (sticker) 1f else fixedRatio ?: ratio)
             .clip(RoundedCornerShape(9.dp)).background(if (sticker) Color.Transparent else Color.Black.copy(alpha = 0.12f))
@@ -118,6 +148,12 @@ internal fun MediaAttachmentPreview(
         contentAlignment = Alignment.Center,
     ) {
         when {
+            dlReq != null && dlState != null -> com.example.chat.ui.chats.detail.MediaDownloadTile(
+                state = dlState, video = video, reduceMotion = motionDisabled,
+                onStart = { dlReq?.let { com.example.chat.ServiceLocator.mediaDownloads.start(it) } },
+                onPause = { dlReq?.let { com.example.chat.ServiceLocator.mediaDownloads.pause(it) } },
+                onCancel = { dlReq?.let { com.example.chat.ServiceLocator.mediaDownloads.cancel(it) } },
+            )
             failed -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 when (unavailableReason) {
                     com.example.chat.data.media.ResolvedSource.Reason.OFFLINE -> {

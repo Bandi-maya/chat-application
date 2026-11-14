@@ -291,6 +291,7 @@ fun NotificationSettingsPage(
             },
         ) {
             Column {
+            com.example.chat.bubbles.ChatBubbleSettings()
             ChatySettingsSection(
                 title = "In-app event notifications",
                 description = "Display non-intrusive toasts for incoming live state transitions without interrupting chats.",
@@ -320,7 +321,7 @@ fun NotificationSettingsPage(
             ) {
                 Column {
                     ChatySwitchTile(
-                        icon = Icons.Rounded.MotionPhotosOn, iconColor = colors.primary, title = "Enable Dynamic Island",
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.animation), iconColor = colors.primary, title = "Enable Dynamic Island",
                         subtitle = "Turn on the island for supported notifications across apps", value = isIslandEnabled,
                         onChanged = { scope.launch { setDynamicIslandEnabled(it) } },
                     )
@@ -434,7 +435,7 @@ fun NotificationSettingsPage(
                         onChanged = { preferences.updateToasts(preferences.toasts.copy(onlineToastWithProfilePicture = it), "Online With Profile Pic") },
                     )
                     GbSwitchTile(
-                        icon = Icons.Rounded.FilterNone, title = "Elevation", subtitle = if (p.onlineElevation) "Enabled" else "Disabled", value = p.onlineElevation,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.layers), title = "Elevation", subtitle = if (p.onlineElevation) "Enabled" else "Disabled", value = p.onlineElevation,
                         onChanged = { preferences.updateToasts(preferences.toasts.copy(onlineToastElevation = it), "Online Toast Elevation") },
                     )
                     GbSliderTile(

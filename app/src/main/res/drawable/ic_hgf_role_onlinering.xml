@@ -1,0 +1,7 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="OnlineRing"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M11,3.5C15.142,3.5,18.5,6.858,18.5,11C18.5,15.142,15.142,18.5,11,18.5C6.858,18.5,3.5,15.142,3.5,11C3.5,6.858,6.858,3.5,11,3.5" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M17.8,15.1C18.765,15.1,19.656,15.615,20.138,16.45C20.621,17.285,20.621,18.315,20.138,19.15C19.656,19.985,18.765,20.5,17.8,20.5C16.835,20.5,15.944,19.985,15.462,19.15C14.979,18.315,14.979,17.285,15.462,16.45C15.944,15.615,16.835,15.1,17.8,15.1" android:fillColor="#FF000000" />
+</vector>

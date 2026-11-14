@@ -33,6 +33,15 @@ import kotlinx.coroutines.launch
 
 class DynamicIslandNotificationListener : NotificationListenerService() {
     private val lifetime = MainScope()
+    private val dismissPolicy = com.example.chat.island.core.NotificationDismissPolicy { SystemClock.elapsedRealtime() }
+    private val onNotificationDrawn: (String, Long?) -> Unit = { key, receipt ->
+        if (dismissPolicy.awaiting(key, receipt)) {
+            val current = snapshot().firstOrNull { it.key == key }
+            val allowed = capture() && IslandSettings.isOn(Trigger.Notifications) && current != null &&
+                current.packageName !in IslandSettings.blockedApps.value && dismissPolicy.eligible(dismissEligibility(current))
+            dismissPolicy.displayed(key, receipt, allowed) { cancelNotification(it) }
+        }
+    }
     private var bound = false
     private var receiverReady = false
     private var mediaManager: MediaSessionManager? = null
@@ -63,6 +72,7 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
         super.onCreate()
         IslandSettings.init(applicationContext)
         IslandController.attach(applicationContext)
+        IslandController.notificationDrawn = onNotificationDrawn
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
@@ -84,6 +94,7 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
         val suppressed = !capture()
         IslandController.setPrivacySuppressed(suppressed)
         if (suppressed) {
+            dismissPolicy.clear()
             fingerprints.clear()
             timerSamples.clear()
             IslandController.clearAll()
@@ -117,6 +128,8 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
     }
 
     override fun onDestroy() {
+        if (IslandController.notificationDrawn === onNotificationDrawn) IslandController.notificationDrawn = null
+        dismissPolicy.clear()
         bound = false
         disconnectMedia()
         settings.unregisterOnSharedPreferenceChangeListener(masterChanged)
@@ -186,6 +199,9 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        // Our narrow shade-dismiss must not instantly erase the card/actions
+        // that were just drawn. Normal lifetime/privacy/disable cleanup remains.
+        if (dismissPolicy.consumeOwnRemoval(sbn.key)) return
         if (callKeys.remove(sbn.key)) IslandController.clearCall(sbn.key)
         IslandController.clearLive(sbn.key)
         IslandController.clearDownload(sbn.key)
@@ -235,9 +251,26 @@ class DynamicIslandNotificationListener : NotificationListenerService() {
             (Build.VERSION.SDK_INT >= 28 && action.semanticAction == Notification.Action.SEMANTIC_ACTION_MARK_AS_READ) || label in setOf("mark as read", "mark read")
         }?.actionIntent
         val duration = if (reply != null || read != null) 8000L else if (quiet || item.isOngoing) 3000L else 4500L
+        val displayReceipt = dismissPolicy.offer(item.key, dismissEligibility(item))
         IslandController.flash(IslandMode.Notification(appName(item), title, body, reply != null, read != null),
             durationMs = duration, open = value.contentIntent, pkg = item.packageName,
-            reply = reply, markRead = read, key = item.key)
+            reply = reply, markRead = read, key = item.key, displayReceipt = displayReceipt)
+    }
+
+    private fun dismissEligibility(item: StatusBarNotification): com.example.chat.island.core.NotificationDismissPolicy.Eligibility {
+        val value = item.notification
+        return com.example.chat.island.core.NotificationDismissPolicy.Eligibility(
+            enabled = isHideSystemNotificationsEnabled(this),
+            ordinaryMessage = value.category == Notification.CATEGORY_MESSAGE,
+            ongoing = item.isOngoing,
+            service = value.flags and Notification.FLAG_FOREGROUND_SERVICE != 0 || value.category == Notification.CATEGORY_SERVICE,
+            alarmOrCall = value.fullScreenIntent != null || value.category in setOf(Notification.CATEGORY_CALL, Notification.CATEGORY_ALARM),
+            progress = value.category == Notification.CATEGORY_PROGRESS || value.extras.containsKey(Notification.EXTRA_PROGRESS_MAX) ||
+                value.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE, false),
+            groupSummary = value.flags and Notification.FLAG_GROUP_SUMMARY != 0,
+            ownPackage = item.packageName == packageName,
+            dismissible = item.isClearable,
+        )
     }
 
     private fun words(text: CharSequence?): Set<String> = text?.toString()?.lowercase()

@@ -141,7 +141,8 @@ fun UniversalChatyIconsScreen(
     fun applyTheme(theme: ChatyIconThemeId) {
         if (!ChatyIconPackCatalog.isSelectable(theme)) return
         ChatyHapticsPort.selection(view)
-        preferences.updateUniversal(preferences.universal.copy(iconTheme = theme.title))
+        // A whole-pack selection replaces prior per-icon choices. Later per-icon edits still override it.
+        preferences.updateUniversal(preferences.universal.copy(iconTheme = theme.title, iconVariants = emptyMap()))
         // Dart snackbar: '<title> icon theme applied across Chaty', 2s.
         onMessage("${theme.title} icon theme applied across Chaty")
     }
@@ -215,7 +216,7 @@ fun UniversalChatyIconsScreen(
                     onClick = { microSizePreview = !microSizePreview },
                     label = { Text(if (microSizePreview) "20px Micro" else "26px Standard", fontSize = 11.sp) },
                     leadingIcon = {
-                        Icon(Icons.Rounded.PhotoSizeSelectSmall, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Icon(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.aspectRatio), contentDescription = null, modifier = Modifier.size(14.dp))
                     },
                     colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
                         selectedContainerColor = accent.copy(alpha = 0.2f),
@@ -332,7 +333,7 @@ fun UniversalChatyIconsScreen(
                     } else if (!selectable) {
                         Text("Unavailable", color = secondaryText, fontSize = 10.sp, fontWeight = FontWeight.W700)
                     } else {
-                        Icon(Icons.Outlined.RadioButtonUnchecked, contentDescription = null, tint = White24, modifier = Modifier.size(24.dp))
+                        Icon(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.radioOff), contentDescription = null, tint = White24, modifier = Modifier.size(24.dp))
                     }
                 }
             }

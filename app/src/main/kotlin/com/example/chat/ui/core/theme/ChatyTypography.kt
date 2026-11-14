@@ -79,29 +79,31 @@ object ChatyTypography {
         else -> deviceFamily(name) // sans-serif-rounded, sans-serif-condensed
     }
 
-    private fun TextStyle.styled(family: FontFamily?, delta: Double): TextStyle {
+    private fun TextStyle.styled(family: FontFamily?, delta: Double, weight: Int?, italic: Boolean): TextStyle {
         val base = if (letterSpacing.type == TextUnitType.Sp) letterSpacing.value else 0f
         return copy(
             fontFamily = family ?: fontFamily,
+            fontWeight = weight?.let { FontWeight(it) } ?: fontWeight,
+            fontStyle = if (italic) FontStyle.Italic else fontStyle,
             letterSpacing = (base + delta.toFloat()).sp,
         )
     }
 
-    fun apply(base: Typography, preset: String, universalPreset: String?): Typography {
+    fun apply(base: Typography, preset: String, universalPreset: String?, customFamily: FontFamily? = null): Typography {
         val spec = ChatyTypographySpec.resolve(preset, universalPreset)
-        val fam = familyFor(spec.family)
+        val fam = customFamily ?: familyFor(spec.family)
         val d = spec.letterSpacingDelta
         var t = Typography(
-            displayLarge = base.displayLarge.styled(fam, d), displayMedium = base.displayMedium.styled(fam, d),
-            displaySmall = base.displaySmall.styled(fam, d),
-            headlineLarge = base.headlineLarge.styled(fam, d), headlineMedium = base.headlineMedium.styled(fam, d),
-            headlineSmall = base.headlineSmall.styled(fam, d),
-            titleLarge = base.titleLarge.styled(fam, d), titleMedium = base.titleMedium.styled(fam, d),
-            titleSmall = base.titleSmall.styled(fam, d),
-            bodyLarge = base.bodyLarge.styled(fam, d), bodyMedium = base.bodyMedium.styled(fam, d),
-            bodySmall = base.bodySmall.styled(fam, d),
-            labelLarge = base.labelLarge.styled(fam, d), labelMedium = base.labelMedium.styled(fam, d),
-            labelSmall = base.labelSmall.styled(fam, d),
+            displayLarge = base.displayLarge.styled(fam, d, spec.weight, spec.italic), displayMedium = base.displayMedium.styled(fam, d, spec.weight, spec.italic),
+            displaySmall = base.displaySmall.styled(fam, d, spec.weight, spec.italic),
+            headlineLarge = base.headlineLarge.styled(fam, d, spec.weight, spec.italic), headlineMedium = base.headlineMedium.styled(fam, d, spec.weight, spec.italic),
+            headlineSmall = base.headlineSmall.styled(fam, d, spec.weight, spec.italic),
+            titleLarge = base.titleLarge.styled(fam, d, spec.weight, spec.italic), titleMedium = base.titleMedium.styled(fam, d, spec.weight, spec.italic),
+            titleSmall = base.titleSmall.styled(fam, d, spec.weight, spec.italic),
+            bodyLarge = base.bodyLarge.styled(fam, d, spec.weight, spec.italic), bodyMedium = base.bodyMedium.styled(fam, d, spec.weight, spec.italic),
+            bodySmall = base.bodySmall.styled(fam, d, spec.weight, spec.italic),
+            labelLarge = base.labelLarge.styled(fam, d, spec.weight, spec.italic), labelMedium = base.labelMedium.styled(fam, d, spec.weight, spec.italic),
+            labelSmall = base.labelSmall.styled(fam, d, spec.weight, spec.italic),
         )
         if (spec.monospaceAccent) {
             t = t.copy(

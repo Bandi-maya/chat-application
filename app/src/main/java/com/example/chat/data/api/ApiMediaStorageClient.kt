@@ -21,7 +21,7 @@ class ApiMediaStorageClient(
     private val baseUrl: () -> String,
     private val tenantId: () -> String,
     private val token: () -> String?,
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient = com.example.chat.data.api.ChatyOkHttp.shared,
 ) : MediaStorageBackend {
 
     /** path -> server URL for files uploaded this session (the server

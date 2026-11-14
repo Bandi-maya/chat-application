@@ -20,7 +20,7 @@ class ScopedCallHttpTransport(
     private val guarded: (ApiAccountScope, () -> Unit) -> Boolean,
     private val registry: CallRequestRegistry,
 ) : ApiHttpTransport {
-    private val client = OkHttpClient.Builder().callTimeout(5, TimeUnit.SECONDS)
+    private val client = ChatyOkHttp.shared.newBuilder().callTimeout(5, TimeUnit.SECONDS)
         .connectTimeout(3, TimeUnit.SECONDS).readTimeout(3, TimeUnit.SECONDS)
         .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build()
     override fun execute(method: String, url: String, headers: Map<String,String>, body: String?): Pair<Int,String> {

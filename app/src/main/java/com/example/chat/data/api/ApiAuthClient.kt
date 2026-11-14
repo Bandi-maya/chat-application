@@ -33,7 +33,7 @@ data class ApiUserProfile(
     val emailVerified: Boolean = true,
 )
 
-data class ApiAuthResult(val token: String, val user: ApiUserProfile, val refreshToken: String? = null)
+data class ApiAuthResult(val token: String, val user: ApiUserProfile, val refreshToken: String? = null, val verificationMessage: String? = null)
 
 /** Transport seam so the request/response logic is JVM-testable.
  *  Returns (statusCode, body); throws on transport failure. */
@@ -64,7 +64,9 @@ class ApiAuthClient(
             .put("password", password)
             .toString()
         val response = postWithFallback("auth/register", body, extraHeaders = extraHeaders)
-        return parseAuthResponse(response.first, response.second)
+        val result = parseAuthResponse(response.first, response.second)
+        val notice = runCatching { JSONObject(response.second).optString("message").takeIf { it.isNotBlank() && it != "null" } }.getOrNull()
+        return result.copy(verificationMessage = notice)
     }
 
     /** ApiBackendService.updateProfile: PUT /app-users/profile (+ /api/v1
@@ -140,6 +142,8 @@ class ApiAuthClient(
         if (displayName != null) legacyPayload.put("full_name", displayName.trim())
         if (about != null) legacyPayload.put("about", about.trim())
         if (username != null) legacyPayload.put("username", username.trim())
+        // Legacy server copies top-level avatarUrl into the directory's users.avatar_url.
+        if (avatarUrl != null) legacyPayload.put("avatarUrl", avatarUrl.trim())
         val publicProfile = JSONObject()
         if (about != null) publicProfile.put("about", about.trim())
         if (avatarUrl != null) publicProfile.put("avatarUrl", avatarUrl.trim())
@@ -419,7 +423,7 @@ class ApiAuthClient(
     fun sendEmailVerification(email: String): String = postOtpMail(
         "auth/email/verification/send",
         JSONObject().put("email", email.trim()).toString(),
-        fallbackMessage = "If an account exists with this email, a verification code has been sent.",
+        fallbackMessage = "If an account exists with this email, verification was requested. Delivery is not yet confirmed.",
     )
 
     /** POST auth/email/verification/confirm: marks the address verified when
@@ -453,7 +457,7 @@ class ApiAuthClient(
                 val data = if (parsed.has("data")) parsed.get("data") else parsed
                 (if (data is JSONObject && data.has("message") && !data.isNull("message"))
                     data.get("message").toString()
-                else null) ?: fallbackMessage
+                else null) ?: parsed.optString("message").takeIf { it.isNotBlank() && it != "null" } ?: fallbackMessage
             } catch (_: Exception) {
                 fallbackMessage
             }

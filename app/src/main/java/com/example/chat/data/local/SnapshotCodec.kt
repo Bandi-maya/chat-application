@@ -28,6 +28,7 @@ object SnapshotCodec {
         adminIds = stringList(json["admin_ids"]),
         avatarInitials = json["avatar_initials"]?.toString(),
         avatarColorHex = json["avatar_color_hex"]?.toString(),
+        avatarUrl = json["avatar_url"]?.toString(),
         lastMessageText = json["last_message_text"]?.toString() ?: "",
         lastMessageTime = parseIsoToInstant(json["last_message_time"]?.toString())
             ?: Instant.ofEpochMilli(0),
@@ -55,6 +56,7 @@ object SnapshotCodec {
             put("admin_ids", conversation.adminIds)
             conversation.avatarInitials?.let { put("avatar_initials", it) }
             conversation.avatarColorHex?.let { put("avatar_color_hex", it) }
+            conversation.avatarUrl?.let { put("avatar_url", it) }
             put("last_message_text", conversation.lastMessageText)
             put("last_message_time", conversation.lastMessageTime.toString())
             put("last_message_sender_id", conversation.lastMessageSenderId)

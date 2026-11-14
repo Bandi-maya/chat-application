@@ -139,7 +139,7 @@ fun ConversationActionBarScreen(preferences: ChatyPreferencesController, onBack:
             Spacer(Modifier.height(14.dp))
             GbCardContainer {
                 GbSettingRow(
-                    title = "Action Bar", icon = Icons.Rounded.Web, subtitle = "Change Color of ActionBar on Chat Screen",
+                    title = "Action Bar", icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.dock), subtitle = "Change Color of ActionBar on Chat Screen",
                     colorValue = p.actionBarColor,
                     onColorTap = { pickColor("Action Bar Color", p.actionBarColor) { preferences.updateConversation(p.copy(actionBarColor = it)) } },
                 )
@@ -152,7 +152,7 @@ fun ConversationActionBarScreen(preferences: ChatyPreferencesController, onBack:
                 GbSwitchTile(Icons.Rounded.PhoneDisabled, "Hide Call Button", p.hideCallButton, {
                     preferences.updateConversation(p.copy(hideCallButton = it))
                 }, "Hide call button from conversation action bar")
-                GbSwitchTile(Icons.Rounded.SpeakerNotesOff, "Disable Contact Status", p.disableContactStatus, {
+                GbSwitchTile(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.personOff), "Disable Contact Status", p.disableContactStatus, {
                     preferences.updateConversation(p.copy(disableContactStatus = it))
                 }, "Removes the Contact status line that's under the header in conversation")
                 GbSettingRow(

@@ -48,6 +48,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.core.content.ContextCompat
 import com.example.chat.ServiceLocator
 import com.example.chat.data.services.AndroidPcmVoiceRecorderPort
@@ -100,9 +104,18 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
     // recording UI before send; lives outside VoiceUiState because the session
     // overwrites that state on every tick.
     var voiceViewOnce by remember(conversationId) { mutableStateOf(false) }
+    // Scope captured when a recording starts; upload and send are refused if the account changed.
+    val recordScope = remember(conversationId) { java.util.concurrent.atomic.AtomicReference<com.example.chat.data.api.ApiAccountScope?>(null) }
     val note = remember(conversationId) {
         VoiceNoteController(
             conversationId = conversationId,
+            joinSegments = { parts, out -> withContext(Dispatchers.IO) { com.example.chat.ui.chats.detail.AndroidAacJoin.join(parts, out) } },
+            validateSession = {
+                val started = recordScope.get()
+                if (started != null) check(ServiceLocator.apiBackend.authSnapshot().generation == started.generation) {
+                    "Account changed while recording."
+                }
+            },
             recorder = AndroidPcmVoiceRecorderPort(context.applicationContext),
             staging = AndroidVoiceStagingPort(context.applicationContext),
             uploadAudio = { path, name, seconds ->
@@ -185,12 +198,23 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
             onState = { ui = it },
         )
     }
-    DisposableEffect(session) { onDispose { session.cancelVoice() } }
+    DisposableEffect(session) { onDispose { session.dispose() } }
+    // Synchronous account-transition guard: the voice controller stops accepting upload/send.
+    DisposableEffect(note) {
+        val l: (com.example.chat.data.api.ApiAccountScope) -> Unit = { next ->
+            val started = recordScope.get()
+            if (started != null && next.generation != started.generation) note.invalidate()
+        }
+        ServiceLocator.apiBackend.addAuthScopeListener(l)
+        onDispose { ServiceLocator.apiBackend.removeAuthScopeListener(l) }
+    }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) Toast.makeText(context, "Microphone permission is required.", Toast.LENGTH_SHORT).show()
     }
     fun begin(locked: Boolean) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            note.rearm()
+            recordScope.set(ServiceLocator.apiBackend.authSnapshot())
             session.beginVoice(locked)
         } else {
             permission.launch(Manifest.permission.RECORD_AUDIO)
@@ -203,7 +227,23 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
         onVoiceMove = { o -> session.onDrag(o.x, o.y) },
         onVoiceHoldEnd = { session.onRelease() },
         overlay = {
-            if (ui.recording) {
+            if (ui.review != null) {
+                Box(
+                    Modifier.fillMaxSize().navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    VoiceReviewCard(
+                        clip = ui.review!!,
+                        busy = ui.busy,
+                        viewOnce = voiceViewOnce,
+                        onToggleViewOnce = { voiceViewOnce = !voiceViewOnce },
+                        onDelete = { voiceViewOnce = false; session.deleteReview() },
+                        onSend = session::sendReview,
+                        onResume = session::resumeRecording,
+                        onRetryJoin = session::retryJoin,
+                    )
+                }
+            } else if (ui.recording) {
                 // Previous card UI restored, docked over the composer and lifted
                 // clear of the system gesture bar (was a floating pill at a fixed
                 // 76.dp offset that overlapped the composer and message list).
@@ -218,7 +258,8 @@ fun rememberChatVoice(conversationId: String, afterSend: () -> Unit, clearTyping
                             voiceViewOnce = false
                             session.cancelVoice()
                         },
-                        onPause = session::togglePause,
+                        // Pause pill opens the review step: stop, keep the file, Listen / Send.
+                        onPause = session::beginReview,
                         onSend = session::finishVoice,
                         viewOnce = voiceViewOnce,
                         onToggleViewOnce = { voiceViewOnce = !voiceViewOnce },
@@ -294,6 +335,184 @@ private fun VoiceRecordingCard(
                         com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.microphone, semanticLabel = "Recording audio", color = foreground)
                     }
                 }
+            }
+        }
+    }
+}
+
+
+/** After-recording review: same sheet and Delete / pill / Send row as the recording card.
+ *  Chaty icons and theme colors only. Reduced motion removes the scrub and press animation. */
+@Composable
+private fun VoiceReviewCard(
+    clip: VoiceNoteController.Clip,
+    busy: Boolean,
+    viewOnce: Boolean,
+    onToggleViewOnce: () -> Unit,
+    onDelete: () -> Unit,
+    onSend: () -> Unit,
+    onResume: () -> Unit,
+    onRetryJoin: () -> Unit,
+) {
+    val theme = ServiceLocator.themeController.globalTheme
+    val accent = Color(theme.accentColor)
+    val foreground = Color(theme.primaryTextColor)
+    val onAccent = Color(theme.onAccentColor)
+    val context = LocalContext.current
+    val reduced = ChatyMotion.durationMs(context, ChatyMotion.instantMs) == 0
+    val fadeMs = if (reduced) 0 else 150
+    val enter = remember(clip.path) { androidx.compose.animation.core.Animatable(if (reduced) 1f else 0f) }
+    LaunchedEffect(clip.path) { enter.animateTo(1f, androidx.compose.animation.core.tween(fadeMs)) }
+    val player = remember(clip.path) { android.media.MediaPlayer() }
+    var ready by remember(clip.path) { mutableStateOf(false) }
+    var playing by remember(clip.path) { mutableStateOf(false) }
+    var positionMs by remember(clip.path) { mutableStateOf(0) }
+    var totalMs by remember(clip.path) { mutableStateOf(clip.durationSeconds * 1000) }
+    var speed by remember(clip.path) { mutableStateOf(1f) }
+    var error by remember(clip.path) { mutableStateOf<String?>(null) }
+    var peaks by remember(clip.path) { mutableStateOf<List<Float>?>(null) }
+    LaunchedEffect(clip.path) {
+        peaks = runCatching { com.example.chat.ui.chats.detail.decodeVoiceWaveform(java.io.File(clip.path)) }.getOrNull()
+    }
+    // Audio focus: take it for playback, give it back on pause, end and dispose.
+    val audioManager = remember { context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
+    val focusRequest = remember {
+        android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            .setOnAudioFocusChangeListener { change ->
+                if (change == android.media.AudioManager.AUDIOFOCUS_LOSS ||
+                    change == android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+                    runCatching { if (player.isPlaying) player.pause() }; playing = false
+                }
+            }.build()
+    }
+    DisposableEffect(clip.path) {
+        onDispose {
+            runCatching { audioManager.abandonAudioFocusRequest(focusRequest) }
+            runCatching { player.release() }
+        }
+    }
+    LaunchedEffect(playing) {
+        while (playing) { positionMs = runCatching { player.currentPosition }.getOrDefault(positionMs); delay(100L) }
+    }
+    fun togglePlay() {
+        error = null
+        try {
+            if (!ready) {
+                player.setDataSource(clip.path); player.prepare(); ready = true
+                totalMs = player.duration.coerceAtLeast(1)
+                player.setOnCompletionListener {
+                    playing = false; positionMs = 0
+                    runCatching { audioManager.abandonAudioFocusRequest(focusRequest) }
+                }
+            }
+            if (player.isPlaying) {
+                player.pause(); playing = false
+                audioManager.abandonAudioFocusRequest(focusRequest)
+            } else {
+                if (audioManager.requestAudioFocus(focusRequest) != android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                    error = "Audio is in use by another app."; return
+                }
+                if (positionMs >= totalMs - 50) { player.seekTo(0); positionMs = 0 }
+                runCatching { player.playbackParams = player.playbackParams.setSpeed(speed) }
+                player.start(); playing = true
+            }
+        } catch (e: Exception) {
+            playing = false; error = e.message ?: "Audio unavailable"
+        }
+    }
+    fun cycleSpeed() {
+        speed = when (speed) { 1f -> 1.5f; 1.5f -> 2f; else -> 1f }
+        if (playing) runCatching { player.playbackParams = player.playbackParams.setSpeed(speed) }
+    }
+    fun seekTo(fraction: Float) {
+        val target = (fraction.coerceIn(0f, 1f) * totalMs).toInt()
+        positionMs = target
+        if (ready) runCatching { player.seekTo(target) }
+    }
+    fun fmt(ms: Int) = "%d:%02d".format(ms / 60000, (ms / 1000) % 60)
+    val bars = peaks ?: List(VoiceLevelMeter.BAR_COUNT * 2) { 0.35f }
+    val progress = if (totalMs > 0) positionMs.toFloat() / totalMs else 0f
+    Column(Modifier.fillMaxWidth().graphicsLayer { alpha = enter.value }.background(Color(theme.surfaceColor), RoundedCornerShape(28.dp)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(fmt(positionMs), color = foreground)
+            // Scrub waveform: tap or drag to seek. Played part uses the foreground color.
+            androidx.compose.foundation.Canvas(
+                Modifier.weight(1f).heightIn(min = 48.dp).fillMaxWidth()
+                    .pointerInput(clip.path) {
+                        detectTapGestures { o -> seekTo(o.x / size.width) }
+                    }
+                    .pointerInput(clip.path) {
+                        detectHorizontalDragGestures { change, _ -> seekTo(change.position.x / size.width) }
+                    },
+            ) {
+                val n = bars.size
+                val step = size.width / n
+                val barW = (step * 0.55f).coerceAtLeast(2f)
+                for (i in 0 until n) {
+                    val h = (bars[i].coerceIn(0.08f, 1f)) * size.height
+                    val x = i * step + step / 2
+                    drawLine(
+                        color = if (i.toFloat() / n <= progress) foreground else foreground.copy(alpha = 0.4f),
+                        start = androidx.compose.ui.geometry.Offset(x, (size.height - h) / 2),
+                        end = androidx.compose.ui.geometry.Offset(x, (size.height + h) / 2),
+                        strokeWidth = barW,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                    )
+                }
+                drawCircle(foreground, radius = 6.dp.toPx(), center = androidx.compose.ui.geometry.Offset(progress * size.width, size.height / 2))
+            }
+            Text(fmt(totalMs), color = foreground.copy(alpha = 0.6f))
+            TextButton(onClick = ::cycleSpeed, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(if (speed == 1f) "1x" else "${speed}x", color = foreground)
+            }
+        }
+        error?.let { Text(it, color = foreground, fontSize = 12.sp) }
+        if (clip.joinFailed) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Parts could not be joined. Send is off until they are.", color = foreground, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            TextButton(onClick = onRetryJoin, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) {
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.refresh, semanticLabel = "Retry joining recording parts", color = foreground)
+                Text("Retry", color = foreground)
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDelete, enabled = !busy, modifier = Modifier.size(52.dp).background(Color(theme.cardColor), CircleShape)) {
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.delete, semanticLabel = "Delete recording", color = foreground)
+            }
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = ::togglePlay, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(26.dp)) {
+                    androidx.compose.animation.Crossfade(targetState = playing, animationSpec = androidx.compose.animation.core.tween(fadeMs), label = "voice-play-pause") { isPlaying ->
+                        com.example.chat.ui.icons.ChatyIcon(
+                            if (isPlaying) com.example.chat.ui.icons.ChatyIconId.pause else com.example.chat.ui.icons.ChatyIconId.playArrow,
+                            semanticLabel = if (isPlaying) "Pause playback" else "Play recording", color = onAccent,
+                        )
+                    }
+                    Text(if (playing) "Pause" else "Listen")
+                }
+                Button(onClick = {
+                    runCatching { if (player.isPlaying) player.pause() }; playing = false
+                    runCatching { audioManager.abandonAudioFocusRequest(focusRequest) }
+                    onResume()
+                }, enabled = !busy, modifier = Modifier.weight(1f).heightIn(min = 52.dp), shape = RoundedCornerShape(26.dp)) {
+                    com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.microphone, semanticLabel = "Resume recording", color = onAccent)
+                    Text("Resume")
+                }
+            }
+            IconButton(
+                onClick = onToggleViewOnce, enabled = !busy,
+                modifier = Modifier.size(52.dp).background(if (viewOnce) accent else Color(theme.cardColor), CircleShape),
+            ) {
+                com.example.chat.ui.icons.ChatyIcon(
+                    com.example.chat.ui.icons.ChatyIconId.numberOne,
+                    semanticLabel = if (viewOnce) "View once on. The voice message plays once." else "Send as view once voice message",
+                    color = if (viewOnce) onAccent else foreground,
+                )
+            }
+            IconButton(onClick = onSend, enabled = !busy && !clip.joinFailed, modifier = Modifier.size(52.dp).background(accent.copy(alpha = if (clip.joinFailed) 0.4f else 1f), CircleShape)) {
+                com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.send, semanticLabel = "Send recording", color = onAccent)
             }
         }
     }

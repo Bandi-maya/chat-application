@@ -539,7 +539,7 @@ private fun StatusChip(label: String, granted: Boolean?, icon: ImageVector) {
         Spacer(Modifier.width(4.dp))
         Icon(
             when (granted) {
-                null -> Icons.Rounded.HourglassBottom
+                null -> com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.hourglass)
                 true -> Icons.Rounded.Check
                 false -> Icons.Rounded.Close
             },

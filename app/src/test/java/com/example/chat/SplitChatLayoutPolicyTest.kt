@@ -81,5 +81,18 @@ class SplitChatLayoutPolicyTest {
         assertEquals(20f, x, 0.01f)
         assertEquals(1500f.coerceAtMost(1920f - 400f - 20f), y, 0.01f)
     }
+    @Test
+    fun narrowPhoneUsesTabsForMoreThanTwoPanes() {
+        assertEquals(SplitPresentationMode.COMPACT_SWITCHER,
+            SplitChatLayoutPolicy.resolvePresentationMode(4, 390.dp, 844.dp))
+    }
+
+    @Test
+    fun tinyViewportCannotPushWindowOutsideBounds() {
+        val (x, y) = SplitChatLayoutPolicy.clampOffset(100f, 100f, 8f, 8f, 8f, 8f, 12f)
+        assertEquals(0f, x, 0.01f)
+        assertEquals(0f, y, 0.01f)
+    }
+
 }
 

@@ -34,7 +34,7 @@ class SupabaseAuthClient(
         const val SUPABASE_PUBLISHABLE_KEY = "sb_publishable_gFpVYJctaDkRRgttvnUl-A_TKu81hFF"
         private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
 
-        private val defaultHttpClient = OkHttpClient.Builder()
+        private val defaultHttpClient = com.example.chat.data.api.ChatyOkHttp.shared.newBuilder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()

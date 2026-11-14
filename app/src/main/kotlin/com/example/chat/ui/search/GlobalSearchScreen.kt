@@ -85,28 +85,42 @@ fun GlobalSearchScreen(
     onOpenConversation: (String) -> Unit = {},
     onOpenConversationReplace: (String) -> Unit = {},
     onNotify: (String) -> Unit = {},
+    // Ordinary search never renders protected chat content. The owner must
+    // supply the real account-scoped privacy predicate and session identity.
+    isConversationProtected: (String) -> Boolean = { false },
+    searchSessionIdentity: Any? = null,
+    isSearchSessionCurrent: () -> Boolean = { true },
 ) {
     val scope = rememberCoroutineScope()
-    val requestGuard = remember { SearchRequestGuard() }
-    var query by remember { mutableStateOf("") }
-    var matchedUsers by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
-    var matchedConversations by remember { mutableStateOf<List<Conversation>>(emptyList()) }
-    var isSearching by remember { mutableStateOf(false) }
-    var isOpeningChat by remember { mutableStateOf(false) }
+    val requestGuard = remember(searchSessionIdentity) { SearchRequestGuard() }
+    var query by remember(searchSessionIdentity) { mutableStateOf("") }
+    var matchedUsers by remember(searchSessionIdentity) { mutableStateOf<List<UserProfile>>(emptyList()) }
+    // Derive local matches from the live list on every composition, not a
+    // snapshot taken when the query changed. Privacy can change mid-search.
+    val matchedConversations = if (isSearchSessionCurrent()) {
+        LocalConversationSearch.filter(conversations, query) { id ->
+            isConversationHidden(id) || isConversationProtected(id)
+        }
+    } else emptyList()
+    var isSearching by remember(searchSessionIdentity) { mutableStateOf(false) }
+    var isOpeningChat by remember(searchSessionIdentity) { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
     fun cleanError(error: Throwable): String =
         (error.message ?: error.toString()).removePrefix("Exception: ")
 
     fun performRemoteSearch(searchQuery: String, requestId: Int) {
+        if (!isSearchSessionCurrent()) return
         scope.launch {
             try {
                 val users = searchUsers(searchQuery)
-                if (!requestGuard.isCurrent(requestId)) return@launch
+                if (!requestGuard.isCurrent(requestId) || !isSearchSessionCurrent()) return@launch
                 matchedUsers = requestGuard.deduplicate(users) { it.id }
                 isSearching = false
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
-                if (!requestGuard.isCurrent(requestId)) return@launch
+                if (!requestGuard.isCurrent(requestId) || !isSearchSessionCurrent()) return@launch
                 isSearching = false
                 onNotify("Search failed: ${cleanError(error)}")
             }
@@ -116,51 +130,71 @@ fun GlobalSearchScreen(
     // Exact port of _queueSearch: invalidate in-flight work first, check the
     // secret phrase, run the local filter, gate remote search on length >= 2,
     // then debounce 280ms.
-    var debounceJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var debounceJob by remember(searchSessionIdentity) { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     fun queueSearch(raw: String) {
         debounceJob?.cancel()
         val trimmed = raw.trim()
         val requestId = requestGuard.begin()
+        matchedUsers = emptyList()
+        if (!isSearchSessionCurrent()) { isSearching = false; return }
 
-        if (trimmed.isNotEmpty()) {
-            scope.launch {
-                val isMatch = runCatching { verifySecretPhrase(trimmed) }.getOrDefault(false)
-                if (isMatch && requestGuard.isCurrent(requestId)) {
-                    query = ""
-                    onOpenLockedChats()
-                }
-            }
-        }
-
-        val local = LocalConversationSearch.filter(conversations, trimmed, isConversationHidden)
-
-        if (trimmed.length < 2) {
-            matchedUsers = emptyList()
-            matchedConversations = local
-            isSearching = false
-            return
-        }
-
-        matchedConversations = local
-        isSearching = true
+        if (trimmed.isEmpty()) { isSearching = false; return }
+        isSearching = trimmed.length >= 2
         debounceJob = scope.launch {
+            // A vault secret is not a remote username. Wait for local
+            // verification before any remote search, even if it is slow.
+            val isMatch = try {
+                verifySecretPhrase(trimmed)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (requestGuard.isCurrent(requestId) && isSearchSessionCurrent()) {
+                    isSearching = false
+                    onNotify("Unable to check private search. Try again.")
+                }
+                return@launch
+            }
+            if (!requestGuard.isCurrent(requestId) || !isSearchSessionCurrent()) return@launch
+            if (isMatch) {
+                requestGuard.begin()
+                query = ""
+                matchedUsers = emptyList()
+                isSearching = false
+                onOpenLockedChats()
+                return@launch
+            }
+            if (trimmed.length < 2) { isSearching = false; return@launch }
             delay(280)
-            performRemoteSearch(trimmed, requestId)
+            if (requestGuard.isCurrent(requestId) && isSearchSessionCurrent()) {
+                performRemoteSearch(trimmed, requestId)
+            }
         }
     }
 
     fun startConversationWith(user: UserProfile) {
-        if (isOpeningChat) return
+        if (isOpeningChat || !isSearchSessionCurrent()) return
         isOpeningChat = true
         scope.launch {
             try {
                 val conversation = openDirectConversation(user)
-                onOpenConversationReplace(conversation.id)
+                if (isSearchSessionCurrent() && !isConversationHidden(conversation.id) &&
+                    !isConversationProtected(conversation.id)) {
+                    onOpenConversationReplace(conversation.id)
+                } else {
+                    isOpeningChat = false
+                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
+                if (!isSearchSessionCurrent()) return@launch
                 isOpeningChat = false
                 onNotify("Unable to open chat: ${cleanError(error)}")
             }
         }
+    }
+
+    androidx.compose.runtime.DisposableEffect(searchSessionIdentity) {
+        onDispose { requestGuard.begin(); debounceJob?.cancel() }
     }
 
     LaunchedEffect(Unit) {
@@ -257,7 +291,7 @@ fun GlobalSearchScreen(
             }
         } else {
             LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                if (matchedUsers.isNotEmpty()) {
+                if (isSearchSessionCurrent() && matchedUsers.isNotEmpty()) {
                     item {
                         SearchSection("People & Usernames", colors) {
                             matchedUsers.forEach { user ->
@@ -278,7 +312,12 @@ fun GlobalSearchScreen(
                                 ConversationTile(
                                     conversation = conversation,
                                     colors = colors,
-                                    onOpen = { onOpenConversation(conversation.id) },
+                                    onOpen = {
+                                        if (isSearchSessionCurrent() && !isConversationHidden(conversation.id) &&
+                                            !isConversationProtected(conversation.id)) {
+                                            onOpenConversation(conversation.id)
+                                        }
+                                    },
                                 )
                             }
                         }

@@ -55,19 +55,33 @@ fun ArchivedChatsScreen(
     onOpenConversation: (Conversation) -> Unit,
     onToggleArchive: (String) -> Unit,
     onDeleteConversations: (List<String>) -> Unit,
+    isConversationHidden: (String) -> Boolean = { false },
 ) {
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    val archived = conversations.filter { it.isArchived }
-    val isSelectionMode = selectedIds.isNotEmpty()
+    val archived = ArchiveVisibilityPolicy.visible(conversations, isConversationHidden)
+    val actionableIds = ArchiveVisibilityPolicy.actionableIds(selectedIds, conversations, isConversationHidden)
+    val isSelectionMode = actionableIds.isNotEmpty()
 
-    if (showDeleteConfirm) {
-        val count = selectedIds.size
+    // Remove stale selections and close a stale confirmation rather than
+    // letting a hidden/removed row be acted on from an old selection.
+    androidx.compose.runtime.LaunchedEffect(actionableIds) {
+        selectedIds = actionableIds.toSet()
+        if (actionableIds.isEmpty()) showDeleteConfirm = false
+    }
+
+    if (showDeleteConfirm && isSelectionMode) {
+        val count = actionableIds.size
         HomeConfirmDialog(
             title = "Delete $count chat${if (count == 1) "" else "s"}?",
             message = "This removes the selected conversations for this account.",
             confirmLabel = "Delete",
-            onConfirm = { onDeleteConversations(selectedIds.toList()); selectedIds = emptySet() },
+            onConfirm = {
+                val ids = ArchiveVisibilityPolicy.actionableIds(selectedIds, conversations, isConversationHidden)
+                if (ids.isNotEmpty()) onDeleteConversations(ids)
+                selectedIds = emptySet()
+                showDeleteConfirm = false
+            },
             onDismiss = { showDeleteConfirm = false },
         )
     }
@@ -89,14 +103,15 @@ fun ArchivedChatsScreen(
                         )
                     }
                     Text(
-                        selectedIds.size.toString(),
+                        actionableIds.size.toString(),
                         color = Color(theme.primaryTextColor),
                         fontWeight = FontWeight.W800,
                         fontSize = 19.sp,
                     )
                     Spacer(Modifier.weight(1f))
                     IconButton(onClick = {
-                        selectedIds.forEach(onToggleArchive)
+                        ArchiveVisibilityPolicy.actionableIds(selectedIds, conversations, isConversationHidden)
+                            .forEach(onToggleArchive)
                         selectedIds = emptySet()
                     }) {
                         com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.unarchive, semanticLabel = "Unarchive", color = Color(theme.primaryTextColor))

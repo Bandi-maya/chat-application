@@ -1,5 +1,7 @@
 package com.example.chat.ui.updates
 
+import androidx.lifecycle.repeatOnLifecycle
+
 import com.example.chat.core.templates.UpdatesLayoutMode
 
 import android.media.MediaPlayer
@@ -170,7 +172,20 @@ fun UpdatesScreen(
     }
     val effectiveRemoteImage = remoteImage ?: defaultRemoteImage
     val viewSession = remember { StatusViewSession() }
-    val statusList by statuses.collectAsState(initial = null)
+    // collectAsState kept the 60s status poll running while the app sat
+    // backgrounded on this tab. Gate collection on STARTED instead: polling
+    // pauses in the background and the cold flow re-polls immediately on
+    // resume, so the feed is fresh when the user returns.
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    val statusList by androidx.compose.runtime.produceState<List<com.example.chat.data.services.StatusRecord>?>(
+        initialValue = null,
+        statuses,
+        lifecycleOwner,
+    ) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            statuses.collect { value = it }
+        }
+    }
     var composerOpen by remember { mutableStateOf(false) }
     var openStatus by remember { mutableStateOf<StatusRecord?>(null) }
 
@@ -357,7 +372,7 @@ private fun StatusList(
                 .height(132.dp)
                 .padding(vertical = 5.dp),
         ) {
-            items(statuses.size) { index ->
+            items(statuses.size, key = { statuses[it].id }) { index ->
                 CircularStatusCard(statuses[index], colors, currentUser, getUser, contactNameColor, onOpen)
             }
         }

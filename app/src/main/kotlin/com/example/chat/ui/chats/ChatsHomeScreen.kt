@@ -133,6 +133,8 @@ fun ChatsHomeScreen(
     paneConversation: Conversation? = null,
     chatPane: (@Composable (Conversation) -> Unit)? = null,
     currentUserId: String = "",
+    /** Opaque auth generation, not merely uid: resets pending selection/dialog state across account transitions. */
+    accountSessionIdentity: Any? = currentUserId,
     identity: HomeIdentity = HomeIdentity(),
     contacts: List<UserProfile> = emptyList(),
     homePreferences: HomePreferences = HomePreferences(),
@@ -143,6 +145,9 @@ fun ChatsHomeScreen(
     presenceFor: (conversationId: String, otherUserId: String) -> HomePresence? = { _, _ -> null },
     isOnline: (String) -> Boolean = { false },
     messagesFor: (String) -> List<ChatMessage> = { emptyList() },
+    /** Cheap tick accessor; when the host provides it, rows avoid copying the
+     *  whole message list via messagesFor on every recomposition. */
+    lastDeliveryStateFor: ((String) -> com.example.chat.domain.models.DeliveryState?)? = null,
     gbBool: (String, Boolean) -> Boolean = { _, fallback -> fallback },
     gbColor: (String) -> Long? = { null },
     isConversationLocked: (String) -> Boolean = { false },
@@ -178,18 +183,18 @@ fun ChatsHomeScreen(
     val listState = rememberLazyListState()
     val searchFocus = remember { FocusRequester() }
 
-    var searchQuery by remember { mutableStateOf("") }
-    var isSearchOpen by remember { mutableStateOf(false) }
-    var selectedIds by remember { mutableStateOf(setOf<String>()) }
-    var selectedFilter by remember { mutableStateOf("All") }
-    var overflowOpen by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showMessageNumber by remember { mutableStateOf(false) }
-    var messageNumberText by remember { mutableStateOf("") }
-    var showWhoCanCallMe by remember { mutableStateOf(false) }
-    var showLockedSetup by remember { mutableStateOf(false) }
-    var showArchived by remember { mutableStateOf(false) }
-    var showEffects by remember { mutableStateOf(false) }
+    var searchQuery by remember(accountSessionIdentity) { mutableStateOf("") }
+    var isSearchOpen by remember(accountSessionIdentity) { mutableStateOf(false) }
+    var selectedIds by remember(accountSessionIdentity) { mutableStateOf(setOf<String>()) }
+    var selectedFilter by remember(accountSessionIdentity) { mutableStateOf("All") }
+    var overflowOpen by remember(accountSessionIdentity) { mutableStateOf(false) }
+    var showDeleteConfirm by remember(accountSessionIdentity) { mutableStateOf(false) }
+    var showMessageNumber by remember(accountSessionIdentity) { mutableStateOf(false) }
+    var messageNumberText by remember(accountSessionIdentity) { mutableStateOf("") }
+    var showWhoCanCallMe by remember(accountSessionIdentity) { mutableStateOf(false) }
+    var showLockedSetup by remember(accountSessionIdentity) { mutableStateOf(false) }
+    var showArchived by remember(accountSessionIdentity) { mutableStateOf(false) }
+    var showEffects by remember(accountSessionIdentity) { mutableStateOf(false) }
 
     // 'Who can call me?' reuses the shared privacy dialog when the real
     // preferences controller is wired; otherwise the nav seam stands.
@@ -247,24 +252,36 @@ fun ChatsHomeScreen(
     val storyTileWidth = if (storyCardWrap) 74.0 else if (storyCompact) 48.0 else 58.0
     val storyNameFontSize = if (storyCompact) 9.0 else 10.5
 
-    val visibleConversations = filterHomeConversations(
-        conversations, searchQuery, selectedFilter, forcedType, isConversationHidden,
-    )
-    val entries = buildHomeEntries(
+    // Snapshot privacy values on every composition. Captured mutable controller state may
+    // change without changing a lambda's identity, especially with strong skipping enabled.
+    val hiddenConversationIds = conversations.asSequence().map { it.id }.filter(isConversationHidden).toSet()
+    val visibleConversations = remember(accountSessionIdentity, conversations, searchQuery, selectedFilter, forcedType, hiddenConversationIds) {
+        filterHomeConversations(
+            conversations, searchQuery, selectedFilter, forcedType, hiddenConversationIds::contains,
+        )
+    }
+    val gbHideArchiveHome = gbBool("key_mas_hide_archive_home", false)
+    val entries = remember(
         visibleConversations, homeStyle, spec, isSearchOpen,
-        homePrefs.hideArchivedChats, gbBool("key_mas_hide_archive_home", false),
-        homePrefs.archiveChatsOnTop,
-    )
+        homePrefs.hideArchivedChats, gbHideArchiveHome, homePrefs.archiveChatsOnTop,
+    ) {
+        buildHomeEntries(
+            visibleConversations, homeStyle, spec, isSearchOpen,
+            homePrefs.hideArchivedChats, gbHideArchiveHome,
+            homePrefs.archiveChatsOnTop,
+        )
+    }
     val filters = homeFilters(forcedType)
 
     val headerStyle = effectiveHomeHeaderStyle(rawHomeUiStyle, homeStyle, bundleTemplates.headerStyle)
 
     // P4 large-title collapse: 0 expanded -> 1 collapsed, driven by the
     // primary list's vertical scroll only.
-    val largeTitleCollapse by remember {
+    val titleCollapseDistancePx = with(LocalDensity.current) { 44.dp.toPx() }
+    val largeTitleCollapse by remember(listState, titleCollapseDistancePx) {
         derivedStateOf {
             if (listState.firstVisibleItemIndex > 0) 1f
-            else (listState.firstVisibleItemScrollOffset / 44f).coerceIn(0f, 1f)
+            else (listState.firstVisibleItemScrollOffset / titleCollapseDistancePx).coerceIn(0f, 1f)
         }
     }
     val effectiveTitleCollapse = if (isSelectionMode || isSearchOpen) 1f else largeTitleCollapse
@@ -349,6 +366,7 @@ fun ChatsHomeScreen(
         ) {
             androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                 ArchivedChatsScreen(
+                    isConversationHidden = isConversationHidden,
                     conversations = conversations,
                     theme = theme,
                     homePrefs = homePreferences,
@@ -686,6 +704,7 @@ fun ChatsHomeScreen(
                                 isSelectionMode = isSelectionMode,
                                 presenceFor = presenceFor,
                                 messagesFor = messagesFor,
+                                lastDeliveryStateFor = lastDeliveryStateFor,
                                 gbBool = gbBool,
                                 gbColor = gbColor,
                                 isConversationLocked = isConversationLocked,
@@ -718,12 +737,18 @@ fun ChatsHomeScreen(
                                         .background(Color(theme.surfaceColor)),
                                 )
                                 Box(Modifier.weight(1f)) {
+                                    val splitPinned = remember(conversations, hiddenConversationIds) {
+                                        conversations.filter { it.isPinned && !it.isArchived && it.id !in hiddenConversationIds }
+                                    }
+                                    val splitGroups = remember(conversations, hiddenConversationIds) {
+                                        conversations.filter {
+                                            it.type == ConversationType.group && !it.isArchived && it.id !in hiddenConversationIds
+                                        }
+                                    }
                                     SplitQuickPane(
                                         theme = theme,
-                                        pinned = conversations.filter { it.isPinned && !it.isArchived },
-                                        groups = conversations.filter {
-                                            it.type == ConversationType.group && !it.isArchived
-                                        },
+                                        pinned = splitPinned,
+                                        groups = splitGroups,
                                         onOpen = { handleConversationTap(it) },
                                     )
                                 }
@@ -789,6 +814,7 @@ private fun HomeConversationList(
     isSelectionMode: Boolean,
     presenceFor: (String, String) -> HomePresence?,
     messagesFor: (String) -> List<ChatMessage>,
+    lastDeliveryStateFor: ((String) -> com.example.chat.domain.models.DeliveryState?)? = null,
     gbBool: (String, Boolean) -> Boolean,
     gbColor: (String) -> Long?,
     isConversationLocked: (String) -> Boolean,
@@ -871,7 +897,8 @@ private fun HomeConversationList(
                     val conversation = entry.conversation
                     val otherId = conversation.participantIds.firstOrNull { it != currentUserId } ?: ""
                     val lastOwn = if (conversation.lastMessageSenderId == currentUserId) {
-                        messagesFor(conversation.id).lastOrNull()?.deliveryState
+                        lastDeliveryStateFor?.invoke(conversation.id)
+                            ?: messagesFor(conversation.id).lastOrNull()?.deliveryState
                     } else {
                         null
                     }

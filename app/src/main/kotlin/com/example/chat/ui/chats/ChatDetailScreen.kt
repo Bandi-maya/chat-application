@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 
 import com.example.chat.ReleaseFeatures
+import com.example.chat.ui.effects.listEntrance
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
@@ -474,7 +475,10 @@ fun ChatDetailScreen(
     var wallpaperOverride by remember(conversation.id) { mutableStateOf(wallpaperPatternId) }
     var wallpaperPickerOpen by remember { mutableStateOf(false) }
     var clearConfirmOpen by remember { mutableStateOf(false) }
-    var emojiComposerOpen by remember { mutableStateOf(false) }
+    var emojiComposerOpen by remember(conversation.id, messageSessionIdentity) { mutableStateOf(false) }
+    val composerFocusRequester = remember { FocusRequester() }
+    val composerKeyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val composerFocusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val emojiReactionTargetState = remember { mutableStateOf<ChatMessage?>(null) }
     var emojiReactionTarget by emojiReactionTargetState
     var connectionSheetOpen by remember { mutableStateOf(false) }
@@ -487,22 +491,26 @@ fun ChatDetailScreen(
     val searchFocusRequester = remember { FocusRequester() }
 
     val listState = rememberLazyListState()
-    val selectedMessages = messages.filter { it.id in selectedIds }
+    val selectedMessages = remember(messages, selectedIds) { messages.filter { it.id in selectedIds } }
     val isSelectionMode = selectedMessages.isNotEmpty()
-    val selectionActions = com.example.chat.ui.chats.detail.SelectionActionPolicy.available(selectedMessages)
+    val selectionActions = remember(selectedMessages) { com.example.chat.ui.chats.detail.SelectionActionPolicy.available(selectedMessages) }
     androidx.activity.compose.BackHandler(isSelectionMode) { selectedIds = emptySet() }
 
     // One projection owns both rendered rows and all scroll destinations.
     // Selection and menus do not change projection or tile geometry. Group identity comes from
     // the validated album envelope, never adjacency or timestamps.
-    val timelineRows = com.example.chat.ui.chats.detail.mediaTimelineRows(messages)
-    val senderClusters = com.example.chat.ui.chats.detail.SenderClusterPolicy.forRows(timelineRows, java.time.ZoneId.systemDefault())
+    // Memoized: this screen recomposes on every composer keystroke; the O(n)
+    // album projection and cluster pass must run only when messages change.
+    val timelineRows = remember(messages) { com.example.chat.ui.chats.detail.mediaTimelineRows(messages) }
+    val senderClusters = remember(timelineRows) { com.example.chat.ui.chats.detail.SenderClusterPolicy.forRows(timelineRows, java.time.ZoneId.systemDefault()) }
     fun selectionUnit(messageId: String): Set<String> =
         com.example.chat.ui.chats.detail.AlbumSelectionPolicy.unit(timelineRows, messageId)
     fun toggleSelectionUnit(messageId: String) {
         selectedIds = com.example.chat.ui.chats.detail.AlbumSelectionPolicy.toggle(timelineRows, selectedIds, messageId)
     }
     val timelineZone = java.time.ZoneId.systemDefault()
+    val dayHeaderLocale = LocalConfiguration.current.locales[0] ?: java.util.Locale.getDefault()
+    val dayHeaderFormatter = remember(dayHeaderLocale) { DateTimeFormatter.ofPattern("d MMM yyyy", dayHeaderLocale) }
     var pendingScrollTarget by remember(conversation.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(pendingScrollTarget, timelineRows) {
         val target = pendingScrollTarget ?: return@LaunchedEffect
@@ -559,10 +567,10 @@ fun ChatDetailScreen(
 
     // Dart _performInChatSearch: case-insensitive substring over message
     // text in timeline order; first match auto-highlights.
-    val searchMatchedIds = messages.let { msgs ->
+    val searchMatchedIds = remember(messages, searchQuery) {
         val q = searchQuery.trim().lowercase()
         if (q.isEmpty()) emptyList()
-        else msgs.filter { it.text.lowercase().contains(q) }.map { it.id }
+        else messages.filter { it.text.lowercase().contains(q) }.map { it.id }
     }
 
     var highlightClearJob by remember { mutableStateOf<Job?>(null) }
@@ -935,7 +943,7 @@ fun ChatDetailScreen(
                 )
             }
 
-            val localPinned = com.example.chat.core.messages.LocalPinnedMessagePolicy.latest(messages)
+            val localPinned = remember(messages) { com.example.chat.core.messages.LocalPinnedMessagePolicy.latest(messages) }
             if (localPinned != null) {
                 Box(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth().background(Color(theme.cardColor))
@@ -981,6 +989,14 @@ fun ChatDetailScreen(
                 val timelineRowKeys = remember(timelineRows) {
                     com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.rowKeys(timelineRows)
                 }
+                // "Conversation Animation" setting (Navigation & Effects): the
+                // model, persistence and picker row existed but nothing read
+                // the value. Same engine and semantics as the home list's
+                // animation (controller read in composition; "Standard" is a
+                // no-op modifier). Read directly from the locator because this
+                // screen's prefs arrive via ChatDetailHost parameters.
+                val conversationListAnimation =
+                    com.example.chat.ServiceLocator.preferencesController.effects.conversationListAnimation
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().testTag("chat-message-list"),
@@ -991,11 +1007,11 @@ fun ChatDetailScreen(
                         key = { index, row -> timelineRowKeys.getOrNull(index) ?: "row_${row.anchor.id}_$index" },
                         contentType = { _, row -> if (row.messages.size > 1) "media-album" else row.anchor.type },
                     ) { rowIndex, row ->
-                        Column(Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().listEntrance(conversationListAnimation, row.anchor.id)) {
                         if (com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.startsDay(timelineRows, rowIndex, timelineZone)) {
                             Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                                 Text(com.example.chat.ui.chats.detail.ChatTimelinePositionPolicy.dayAt(timelineRows, rowIndex, timelineZone)
-                                    .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")),
+                                    .format(dayHeaderFormatter),
                                     color = Color(theme.secondaryTextColor), fontSize = 11.sp,
                                     modifier = Modifier.background(Color(theme.cardColor), RoundedCornerShape(12.dp))
                                         .padding(horizontal = 10.dp, vertical = 4.dp))
@@ -1313,7 +1329,22 @@ fun ChatDetailScreen(
                     text = composerText,
                     onTextChange = ::handleComposerChanged,
                     emojiPickerOpen = emojiComposerOpen,
-                    onEmoji = { emojiComposerOpen = true },
+                    onEmoji = {
+                        if (emojiComposerOpen) {
+                            emojiComposerOpen = false
+                            scope.launch {
+                                kotlinx.coroutines.yield()
+                                runCatching { composerFocusRequester.requestFocus() }
+                                composerKeyboard?.show()
+                            }
+                        } else {
+                            composerFocusManager.clearFocus()
+                            composerKeyboard?.hide()
+                            emojiComposerOpen = true
+                        }
+                    },
+                    textFocusRequester = composerFocusRequester,
+                    onTextInputFocused = { emojiComposerOpen = false },
                     onAttach = { attachmentSheetOpen = true },
                     onCamera = onCameraTap,
                     onGallery = onGalleryTap,

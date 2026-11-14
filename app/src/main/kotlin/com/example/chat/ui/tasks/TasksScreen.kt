@@ -218,13 +218,18 @@ fun TasksScreen(
                 }
             }
 
-            val filtered = tasks.filter { task ->
-                when (priorityFilter) {
-                    "Urgent" -> task.priority == TaskPriority.urgent
-                    "High" -> task.priority == TaskPriority.high
-                    "Med" -> task.priority == TaskPriority.medium
-                    "Low" -> task.priority == TaskPriority.low
-                    else -> true
+            // Memoized: controller.tasks returns a fresh copy each read and
+            // this screen recomposes on selection/detail state too; List
+            // equality keeps the memo stable across identical snapshots.
+            val filtered = remember(tasks, priorityFilter) {
+                tasks.filter { task ->
+                    when (priorityFilter) {
+                        "Urgent" -> task.priority == TaskPriority.urgent
+                        "High" -> task.priority == TaskPriority.high
+                        "Med" -> task.priority == TaskPriority.medium
+                        "Low" -> task.priority == TaskPriority.low
+                        else -> true
+                    }
                 }
             }
 
@@ -334,7 +339,9 @@ private fun TaskListView(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(filtered.size) { index ->
+        // Stable keys keep per-item state (expand, swipe, animations) attached
+        // to the right task when the list reorders or a card completes.
+        items(filtered.size, key = { index -> filtered[index].id }) { index ->
             val task = filtered[index]
             TaskListCard(
                 task = task,

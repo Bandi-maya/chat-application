@@ -145,7 +145,7 @@ private fun CardBody(icon: ImageVector, title: String, subtitle: String, selecte
 private fun RadioIcon(selected: Boolean) {
     val colors = LocalAppColors.current
     Icon(
-        if (selected) Icons.Rounded.RadioButtonChecked else Icons.Rounded.RadioButtonUnchecked,
+        if (selected) com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.radioOn) else com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.radioOff),
         null, Modifier.size(20.dp), tint = if (selected) colors.primary else colors.foregroundTertiary,
     )
 }

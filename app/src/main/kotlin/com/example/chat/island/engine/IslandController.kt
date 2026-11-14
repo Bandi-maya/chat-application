@@ -57,7 +57,8 @@ internal data class Notice(
     val readAction: PendingIntent? = null,
     val notificationKey: String? = null,
     val seen: Boolean = false,
-    val persistent: Boolean = false
+    val persistent: Boolean = false,
+    val displayReceipt: Long? = null,
 )
 
 internal data class Source(val intent: PendingIntent? = null, val packageName: String? = null)
@@ -99,6 +100,18 @@ object IslandController {
     private val count = MutableStateFlow(0)
     private val miniPlayer = MutableStateFlow<IslandMode.Media?>(null)
     val mode = display.asStateFlow()
+    data class NotificationFrame(val key: String, val revision: Long, val receipt: Long?)
+    private var notificationRevision = 0L
+    private var frameNotice: Notice? = null
+    private val notificationFrame = MutableStateFlow<NotificationFrame?>(null)
+    val displayedNotificationFrame = notificationFrame.asStateFlow()
+    // The window acknowledges a drawn frame, not merely a queued controller payload.
+    var notificationDrawn: ((String, Long?) -> Unit)? = null
+    fun acknowledgeNotificationDrawn(frame: NotificationFrame) {
+        if (!privacy.value && notificationFrame.value == frame && display.value is IslandMode.Notification) {
+            notificationDrawn?.invoke(frame.key, frame.receipt)
+        }
+    }
     val level = expansion.asStateFlow()
     val privacySuppressed = privacy.asStateFlow()
     val replying = editor.asStateFlow()
@@ -175,6 +188,12 @@ object IslandController {
         }
         val boundary = (display.value == IslandMode.Idle) != (next == IslandMode.Idle)
         display.value = next
+        val shownNotice = notice?.takeIf { next === it.content && next is IslandMode.Notification }
+        if (shownNotice !== frameNotice) {
+            frameNotice = shownNotice
+            notificationRevision++
+        }
+        notificationFrame.value = shownNotice?.notificationKey?.let { NotificationFrame(it, notificationRevision, shownNotice.displayReceipt) }
         if (boundary && notice == null) setLevel(IslandLevel.Compact)
     }
 
@@ -251,11 +270,12 @@ object IslandController {
 
     fun flash(m: IslandMode, durationMs: Long = 4500, level: IslandLevel = IslandLevel.Banner,
         open: PendingIntent? = null, pkg: String? = null, reply: Notification.Action? = null,
-        markRead: PendingIntent? = null, key: String? = null) {
+        markRead: PendingIntent? = null, key: String? = null, displayReceipt: Long? = null) {
         if (call != null) return
         val duration = if (level == IslandLevel.Banner) IslandSettings.kindDurationMs(m) ?: durationMs else durationMs
         val next = Notice(m, duration, level, Source(open, pkg), reply, markRead, key,
-            persistent = IslandSettings.stickyNotif.value && m is IslandMode.Notification && pkg != null)
+            persistent = IslandSettings.stickyNotif.value && m is IslandMode.Notification && pkg != null,
+            displayReceipt = displayReceipt)
         val current = notice
         if (current == null || (!editor.value && sameNotice(current.content, m))) {
             begin(next)
@@ -375,6 +395,12 @@ object IslandController {
         is IslandMode.Media -> open(Source(media?.sessionActivity, media?.packageName))
         is IslandMode.Live -> open(if (shown.kind == LiveKind.Download) transfers.values.firstOrNull()?.second ?: Source() else activitySource)
         else -> false
+    }
+
+    /** Explicit notification action. Failed/cancelled intents keep the card visible. */
+    fun openNotification() {
+        if (privacy.value || editor.value || display.value !is IslandMode.Notification) return
+        if (openCurrent()) finishNotice()
     }
 
     fun openMedia() {

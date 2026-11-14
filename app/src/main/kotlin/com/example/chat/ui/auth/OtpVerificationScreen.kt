@@ -65,6 +65,7 @@ fun OtpVerificationScreen(
     /** VerifyEmail only: verification is a nudge, not a gate — skipping lands
      *  on Home, where the banner offers to verify later. */
     onSkip: (() -> Unit)? = null,
+    deliveryMessage: String? = null,
 ) {
     val theme = LocalThemeConfig.current
     val scope = rememberCoroutineScope()
@@ -72,7 +73,7 @@ fun OtpVerificationScreen(
     var code by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var resendMessage by remember { mutableStateOf<String?>(null) }
+    var resendMessage by remember(email, deliveryMessage) { mutableStateOf(deliveryMessage) }
     var resendIn by remember { mutableIntStateOf(OtpVerificationLogic.RESEND_COUNTDOWN_SECONDS) }
 
     LaunchedEffect(resendIn) {
@@ -144,7 +145,7 @@ fun OtpVerificationScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Enter the 6-digit code we sent to ${OtpVerificationLogic.maskEmail(email)}.",
+                        "Enter the 6-digit code for ${OtpVerificationLogic.maskEmail(email)}.",
                         color = Color(theme.secondaryTextColor),
                         fontSize = 14.sp,
                         lineHeight = 19.6.sp,

@@ -1,5 +1,7 @@
 package com.example.chat.ui.settings
 
+import androidx.lifecycle.repeatOnLifecycle
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -77,7 +79,14 @@ fun DataUsageScreen(onBack: () -> Unit) {
     val monitor = ServiceLocator.transferMonitor
     val transfers by monitor.items.collectAsState()
     val totals by monitor.totals.collectAsState()
-    val appTraffic by ServiceLocator.appTrafficMonitor.state.collectAsState()
+    // Do not keep the subscriber-gated 1s traffic sampler awake off-screen.
+    val trafficOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    val trafficState = ServiceLocator.appTrafficMonitor.state
+    val appTraffic by androidx.compose.runtime.produceState(trafficState.value, trafficState, trafficOwner) {
+        trafficOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            trafficState.collect { value = it }
+        }
+    }
     val active = transfers.filter { it.status == TransferStatus.active || it.status == TransferStatus.paused || it.status == TransferStatus.queued }
 
     Column(

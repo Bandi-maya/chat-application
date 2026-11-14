@@ -379,9 +379,28 @@ internal fun IosAnimatedEmoji(
     )
 }
 
+/** Process-wide cache for static asset emoji/sticker bitmaps. Without it,
+ *  every grid tile re-decoded its asset at full resolution each time it
+ *  re-entered composition on scroll, and the old dispose-recycle made reuse
+ *  impossible by construction. Entries are never recycled on eviction: an
+ *  ImageView may still be drawing a bitmap when the cache drops it, and
+ *  recycling a displayed bitmap crashes - the GC reclaims them instead.
+ *  Bounded by 4 MB of actual bitmap allocation, not entry count.
+ *  Asset content is app-bundled, not account data, so sharing it across
+ *  accounts breaks no isolation. */
+private object StaticAssetEmojiCache {
+    private val cache = object : android.util.LruCache<String, android.graphics.Bitmap>(4 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: android.graphics.Bitmap): Int = value.allocationByteCount.coerceAtLeast(1)
+    }
+    fun get(key: String): android.graphics.Bitmap? = cache.get(key)
+    fun put(key: String, b: android.graphics.Bitmap) { cache.put(key, b) }
+}
+
 /**
  * Shows one static pack image (OpenMoji). Never animated. [onUnavailable] is
- * called once when the file is missing or cannot be decoded.
+ * called once when the file is missing or cannot be decoded. Bitmaps come
+ * from [StaticAssetEmojiCache], sampled to roughly the display size instead
+ * of the full asset resolution.
  */
 @Composable
 internal fun StaticAssetEmoji(
@@ -390,17 +409,26 @@ internal fun StaticAssetEmoji(
     onUnavailable: () -> Unit,
 ) {
     val context = LocalContext.current
-    var bitmap by remember(assetPath) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    LaunchedEffect(assetPath) {
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val targetPx = (size * density).toInt().coerceAtLeast(1)
+    val cacheKey = "$assetPath@$targetPx"
+    var bitmap by remember(cacheKey) { mutableStateOf(StaticAssetEmojiCache.get(cacheKey)) }
+    LaunchedEffect(cacheKey) {
+        if (bitmap != null) return@LaunchedEffect
         val b = withContext(Dispatchers.IO) {
-            runCatching { context.assets.open(assetPath).use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull()
+            runCatching {
+                com.example.chat.ui.core.system.SampledBitmapDecoder.decode(
+                    { context.assets.open(assetPath) },
+                    targetPx,
+                )
+            }.getOrNull()
         }
-        if (b == null) onUnavailable() else bitmap = b
+        if (b == null) onUnavailable() else {
+            StaticAssetEmojiCache.put(cacheKey, b)
+            bitmap = b
+        }
     }
     val b = bitmap ?: return
-    DisposableEffect(b) {
-        onDispose { if (!b.isRecycled) b.recycle() }
-    }
     AndroidView(
         modifier = Modifier.size(size.dp),
         factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.FIT_CENTER } },

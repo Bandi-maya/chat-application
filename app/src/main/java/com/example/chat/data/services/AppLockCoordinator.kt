@@ -26,7 +26,7 @@ class AppLockCoordinator(
     private var backgroundedAt: Long? = null
     private var freshLoginSession = false
     private var initialScheduled = false
-    private var checking = false
+    @Volatile private var checking = false
 
     /** Dart paused/hidden/detached branch: `_backgroundedAt ??= now`. */
     fun onBackgrounded() {
@@ -50,6 +50,11 @@ class AppLockCoordinator(
         if (ready && isAuthenticated() && isLockEnabled() && !_lockRequired.value) {
             _lockRequired.value = true
         }
+    }
+
+    /** External chat activities must not mount a composer while the process resume check is pending. */
+    suspend fun awaitPendingCheck() {
+        while (checking) kotlinx.coroutines.delay(10)
     }
 
     /** Dart _scheduleInitialAppLockIfNeeded (cold start with a restored session). */

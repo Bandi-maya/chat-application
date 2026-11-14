@@ -206,6 +206,30 @@ class AttachmentSourceResolver(
         return when (put) { StorePut.Stored -> null; StorePut.NotAllowed, StorePut.Closed -> "denied not storable"; else -> "failed store" }
     }
 
+    /** Trusted message state for the tile (never from the caller). Null = unknown/deleted/not ours. */
+    fun trusted(ref: AttachmentRef): TrustedAttachment? = if (validRef(ref)) lookup(ref) else null
+
+    /**
+     * Stores a finished resumable-download part file through the SAME guards as a normal download: stamp, trusted
+     * lookup before and after, store.put (encrypt + verify later on read). null = stored; otherwise a
+     * "denied ..." (policy/session) or "failed ..." string. The caller deletes the part file afterwards.
+     */
+    suspend fun ingestPart(ref: AttachmentRef, expectedSession: String, part: java.io.File): String? {
+        if (!validRef(ref)) return "denied ref"
+        if (store.session() != expectedSession) return "denied session"
+        val cur = lookup(ref)
+        if (cur == null || cur.viewOnce || cur.restricted) return "denied policy"
+        val put = try {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                java.io.FileInputStream(part).use { store.put(ref, it, viewOnce = false, restricted = false, expectedSession = expectedSession) }
+            }
+        } catch (e: CancellationException) { throw e } catch (_: IOException) { return "failed store" }
+        if (store.session() != expectedSession) return "denied session"
+        val after = lookup(ref)
+        if (put == StorePut.Stored && (after == null || after.viewOnce || after.restricted)) { store.invalidate(ref); return "denied policy" }
+        return when (put) { StorePut.Stored -> null; StorePut.NotAllowed, StorePut.Closed -> "denied not storable"; else -> "failed store" }
+    }
+
     /** Last step before anything leaves: same session, still authorized, no new restriction. */
     private fun finalGuard(ref: AttachmentRef, stamp: String, t0: TrustedAttachment, result: ResolvedSource): ResolvedSource {
         if (result is ResolvedSource.Unavailable) return result

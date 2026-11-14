@@ -79,6 +79,27 @@ class ApiAuthClientParityTest {
     }
 
     @Test
+    fun registrationKeepsSessionAndExposesVerificationWarning() {
+        val t = FakeTransport { 200 to """{"data":{"token":"${jwt("{}")}","user":{"id":"u3","username":"maya"}},"message":"Account created, but verification code could not be sent."}""" }
+        val result = client(t).register("a@b.c", "maya", "secret")
+        assertEquals("u3", result.user.id)
+        assertEquals("Account created, but verification code could not be sent.", result.verificationMessage)
+    }
+
+    @Test
+    fun verificationReadsRootMessageAndSurfacesServerFailures() {
+        val t = FakeTransport { 200 to """{"data":null,"message":"Email queued; delivery unconfirmed."}""" }
+        assertEquals("Email queued; delivery unconfirmed.", client(t).sendEmailVerification("a@b.c"))
+        t.handler = { 503 to """{"detail":"Could not send the code right now."}""" }
+        try {
+            client(t).sendEmailVerification("a@b.c")
+            fail("provider error must not become success")
+        } catch (e: Exception) {
+            assertTrue(e.message!!.contains("Could not send the code"))
+        }
+    }
+
+    @Test
     fun displayNameFallbackChain() {
         fun name(userJson: String, payload: String = "{}"): String {
             val t = FakeTransport { 200 to """{"access_token":"${jwt(payload)}","user":$userJson}""" }

@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="Voicemail"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M7,8.75C9.347,8.75,11.25,10.653,11.25,13C11.25,15.347,9.347,17.25,7,17.25C4.653,17.25,2.75,15.347,2.75,13C2.75,10.653,4.653,8.75,7,8.75" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M17,8.75C19.347,8.75,21.25,10.653,21.25,13C21.25,15.347,19.347,17.25,17,17.25C14.653,17.25,12.75,15.347,12.75,13C12.75,10.653,14.653,8.75,17,8.75" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M2.75,17.25L21.25,17.25" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

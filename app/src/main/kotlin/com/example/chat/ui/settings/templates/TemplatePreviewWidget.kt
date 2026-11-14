@@ -224,7 +224,7 @@ private fun VisualSocialLayout(template: ChatyTemplateDefinition, colors: AppCol
         Spacer(Modifier.height(8.dp))
         Row(Modifier.weight(1f)) {
             Box(Modifier.weight(6f)) {
-                MediaTile(colors, accent, Icons.Rounded.Landscape, "Highlights", tall = true)
+                MediaTile(colors, accent, com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.gallery), "Highlights", tall = true)
             }
             Spacer(Modifier.width(6.dp))
             Column(Modifier.weight(5f)) {
@@ -464,7 +464,7 @@ private fun CommunityLayout(colors: AppColors, accent: Color) {
                 .padding(horizontal = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Rounded.Hub, contentDescription = null, modifier = Modifier.size(17.dp), tint = accent)
+            Icon(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.community), contentDescription = null, modifier = Modifier.size(17.dp), tint = accent)
             Spacer(Modifier.width(7.dp))
             Text("Design Community", modifier = Modifier.weight(1f), fontSize = 9.sp, fontWeight = FontWeight.W800)
             com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, modifier = Modifier.size(14.dp), color = accent)

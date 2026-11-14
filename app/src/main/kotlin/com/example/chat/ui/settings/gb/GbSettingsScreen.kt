@@ -245,7 +245,7 @@ fun GbSettingsScreen(
                 GbDivider()
                 GbRow(Icons.Rounded.FormatPaint, colors.warning.copy(alpha = 0.14f), colors.warning, "Theme Studio", "23 Presets • Photo Palette • Import/Export • Reset") { onOpenThemeEditor() }
                 GbDivider()
-                GbRow(Icons.Rounded.SettingsSuggest, colors.info.copy(alpha = 0.14f), colors.info, "Universal", "Colors • Icons and Fonts • Language • Other") { onOpenUniversal() }
+                GbRow(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.tune), colors.info.copy(alpha = 0.14f), colors.info, "Universal", "Colors • Icons and Fonts • Language • Other") { onOpenUniversal() }
             }
             Spacer(Modifier.height(12.dp))
             GbGroupCard {

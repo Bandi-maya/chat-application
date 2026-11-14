@@ -97,7 +97,13 @@ class ChatyNotificationCoordinator(
     // --- ChatyNotificationSink: the sole NotificationManager IPC surface, invoked on the lane thread only. ---
 
     override fun postMessage(tag: String, title: String, body: String, whenEpochMs: Long, replyNonce: String?, dismissNonce: String?) {
-        ChatyNotificationPoster.postMessage(context, style, tag, title, body, whenEpochMs, replyNonce, dismissNonce)
+        val account = api.authSnapshot()
+        val prefix = "m:${account.generation}:"
+        if (!tag.startsWith(prefix)) return
+        val conversationId = tag.removePrefix(prefix)
+        val unread = api.conversations.firstOrNull { it.id == conversationId }?.unreadCount ?: 1
+        ChatyNotificationPoster.postMessage(context, style, tag, title, body, whenEpochMs, replyNonce, dismissNonce,
+            messageCount = unread.coerceAtLeast(1))
     }
 
     override fun cancelMessage(tag: String) = ChatyNotificationPoster.cancelMessage(context, tag)

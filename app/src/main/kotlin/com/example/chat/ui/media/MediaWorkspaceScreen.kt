@@ -198,7 +198,7 @@ fun MediaWorkspaceScreen(
                         ) { Text("No files or media found in Chaty storage.") }
                     }
                 } else {
-                    items(files.take(15).size) { idx ->
+                    items(files.take(15).size, key = { files[it].id }) { idx ->
                         val file = files[idx]
                         Box(
                             Modifier

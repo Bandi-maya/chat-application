@@ -240,7 +240,7 @@ class ApiMediaUploadClient(
     /** Device transport over OkHttp, mirroring http.MultipartRequest: one
      *  'file' part, Bearer + x-tenant-id headers, no extra fields. */
     class OkHttpTransport : ProgressTransport, FileProgressTransport {
-        private val client = okhttp3.OkHttpClient()
+        private val client = com.example.chat.data.api.ChatyOkHttp.shared
 
         override fun upload(
             url: String,

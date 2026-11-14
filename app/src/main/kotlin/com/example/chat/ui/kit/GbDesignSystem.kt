@@ -155,7 +155,7 @@ fun GbSettingRow(
             when {
                 iconContent != null -> iconContent()
                 icon != null -> Icon(icon, null, tint = effIcon, modifier = Modifier.size(20.dp))
-                else -> Icon(Icons.Rounded.Circle, null, tint = effIcon, modifier = Modifier.size(20.dp))
+                else -> Icon(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.presenceDot), null, tint = effIcon, modifier = Modifier.size(20.dp))
             }
         }
         Spacer(Modifier.width(14.dp))

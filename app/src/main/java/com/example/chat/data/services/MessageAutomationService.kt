@@ -1,9 +1,12 @@
 package com.example.chat.data.services
 
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.example.chat.domain.models.MessageAutomationPreferences
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.launch
 
 /** Exact port of lib/data/services/message_automation_service.dart.
@@ -25,18 +28,50 @@ class MessageAutomationService(
     private val addListener: (() -> Unit) -> Unit,
     private val removeListener: (() -> Unit) -> Unit,
 ) {
-    private var syncing = false
-    private val onPreferencesChanged: () -> Unit = { launchSync() }
+    private val syncMutex = Mutex()
+    private var disposed = false
+    private var lifecycleOwner: LifecycleOwner? = null
+
+    /** Set when a push may be needed: on preference change, on service start
+     *  (covers sign-in after init), and after a failed pass (retry). Cleared
+     *  at the START of a sync attempt, so a change landing mid-flight re-sets
+     *  it and survives that attempt's completion. */
+    @Volatile
+    private var syncPending = true
+
+    /** Retrying a failed push is a foreground affordance: a backgrounded user
+     *  is not editing rules, and the next resume (or process start) re-kicks. */
+    @Volatile
+    private var appInForeground = true
+
+    private val lifecycleObserver = object : DefaultLifecycleObserver {
+        override fun onResume(owner: LifecycleOwner) {
+            appInForeground = true
+            if (syncPending) launchSync()
+        }
+
+        override fun onPause(owner: LifecycleOwner) {
+            appInForeground = false
+        }
+    }
+
+    /** Wire foreground/resume behavior (same pattern as ConnectionHealthService). */
+    fun attachLifecycle(owner: LifecycleOwner) {
+        lifecycleOwner?.lifecycle?.removeObserver(lifecycleObserver)
+        lifecycleOwner = owner
+        appInForeground = owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        owner.lifecycle.addObserver(lifecycleObserver)
+    }
+
+    private val onPreferencesChanged: () -> Unit = {
+        syncPending = true
+        launchSync()
+    }
 
     init {
         addListener(onPreferencesChanged)
-        // Timer.periodic(30s) + immediate kickoff, same as Dart.
-        scope.launch {
-            while (isActive) {
-                delay(30_000)
-                sync()
-            }
-        }
+        // Changes, initial load, incoming events and resume trigger sync.
+        // A failed push stays pending until the next event; no idle retry timer.
         launchSync()
     }
 
@@ -44,15 +79,16 @@ class MessageAutomationService(
         scope.launch { sync() }
     }
 
-    private suspend fun sync() {
-        if (syncing || currentUserId() == null) return
-        syncing = true
+    private suspend fun sync() = syncMutex.withLock {
+        if (disposed || !appInForeground || !syncPending || currentUserId() == null) return@withLock
+        syncPending = false
         try {
             backend.synchronizeAutomation(automation())
+        } catch (cancelled: CancellationException) {
+            syncPending = true
+            throw cancelled
         } catch (_: Exception) {
-            // Account sync retries on the next preference change / periodic pass.
-        } finally {
-            syncing = false
+            syncPending = true
         }
     }
 
@@ -63,6 +99,9 @@ class MessageAutomationService(
     }
 
     fun dispose() {
+        disposed = true
+        lifecycleOwner?.lifecycle?.removeObserver(lifecycleObserver)
+        lifecycleOwner = null
         removeListener(onPreferencesChanged)
     }
 }

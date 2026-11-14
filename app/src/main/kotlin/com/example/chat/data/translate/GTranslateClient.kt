@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
  *  involvement; failures surface honestly to the caller. Results are cached
  *  in memory for the process lifetime, bounded. */
 class GTranslateClient(
-    private val client: OkHttpClient = OkHttpClient.Builder()
+    private val client: OkHttpClient = com.example.chat.data.api.ChatyOkHttp.shared.newBuilder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build(),

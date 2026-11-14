@@ -473,7 +473,7 @@ private fun VariantGrid(
                     }
                 }
                 Icon(
-                    if (isSelected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                    if (isSelected) Icons.Rounded.CheckCircle else com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.radioOff),
                     contentDescription = null,
                     tint = if (isSelected) colors.primary else colors.border,
                     modifier = Modifier.size(22.dp),

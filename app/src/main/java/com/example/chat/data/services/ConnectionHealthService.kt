@@ -50,7 +50,6 @@ class ConnectionHealthService(
     val isHealthy: Boolean get() = state.health == ConnectionHealth.excellent
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var periodicJob: Job? = null
     private var debounceJob: Job? = null
     private val probeMutex = Mutex()
     private val probing = AtomicBoolean(false)
@@ -61,25 +60,30 @@ class ConnectionHealthService(
     /** Sliding latency ring buffer for median calculation. */
     private val recentLatenciesMs = ArrayList<Long>()
 
+    /** True until a lifecycle owner is attached and reports paused. Probing is
+     *  a UI/diagnostic affordance; the Dart doc for this service scopes the
+     *  30s pass to the foreground, and the header readout it feeds is not
+     *  visible while backgrounded. */
+    @Volatile
+    private var appInForeground = true
+
     private val lifecycleObserver = object : DefaultLifecycleObserver {
         override fun onResume(owner: LifecycleOwner) {
+            appInForeground = true
             scope.launch { probeConnection() }
         }
 
         override fun onPause(owner: LifecycleOwner) {
+            appInForeground = false
             debounceJob?.cancel()
         }
     }
 
     init {
-        // Probe on startup, then every 30s in the foreground (Dart _init).
+        // Probe on startup; later probes are event-driven.
         scope.launch { probeConnection() }
-        periodicJob = scope.launch {
-            while (isActive) {
-                delay(30_000)
-                probeConnection()
-            }
-        }
+        // Resume, network and explicit diagnostic events trigger later probes.
+        // No recurring job survives pause or wakes an idle process.
     }
 
     /** Wires the Dart AppLifecycleListener behaviour to a LifecycleOwner. */
@@ -294,7 +298,6 @@ class ConnectionHealthService(
 
     fun dispose() {
         disposed = true
-        periodicJob?.cancel()
         debounceJob?.cancel()
         lifecycleOwner?.lifecycle?.removeObserver(lifecycleObserver)
     }

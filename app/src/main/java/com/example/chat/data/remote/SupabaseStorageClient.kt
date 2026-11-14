@@ -23,7 +23,7 @@ class SupabaseStorageClient(
     private val supabaseUrl: String,
     private val publishableKey: String,
     private val accessToken: suspend () -> String?,
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient = com.example.chat.data.api.ChatyOkHttp.shared,
 ) : MediaStorageBackend {
     /** Mirrors storage.from(bucket).upload(path, file, FileOptions(cacheControl: '3600', upsert: false, contentType: mime)). */
     override suspend fun upload(

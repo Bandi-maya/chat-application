@@ -1,6 +1,5 @@
 package com.example.chat.ui.effects
 
-import android.provider.Settings
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -11,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 
 /**
  * GB-reference list-arrival animations (reference keys key_chats_listanimation for the
@@ -46,11 +44,8 @@ object ListEntranceAnimations {
 @Composable
 fun Modifier.listEntrance(style: String, key: Any): Modifier {
     if (style == "Standard" || style !in ListEntranceAnimations.styles) return this
-    val context = LocalContext.current
-    val animatorScale = remember {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
-    }
-    if (animatorScale == 0f) return this
+    // Observe accessibility changes while the list stays mounted, not only its initial value.
+    if (com.example.chat.ui.kit.rememberChatyReduceMotion()) return this
     val progress = remember(key) { Animatable(0f) }
     val arrived = remember(key) { mutableStateOf(false) }
     LaunchedEffect(key) {

@@ -171,9 +171,9 @@ fun HomeScreenSettingsPage(
         }
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 10.dp)) {
             card {
-                subpageRow(Icons.Rounded.ViewHeadline, "Header", onOpenHeader)
+                subpageRow(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.alignTop), "Header", onOpenHeader)
                 divider()
-                subpageRow(Icons.Outlined.ViewAgenda, "Rows", onOpenRows)
+                subpageRow(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.list), "Rows", onOpenRows)
                 divider()
                 subpageRow(Icons.Outlined.AddCircleOutline, "Floating Action Button", onOpenFab)
                 divider()

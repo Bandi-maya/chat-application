@@ -71,8 +71,14 @@ fun GroupInfoScreen(
     val snackbar = remember { SnackbarHostState() }
     var memberQuery by remember(conversation.id, currentUserId) { mutableStateOf("") }
     val memberCount = GroupMemberPolicy.knownCount(conversation.participantIds)
-    val loadedMembers = GroupMemberPolicy.members(conversation.participantIds, participants, conversation.adminIds, currentUserId, "")
-    val visibleMembers = GroupMemberPolicy.members(conversation.participantIds, participants, conversation.adminIds, currentUserId, memberQuery)
+    // Memoized: members() runs distinctBy + two filters + a full sort over all
+    // profiles, and this screen recomposes per member-search keystroke.
+    val loadedMembers = remember(conversation.participantIds, participants, conversation.adminIds, currentUserId) {
+        GroupMemberPolicy.members(conversation.participantIds, participants, conversation.adminIds, currentUserId, "")
+    }
+    val visibleMembers = remember(conversation.participantIds, participants, conversation.adminIds, currentUserId, memberQuery) {
+        GroupMemberPolicy.members(conversation.participantIds, participants, conversation.adminIds, currentUserId, memberQuery)
+    }
 
     Scaffold(
         containerColor = colors.background,

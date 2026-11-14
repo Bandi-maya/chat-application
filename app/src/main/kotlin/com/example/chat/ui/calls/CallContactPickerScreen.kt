@@ -524,7 +524,7 @@ fun CallContactPickerScreen(
                                         )
                                         if (key.digit == "1") {
                                             Icon(
-                                                Icons.Rounded.Voicemail,
+                                                com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.voicemail),
                                                 contentDescription = null,
                                                 tint = Color(theme.secondaryTextColor),
                                                 modifier = Modifier.size(13.dp),

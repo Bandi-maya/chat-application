@@ -306,10 +306,24 @@ class ApiBackendService(
         addAuthScopeListener { if (!DemoMode.active) realtime.connect() }
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             val lifecycle = androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle
-            callCoordinator.foreground(lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
+            syncForeground = lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+            callCoordinator.foreground(syncForeground)
+            if (syncForeground) startBackgroundSync()
             lifecycle.addObserver(androidx.lifecycle.LifecycleEventObserver { _, event ->
-                if (event == androidx.lifecycle.Lifecycle.Event.ON_START) callCoordinator.foreground(true)
-                if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) callCoordinator.foreground(false)
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
+                    syncForeground = true
+                    callCoordinator.foreground(true)
+                    if (!DemoMode.active) realtime.connect()
+                    startBackgroundSync()
+                }
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                    syncForeground = false
+                    realtime.disconnect()
+                    activeSyncJob?.cancel()
+                    activeSyncJob = null
+                    syncRunning = false
+                    callCoordinator.foreground(false)
+                }
             })
         }
     }
@@ -436,6 +450,14 @@ class ApiBackendService(
                             else if (normalized.type == MessageType.image) "📷 Photo" else "📎 Attachment",
                             lastMessageTime = normalized.createdAt,
                             lastMessageSenderId = normalized.senderId,
+                            unreadCount = ApiUnreadPolicy.afterRealtime(
+                                previous = old.unreadCount,
+                                isNewMessage = isNewToList,
+                                fromSelf = normalized.senderId == myId,
+                                conversationVisible = roomId == activeConversationId || roomId in activeConversationIds,
+                                isContentMessage = normalized.type != MessageType.system &&
+                                    !normalized.isDeletedForEveryone && !normalized.isDeletedForMe && !normalized.isRevokedBySender,
+                            ),
                         ),
                     )
                 } else {
@@ -568,6 +590,7 @@ class ApiBackendService(
             if (seen != null) lastSeenById[userId] = seen
             else if (!isOnline) lastSeenById.remove(userId)
             notifyChatListeners()
+            for (l in contactEventListeners) runCatching { l.onContactOnlineChanged(userId, isOnline) }
         }
 
         override fun onPresenceChanged(userId: String, online: Boolean, lastSeenAt: String?, approx: String?) {
@@ -578,6 +601,7 @@ class ApiBackendService(
             if (seen != null) lastSeenById[userId] = seen else lastSeenById.remove(userId)
             if (approx != null) approxPresenceById[userId] = approx else approxPresenceById.remove(userId)
             notifyChatListeners()
+            for (l in contactEventListeners) runCatching { l.onContactOnlineChanged(userId, online) }
         }
 
         override fun onMessagesDelivered(roomId: String, deliveredUpTo: String) {
@@ -606,10 +630,32 @@ class ApiBackendService(
             val key = "$roomId|$userId"
             if (isTyping) typingUntil[key] = System.currentTimeMillis() + TYPING_TTL_MS else typingUntil.remove(key)
             notifyChatListeners()
+            for (l in contactEventListeners) runCatching { l.onContactTypingChanged(roomId, userId, isTyping) }
         }
     }
 
     // ---- Presence / typing / read state from the custom backend socket ----
+
+    /** Additive fan-out of live socket presence/typing events for the in-app
+     *  event toasts (RichChatRealtimeService gating decides whether a toast
+     *  actually shows). Invoked synchronously on the socket scheduler thread
+     *  after internal state updates; listener failures are swallowed so the
+     *  socket handler stays healthy. */
+    interface ContactEventListener {
+        fun onContactOnlineChanged(userId: String, online: Boolean)
+        fun onContactTypingChanged(roomId: String, userId: String, isTyping: Boolean)
+    }
+
+    private val contactEventListeners =
+        java.util.concurrent.CopyOnWriteArrayList<ContactEventListener>()
+
+    fun addContactEventListener(listener: ContactEventListener) {
+        contactEventListeners.addIfAbsent(listener)
+    }
+
+    fun removeContactEventListener(listener: ContactEventListener) {
+        contactEventListeners.remove(listener)
+    }
 
     private val onlineIds: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
     private val lastSeenById = java.util.concurrent.ConcurrentHashMap<String, Instant>()
@@ -645,6 +691,36 @@ class ApiBackendService(
     // --- Contacts plane (research 5.3) ------------------------------------
 
     fun contactsPlane(): ApiContactsClient = contactsClient
+    fun contactsPlane(expected: ApiAccountScope): ApiContactsClient = ApiContactsClient(
+        baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
+        transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
+    )
+
+    /** Exact public profile lookup, bound to the account that opened contact info. */
+    suspend fun peerProfile(username: String, userId: String, expected: ApiAccountScope): UserProfile {
+        val reader = ApiAuthClient(
+            baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
+            transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
+        )
+        val profile = withContext(Dispatchers.IO) { ApiChatClient.userFromApi(reader.profileByUsername(username)) }
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
+        check(profile.id == userId) { "Contact profile identity changed." }
+        if (!withAuthScope(expected) {
+            synchronized(chatLock) {
+                val index = _users.indexOfFirst { it.id == userId }
+                if (index >= 0) _users[index] = _users[index].copy(
+                    displayName = profile.displayName, username = profile.username, about = profile.about,
+                    avatarUrl = profile.avatarUrl, bannerUrl = profile.bannerUrl,
+                )
+                _conversations.replaceAll { room ->
+                    if (room.isDirect && userId in room.participantIds) room.copy(avatarUrl = profile.avatarUrl) else room
+                }
+            }
+        }) throw ApiScopeChangedException()
+        notifyChatListeners()
+        return profile
+    }
+
 
     // --- Call history plane (research 5.4) ---------------------------------
 
@@ -765,7 +841,9 @@ class ApiBackendService(
 
     private val realtime: ApiRealtimeClient = ApiRealtimeClient(
         webSocketUrl = { resolveWebSocketUrl() },
-        token = { session.token },
+        // Every connect/reconnect and heartbeat re-checks this gate, including
+        // auth/network/push callbacks. Background nudges use bounded REST only.
+        token = { if (syncForeground) session.token else null },
         // Reconnect-storm-safe full jitter (500ms base, 30s cap): every retry is
         // uniformly spread, so a server restart never sees a thundering herd.
         backoff = com.example.chat.data.network.BackoffPolicy(
@@ -1094,6 +1172,8 @@ class ApiBackendService(
     }
     /** Incoming (not own) realtime message: (message, conversation title, muted). Invoked outside chatLock. */
     @Volatile var onIncomingMessage: ((ChatMessage, String?, Boolean) -> Unit)? = null
+    // Process lifecycle owns this UI catch-up loop, never the sticky socket service.
+    @Volatile private var syncForeground = false
     @Volatile private var syncRunning = false
     @Volatile private var activeSyncJob: kotlinx.coroutines.Job? = null
 
@@ -1137,6 +1217,14 @@ class ApiBackendService(
             m.copy(isStarred = o.optBoolean("starred", m.isStarred), isPinned = o.optBoolean("pinned", m.isPinned))
         }
     }
+
+    /** Cheap home-row tick accessor: the last message's delivery state without
+     *  copying the whole list. getMessages above copies every element (plus a
+     *  JSON pass) per call, which the home list triggered per row per
+     *  recomposition. Local starred/pinned overlays never affect the delivery
+     *  state, so it can be read straight from the cached message. */
+    fun lastMessageDeliveryState(chatId: String): DeliveryState? =
+        synchronized(chatLock) { _messages[chatId]?.lastOrNull()?.deliveryState }
 
     // ---- Device-local chat state ----
     // The custom backend has no per-user pin/mute/archive or star/pin-message API yet, so these
@@ -1434,35 +1522,56 @@ class ApiBackendService(
      *  index 0 (replace if the id already exists), notify. 402 sets the
      *  subscription state with the exact Dart message, notifies, rethrows. */
     suspend fun createOrGetDirectConversation(targetUserId: String): Conversation {
+        val expected = authSnapshot()
+        // Bind the request to the original credentials and cancel it on
+        // auth/routing transition, just like scope-bound message sends.
+        val scopedChat = ApiChatClient(
+            baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
+            transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
+        )
         try {
-            val conversation = withContext(Dispatchers.IO) { chat.createDirectRoom(targetUserId) }
-            synchronized(chatLock) {
-                val idx = _conversations.indexOfFirst { it.id == conversation.id }
-                if (idx != -1) _conversations.removeAt(idx)
-                _conversations.add(0, conversation)
-            }
-            schedulePersistConversations()
+            val conversation = withContext(Dispatchers.IO) { scopedChat.createDirectRoom(targetUserId) }
+            if (!withAuthScope(expected) {
+                synchronized(chatLock) {
+                    val idx = _conversations.indexOfFirst { it.id == conversation.id }
+                    if (idx != -1) _conversations.removeAt(idx)
+                    _conversations.add(0, conversation)
+                }
+                schedulePersistConversations(expected)
+            }) throw ApiScopeChangedException()
             notifyChatListeners()
+            if (authSnapshot() !== expected) throw ApiScopeChangedException()
             return conversation
         } catch (e: ApiChatClient.SubscriptionRequiredException) {
-            requiresSubscription = true
-            subscriptionErrorMessage =
-                "Workspace subscription required. Please choose a plan to chat."
+            if (!withAuthScope(expected) {
+                requiresSubscription = true
+                subscriptionErrorMessage =
+                    "Workspace subscription required. Please choose a plan to chat."
+            }) throw ApiScopeChangedException()
             notifyChatListeners()
             throw e
         }
     }
 
-    /** createGroup: upsert at index 0 (replace if the id exists), notify. */
+    /** createGroup: scope-bound request and publication; never insert an old
+     *  account's room into a newly switched account's list or snapshot. */
     suspend fun createGroupRoom(name: String, memberUserIds: List<String>): Conversation {
-        val conversation = withContext(Dispatchers.IO) { chat.createGroupRoom(name, memberUserIds) }
-        synchronized(chatLock) {
-            val idx = _conversations.indexOfFirst { it.id == conversation.id }
-            if (idx != -1) _conversations.removeAt(idx)
-            _conversations.add(0, conversation)
-        }
-        schedulePersistConversations()
+        val expected = authSnapshot()
+        val scopedChat = ApiChatClient(
+            baseUrl = { expected.baseUrl }, tenantId = { expected.tenantId }, token = { expected.token },
+            transport = ScopedCallHttpTransport(expected, ::withAuthScope, sendRequests),
+        )
+        val conversation = withContext(Dispatchers.IO) { scopedChat.createGroupRoom(name, memberUserIds) }
+        if (!withAuthScope(expected) {
+            synchronized(chatLock) {
+                val idx = _conversations.indexOfFirst { it.id == conversation.id }
+                if (idx != -1) _conversations.removeAt(idx)
+                _conversations.add(0, conversation)
+            }
+            schedulePersistConversations(expected)
+        }) throw ApiScopeChangedException()
         notifyChatListeners()
+        if (authSnapshot() !== expected) throw ApiScopeChangedException()
         return conversation
     }
 
@@ -1566,6 +1675,7 @@ class ApiBackendService(
      * or while WebSocket realtime is disconnected.
      */
     fun startBackgroundSync() {
+        if (!syncForeground || session.token == null || DemoMode.active) return
         if (syncRunning && activeSyncJob?.isActive == true) return
         syncRunning = true
         val scope = chatScope
@@ -1575,7 +1685,7 @@ class ApiBackendService(
                 var ticks = 0
                 while (true) {
                     delay(4000)
-                    if (session.token == null || DemoMode.active) break
+                    if (!syncForeground || session.token == null || DemoMode.active) break
                     try {
                         ensureFreshToken()
                         if (session.token == null) break
@@ -2373,9 +2483,13 @@ class ApiBackendService(
         withTimeoutOrNull(INITIAL_LOGIN_SYNC_TIMEOUT_MS) { syncJob.join() }
     }
 
+    @Volatile var registrationVerificationMessage: String? = null
+        private set
+
     suspend fun register(email: String, username: String, password: String): ApiUserProfile =
         withContext(Dispatchers.IO) {
             val result = auth.register(email, username, password, extraHeaders = deviceIdentity?.identityHeaders() ?: emptyMap())
+            registrationVerificationMessage = result.verificationMessage
             lastAdoptEpochMs = System.currentTimeMillis()
             session.adopt(result)
             saveRefreshToken(result.refreshToken)

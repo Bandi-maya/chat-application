@@ -301,7 +301,7 @@ fun TaskDetailScreen(
                 }
                 if (currentTask.labels.isNotEmpty()) {
                     TaskPropertyRow(
-                        icon = { Icon(Icons.Rounded.Label, contentDescription = null, tint = colors.primary, modifier = Modifier.size(20.dp)) },
+                        icon = { Icon(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.contactLabel), contentDescription = null, tint = colors.primary, modifier = Modifier.size(20.dp)) },
                         title = "Labels",
                         colors = colors,
                     ) {

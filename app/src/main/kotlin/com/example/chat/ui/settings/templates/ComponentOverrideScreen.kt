@@ -87,11 +87,11 @@ private fun componentOverrideIcon(iconName: String): ImageVector = when (iconNam
     "home_outlined" -> Icons.Outlined.Home
     "format_list_bulleted_rounded" -> Icons.Rounded.FormatListBulleted
     "chat_bubble_outline_rounded" -> Icons.Rounded.ChatBubbleOutline
-    "input_rounded" -> Icons.Rounded.Input
+    "input_rounded" -> com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.entry)
     "auto_stories_outlined" -> Icons.Outlined.AutoStories
     "person_outline_rounded" -> Icons.Rounded.PersonOutline
     "call_outlined" -> Icons.Outlined.Call
-    else -> Icons.Rounded.Circle
+    else -> com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.presenceDot)
 }
 
 /** Dart destinationIcon switch. */
@@ -103,7 +103,7 @@ private fun destinationIcon(id: String): ImageVector = when (id) {
     "calls" -> Icons.Outlined.Call
     "settings" -> Icons.Outlined.Settings
     "desktop" -> Icons.Outlined.Devices
-    else -> Icons.Rounded.Circle
+    else -> com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.presenceDot)
 }
 
 /** Dart: tmpl.navigation.centerActionIcon ?? Icons.camera_alt_rounded. */

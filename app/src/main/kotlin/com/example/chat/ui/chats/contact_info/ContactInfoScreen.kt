@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -107,6 +108,8 @@ fun ContactInfoScreen(
     onOpenPrivacy: () -> Unit,
     onOpenMedia: (ChatMessage) -> Unit,
     onSearch: () -> Unit,
+    onStartCall: (Boolean) -> Unit,
+    onShareContact: () -> Unit,
     onDeletedPopToRoot: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -220,14 +223,14 @@ fun ContactInfoScreen(
             // Quick action row: Call / Video / Search / Share.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly) {
                 QuickAction(Icons.Outlined.Call, "Call") {
-                    scope.launch { snackbar.showSnackbar("Starting voice call with ${contact.displayName}...") }
+                    onStartCall(false)
                 }
                 QuickAction(Icons.Outlined.Videocam, "Video") {
-                    scope.launch { snackbar.showSnackbar("Starting video call with ${contact.displayName}...") }
+                    onStartCall(true)
                 }
                 QuickAction(Icons.Rounded.Search, "Search") { onSearch() }
                 QuickAction(Icons.Outlined.Share, "Share") {
-                    scope.launch { snackbar.showSnackbar("Sharing contact card for ${contact.displayName}...") }
+                    onShareContact()
                 }
             }
 
@@ -424,6 +427,53 @@ fun ContactInfoScreen(
                         }
                     }
                 }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // Per-chat media auto-download (existing MediaAutoDownloadGate override; no new screen).
+            var dlOverride by remember(conversation.id) { mutableStateOf(com.example.chat.ServiceLocator.mediaAutoDownloadGate.overrideFor(conversation.id)) }
+            var dlPicker by remember(conversation.id) { mutableStateOf(false) }
+            Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
+                InfoTile(
+                    icon = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.cloudDownload, semanticLabel = null, color = colors.primary) },
+                    title = "Media auto-download",
+                    titleColor = colors.foreground,
+                    subtitle = when (dlOverride) {
+                        com.example.chat.data.media.AutoDownloadPolicy.Override.ALWAYS -> "Always download media from this chat"
+                        com.example.chat.data.media.AutoDownloadPolicy.Override.NEVER -> "Never. Tap a photo or video to download it"
+                        com.example.chat.data.media.AutoDownloadPolicy.Override.DEFAULT -> "Follow Storage & Media settings"
+                    },
+                    trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary, modifier = Modifier.size(18.dp)) },
+                    onClick = { dlPicker = true },
+                )
+            }
+            if (dlPicker) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { dlPicker = false },
+                    title = { Text("Media auto-download") },
+                    text = {
+                        Column {
+                            listOf(
+                                com.example.chat.data.media.AutoDownloadPolicy.Override.DEFAULT to "Follow default",
+                                com.example.chat.data.media.AutoDownloadPolicy.Override.ALWAYS to "Always download",
+                                com.example.chat.data.media.AutoDownloadPolicy.Override.NEVER to "Never (tap to download)",
+                            ).forEach { (value, label) ->
+                                Row(
+                                    Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable {
+                                        com.example.chat.ServiceLocator.mediaAutoDownloadGate.setOverride(conversation.id, value)
+                                        dlOverride = value; dlPicker = false
+                                    },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    androidx.compose.material3.RadioButton(selected = dlOverride == value, onClick = null)
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(label, color = colors.foreground)
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = { androidx.compose.material3.TextButton(onClick = { dlPicker = false }) { Text("Close") } },
+                )
             }
             Spacer(Modifier.height(12.dp))
 

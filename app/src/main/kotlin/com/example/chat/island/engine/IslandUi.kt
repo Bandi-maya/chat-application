@@ -10,6 +10,9 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -72,7 +75,7 @@ private data class Controls(
     val previous: () -> Unit, val play: () -> Unit, val next: () -> Unit, val seek: (Long) -> Unit,
     val answer: () -> Unit, val decline: () -> Unit, val read: () -> Unit, val reply: () -> Unit,
     val send: (String) -> Unit, val cancel: () -> Unit, val openMusic: () -> Unit,
-    val editing: Boolean
+    val editing: Boolean, val openNotification: () -> Unit, val dismiss: () -> Unit
 )
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -84,11 +87,13 @@ fun DynamicIslandUi(
     onLongPress: () -> Unit = {}, onDismiss: () -> Unit = {}, onPrev: () -> Unit = {},
     onPlayPause: () -> Unit = {}, onNext: () -> Unit = {}, onSeek: (Long) -> Unit = {},
     onAnswer: () -> Unit = {}, onDecline: () -> Unit = {}, onMarkRead: () -> Unit = {},
+    onOpenNotification: () -> Unit = {},
     onReply: () -> Unit = {}, onSendReply: (String) -> Unit = {}, onCancelReply: () -> Unit = {},
     replying: Boolean = false, onSwipeSide: (Int) -> Unit = {}, appAccent: Color? = null,
     onOpenMedia: () -> Unit = {}, secondary: IslandMode.Media? = null, queued: Int = 0,
     onSwipe: ((SwipeDir) -> Unit)? = null, modifier: Modifier = Modifier, styleOverride: KindStyle? = null
 ) {
+    val reducedMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
     val customizations by IslandSettings.kindStyles.collectAsState()
     val style = styleOverride ?: customizations[kindOf(mode)?.key] ?: KindStyle()
     val expanded = level == IslandLevel.Expanded || level == IslandLevel.Large
@@ -97,7 +102,7 @@ fun DynamicIslandUi(
     val screen = LocalConfiguration.current.screenWidthDp
     val zoom = scale.coerceIn(.3f, 2.5f)
     val controls = Controls(onPrev, onPlayPause, onNext, onSeek, onAnswer, onDecline,
-        onMarkRead, onReply, onSendReply, onCancelReply, onOpenMedia, replying)
+        onMarkRead, onReply, onSendReply, onCancelReply, onOpenMedia, replying, onOpenNotification, onDismiss)
     val mini = secondary.takeIf { mode is IslandMode.Timer || mode is IslandMode.Live }
     val accent = appAccent ?: (mode as? IslandMode.Media)?.accent?.let { Color(it) } ?: positive
     val targetWidth = if (expanded) 356f * style.cardW else when (level) {
@@ -115,15 +120,22 @@ fun DynamicIslandUi(
         first = false
     }
     val paddingY = (if (expanded) 18f * style.cardH else 10f * style.h) * heightScale
+    val animatedCorner by animateFloatAsState(
+        targetValue = (if (expanded) 30f else 50f) * effectiveRoundness,
+        animationSpec = if (reducedMotion) snap() else spring(dampingRatio = 1f, stiffness = 380f * animSpeed.coerceIn(.5f, 2f)),
+        label = "islandCorner",
+    )
     CompositionLocalProvider(LocalDensity provides Density(density.density * zoom, density.fontScale * style.text)) {
         IslandTheme {
             Column(
-                modifier.width(width.dp)
-                    .animateContentSize(tween((240 / animSpeed.coerceIn(.5f, 2f)).toInt()))
-                    .clip(RoundedCornerShape((if (expanded) 30f else 50f) * effectiveRoundness))
+                modifier
+                    // Place animation before width so both width and height share one surface.
+                    .animateContentSize(if (reducedMotion) snap() else spring(dampingRatio = 1f, stiffness = 380f * animSpeed.coerceIn(.5f, 2f)))
+                    .width(width.dp)
+                    .clip(RoundedCornerShape(animatedCorner))
                     .background(panelInk)
                     .border(if (glow) 1.dp else 0.dp, if (glow) accent.copy(alpha = .35f) else Color.Transparent,
-                        RoundedCornerShape((if (expanded) 30f else 50f) * effectiveRoundness))
+                        RoundedCornerShape(animatedCorner))
                     .combinedClickable(onClick = onClick, onLongClick = onLongPress)
                     .pointerInput(Unit) {
                         var horizontal = 0f
@@ -292,6 +304,14 @@ private fun ExpandedContent(mode: IslandMode, large: Boolean, controls: Controls
         is IslandMode.Notification -> {
             Text(detail, color = panelText, style = MaterialTheme.typography.bodyMedium,
                 maxLines = if (large) 12 else 5, overflow = TextOverflow.Ellipsis)
+            if (!controls.editing) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = controls.openNotification, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.swipe_act_open), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                OutlinedButton(onClick = controls.dismiss, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.swipe_act_dismiss), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
             if (!controls.editing) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (mode.canMarkRead) OutlinedButton(onClick = controls.read) { Text(stringResource(R.string.island_mark_read)) }
                 if (mode.canReply) Button(onClick = controls.reply) { Text(stringResource(R.string.island_reply)) }
@@ -428,8 +448,12 @@ private fun MediaProgress(media: IslandMode.Media, seek: (Long) -> Unit, accent:
 
 @Composable
 private fun SoundBars(playing: Boolean, accent: Color) {
-    val pulse = rememberInfiniteTransition(label = "musicPulse")
-    val amount by pulse.animateFloat(.25f, 1f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "barHeight")
+    val reducedMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val amount = if (reducedMotion || !playing) .5f else {
+        val pulse = rememberInfiniteTransition(label = "musicPulse")
+        val animated by pulse.animateFloat(.25f, 1f, infiniteRepeatable(tween(600), RepeatMode.Reverse), label = "barHeight")
+        animated
+    }
     Row(Modifier.height(22.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
         for (index in 0..3) {
             val fraction = if (!playing) .3f else if (index % 2 == 0) amount else 1.25f - amount

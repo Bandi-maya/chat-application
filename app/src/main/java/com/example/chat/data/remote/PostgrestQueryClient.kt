@@ -20,7 +20,7 @@ class PostgrestQueryClient(
     private val supabaseUrl: String,
     private val publishableKey: String,
     private val accessToken: suspend () -> String?,
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient = com.example.chat.data.api.ChatyOkHttp.shared,
 ) {
 
     class Query(

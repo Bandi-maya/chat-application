@@ -1,15 +1,15 @@
 package com.example.chat.ui.core.theme
 
 /** Pure resolver mirroring main.dart _applyTypographyStyle (family / letterSpacingDelta / Monospace Accent). */
-data class ChatyTypographySpec(val family: String?, val letterSpacingDelta: Double, val monospaceAccent: Boolean) {
+data class ChatyTypographySpec(val family: String?, val letterSpacingDelta: Double, val monospaceAccent: Boolean, val weight: Int? = null, val italic: Boolean = false) {
     companion object {
         /**
          * [preset] = appearance typographyStyle; [universalPreset] = preferences.universal.fontStyle.
-         * Dart quirk kept: the family uses the *effective* preset (Default/empty falls back to the universal one) but the
-         * letter-spacing delta and Monospace Accent use the raw [preset].
+         * System Default appearance delegates to the universal font choice. The same effective
+         * preset controls family, weight, italic and spacing so selection and preview agree.
          */
         fun resolve(preset: String, universalPreset: String?): ChatyTypographySpec {
-            val effective = if (preset.isEmpty() || preset == "Default") (universalPreset ?: preset) else preset
+            val effective = if (preset.isBlank() || preset == "Default" || preset == "System Default") (universalPreset ?: preset) else preset
             val family = when (effective) {
                 "Editorial", "Classic" -> "serif"
                 "Rounded" -> "sans-serif-rounded"
@@ -25,14 +25,25 @@ data class ChatyTypographySpec(val family: String?, val letterSpacingDelta: Doub
                 "FrutigerLTStdRoman", "Roboto-Light", "Roboto-Medium" -> "sans-serif"
                 else -> null
             }
-            val delta = when (preset) {
+            val delta = when (effective) {
                 "Compact", "Dense UI" -> -0.18
                 "Editorial" -> 0.12
                 "Geometric", "Product Sans" -> 0.04
                 "Minimal", "Focus" -> -0.08
+                "ProductSans" -> 0.2
+                "BEBASNEUE" -> 1.5
+                "TRANSFORMERS" -> 1.2
                 else -> 0.0
             }
-            return ChatyTypographySpec(family, delta, preset == "Monospace Accent")
+            val weight = when (effective) {
+                "Roboto-Light" -> 300
+                "Roboto-Medium", "Comfortaa" -> 600
+                "ProductSans", "ComicSans", "HappyGiraffe" -> 500
+                "BEBASNEUE" -> 900
+                "TRANSFORMERS" -> 800
+                else -> null
+            }
+            return ChatyTypographySpec(family, delta, effective == "Monospace Accent", weight, effective == "HappyGiraffe")
         }
     }
 }

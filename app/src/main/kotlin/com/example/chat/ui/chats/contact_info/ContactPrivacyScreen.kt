@@ -176,7 +176,7 @@ fun ContactPrivacyScreen(
 
                 SectionTitle("Presence & Timestamp", colors)
                 Column(Modifier.fillMaxWidth().background(colors.surface, RoundedCornerShape(16.dp))) {
-                    PrivacyTile(Icons.Outlined.Circle, "Hide online status",
+                    PrivacyTile(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.presenceDot), "Hide online status",
                         "This contact will receive an offline status projection even while active.",
                         current.hideOnline, saving) { save(current.copy(hideOnline = it)) }
                     PrivacyTile(Icons.Rounded.Schedule, "Hide last seen",

@@ -576,9 +576,10 @@ private fun readDownscaledJpeg(
     maxEdge: Int,
     quality: Int,
 ): ByteArray {
-    val source = resolver.openInputStream(uri)?.use { stream ->
-        BitmapFactory.decodeStream(stream)
-    } ?: throw Exception("Could not read the selected image")
+    val source = com.example.chat.ui.core.system.SampledBitmapDecoder.decode(
+        { resolver.openInputStream(uri) },
+        maxEdge * 2,
+    ) ?: throw Exception("Could not read the selected image")
     val longEdge = maxOf(source.width, source.height)
     val scaled = if (longEdge > maxEdge) {
         val scale = maxEdge.toFloat() / longEdge

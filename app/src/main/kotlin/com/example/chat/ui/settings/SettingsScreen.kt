@@ -270,7 +270,7 @@ fun SettingsScreen(
 
             ChatySettingsCard {
                 Column {
-                    Tile(Icons.Rounded.CurrencyRupee, colors.primary, "Payments", "Chaty Pro plans, UPI & billing", nav(SettingsScreenDestination.ProPricing))
+                    Tile(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.rupee), colors.primary, "Payments", "Chaty Pro plans, UPI & billing", nav(SettingsScreenDestination.ProPricing))
                     ChatySettingsRowDivider()
                     Tile(Icons.Outlined.Diamond, Color(0xFFFFC107), "Subscriptions", "Explore premium benefits", nav(SettingsScreenDestination.ProPricing))
                     ChatySettingsRowDivider()

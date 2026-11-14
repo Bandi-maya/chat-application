@@ -46,15 +46,19 @@ fun ChatyCallIsland(
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val wave by rememberInfiniteTransition(label = "islandWave").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1400, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "islandWaveValue",
-    )
+    val reduceMotion = com.example.chat.ui.kit.rememberChatyReduceMotion()
+    val wave = if (reduceMotion) .25f else {
+        val animated by rememberInfiniteTransition(label = "islandWave").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1400, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "islandWaveValue",
+        )
+        animated
+    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,

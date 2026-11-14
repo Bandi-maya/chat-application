@@ -278,7 +278,9 @@ fun UniversalStylesScreen(
             StylesNavRow(
                 icon = Icons.Rounded.FolderOpen,
                 title = "Load Font...",
-                subtitle = if (prefs.loadFontCustom) "Custom Font: Loaded & Active" else "Tap to select .ttf or .otf file",
+                subtitle = if (prefs.loadFontCustom && prefs.customFontFileName?.let { name ->
+                    name.startsWith("custom_font_") && java.io.File(name).name == name && java.io.File(context.filesDir, name).isFile
+                } == true) "Custom Font: Loaded & Active" else "Tap to select .ttf or .otf file",
                 onClick = {
                     if (prefs.loadFontCustom) {
                         preferences.updateUniversal(prefs.copy(loadFontEnabled = false))
@@ -292,10 +294,14 @@ fun UniversalStylesScreen(
                     }
                     scope.launch {
                         val picked = picker() ?: return@launch
-                        val result = CustomFontLogic { context.filesDir }.install(picked.source, picked.name)
+                        val result = try {
+                            // Parse the face before ever claiming it active.
+                            android.graphics.Typeface.createFromFile(picked.source)
+                            CustomFontLogic { context.filesDir }.install(picked.source, picked.name)
+                        } catch (_: Exception) { CustomFontLogic.Result.Failure("That file could not be loaded as a font.") }
                         when (result) {
                             is CustomFontLogic.Result.Loaded -> {
-                                preferences.updateUniversal(preferences.universal.copy(loadFontEnabled = true))
+                                preferences.updateUniversal(preferences.universal.copy(loadFontEnabled = true, customFontFileName = result.fileName))
                                 onMessage(result.message)
                             }
                             is CustomFontLogic.Result.Failure -> onMessage(result.message)

@@ -1,0 +1,7 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="RadioOn"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M12,3.5C16.694,3.5,20.5,7.306,20.5,12C20.5,16.694,16.694,20.5,12,20.5C7.306,20.5,3.5,16.694,3.5,12C3.5,7.306,7.306,3.5,12,3.5" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M12,8.75C13.795,8.75,15.25,10.205,15.25,12C15.25,13.795,13.795,15.25,12,15.25C10.205,15.25,8.75,13.795,8.75,12C8.75,10.205,10.205,8.75,12,8.75" android:fillColor="#FF000000" />
+</vector>

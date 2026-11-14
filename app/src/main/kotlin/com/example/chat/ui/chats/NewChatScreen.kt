@@ -103,7 +103,9 @@ fun NewChatScreen(
     var searchText by remember { mutableStateOf("") }
     var groupName by remember { mutableStateOf("") }
     var selectedMembers by remember { mutableStateOf(setOf<String>()) }
-    var results by remember { mutableStateOf(contacts) }
+    var results by remember { mutableStateOf(emptyList<UserProfile>()) }
+    var acceptedContacts by remember { mutableStateOf(emptyList<UserProfile>()) }
+    var contactLoadError by remember { mutableStateOf<String?>(null) }
     var isCreatingGroup by remember { mutableStateOf(startInGroupMode || startInBroadcastMode) }
     var isBroadcast by remember { mutableStateOf(startInBroadcastMode) }
     var isLoading by remember { mutableStateOf(false) }
@@ -120,44 +122,68 @@ fun NewChatScreen(
     var contactUsernames by remember { mutableStateOf(setOf<String>()) }
     var contactRequests by remember { mutableStateOf(listOf<com.example.chat.data.api.ApiContactsClient.ContactRequestItem>()) }
     var requestedUsernames by remember { mutableStateOf(setOf<String>()) }
+    var respondingRequestIds by remember { mutableStateOf(setOf<String>()) }
 
     fun isContact(user: UserProfile): Boolean =
         user.id in contactIds || user.username.lowercase() in contactUsernames
 
-    // _loadInitialUsers: remote directory load; failure only clears loading.
-    LaunchedEffect(Unit) {
+    fun contactProfile(entry: com.example.chat.data.api.ApiContactsClient.ContactEntry): UserProfile =
+        contacts.firstOrNull { it.id == entry.userId } ?: UserProfile(
+            id = entry.userId,
+            displayName = entry.displayName.ifBlank { entry.username },
+            username = entry.username,
+            avatarInitials = entry.displayName.ifBlank { entry.username }.take(2).uppercase(),
+            avatarColorHex = "0xFF6366F1",
+            about = entry.about,
+            avatarUrl = entry.avatarUrl,
+            lastSeenAt = java.time.Instant.EPOCH,
+        )
+
+    // Empty search is the accepted-contacts list, never the workspace directory.
+    suspend fun refreshAcceptedContacts() {
         isLoading = true
+        contactLoadError = null
         try {
-            results = searchUsersRemote("")
-        } catch (_: Exception) {
+            if (loadContactRelations != null) {
+                val (entries, inbox) = loadContactRelations()
+                contactIds = entries.map { it.userId }.toSet()
+                contactUsernames = entries.map { it.username.lowercase() }.toSet()
+                acceptedContacts = entries.map(::contactProfile)
+                contactRequests = inbox
+            } else {
+                contactLoadError = "The contacts list is unavailable on this server. Search a username explicitly."
+            }
+            if (searchText.isBlank()) results = acceptedContacts
+        } catch (error: Exception) {
+            contactLoadError = "Could not load contacts. ${errorText(error)}"
         } finally {
             isLoading = false
         }
-        if (loadContactRelations != null) {
-            try {
-                val (contacts, inbox) = loadContactRelations()
-                contactIds = contacts.map { it.userId }.toSet()
-                contactUsernames = contacts.map { it.username.lowercase() }.toSet()
-                contactRequests = inbox
-            } catch (_: Exception) {
-                // Plane unavailable: legacy flow, no requests section.
-            }
-        }
     }
 
+    LaunchedEffect(Unit) { refreshAcceptedContacts() }
+
     fun respondToRequest(req: com.example.chat.data.api.ApiContactsClient.ContactRequestItem, accept: Boolean) {
+        if (req.requestId in respondingRequestIds) return
+        val responder = respondContactRequest
+        respondingRequestIds = respondingRequestIds + req.requestId
         scope.launch {
             try {
-                respondContactRequest?.invoke(req.requestId, accept)
+                checkNotNull(responder) { "Contact requests are unavailable on this server." }
+                responder.invoke(req.requestId, accept)
                 contactRequests = contactRequests.filterNot { it.requestId == req.requestId }
                 if (accept) {
                     contactIds = contactIds + req.from.userId
                     contactUsernames = contactUsernames + req.from.username.lowercase()
+                    acceptedContacts = (acceptedContacts + contactProfile(req.from)).distinctBy { it.id }
+                    if (searchText.isBlank()) results = acceptedContacts
                 }
                 snackbar.showSnackbar(if (accept) "${req.from.displayName} added to your contacts" else "Request declined")
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 snackbar.showSnackbar(errorText(error))
-            }
+            } finally { respondingRequestIds = respondingRequestIds - req.requestId }
         }
     }
 
@@ -182,12 +208,12 @@ fun NewChatScreen(
         searchText = value
         debounceJob?.cancel()
         val query = value.trim()
+        val nextEpoch = ++epoch // Also invalidate an in-flight search when cleared.
         if (query.isEmpty()) {
-            results = contacts
+            results = acceptedContacts
             isLoading = false
             return
         }
-        val nextEpoch = ++epoch
         isLoading = true
         debounceJob = scope.launch {
             delay(NewChatRules.SEARCH_DEBOUNCE_MS)
@@ -437,17 +463,22 @@ fun NewChatScreen(
                         )
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            "Search contacts",
+                            if (contactLoadError == null) "No contacts yet" else "Contacts unavailable",
                             color = colors.foreground,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "Enter a name or @username above to start an encrypted conversation.",
+                            contactLoadError ?: "Accepted contacts appear here. Search a username to send a request.",
                             color = colors.foregroundSecondary,
                             fontSize = 13.sp,
                         )
+                        if (contactLoadError != null && loadContactRelations != null) {
+                            TextButton(onClick = { scope.launch { refreshAcceptedContacts() } }) {
+                                Text("Retry", color = colors.accent)
+                            }
+                        }
                     }
                 }
                 else -> {
@@ -607,10 +638,8 @@ fun NewChatScreen(
                         isLoading = true
                         try {
                             deleteUser(deleteTarget.id)
-                            try {
-                                results = searchUsersRemote("")
-                            } catch (_: Exception) {
-                            }
+                            acceptedContacts = acceptedContacts.filterNot { it.id == deleteTarget.id }
+                            results = results.filterNot { it.id == deleteTarget.id }
                             snackbar.showSnackbar("${deleteTarget.displayName} deleted")
                         } catch (error: Exception) {
                             snackbar.showSnackbar("Failed to delete user: $error")

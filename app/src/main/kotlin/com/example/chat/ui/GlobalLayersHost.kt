@@ -44,7 +44,19 @@ fun GlobalTypographyScale(content: @Composable () -> Unit) {
         onDispose { appearance.removeListener(appL); prefs.removeListener(prefsL) }
     }
     @Suppress("UNUSED_EXPRESSION") rev
-    val typography = ChatyTypography.apply(MaterialTheme.typography, appearance.typographyStyle, prefs.universal.fontStyle)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val fontPrefs = prefs.universal
+    val customFamily = remember(fontPrefs.loadFontEnabled, fontPrefs.customFontFileName) {
+        if (!fontPrefs.loadFontEnabled) null else runCatching {
+            val name = fontPrefs.customFontFileName ?: error("No saved custom font")
+            require(name.startsWith("custom_font_") && java.io.File(name).name == name && !name.contains('\\'))
+            val file = java.io.File(context.filesDir, name)
+            check(file.isFile && file.length() in 1..(10L * 1024 * 1024))
+            android.graphics.Typeface.createFromFile(file)
+            androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(file))
+        }.getOrNull()
+    }
+    val typography = ChatyTypography.apply(MaterialTheme.typography, appearance.typographyStyle, fontPrefs.fontStyle, customFamily)
     MaterialTheme(colorScheme = MaterialTheme.colorScheme, typography = typography, shapes = MaterialTheme.shapes) {
         ChatyTextScaleProvider(appearance.textScale, content)
     }

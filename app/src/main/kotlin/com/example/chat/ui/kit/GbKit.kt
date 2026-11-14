@@ -206,7 +206,7 @@ fun ChatyColorPickerModal(
                         val fixed = ColorPickerLogic.autoFix(bg, colorToArgb(colors.foreground), colorToArgb(colors.onPrimary))
                         color = fixed; hex = ColorPickerLogic.toHex(fixed)
                     }) {
-                        Icon(Icons.Rounded.AutoFixHigh, null, tint = colors.primary, modifier = Modifier.size(16.dp))
+                        Icon(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.autoAwesome), null, tint = colors.primary, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Auto Fix Contrast", fontSize = 12.sp, color = colors.primary)
                     }

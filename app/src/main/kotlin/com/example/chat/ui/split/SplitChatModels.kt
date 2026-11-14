@@ -34,6 +34,7 @@ data class SplitChatSessionState(
     val paneItems: List<SplitPaneItem> = emptyList(),
     val focusedConversationId: String? = null,
     val isMiniWindowMinimized: Boolean = false,
+    val freeLayout: Boolean = false,
 ) {
     val count: Int get() = paneItems.size
     val isActive: Boolean get() = paneItems.isNotEmpty()
@@ -48,6 +49,7 @@ data class SplitChatSessionState(
                     putBooleanArray("isGroups", value.paneItems.map { it.isGroup }.toBooleanArray())
                     putString("focusedId", value.focusedConversationId)
                     putBoolean("isMinimized", value.isMiniWindowMinimized)
+                    putBoolean("freeLayout", value.freeLayout)
                 }
             }
 
@@ -70,9 +72,41 @@ data class SplitChatSessionState(
                     paneItems = items.take(4),
                     focusedConversationId = focused ?: items.firstOrNull()?.conversationId,
                     isMiniWindowMinimized = minimized,
+                    freeLayout = value.getBoolean("freeLayout", false),
                 )
             }
         }
     }
 }
 
+
+/** Reorders only within this session; never changes the owning account or chat ID. */
+fun SplitChatSessionState.reordered(conversationId: String, direction: Int): SplitChatSessionState {
+    val from = paneItems.indexOfFirst { it.conversationId == conversationId }
+    if (from < 0 || direction == 0) return this
+    val to = (from + if (direction > 0) 1 else -1).coerceIn(0, paneItems.lastIndex)
+    if (from == to) return this
+    val items = paneItems.toMutableList()
+    val moving = items.removeAt(from)
+    items.add(to, moving)
+    return copy(paneItems = items, focusedConversationId = conversationId)
+}
+
+/** Length-prefix the account so opaque account/room IDs cannot collide at delimiters. */
+fun SplitPaneItem.stateKey(): String {
+    val account = accountNamespace.orEmpty()
+    return "${account.length}:$account$conversationId"
+}
+
+/** Restored pane state is presentation data, never permission to mount another account's room. */
+fun SplitChatSessionState.forAccount(account: String?): SplitChatSessionState {
+    if (account.isNullOrBlank()) return SplitChatSessionState()
+    val matching = paneItems.filter { it.accountNamespace == account }
+    if (matching.size == paneItems.size) return this
+    if (matching.isEmpty()) return SplitChatSessionState()
+    return copy(
+        paneItems = matching,
+        focusedConversationId = focusedConversationId?.takeIf { id -> matching.any { it.conversationId == id } }
+            ?: matching.first().conversationId,
+    )
+}

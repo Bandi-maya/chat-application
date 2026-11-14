@@ -140,7 +140,7 @@ fun NotificationToastSettingsScreen(preferences: ChatyPreferencesController, onB
                         onChanged = { preferences.updateToasts(preferences.toasts.copy(onlineToastWithProfilePicture = it)) },
                     )
                     GbSwitchTile(
-                        icon = Icons.Rounded.FilterNone, title = "Elevation", subtitle = if (p.onlineElevation) "Enabled" else "Disabled", value = p.onlineElevation,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.layers), title = "Elevation", subtitle = if (p.onlineElevation) "Enabled" else "Disabled", value = p.onlineElevation,
                         onChanged = { preferences.updateToasts(preferences.toasts.copy(onlineToastElevation = it)) },
                     )
                     GbSliderTile(

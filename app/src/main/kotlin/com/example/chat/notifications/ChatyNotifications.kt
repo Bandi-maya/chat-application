@@ -184,6 +184,42 @@ object ChatyNotifications {
         try { NotificationManagerCompat.from(context).notify(roomId, roomId.hashCode(), notification) } catch (_: SecurityException) {}
     }
 
+    // Inactive alerts contain no peer, room, message text or call action.
+    const val ACTION_OPEN_ACCOUNTS = "com.example.chat.action.OPEN_ACCOUNTS"
+    val pendingAccountAlert = MutableStateFlow<String?>(null)
+    fun cancelInactiveAccountMessage(context: Context, accountHash: String) {
+        NotificationManagerCompat.from(context).cancel("inactive:$accountHash", 1)
+    }
+    fun showInactiveAccountMessage(context: Context, accountHash: String, label: String): Boolean {
+        if (!canPost(context) || !NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
+        ChatyNotificationPoster.ensureChannels(context)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = context.getSystemService(NotificationManager::class.java)
+                ?.getNotificationChannel(ChatyNotificationPolicy.CH_MESSAGES) ?: return false
+            if (channel.importance == NotificationManager.IMPORTANCE_NONE) return false
+        }
+        val open = Intent(context, MainActivity::class.java).apply {
+            action = ACTION_OPEN_ACCOUNTS
+            putExtra("account_hash", accountHash)
+            data = android.net.Uri.Builder().scheme("chaty").authority("accounts").appendPath(accountHash).build()
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val public = NotificationCompat.Builder(context, ChatyNotificationPolicy.CH_MESSAGES)
+            .setSmallIcon(android.R.drawable.stat_notify_chat).setContentTitle("New message")
+            .setContentText("You received a new message").build()
+        val notification = NotificationCompat.Builder(context, ChatyNotificationPolicy.CH_MESSAGES)
+            .setSmallIcon(android.R.drawable.stat_notify_chat).setContentTitle("New message")
+            .setContentText("You received a new message").setSubText(label)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE).setPublicVersion(public)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE).setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true).setOnlyAlertOnce(true)
+            .setContentIntent(PendingIntent.getActivity(context, accountHash.hashCode(), open, flags())).build()
+        return try {
+            NotificationManagerCompat.from(context).notify("inactive:$accountHash", 1, notification)
+            true
+        } catch (_: SecurityException) { false }
+    }
+
     /** The chat was opened / read on this device: drop its notification. */
     fun cancelMessages(context: Context, roomId: String) {
         synchronized(linesByRoom) { linesByRoom.remove(roomId) }

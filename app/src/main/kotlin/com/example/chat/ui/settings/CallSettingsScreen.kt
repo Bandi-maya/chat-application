@@ -110,7 +110,7 @@ fun CallSettingsScreen(
         ChatySettingsSection("Audio & Connectivity") {
             ChatySettingsTile(title = "Dual-Speaker & Output Routing", icon = Icons.Rounded.SpeakerGroup, iconColor = colors.accent, subtitle = "Configure receiver, bottom speaker, and capability routing", trailing = { com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.chevronRight, semanticLabel = null, color = colors.foregroundSecondary) }, onTap = onOpenAudioSettings)
             ChatySettingsRowDivider()
-            ChatySwitchTile(title = "Low Data Usage for Calls", icon = Icons.Rounded.SpeakerPhone, iconColor = colors.success, subtitle = "Optimize WebRTC bandwidth consumption on cellular connections.", value = call.lowDataUsageEnabled, onChanged = onLowData)
+            ChatySwitchTile(title = "Low Data Usage for Calls", icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.callDataSaver), iconColor = colors.success, subtitle = "Optimize WebRTC bandwidth consumption on cellular connections.", value = call.lowDataUsageEnabled, onChanged = onLowData)
         }
     }
 

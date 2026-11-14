@@ -160,7 +160,7 @@ fun HomeFabSettingsScreen(preferences: ChatyPreferencesController, onBack: () ->
                         onChanged = { preferences.updateHome(preferences.home.copy(hideFab = it)) },
                     )
                     GbSettingRow(
-                        icon = Icons.Rounded.Lens, title = "Fab normal", subtitle = "Change Color of Fab Normal", colorValue = p.fabNormalColor,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.fabChat), title = "Fab normal", subtitle = "Change Color of Fab Normal", colorValue = p.fabNormalColor,
                         onColorTap = { pickColor("Fab Normal Color", p.fabNormalColor) { c -> preferences.updateHome(preferences.home.copy(fabNormalColor = c)) } },
                     )
                     GbSettingRow(

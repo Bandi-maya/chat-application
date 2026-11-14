@@ -20,7 +20,7 @@ class ApiEncryptedAttachmentClient(
     private val baseUrl: () -> String,
     private val tenantId: () -> String,
     private val token: suspend () -> String?,
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient = com.example.chat.data.api.ChatyOkHttp.shared,
 ) {
     data class UploadResult(val attachmentId: String, val sizeBytes: Long)
 

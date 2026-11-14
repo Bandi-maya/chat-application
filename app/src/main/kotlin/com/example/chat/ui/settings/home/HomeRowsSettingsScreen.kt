@@ -165,7 +165,7 @@ fun HomeRowsSettingsScreen(preferences: ChatyPreferencesController, onBack: () -
                         onColorTap = { pickColor("Unread Counter Text Color", p.unreadCounterTextColor) { c -> preferences.updateHome(preferences.home.copy(unreadCounterTextColor = c)) } },
                     )
                     GbSettingRow(
-                        icon = Icons.Rounded.WifiTethering, title = "Contact Online Color", subtitle = "Change Color of Online in Main Screen", colorValue = p.contactOnlineColor,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.onlineRing), title = "Contact Online Color", subtitle = "Change Color of Online in Main Screen", colorValue = p.contactOnlineColor,
                         onColorTap = { pickColor("Contact Online Color", p.contactOnlineColor) { c -> preferences.updateHome(preferences.home.copy(contactOnlineColor = c)) } },
                     )
                     GbSettingRow(
@@ -177,7 +177,7 @@ fun HomeRowsSettingsScreen(preferences: ChatyPreferencesController, onBack: () -
                         onColorTap = { pickColor("Mention Indicator Background", p.mentionIndicatorBgColor) { c -> preferences.updateHome(preferences.home.copy(mentionIndicatorBgColor = c)) } },
                     )
                     GbSettingRow(
-                        icon = Icons.Rounded.Tag, title = "Mention Icon Color", subtitle = "Change icon color for @ mention indicator", colorValue = p.mentionIconColor,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.atSign), title = "Mention Icon Color", subtitle = "Change icon color for @ mention indicator", colorValue = p.mentionIconColor,
                         onColorTap = { pickColor("Mention Icon Color", p.mentionIconColor) { c -> preferences.updateHome(preferences.home.copy(mentionIconColor = c)) } },
                     )
                 }
@@ -202,7 +202,7 @@ fun HomeRowsSettingsScreen(preferences: ChatyPreferencesController, onBack: () -
                         onChanged = { preferences.updateHome(preferences.home.copy(disableOnlineDot = it)) },
                     )
                     GbSettingRow(
-                        icon = Icons.Rounded.Circle, title = "Online Dot Color", subtitle = "Change the online indicator dot color", colorValue = p.onlineDotColor,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.presenceDot), title = "Online Dot Color", subtitle = "Change the online indicator dot color", colorValue = p.onlineDotColor,
                         onColorTap = { pickColor("Online Dot Color", p.onlineDotColor) { c -> preferences.updateHome(preferences.home.copy(onlineDotColor = c)) } },
                     )
                     GbSwitchTile(

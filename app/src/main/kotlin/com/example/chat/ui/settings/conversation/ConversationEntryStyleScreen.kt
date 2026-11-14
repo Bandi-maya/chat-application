@@ -191,7 +191,7 @@ fun ConversationEntryStyleScreen(preferences: ChatyPreferencesController, onBack
                     onColorTap = { pickColor("Entry Background Color", p.uiEntryBackgroundColor) { c -> preferences.updateConversation(preferences.conversation.copy(uiEntryBackgroundColor = c)) } },
                 )
                 GbSettingRow(
-                    icon = Icons.Rounded.SmartButton, title = "Conversation UI Buttons Color", subtitle = "Change the Color of the Entry icons",
+                    icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.toggle), title = "Conversation UI Buttons Color", subtitle = "Change the Color of the Entry icons",
                     colorValue = p.uiButtonsColor,
                     onColorTap = { pickColor("UI Buttons Color", p.uiButtonsColor) { c -> preferences.updateConversation(preferences.conversation.copy(uiButtonsColor = c)) } },
                 )
@@ -206,7 +206,7 @@ fun ConversationEntryStyleScreen(preferences: ChatyPreferencesController, onBack
                     onColorTap = { pickColor("Send Button Color", p.sendButtonColor) { c -> preferences.updateConversation(preferences.conversation.copy(sendButtonColor = c)) } },
                 )
                 GbSettingRow(
-                    icon = Icons.Rounded.RadioButtonChecked, title = "Mic/Send Background circle", subtitle = "Change the color of the circle behind Send/Mic",
+                    icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.radioOn), title = "Mic/Send Background circle", subtitle = "Change the color of the circle behind Send/Mic",
                     colorValue = p.micSendBgCircleColor,
                     onColorTap = { pickColor("Mic/Send Circle Color", p.micSendBgCircleColor) { c -> preferences.updateConversation(preferences.conversation.copy(micSendBgCircleColor = c)) } },
                 )
@@ -271,7 +271,7 @@ private fun EntryStylePreview(style: String, pc: EntryPreviewColors) {
     ) {
         for (k in 0 until n) {
             if (k == 0) com.example.chat.ui.icons.ChatyIcon(com.example.chat.ui.icons.ChatyIconId.emoji, semanticLabel = null, color = pc.emoji, modifier = Modifier.size(16.dp))
-            else Icon(Icons.Rounded.Circle, null, tint = pc.buttons.copy(alpha = 0.7f), modifier = Modifier.size(5.dp))
+            else Icon(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.presenceDot), null, tint = pc.buttons.copy(alpha = 0.7f), modifier = Modifier.size(5.dp))
         }
     }
 

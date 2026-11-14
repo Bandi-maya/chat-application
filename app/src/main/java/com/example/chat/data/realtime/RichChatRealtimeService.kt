@@ -71,12 +71,25 @@ interface RealtimePreferences {
     val ghostMode: Boolean
     fun gbBool(key: String, fallback: Boolean = false): Boolean
     fun gbColorArgb(key: String): Long?
+
+    /** Per-contact popup override, keyed by contact user id (null = follow
+     *  the global toggles). Account-scoped in NotificationPreferences. */
+    fun contactEventAlertOverride(userId: String): com.example.chat.domain.models.ContactEventAlertOverride?
 }
 
 /** Seam over ChatyBackendService.getUserById / conversations lookup. */
 interface RealtimeBackend {
     fun getUserById(userId: String): UserProfile?
     fun isConversationMuted(conversationId: String): Boolean
+
+    /** Direct (1:1) conversation id for a contact user, null when no loaded
+     *  direct conversation exists. Used to apply per-chat popup guards to
+     *  user-scoped events such as contact-online. */
+    fun directConversationIdForUser(userId: String): String?
+
+    /** Locked/hidden chats never produce event popups (same rule as the
+     *  native bubble and the island's private-chat hiding). */
+    fun isConversationProtected(conversationId: String): Boolean
 }
 
 /**
@@ -271,21 +284,128 @@ class RichChatRealtimeService(
         }
         if (emitNotification &&
             previous == PresenceState.offline &&
-            next == PresenceState.online &&
-            (preferences.notifyContactOnline || preferences.gbBool("abu_saleh_toast_online"))
+            next == PresenceState.online
         ) {
-            val profile = backend.getUserById(userId)
-            notifications.triggerEventNotification(
-                title = "${profile?.displayName ?: "Contact"} is online",
-                body = "Now active in Chaty",
-                icon = EventNotificationIcon.onlinePrediction,
-                colorArgb = preferences.gbColorArgb("abu_saleh_toast_online_bc") ?: 0xFF69F0AE,
-                textColorArgb = preferences.gbColorArgb("abu_saleh_toast_online_tc"),
-                userId = userId,
-                avatarInitials = profile?.avatarInitials,
-                avatarColorHex = profile?.avatarColorHex,
-            )
+            fireOnlineToastIfAllowed(userId)
         }
+    }
+
+    /** Live presence event from the backend socket (api plane). Applies the
+     *  same state tracking and popup gating as the postgres-changes path, so
+     *  the contact-online toast works on the live backend too. */
+    fun onLivePresenceChanged(userId: String, online: Boolean) {
+        if (userId.isEmpty() || userId == currentUserId()) return
+        val previous = synchronized(lock) { presenceByUserId[userId] } ?: PresenceState.offline
+        val next = if (online) PresenceState.online else PresenceState.offline
+        synchronized(lock) { presenceByUserId[userId] = next }
+        if (previous == PresenceState.offline && next == PresenceState.online) {
+            fireOnlineToastIfAllowed(userId)
+        }
+    }
+
+    /** Live typing event from the backend socket (api plane). Only the start
+     *  edge fires a popup; a missed stop event just dedupes repeats. The
+     *  socket has no inbound recording event yet, so recording toasts stay
+     *  gated behind the postgres path and fail closed here. */
+    fun onLiveTypingChanged(conversationId: String, userId: String, isTyping: Boolean) {
+        if (conversationId.isEmpty() || userId.isEmpty() || userId == currentUserId()) return
+        val key = "$conversationId:$userId"
+        val previous = synchronized(lock) { activityByConversationAndUser[key] }
+        if (isTyping) {
+            synchronized(lock) {
+                activityByConversationAndUser[key] = ContactActivityState(
+                    isTyping = true,
+                    isRecording = previous?.isRecording == true,
+                    updatedAt = Instant.now(),
+                )
+            }
+        } else if (previous != null) {
+            synchronized(lock) {
+                if (previous.isRecording) {
+                    activityByConversationAndUser[key] =
+                        previous.copy(isTyping = false, updatedAt = Instant.now())
+                } else {
+                    activityByConversationAndUser.remove(key)
+                }
+            }
+        }
+        if (isTyping && previous?.isTyping != true) {
+            fireTypingToastIfAllowed(conversationId, userId)
+        }
+    }
+
+    private fun fireOnlineToastIfAllowed(userId: String) {
+        // Online is a user-scoped event; apply the guards of that contact's
+        // direct conversation when one is loaded.
+        val conversationId = backend.directConversationIdForUser(userId)
+        val allow = ContactEventAlertPolicy.shouldPopup(
+            globalEventEnabled = preferences.notifyContactOnline ||
+                preferences.gbBool("abu_saleh_toast_online"),
+            contactOverride = preferences.contactEventAlertOverride(userId),
+            kind = ContactEventKind.ONLINE,
+            conversationProtected = conversationId?.let { backend.isConversationProtected(it) } == true,
+            conversationMuted = conversationId?.let { backend.isConversationMuted(it) } == true,
+            conversationOpen = conversationId != null && conversationId == activeConversationId,
+        )
+        if (!allow) return
+        val profile = backend.getUserById(userId)
+        notifications.triggerEventNotification(
+            title = "${profile?.displayName ?: "Contact"} is online",
+            body = "Now active in Chaty",
+            icon = EventNotificationIcon.onlinePrediction,
+            colorArgb = preferences.gbColorArgb("abu_saleh_toast_online_bc") ?: 0xFF69F0AE,
+            textColorArgb = preferences.gbColorArgb("abu_saleh_toast_online_tc"),
+            userId = userId,
+            avatarInitials = profile?.avatarInitials,
+            avatarColorHex = profile?.avatarColorHex,
+        )
+    }
+
+    private fun fireTypingToastIfAllowed(conversationId: String, userId: String) {
+        val allow = ContactEventAlertPolicy.shouldPopup(
+            globalEventEnabled = preferences.notifyTypingStarted ||
+                preferences.gbBool("abu_saleh_toast_typing"),
+            contactOverride = preferences.contactEventAlertOverride(userId),
+            kind = ContactEventKind.TYPING,
+            conversationProtected = backend.isConversationProtected(conversationId),
+            conversationMuted = backend.isConversationMuted(conversationId),
+            conversationOpen = conversationId == activeConversationId,
+        )
+        if (!allow) return
+        val profile = backend.getUserById(userId)
+        notifications.triggerEventNotification(
+            title = "${profile?.displayName ?: "Contact"} is typing",
+            body = "Typing in a conversation",
+            icon = EventNotificationIcon.keyboardAlt,
+            colorArgb = preferences.gbColorArgb("abu_saleh_toast_typing_bc") ?: 0xFF448AFF,
+            textColorArgb = preferences.gbColorArgb("abu_saleh_toast_typing_tc"),
+            userId = userId,
+            avatarInitials = profile?.avatarInitials,
+            avatarColorHex = profile?.avatarColorHex,
+        )
+    }
+
+    private fun fireRecordingToastIfAllowed(conversationId: String, userId: String) {
+        val allow = ContactEventAlertPolicy.shouldPopup(
+            globalEventEnabled = preferences.gbBool("notify_recording_started", fallback = true),
+            contactOverride = preferences.contactEventAlertOverride(userId),
+            kind = ContactEventKind.RECORDING,
+            conversationProtected = backend.isConversationProtected(conversationId),
+            conversationMuted = backend.isConversationMuted(conversationId),
+            conversationOpen = conversationId == activeConversationId,
+        )
+        if (!allow) return
+        val profile = backend.getUserById(userId)
+        notifications.triggerEventNotification(
+            title = "${profile?.displayName ?: "Contact"} is recording",
+            body = "Recording a voice message",
+            icon = EventNotificationIcon.micNone,
+            colorArgb = 0xFFFF5252,
+            textColorArgb = null,
+            userId = userId,
+            avatarInitials = profile?.avatarInitials,
+            avatarColorHex = profile?.avatarColorHex,
+        )
     }
 
     private suspend fun loadActivity(conversationId: String, emitNotifications: Boolean) {
@@ -320,38 +440,11 @@ class RichChatRealtimeService(
         }
         synchronized(lock) { activityByConversationAndUser[key] = next }
 
-        val profile = backend.getUserById(userId)
-        if (emitNotification &&
-            next.isTyping &&
-            previous?.isTyping != true &&
-            (preferences.notifyTypingStarted || preferences.gbBool("abu_saleh_toast_typing"))
-        ) {
-            notifications.triggerEventNotification(
-                title = "${profile?.displayName ?: "Contact"} is typing",
-                body = "Typing in a conversation",
-                icon = EventNotificationIcon.keyboardAlt,
-                colorArgb = preferences.gbColorArgb("abu_saleh_toast_typing_bc") ?: 0xFF448AFF,
-                textColorArgb = preferences.gbColorArgb("abu_saleh_toast_typing_tc"),
-                userId = userId,
-                avatarInitials = profile?.avatarInitials,
-                avatarColorHex = profile?.avatarColorHex,
-            )
+        if (emitNotification && next.isTyping && previous?.isTyping != true) {
+            fireTypingToastIfAllowed(conversationId, userId)
         }
-        if (emitNotification &&
-            next.isRecording &&
-            previous?.isRecording != true &&
-            preferences.gbBool("notify_recording_started", fallback = true)
-        ) {
-            notifications.triggerEventNotification(
-                title = "${profile?.displayName ?: "Contact"} is recording",
-                body = "Recording a voice message",
-                icon = EventNotificationIcon.micNone,
-                colorArgb = 0xFFFF5252,
-                textColorArgb = null,
-                userId = userId,
-                avatarInitials = profile?.avatarInitials,
-                avatarColorHex = profile?.avatarColorHex,
-            )
+        if (emitNotification && next.isRecording && previous?.isRecording != true) {
+            fireRecordingToastIfAllowed(conversationId, userId)
         }
         return key
     }

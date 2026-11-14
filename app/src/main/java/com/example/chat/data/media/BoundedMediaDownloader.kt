@@ -14,7 +14,7 @@ import okhttp3.Request
  * URL, no cookies/headers added. Call from an IO dispatcher.
  */
 class BoundedMediaDownloader(
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient = com.example.chat.data.api.ChatyOkHttp.shared,
     private val maxBytes: Long,
 ) {
     fun open(url: String, onProgress: ((transferred: Long, total: Long?) -> Unit)? = null): InputStream {

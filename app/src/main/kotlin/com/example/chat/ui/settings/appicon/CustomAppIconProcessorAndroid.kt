@@ -31,7 +31,12 @@ class AndroidCustomIconProcessor(
         withContext(Dispatchers.IO) {
             require(sourcePng.isNotEmpty()) { "Custom icon data is empty." }
 
-            val source = BitmapFactory.decodeByteArray(sourcePng, 0, sourcePng.size)
+            // Output is OUTPUT_SIZE px, so decode sampled instead of full-res:
+            // a user-picked photo can be tens of MP (~200 MB of heap) for a
+            // 512 px icon. Keep the short edge at or above 2x OUTPUT_SIZE so
+            // the center-crop downscale keeps its quality headroom.
+            val source = com.example.chat.ui.core.system.SampledBitmapDecoder
+                .decodeShortEdge(sourcePng, OUTPUT_SIZE * 2)
                 ?: throw IllegalStateException("Unable to decode custom icon image.")
             try {
                 val sourceWidth = source.width

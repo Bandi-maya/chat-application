@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="ReactionAdd"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M10.75,3.5C7.673,3.505,4.934,5.451,3.918,8.356C2.901,11.26,3.829,14.49,6.232,16.412C8.635,18.334,11.99,18.53,14.6,16.9" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M7.9,9.6L7.9,10.1M13.6,9.6L13.6,10.1" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M7.4,12.9C9.633,14.7,11.867,14.7,14.1,12.9" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M17.75,13.65C20.014,13.65,21.85,15.486,21.85,17.75C21.85,20.014,20.014,21.85,17.75,21.85C15.486,21.85,13.65,20.014,13.65,17.75C13.65,15.486,15.486,13.65,17.75,13.65" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M17.75,16.1L17.75,19.4M16.1,17.75L19.4,17.75" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

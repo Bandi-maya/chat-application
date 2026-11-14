@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AccountSwitcherHost(
     open: Boolean,
+    startInManage: Boolean = false,
     onDismiss: () -> Unit,
     theme: ThemeConfig,
     gate: GatePrompts,
@@ -74,8 +75,49 @@ fun AccountSwitcherHost(
     var isSwitching by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var addingAccount by rememberSaveable { mutableStateOf(false) }
+    // Recents-style card view first; the classic overlay is the "Manage accounts" destination.
     var reauthIdentifier by rememberSaveable { mutableStateOf("") }
     var reauthWorkspace by rememberSaveable { mutableStateOf<String?>(null) }
+    var manageMode by rememberSaveable { mutableStateOf(startInManage) }
+    LaunchedEffect(open) { if (open) manageMode = startInManage }
+
+    fun startAddAccount() {
+        reauthIdentifier = ""
+        reauthWorkspace = null
+        errorMessage = null
+        addingAccount = true
+    }
+
+    fun selectAccount(target: ApiRegisteredAccountMeta) {
+        if (isSwitching) return
+        scope.launch {
+            isSwitching = true
+            errorMessage = null
+            try {
+                when (val result = api.switchToAccount(target.accountKey)) {
+                    is ApiBackendService.AccountSwitchResult.Switched -> {
+                        onSwitchedAccount()
+                        onDismiss()
+                    }
+                    is ApiBackendService.AccountSwitchResult.AlreadyActive -> {
+                        onDismiss()
+                    }
+                    is ApiBackendService.AccountSwitchResult.SessionExpired -> {
+                        errorMessage = result.message
+                        reloadSnapshot()
+                    }
+                    is ApiBackendService.AccountSwitchResult.Failed -> {
+                        errorMessage = result.message
+                        reloadSnapshot()
+                    }
+                }
+            } catch (e: Exception) {
+                errorMessage = e.message ?: "Unable to switch accounts."
+            } finally {
+                isSwitching = false
+            }
+        }
+    }
 
     fun resolveConversationForActiveAccount(summary: AccountRecentChatSummary): Conversation {
         val existing = api.conversations.firstOrNull { it.id == summary.conversationId }
@@ -95,8 +137,22 @@ fun AccountSwitcherHost(
         )
     }
 
+    AccountRecentsOverlay(
+        visible = open && !addingAccount && !manageMode,
+        accounts = accounts,
+        activeAccountKey = activeKey,
+        recentByAccount = recentByAccount,
+        theme = theme,
+        isSwitching = isSwitching,
+        errorMessage = errorMessage,
+        onSelectAccount = { target -> selectAccount(target) },
+        onAddAccount = { startAddAccount() },
+        onManageAccounts = { manageMode = true },
+        onDismiss = onDismiss,
+    )
+
     AccountSwitcherOverlay(
-        visible = open && !addingAccount,
+        visible = open && !addingAccount && manageMode,
         accounts = accounts,
         activeAccountKey = activeKey,
         recentByAccount = recentByAccount,
@@ -106,42 +162,8 @@ fun AccountSwitcherHost(
         isSwitching = isSwitching,
         errorMessage = errorMessage,
         onDismissError = { errorMessage = null },
-        onSelectAccount = { target ->
-            if (isSwitching) return@AccountSwitcherOverlay
-            scope.launch {
-                isSwitching = true
-                errorMessage = null
-                try {
-                    when (val result = api.switchToAccount(target.accountKey)) {
-                        is ApiBackendService.AccountSwitchResult.Switched -> {
-                            onSwitchedAccount()
-                            onDismiss()
-                        }
-                        is ApiBackendService.AccountSwitchResult.AlreadyActive -> {
-                            onDismiss()
-                        }
-                        is ApiBackendService.AccountSwitchResult.SessionExpired -> {
-                            errorMessage = result.message
-                            reloadSnapshot()
-                        }
-                        is ApiBackendService.AccountSwitchResult.Failed -> {
-                            errorMessage = result.message
-                            reloadSnapshot()
-                        }
-                    }
-                } catch (e: Exception) {
-                    errorMessage = e.message ?: "Unable to switch accounts."
-                } finally {
-                    isSwitching = false
-                }
-            }
-        },
-        onAddAccount = {
-            reauthIdentifier = ""
-            reauthWorkspace = null
-            errorMessage = null
-            addingAccount = true
-        },
+        onSelectAccount = { target -> selectAccount(target) },
+        onAddAccount = { startAddAccount() },
         onReauthenticateAccount = { meta ->
             reauthIdentifier = meta.username
             reauthWorkspace = if (meta.isDefaultTenant) null else meta.tenantId

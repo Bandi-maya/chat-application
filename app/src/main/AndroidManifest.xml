@@ -85,6 +85,17 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- Native conversation bubbles: OS/user opt-in, no overlay service. -->
+        <activity
+            android:name=".bubbles.ChatBubbleActivity"
+            android:exported="false"
+            android:allowEmbedded="true"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always"
+            android:excludeFromRecents="true"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Chaty" />
+
         <!-- Launcher icon variants: all disabled by default, MainActivity stays the installed (bird) launcher entry. -->
         <activity-alias
             android:name=".launcher.WarmIconAlias"

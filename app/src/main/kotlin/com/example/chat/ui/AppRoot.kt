@@ -1,5 +1,7 @@
 package com.example.chat.ui
 
+import com.example.chat.ui.split.forAccount
+
 import com.example.chat.ReleaseFeatures
 
 import com.example.chat.ui.core.system.ChatySystemBarScrims
@@ -99,6 +101,14 @@ fun AppRoot() {
     // including the unauthenticated auth flow; explicitly chosen/custom themes stay
     // protected by the controller's followSystem guard.
     com.example.chat.ui.theme.SyncChatySystemTheme(themeController, themeRevision)
+    // Security Center's "Protect Screen & App Previews" switch had no consumer:
+    // apply it app-wide through the same reference-counted FLAG_SECURE lease
+    // locked chats and the vault use, so it composes with per-window
+    // protection instead of fighting it. The themeRevision subscription above
+    // re-reads the pref on every preferences mutation.
+    com.example.chat.ui.kit.ProtectSensitiveWindow(
+        ServiceLocator.preferencesController.security.protectFromScreenshots,
+    )
     // Dart main.dart:725 GbThemeOverrides.resolve(themeController.globalTheme, prefs).
     val resolvedTheme = com.example.chat.ui.theme.GbThemeOverrides.resolve(
         themeController.globalTheme, ServiceLocator.preferencesController,
@@ -143,6 +153,7 @@ fun AppRoot() {
         // carried to the new-password screen because the server only validates
         // it at auth/reset-password.
         var otpEmail by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+        var otpDeliveryMessage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
         var otpPurposeVerify by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(true) }
         var otpOrigin by remember { mutableStateOf(AuthRoute.ForgotPassword) }
         var resetCode by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
@@ -388,6 +399,7 @@ fun AppRoot() {
                     // The registration already sent a verification code: land
                     // on the OTP screen (skippable — verification is a nudge,
                     // not a gate, per the locked OTP defaults).
+                    otpDeliveryMessage = ServiceLocator.apiBackend.registrationVerificationMessage
                     otpEmail = pendingRegisterEmail
                     otpPurposeVerify = true
                     otpOrigin = AuthRoute.Register
@@ -425,6 +437,7 @@ fun AppRoot() {
                 // (it is, in locator) over the Supabase path.
                 sendRecovery = { email -> ServiceLocator.apiBackend.forgotPassword(email) },
                 onSent = { email ->
+                    otpDeliveryMessage = null
                     otpEmail = email
                     otpPurposeVerify = false
                     otpOrigin = AuthRoute.ForgotPassword
@@ -435,6 +448,7 @@ fun AppRoot() {
         val otpScreen: @Composable () -> Unit = {
             com.example.chat.ui.auth.OtpVerificationScreen(
                 email = otpEmail,
+                deliveryMessage = otpDeliveryMessage,
                 purpose = if (otpPurposeVerify) com.example.chat.ui.auth.OtpPurpose.VerifyEmail
                     else com.example.chat.ui.auth.OtpPurpose.ResetPassword,
                 onBack = { route = otpOrigin },
@@ -672,7 +686,18 @@ fun AppRoot() {
                 var pushedNetworkUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var pushedDataUsage by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                 var accountSwitcherOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-                var splitChatState by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = com.example.chat.ui.split.SplitChatSessionState.Saver) {
+                var accountRecentsOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                val inactiveAccountAlert by com.example.chat.notifications.ChatyNotifications.pendingAccountAlert.collectAsState()
+                androidx.compose.runtime.LaunchedEffect(inactiveAccountAlert, lockRequired) {
+                    val hash = inactiveAccountAlert ?: return@LaunchedEffect
+                    if (lockRequired) return@LaunchedEffect
+                    if (ServiceLocator.apiBackend.multiAccount.accounts().any { it.accountHash == hash }) {
+                        // Existing account picker only. User chooses whether to switch.
+                        accountSwitcherOpen = true
+                    }
+                    com.example.chat.notifications.ChatyNotifications.pendingAccountAlert.value = null
+                }
+                var splitChatState by androidx.compose.runtime.saveable.rememberSaveable(ServiceLocator.apiBackend.currentAccountKey(), stateSaver = com.example.chat.ui.split.SplitChatSessionState.Saver) {
                     mutableStateOf(com.example.chat.ui.split.SplitChatSessionState())
                 }
                 val settingsNavigate: (com.example.chat.ui.settings.SettingsDestination) -> Unit = { dest ->
@@ -865,7 +890,7 @@ fun AppRoot() {
                             },
                             onSearch = { route = AuthRoute.GlobalSearch },
                             onSettings = { pushedSettings = true },
-                            onAccountSwitcher = { accountSwitcherOpen = true },
+                            onAccountSwitcher = { accountRecentsOpen = true },
                         )
                     },
                     colors = shellColors,
@@ -1044,7 +1069,14 @@ fun AppRoot() {
                     onOpenSecurity = { route = AuthRoute.Security },
                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
                     onOpenSettings = { pushedSettings = true },
-                    onOpenAccountSwitcher = { accountSwitcherOpen = true },
+                    onOpenAccountSwitcher = { accountRecentsOpen = true },
+                    onVerifyEmail = { address, message ->
+                        otpEmail = address
+                        otpDeliveryMessage = message
+                        otpPurposeVerify = true
+                        otpOrigin = AuthRoute.Home
+                        route = AuthRoute.OtpVerification
+                    },
                     onOpenSplitChat = { chats ->
                         val items = chats.take(4).map { c ->
                             com.example.chat.ui.split.SplitPaneItem(
@@ -1102,7 +1134,14 @@ fun AppRoot() {
                                     onOpenSecurity = { route = AuthRoute.Security },
                                     onOpenLockedChats = { route = AuthRoute.HiddenVault },
                                     onOpenSettings = { pushedSettings = true },
-                                    onOpenAccountSwitcher = { accountSwitcherOpen = true },
+                                    onOpenAccountSwitcher = { accountRecentsOpen = true },
+                                    onVerifyEmail = { address, message ->
+                                        otpEmail = address
+                                        otpDeliveryMessage = message
+                                        otpPurposeVerify = true
+                                        otpOrigin = AuthRoute.Home
+                                        route = AuthRoute.OtpVerification
+                                    },
                                     onOpenSplitChat = { chats ->
                                         val items = chats.take(4).map { c ->
                                             com.example.chat.ui.split.SplitPaneItem(
@@ -1587,13 +1626,18 @@ fun AppRoot() {
                     )
                 }
                 com.example.chat.ui.accounts.AccountSwitcherHost(
-                    open = accountSwitcherOpen,
-                    onDismiss = { accountSwitcherOpen = false },
+                    open = accountSwitcherOpen || accountRecentsOpen,
+                    startInManage = accountSwitcherOpen,
+                    onDismiss = {
+                        accountSwitcherOpen = false
+                        accountRecentsOpen = false
+                    },
                     theme = resolvedTheme,
                     gate = gate,
                     refreshRevision = chatRevision + authRevision,
                     onOpenSettings = {
                         accountSwitcherOpen = false
+                        accountRecentsOpen = false
                         pushedSettings = true
                     },
                     onSwitchedAccount = {
@@ -1624,9 +1668,14 @@ fun AppRoot() {
                     },
                     onToast = shellToast,
                 )
+                val splitAccount = ServiceLocator.apiBackend.currentAccountKey()
+                val scopedSplitChatState = splitChatState.forAccount(splitAccount)
+                androidx.compose.runtime.LaunchedEffect(splitAccount, splitChatState) {
+                    if (splitChatState != scopedSplitChatState) splitChatState = scopedSplitChatState
+                }
                 com.example.chat.ui.split.SplitChatWorkspace(
-                    sessionState = splitChatState,
-                    onUpdateSessionState = { splitChatState = it },
+                    sessionState = scopedSplitChatState,
+                    onUpdateSessionState = { splitChatState = it.forAccount(ServiceLocator.apiBackend.currentAccountKey()) },
                     onClosePane = { id ->
                         val remaining = splitChatState.paneItems.filter { it.conversationId != id }
                         splitChatState = splitChatState.copy(
@@ -1741,35 +1790,61 @@ fun AppRoot() {
             AuthRoute.GlobalSearch -> {
                 val repoS = ServiceLocator.conversationsRepository
                 val prefsS = ServiceLocator.preferencesController
+                val searchApi = ServiceLocator.apiBackend
+                val searchAccount = searchApi.authSnapshot()
+                val searchVault = ServiceLocator.hiddenVaultController
+                var searchPrivacyRevision by remember { mutableIntStateOf(0) }
+                androidx.compose.runtime.DisposableEffect(prefsS, searchVault) {
+                    val changed: () -> Unit = { searchPrivacyRevision++ }
+                    prefsS.addListener(changed)
+                    searchVault.addListener(changed)
+                    onDispose { prefsS.removeListener(changed); searchVault.removeListener(changed) }
+                }
+                @Suppress("UNUSED_EXPRESSION") searchPrivacyRevision
                 val searchSnackbar = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
                 val searchScope = androidx.compose.runtime.rememberCoroutineScope()
                 androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                androidx.compose.runtime.key(searchAccount) {
                 com.example.chat.ui.search.GlobalSearchScreen(
+                    searchSessionIdentity = searchAccount,
+                    isSearchSessionCurrent = { searchApi.authSnapshot() === searchAccount },
+                    isConversationProtected = { id -> prefsS.isConversationProtected(id) || searchVault.isConversationLocked(id) },
                     // Dart ScaffoldMessenger SnackBar for the search error strings (Material3 SnackbarHost below).
-                    onNotify = { msg -> searchScope.launch { searchSnackbar.showSnackbar(msg) } },
+                    onNotify = { msg -> if (searchApi.authSnapshot() === searchAccount) searchScope.launch { searchSnackbar.showSnackbar(msg) } },
                     colors = com.example.chat.ui.core.theme.ChatyColors(resolvedTheme),
                     conversations = ServiceLocator.apiBackend.conversations,
-                    searchUsers = { q -> ServiceLocator.apiBackend.searchUsers(q) },
-                    openDirectConversation = { u -> ServiceLocator.apiBackend.createOrGetDirectConversation(u.id) },
+                    searchUsers = { q ->
+                        check(searchApi.authSnapshot() === searchAccount) { "Account changed." }
+                        val found = searchApi.searchUsers(q)
+                        check(searchApi.authSnapshot() === searchAccount) { "Account changed." }
+                        found
+                    },
+                    openDirectConversation = { u ->
+                        check(searchApi.authSnapshot() === searchAccount) { "Account changed." }
+                        val found = searchApi.createOrGetDirectConversation(u.id)
+                        check(searchApi.authSnapshot() === searchAccount) { "Account changed." }
+                        found
+                    },
                     verifySecretPhrase = { phrase -> ServiceLocator.localLockService.verifySecretPhrase(phrase) },
                     isConversationHidden = { id -> prefsS.isConversationHidden(id) },
-                    onBack = { navigation.goBack() },
-                    onOpenLockedChats = { route = AuthRoute.HiddenVault },
+                    onBack = { if (searchApi.authSnapshot() === searchAccount) navigation.goBack() },
+                    onOpenLockedChats = { if (searchApi.authSnapshot() === searchAccount) route = AuthRoute.HiddenVault },
                     onOpenConversation = { id ->
-                        ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { c ->
+                        searchApi.conversations.firstOrNull { it.id == id && searchApi.authSnapshot() === searchAccount }?.let { c ->
                             ServiceLocator.apiBackend.setActiveConversation(c.id)
                             selectedConversation = c
                             route = AuthRoute.ChatDetail
                         }
                     },
                     onOpenConversationReplace = { id ->
-                        ServiceLocator.apiBackend.conversations.firstOrNull { it.id == id }?.let { c ->
+                        searchApi.conversations.firstOrNull { it.id == id && searchApi.authSnapshot() === searchAccount }?.let { c ->
                             ServiceLocator.apiBackend.setActiveConversation(c.id)
                             selectedConversation = c
                             route = AuthRoute.ChatDetail
                         }
                     },
                 )
+                }
                 androidx.compose.material3.SnackbarHost(searchSnackbar, Modifier.align(Alignment.BottomCenter))
                 }
             }
@@ -1893,6 +1968,7 @@ fun AppRoot() {
                 androidx.activity.compose.BackHandler { navigation.goBack() }
                 com.example.chat.ui.chats.starred.StarredMessagesScreen(
                     conversations = ServiceLocator.apiBackend.conversations,
+                    messagesRevision = starRevision,
                     messagesFor = { id -> ServiceLocator.apiBackend.getMessages(id) },
                     // Dart _loadConversations: ensureConversationLoaded for every conversation (Future.wait).
                     onRefresh = {

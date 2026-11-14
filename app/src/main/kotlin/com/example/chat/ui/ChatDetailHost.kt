@@ -1,5 +1,7 @@
 package com.example.chat.ui
 
+import androidx.lifecycle.repeatOnLifecycle
+
 import com.example.chat.ReleaseFeatures
 
 import android.widget.Toast
@@ -103,7 +105,14 @@ fun ChatDetailHost(
     val liveNetworkStatus by ServiceLocator.networkMonitor.state.collectAsState()
     val liveP2pTransfers by p2pTransfers.transfers.collectAsState()
     val liveTransferItems by ServiceLocator.transferMonitor.items.collectAsState()
-    val liveAppTraffic by ServiceLocator.appTrafficMonitor.state.collectAsState()
+    // Do not keep the subscriber-gated 1s traffic sampler awake off-screen.
+    val trafficOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    val trafficState = ServiceLocator.appTrafficMonitor.state
+    val liveAppTraffic by androidx.compose.runtime.produceState(trafficState.value, trafficState, trafficOwner) {
+        trafficOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            trafficState.collect { value = it }
+        }
+    }
     val prefs = ServiceLocator.preferencesController
     val repo = ServiceLocator.conversationsRepository
     val rt = ServiceLocator.richRealtime
@@ -262,13 +271,17 @@ fun ChatDetailHost(
     val privacy = prefs.privacy
     fun gbB(k: String, d: Boolean) = prefs.gbBool(k, d)
 
-    var connection by remember(conversation.id) { mutableStateOf<ContactConnectionStatus?>(null) }
+    var connection by remember(conversation.id, messageAccountScope) { mutableStateOf<ContactConnectionStatus?>(null) }
     suspend fun refreshConnection() {
         if (isDirect && otherId != null) {
-            try { connection = ServiceLocator.contactRelationships.connectionStatus(otherId) } catch (_: Exception) {}
+            try {
+                val status = ServiceLocator.contactRelationships.connectionStatus(otherId, api.contactsPlane(messageAccountScope))
+                if (api.authSnapshot() === messageAccountScope) connection = status
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { if (api.authSnapshot() === messageAccountScope) connection = null }
         }
     }
-    LaunchedEffect(conversation.id, otherId) { refreshConnection() }
+    LaunchedEffect(conversation.id, otherId, messageAccountScope) { refreshConnection() }
     var directOriginalSelection by remember { mutableStateOf(false) }
     val largeFilePicker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
@@ -400,17 +413,18 @@ fun ChatDetailHost(
     var taskDetail by remember { mutableStateOf<ChatTask?>(null) }
     // 0 none, 1 info (ContactInfo/GroupInfo), 2 contact privacy; viewer = MediaViewerScreen target.
     var infoSearchRequest by remember(conversation.id, mediaStamp) { mutableIntStateOf(0) }
-    var infoRoute by remember(conversation.id) { mutableIntStateOf(0) }
+    var infoRoute by remember(conversation.id, messageAccountScope) { mutableIntStateOf(0) }
     var viewerBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     var viewerMessage by remember(conversation.id, mediaStamp) { mutableStateOf<ChatMessage?>(null) }
     var pollCreateOpen by remember(conversation.id) { mutableStateOf(false) }
     var pollViewId by remember(conversation.id) { mutableStateOf<String?>(null) }
     var appearanceOpen by remember(conversation.id) { mutableStateOf(false) }
-    var infoBusy by remember { mutableStateOf(false) }
-    var infoConnection by remember(conversation.id) { mutableStateOf(ContactConnectionStatus()) }
-    var infoBlocked by remember(conversation.id) { mutableStateOf(false) }
-    var infoLoading by remember(conversation.id) { mutableStateOf(false) }
-    var infoError by remember(conversation.id) { mutableStateOf<String?>(null) }
+    var infoBusy by remember(conversation.id, messageAccountScope) { mutableStateOf(false) }
+    var infoConnection by remember(conversation.id, messageAccountScope) { mutableStateOf(ContactConnectionStatus()) }
+    var infoBlocked by remember(conversation.id, messageAccountScope) { mutableStateOf(false) }
+    var infoLoading by remember(conversation.id, messageAccountScope) { mutableStateOf(false) }
+    var infoError by remember(conversation.id, messageAccountScope) { mutableStateOf<String?>(null) }
+    var infoProfile by remember(conversation.id, messageAccountScope) { mutableStateOf<com.example.chat.domain.models.UserProfile?>(null) }
 
     // Presence text (Dart _buildChat).
     // Presence and typing come from the custom backend socket (ApiBackendService); the legacy
@@ -509,6 +523,34 @@ fun ChatDetailHost(
     DisposableEffect(api, conversation.id) {
         onDispose { videoHoldRequest?.close(); cameraEntryFlow?.let(attachments.closeCaptureSession) }
     }
+    // One call entry point for the chat toolbar and contact info. Lookup failures never unlock calls.
+    var callStarting by remember(conversation.id, messageAccountScope) { mutableStateOf(false) }
+    fun startContactCall(isVideo: Boolean) {
+        if (callStarting) return
+        val targetId = otherId
+        if (!isDirect || targetId == null) { toast("Direct contact calls are available for one-to-one chats."); return }
+        val expected = messageAccountScope
+        if (api.authSnapshot() !== expected) { toast("Account changed. Open the chat again."); return }
+        callStarting = true
+        scope.launch {
+            try {
+                val status = ServiceLocator.contactRelationships.connectionStatus(targetId, api.contactsPlane(expected))
+                check(api.authSnapshot() === expected) { "Account changed. Call cancelled." }
+                connection = status
+                if (!status.callsAllowed) { gateOpen = true; return@launch }
+                ServiceLocator.callPresentationController.showFullScreen()
+                ServiceLocator.callSignaling.initiateCall(
+                    targetId, other?.displayName ?: live.title,
+                    other?.avatarInitials, other?.avatarColorHex, isVideo,
+                    expectedAccountScope = expected,
+                )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (api.authSnapshot() === expected) toast(error.message ?: "Unable to verify call permission.")
+            } finally { callStarting = false }
+        }
+    }
     val voice = rememberChatVoice(
         conversation.id,
         afterSend = { rev++ },
@@ -544,28 +586,8 @@ fun ChatDetailHost(
         headerBarColor = conv.actionBarColor,
         presencePillColor = conv.contactStatusBgColor ?: prefs.gbColor("ModChatGStatusB"),
         presenceTextColor = conv.contactStatusTextColor ?: prefs.gbColor("ModChatGStatusT"),
-        callsAllowed = connection?.callsAllowed ?: true,
-        onStartCall = { isVideo ->
-            if (isDirect && otherId != null) {
-                scope.launch {
-                    val status = try { ServiceLocator.contactRelationships.connectionStatus(otherId) } catch (_: Exception) { null }
-                    if (status != null) connection = status
-                    if (status != null && !status.callsAllowed) {
-                        gateOpen = true
-                    } else {
-                        ServiceLocator.callPresentationController.showFullScreen()
-                        try {
-                            ServiceLocator.callSignaling.initiateCall(
-                                otherId, other?.displayName ?: live.title,
-                                other?.avatarInitials, other?.avatarColorHex, isVideo,
-                            )
-                        } catch (e: Exception) { toast(e.message ?: "Unable to start the call.") }
-                    }
-                }
-            } else {
-                toast("Direct contact calls are available for one-to-one chats.")
-            }
-        },
+        callsAllowed = connection?.callsAllowed ?: false,
+        onStartCall = { startContactCall(it) },
         connectionState = ServiceLocator.connectionHealth.state,
         networkStatus = liveNetworkStatus,
         appTraffic = liveAppTraffic,
@@ -728,12 +750,22 @@ fun ChatDetailHost(
                     try {
                         // Dart ContactInfoScreen._load commits both results only if both succeed.
                         // Keep its fresh default separate from the chat call-gate cache on error.
-                        val nextConnection = ServiceLocator.contactRelationships.connectionStatus(other.id)
-                        val nextBlocked = ServiceLocator.contactRelationships.isBlocked(other.id)
+                        val nextConnection = ServiceLocator.contactRelationships.connectionStatus(other.id, api.contactsPlane(messageAccountScope))
+                        val nextBlocked = ServiceLocator.contactRelationships.isBlocked(other.id, api.contactsPlane(messageAccountScope))
+                        if (api.authSnapshot() !== messageAccountScope) return@launch
                         infoConnection = nextConnection
                         infoBlocked = nextBlocked
-                    } catch (e: Exception) { infoError = e.message ?: "Unable to load contact." }
-                    infoLoading = false
+                        try {
+                            val loaded = api.peerProfile(other.username, other.id, messageAccountScope)
+                            if (api.authSnapshot() === messageAccountScope) infoProfile = loaded
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            // Keep the cached profile and contact actions usable if refresh is unavailable.
+                        }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (e: Exception) { if (api.authSnapshot() === messageAccountScope) infoError = e.message ?: "Unable to load contact." }
+                    finally { if (api.authSnapshot() === messageAccountScope) infoLoading = false }
                 }
             }
         },
@@ -906,7 +938,18 @@ fun ChatDetailHost(
             } else if (other != null) {
                 com.example.chat.ui.chats.contact_info.ContactInfoScreen(
                     conversation = live,
-                    contact = other,
+                    contact = infoProfile ?: other,
+                    onStartCall = { startContactCall(it) },
+                    onShareContact = {
+                        if (api.authSnapshot() === messageAccountScope) {
+                            val share = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(android.content.Intent.EXTRA_TEXT, "${other.displayName}\n@${other.username}")
+                            }
+                            try { context.startActivity(android.content.Intent.createChooser(share, "Share contact")) }
+                            catch (_: Exception) { toast("No app is available to share this contact.") }
+                        }
+                    },
                     messages = messages,
                     connection = infoConnection,
                     blocked = infoBlocked,
@@ -920,18 +963,26 @@ fun ChatDetailHost(
                     onAccept = {
                         infoBusy = true
                         try {
-                            ServiceLocator.contactRelationships.acceptConnection(other.id)
+                            check(api.authSnapshot() === messageAccountScope) { "Account changed." }
+                            check(infoConnection.isPendingIncoming) { "There is no incoming request to accept." }
+                            ServiceLocator.contactRelationships.acceptConnection(other.id, api.contactsPlane(messageAccountScope))
+                            check(api.authSnapshot() === messageAccountScope) { "Account changed." }
                             refreshConnection()
-                            infoConnection = ServiceLocator.contactRelationships.connectionStatus(other.id)
+                            val nextStatus = ServiceLocator.contactRelationships.connectionStatus(other.id, api.contactsPlane(messageAccountScope))
+                            check(api.authSnapshot() === messageAccountScope) { "Account changed." }
+                            infoConnection = nextStatus
                         } finally { infoBusy = false }
                     },
                     onSetBlocked = { next ->
                         infoBusy = true
                         try {
                             api.setUserBlocked(messageAccountScope, other.id, next)
+                            check(api.authSnapshot() === messageAccountScope) { "Account changed." }
                             infoBlocked = next
                             refreshConnection()
-                            infoConnection = ServiceLocator.contactRelationships.connectionStatus(other.id)
+                            val nextStatus = ServiceLocator.contactRelationships.connectionStatus(other.id, api.contactsPlane(messageAccountScope))
+                            check(api.authSnapshot() === messageAccountScope) { "Account changed." }
+                            infoConnection = nextStatus
                         } finally { infoBusy = false }
                     },
                     onDeleteConversation = {
@@ -1158,12 +1209,19 @@ fun ChatDetailHost(
                 )
             },
             confirmButton = {
-                if (!st.myAccepted) {
+                if (st.isPendingIncoming) {
                     TextButton(onClick = {
                         gateOpen = false
                         scope.launch {
-                            try { if (otherId != null) ServiceLocator.contactRelationships.acceptConnection(otherId); refreshConnection() }
-                            catch (e: Exception) { toast("$e") }
+                            try {
+                                val id = otherId ?: return@launch
+                                check(api.authSnapshot() === messageAccountScope) { "Account changed." }
+                                val plane = api.contactsPlane(messageAccountScope)
+                                check(ServiceLocator.contactRelationships.connectionStatus(id, plane).isPendingIncoming) { "There is no incoming request to accept." }
+                                ServiceLocator.contactRelationships.acceptConnection(id, plane)
+                                refreshConnection()
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                            catch (e: Exception) { if (api.authSnapshot() === messageAccountScope) toast(e.message ?: "Could not accept contact.") }
                         }
                     }) { Text("Accept contact") }
                 } else TextButton(onClick = { gateOpen = false }) { Text("Done") }

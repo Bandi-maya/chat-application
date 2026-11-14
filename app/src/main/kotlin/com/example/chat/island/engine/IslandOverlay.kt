@@ -19,6 +19,9 @@ import android.os.PowerManager
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -58,7 +61,9 @@ class IslandOverlay(private val host: Context, private val windowType: Int) {
             type = windowType
             format = PixelFormat.TRANSLUCENT
             gravity = Gravity.TOP or Gravity.LEFT
-            flags = WindowManager.LayoutParams.FLAG_SECURE or
+            // Ordinary status must not block screenshots of the entire display.
+            // Private modes still suppress content immediately and retain protection.
+            flags = (if (IslandController.privacySuppressed.value) WindowManager.LayoutParams.FLAG_SECURE else 0) or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -84,6 +89,13 @@ class IslandOverlay(private val host: Context, private val windowType: Int) {
             windows.addView(content, layout)
             lifetime.launch {
                 combine(IslandSettings.offsetX, IslandSettings.offsetY) { x, y -> x to y }.collect { position() }
+            }
+            lifetime.launch {
+                IslandController.privacySuppressed.collect { privateContent ->
+                    val secure = WindowManager.LayoutParams.FLAG_SECURE
+                    layout.flags = if (privateContent) layout.flags or secure else layout.flags and secure.inv()
+                    update()
+                }
             }
             lifetime.launch {
                 IslandController.replying.collect { typing ->
@@ -148,6 +160,8 @@ private fun OverlayContent() {
     val idle by IslandSettings.idlePill.collectAsState()
     // Privacy removes the content immediately; it is never left in an exit animation.
     if (privateScreen || !enabled || (mode == IslandMode.Idle && !idle)) return
+    val notificationFrame by IslandController.displayedNotificationFrame.collectAsState()
+    val view = LocalView.current
     val level by IslandController.level.collectAsState()
     val scale by IslandSettings.scale.collectAsState()
     val width by IslandSettings.widthScale.collectAsState()
@@ -161,10 +175,20 @@ private fun OverlayContent() {
     val editor by IslandController.replying.collectAsState()
     val waiting by IslandController.queued.collectAsState()
     val music by IslandController.secondary.collectAsState()
-    DynamicIslandUi(mode = mode, level = level, scale = scale, widthScale = width, heightScale = height,
+    DynamicIslandUi(modifier = Modifier.drawWithContent {
+        drawContent()
+        // Posting runs after this draw pass. Revalidate at callback time: a
+        // privacy/settings/call transition may have replaced the payload.
+        val frame = notificationFrame
+        if (frame != null && size.width > 0 && size.height > 0) view.post {
+            if (view.isAttachedToWindow && view.isShown && view.windowVisibility == android.view.View.VISIBLE) {
+                IslandController.acknowledgeNotificationDrawn(frame)
+            }
+        }
+    }, mode = mode, level = level, scale = scale, widthScale = width, heightScale = height,
         cornerFactor = corner, animSpeed = speed, glow = glow, haptics = haptics,
         onClick = { IslandController.toggle() }, onLongPress = { IslandController.large() },
-        onDismiss = { IslandController.dismiss() }, onPrev = { IslandController.prev() },
+        onDismiss = { IslandController.dismiss() }, onOpenNotification = { IslandController.openNotification() }, onPrev = { IslandController.prev() },
         onNext = { IslandController.next() }, onPlayPause = { IslandController.playPause() },
         onSeek = { IslandController.seekTo(it) }, onAnswer = { IslandController.answerCall() },
         onDecline = { IslandController.declineCall() }, onMarkRead = { IslandController.markRead() },

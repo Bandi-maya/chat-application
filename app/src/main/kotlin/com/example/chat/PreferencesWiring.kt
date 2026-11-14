@@ -205,6 +205,8 @@ class ControllerRealtimePreferences(
     override val ghostMode: Boolean get() = controller.home.ghostMode
     override fun gbBool(key: String, fallback: Boolean): Boolean = controller.gbBool(key, fallback)
     override fun gbColorArgb(key: String): Long? = controller.gbColor(key)
+    override fun contactEventAlertOverride(userId: String): com.example.chat.domain.models.ContactEventAlertOverride? =
+        controller.notification.contactEventOverrides[userId]
 }
 
 /** Mappers from the typed privacy model to the service seams. */

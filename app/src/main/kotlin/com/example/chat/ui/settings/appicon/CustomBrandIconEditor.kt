@@ -140,8 +140,10 @@ fun renderCroppedIconPng(
     offset: Offset,
     quarterTurns: Int,
 ): ByteArray {
-    val source = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-        ?: throw IllegalStateException("Could not encode image.")
+    val source = com.example.chat.ui.core.system.SampledBitmapDecoder.decode(
+        imageBytes,
+        previewSize * 6,
+    ) ?: throw IllegalStateException("Could not encode image.")
     try {
         val densityScale = 3f
         val side = previewSize * densityScale.toInt()

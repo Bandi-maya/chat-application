@@ -34,6 +34,8 @@ data class VoiceUiState(
     val busy: Boolean = false,
     val seconds: Int = 0,
     val paused: Boolean = false,
+    /** Finished recording waiting in the review step; recording is false while set. */
+    val review: VoiceNoteController.Clip? = null,
 )
 
 /** Exact port of the screen-level voice orchestration in
@@ -60,6 +62,7 @@ class VoiceSessionController(
     private val onState: (VoiceUiState) -> Unit = {},
 ) {
     private var ticker: Job? = null
+    private var sendAfterReview = false
     private var starting = false
     private var releasedDuringStart = false
     private var canceledDuringStart = false
@@ -75,7 +78,7 @@ class VoiceSessionController(
 
     /** Dart _beginVoice(locked). */
     fun beginVoice(locked: Boolean) {
-        if (state.busy || state.recording) return
+        if (state.busy || state.recording || state.review != null) return
         // Dart clears a published typing indicator before starting.
         starting = true
         releasedDuringStart = false
@@ -108,6 +111,8 @@ class VoiceSessionController(
     /** Dart _finishVoice(): stop + upload + send; on success track + scroll. */
     fun finishVoice() {
         if (!state.recording || state.busy) return
+        // After a Pause and Resume there are several parts: join them in review, then send from there.
+        if (voice.hasSegments) { sendAfterReview = true; beginReview(); return }
         update { it.copy(busy = true) }
         scope.launch {
             try {
@@ -134,6 +139,92 @@ class VoiceSessionController(
                 // A failed native transition cannot leave a seemingly usable recording.
                 runCatching { voice.cancel() }
                 update { VoiceUiState() }
+            } finally { update { it.copy(busy = false) } }
+        }
+    }
+
+
+    /** Paused locked recording -> stop and open the review step. */
+    fun beginReview() {
+        if (!state.recording || !state.locked || state.busy) return
+        update { it.copy(busy = true) }
+        scope.launch {
+            try {
+                val clip = voice.pauseForReview()
+                runCatching { setRecordingIndicator(false) }
+                if (clip == null) {
+                    showError("Recording is too short.")
+                    update { VoiceUiState() }
+                } else {
+                    update { VoiceUiState(review = clip) }
+                    if (clip.joinFailed) showError("Could not join the recording parts. Tap Retry.")
+                }
+            } catch (error: Throwable) {
+                showError("Could not open the recording. ${describeError(error)}")
+                runCatching { setRecordingIndicator(false) }
+                update { VoiceUiState() }
+            } finally {
+                update { it.copy(busy = false) }
+                val auto = sendAfterReview; sendAfterReview = false
+                if (auto && state.review?.joinFailed == false) sendReview()
+            }
+        }
+    }
+
+    fun sendReview() {
+        val clip = state.review ?: return
+        if (state.busy || clip.joinFailed) return
+        update { it.copy(busy = true) }
+        scope.launch {
+            try {
+                if (voice.sendClip(clip)) { update { VoiceUiState() }; onSent() }
+            } catch (error: Throwable) {
+                // The clip stays in review so Send can be tried again.
+                showError("Could not send voice note. ${describeError(error)}")
+                if (voice.isInvalidated) deleteReview()
+            } finally { update { it.copy(busy = false) } }
+        }
+    }
+
+    /** Leaving the screen: stop any recording and drop a pending review file. */
+    fun dispose() { cancelVoice(); deleteReview() }
+
+    fun deleteReview() {
+        val had = state.review != null
+        scope.launch { runCatching { voice.discardReview() } }
+        if (had) update { VoiceUiState() }
+    }
+
+    /** Try joining the parts again; all parts stay on disk until sent or deleted. */
+    fun retryJoin() {
+        val clip = state.review ?: return
+        if (state.busy || !clip.joinFailed) return
+        update { it.copy(busy = true) }
+        scope.launch {
+            try {
+                val next = voice.retryJoin(clip)
+                update { it.copy(review = next) }
+                if (next.joinFailed) showError("Still could not join the parts. Try again, or Resume and Send later.")
+            } catch (error: Throwable) {
+                showError("Could not join the parts. ${describeError(error)}")
+            } finally { update { it.copy(busy = false) } }
+        }
+    }
+
+    /** Review -> back to recording: a new segment starts and the recording sheet returns unchanged. */
+    fun resumeRecording() {
+        if (state.review == null || state.busy) return
+        update { it.copy(busy = true) }
+        scope.launch {
+            try {
+                voice.resumeSegment()
+                if (!voice.isRecording) throw IllegalStateException("Recording could not resume.")
+                setRecordingIndicator(true)
+                update { VoiceUiState(recording = true, locked = true, seconds = (voice.elapsedMs / 1000L).toInt()) }
+                startSecondsTicker()
+            } catch (error: Throwable) {
+                // Failure keeps the review so nothing is lost; the user can still send or delete.
+                showError("Could not resume recording. ${describeError(error)}")
             } finally { update { it.copy(busy = false) } }
         }
     }

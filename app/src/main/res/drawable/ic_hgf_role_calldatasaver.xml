@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="CallDataSaver"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M4.686,11.856L8.272,8.92C9.094,8.248,9.504,7.911,9.627,7.435C9.749,6.959,9.552,6.467,9.158,5.481L9.09,5.309C8.564,3.995,8.302,3.337,7.73,3.092C7.159,2.847,6.502,3.11,5.189,3.636L4.231,4.019C3.612,4.267,3.302,4.391,3.129,4.678C2.956,4.965,2.987,5.269,3.05,5.875C3.246,7.764,3.814,10.099,4.686,11.856ZM4.686,11.856C6.289,15.088,8.92,17.72,12.15,19.325M12.15,19.325L15.084,15.736C15.756,14.914,16.092,14.503,16.567,14.381C17.043,14.258,17.536,14.455,18.521,14.849L18.693,14.918C20.006,15.444,20.663,15.707,20.908,16.278C21.152,16.85,20.89,17.507,20.364,18.821L19.981,19.78C19.736,20.394,19.613,20.702,19.32,20.875C19.027,21.049,18.728,21.012,18.129,20.939C16.368,20.725,13.843,20.166,12.15,19.325Z" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M18.2,14.3C19.593,14.3,20.881,15.043,21.577,16.25C22.274,17.457,22.274,18.943,21.577,20.15C20.881,21.357,19.593,22.1,18.2,22.1C16.807,22.1,15.519,21.357,14.823,20.15C14.126,18.943,14.126,17.457,14.823,16.25C15.519,15.043,16.807,14.3,18.2,14.3" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+    <path android:pathData="M18.2,16.7L18.2,19.7M16.9,18.4L18.2,19.7L19.5,18.4" android:strokeColor="#FF000000" android:strokeWidth="1.5" android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>

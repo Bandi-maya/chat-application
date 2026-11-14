@@ -95,6 +95,7 @@ import kotlinx.coroutines.launch
 fun StarredMessagesScreen(
     conversations: List<Conversation>,
     messagesFor: (String) -> List<ChatMessage>,
+    messagesRevision: Int = 0,
     onRefresh: suspend () -> Boolean,
     onToggleStar: (conversationId: String, messageId: String) -> Unit,
     onOpenConversation: (conversationId: String, messageId: String?) -> Unit,
@@ -132,17 +133,23 @@ fun StarredMessagesScreen(
 
     // Dart _starredMessages: per-conversation scan, skip unstarred/deleted-for-me,
     // query over "title text typeName", newest first.
-    val starred = conversations.flatMap { conversation ->
-        messagesFor(conversation.id)
-            .filter { it.isStarred && !it.isDeletedForMe }
-            .filter { message ->
-                if (query.isEmpty()) return@filter true
-                "${conversation.title} ${message.text} ${message.type.name}"
-                    .lowercase()
-                    .contains(query)
-            }
-            .map { conversation to it }
-    }.sortedByDescending { it.second.createdAt }
+    // Capture values: callback identity does not establish backend freshness.
+    // Copying still happens on recomposition; filtering and sorting are reused
+    // only while both the conversation/message snapshots and query are equal.
+    val messageSnapshots = conversations.map { it to messagesFor(it.id).toList() }
+    val starred = remember(messageSnapshots, query, messagesRevision) {
+        messageSnapshots.flatMap { (conversation, messages) ->
+            messages
+                .filter { it.isStarred && !it.isDeletedForMe }
+                .filter { message ->
+                    if (query.isEmpty()) return@filter true
+                    "${conversation.title} ${message.text} ${message.type.name}"
+                        .lowercase()
+                        .contains(query)
+                }
+                .map { conversation to it }
+        }.sortedByDescending { it.second.createdAt }
+    }
 
     Scaffold(
         topBar = {
@@ -301,7 +308,12 @@ fun StarredMessagesScreen(
                                 bottom = 24.dp,
                             ),
                         ) {
-                            items(starred.size) { index ->
+                            // Stable keys keep row state attached to the right
+                            // starred message when entries are added/removed.
+                            items(starred.size, key = { index ->
+                                val (conversation, message) = starred[index]
+                                "${conversation.id}:${message.id}"
+                            }) { index ->
                                 val (conversation, message) = starred[index]
                                 StarredMessageRow(
                                     conversation = conversation,

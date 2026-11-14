@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
  *  loader into a private/local target - the card renders decoded bytes,
  *  never a remote URL. Results and failures are cached in memory. */
 class LinkPreviewService(
-    private val client: OkHttpClient = OkHttpClient.Builder()
+    private val client: OkHttpClient = com.example.chat.data.api.ChatyOkHttp.shared.newBuilder()
         .connectTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
         .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
         // Redirects are followed manually so every hop is re-validated.

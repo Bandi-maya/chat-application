@@ -71,7 +71,7 @@ object ChatyNotificationPoster {
      *  fixture are the only callers; no other call site may post or cancel. */
     internal fun postMessage(
         context: Context, style: ChatyNotificationStyle, tag: String, title: String, body: String,
-        timestampMillis: Long, replyNonce: String?, readNonce: String?,
+        timestampMillis: Long, replyNonce: String?, readNonce: String?, messageCount: Int = 1,
     ) {
         if (!canPost(context)) return
         ensureChannels(context)
@@ -82,6 +82,8 @@ object ChatyNotificationPoster {
         val b = NotificationCompat.Builder(context, ChatyNotificationPolicy.CH_MESSAGES)
             .setSmallIcon(smallIcon(style)).setColor(style.accentArgb)
             .setStyle(msgStyle).setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setNumber(messageCount.coerceAtLeast(1))
+            .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
             .setPriority(NotificationCompat.PRIORITY_HIGH).setGroup("chaty_messages")
             .setAutoCancel(true).setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setContentIntent(openApp(context, nid))
@@ -120,6 +122,12 @@ object ChatyNotificationPoster {
             .setOngoing(true).setOnlyAlertOnce(true).setTimeoutAfter(60_000)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setContentIntent(open)
+        // The live Coordinator path must opt in too; legacy ChatyNotifications
+        // is not this poster. Keep its existing normal launch/auth/lock route.
+        if (open != null && (Build.VERSION.SDK_INT < 34 ||
+                (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).canUseFullScreenIntent())) {
+            b.setFullScreenIntent(open, true)
+        }
         if (declineNonce != null) b.addAction(R.drawable.ic_notif_hangup, "Decline", broadcast(context, ChatyNotificationPolicy.ACTION_DECLINE, declineNonce))
         if (open != null) b.addAction(R.drawable.ic_notif_call, "Open to answer", open)
         try { NotificationManagerCompat.from(context).notify(tag, ChatyNotificationPolicy.INCOMING_CALL_ID, b.build()) } catch (_: SecurityException) {}

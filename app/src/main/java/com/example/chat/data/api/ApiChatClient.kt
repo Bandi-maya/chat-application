@@ -499,6 +499,7 @@ class ApiChatClient(
             val fullName = (
                 json["full_name"]
                     ?: json["displayName"]
+                    ?: json["display_name"]
                     ?: "${json["first_name"] ?: ""} ${json["last_name"] ?: ""}".trim()
                 ).toString()
             val username = (json["username"] ?: "").toString()
@@ -513,7 +514,10 @@ class ApiChatClient(
                 json["photo"]
                     ?: json["avatar_url"]
                     ?: json["avatarUrl"]
+                    ?: json["avatar"]
                     ?: publicProfileCamel?.get("avatarUrl")
+                    ?: publicProfileSnake?.get("avatarUrl")
+                    ?: publicProfileSnake?.get("avatar_url")
                 )?.toString()
             val about = when {
                 json["about"] != null && json["about"].toString().trim().isNotEmpty() ->
@@ -554,6 +558,9 @@ class ApiChatClient(
                 phone = (json["mobile"] ?: json["phone"] ?: "").toString(),
                 safetyNumber = "",
                 avatarUrl = photo,
+                bannerUrl = (json["banner_url"] ?: json["bannerUrl"]
+                    ?: publicProfileSnake?.get("banner_url") ?: publicProfileCamel?.get("bannerUrl"))
+                    ?.toString()?.takeIf { it.isNotBlank() },
             )
         }
     }

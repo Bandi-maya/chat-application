@@ -26,6 +26,10 @@ object SplitChatLayoutPolicy {
             return SplitPresentationMode.COMPACT_SWITCHER
         }
 
+        if (paneCount >= 3 && windowWidthDp < 600.dp) {
+            return SplitPresentationMode.COMPACT_SWITCHER
+        }
+
         return when (paneCount) {
             2 -> SplitPresentationMode.TWO_PANE_STACK
             3 -> SplitPresentationMode.THREE_PANE_GRID
@@ -46,10 +50,12 @@ object SplitChatLayoutPolicy {
         miniHeightPx: Float,
         marginPx: Float = 16f,
     ): Pair<Float, Float> {
-        val maxX = (windowWidthPx - miniWidthPx - marginPx).coerceAtLeast(marginPx)
-        val maxY = (windowHeightPx - miniHeightPx - marginPx).coerceAtLeast(marginPx)
-        val clampedX = currentX.coerceIn(marginPx, maxX)
-        val clampedY = currentY.coerceIn(marginPx, maxY)
+        val roomX = (windowWidthPx - miniWidthPx).coerceAtLeast(0f)
+        val roomY = (windowHeightPx - miniHeightPx).coerceAtLeast(0f)
+        val minX = marginPx.coerceIn(0f, roomX / 2f)
+        val minY = marginPx.coerceIn(0f, roomY / 2f)
+        val clampedX = currentX.coerceIn(minX, roomX - minX)
+        val clampedY = currentY.coerceIn(minY, roomY - minY)
         return clampedX to clampedY
     }
 }

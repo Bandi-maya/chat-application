@@ -21,7 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.NotificationsOff
-import androidx.compose.material3.Icon
+import com.example.chat.ui.icons.ChatyPackAwareIcon as Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -202,7 +202,7 @@ fun AccountRecentCardsSection(
                                 modifier = Modifier.size(48.dp),
                             ) {
                                 Icon(
-                                    Icons.Outlined.ArrowDownward,
+                                    com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.moveDown),
                                     contentDescription = "Move ${meta.displayName} card later",
                                     tint = if (index < accounts.lastIndex) colors.foregroundSecondary else colors.disabledForeground,
                                     modifier = Modifier.size(18.dp),

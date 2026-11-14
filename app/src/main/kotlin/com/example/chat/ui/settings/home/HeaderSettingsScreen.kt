@@ -114,12 +114,12 @@ data class HeaderPreviewArgs(
 )
 
 private fun homeUiStyleIcon(style: String): ImageVector = when (style) {
-    "ONE UI" -> Icons.Rounded.ViewQuilt
+    "ONE UI" -> com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.mosaic)
     "WhatsApp UI Stock" -> Icons.Rounded.Chat
     "IOS STYLE" -> Icons.Rounded.PhoneIphone
     "BUBBLES TAB STYLE" -> Icons.Rounded.BubbleChart
     "BASIC TAB STYLE" -> Icons.Rounded.Dashboard
-    "WhatsApp OLD UI" -> Icons.Rounded.ViewWeek
+    "WhatsApp OLD UI" -> com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.layout)
     "Floating Rail" -> Icons.Rounded.ViewSidebar
     "3D Perspective Drawer" -> Icons.Rounded.ViewInAr
     "Modern Side Menu" -> Icons.Rounded.MenuOpen

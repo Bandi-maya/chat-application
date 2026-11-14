@@ -101,9 +101,12 @@ class CustomFontLogic(private val docsDir: () -> java.io.File) {
             return Result.Failure("Invalid or empty font file.")
         }
         return try {
-            val dest = java.io.File(docsDir(), "custom_font_$fileName")
+            val safeName = java.io.File(fileName.replace('\\', '/')).name
+            require(safeName.lowercase().endsWith(".ttf") || safeName.lowercase().endsWith(".otf")) { "Choose a .ttf or .otf font." }
+            require(source.length() <= 10L * 1024 * 1024) { "Font file is too large (maximum 10 MB)." }
+            val dest = java.io.File(docsDir(), "custom_font_$safeName")
             source.copyTo(dest, overwrite = true)
-            Result.Loaded(fileName, "Custom font \"$fileName\" loaded successfully!")
+            Result.Loaded(dest.name, "Custom font \"$fileName\" loaded successfully!")
         } catch (e: Exception) {
             Result.Failure("Failed to load font: $e")
         }

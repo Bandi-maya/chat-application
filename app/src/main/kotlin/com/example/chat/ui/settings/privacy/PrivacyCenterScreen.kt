@@ -357,7 +357,7 @@ fun PrivacyCenterScreen(
                     }
 
                     SectionDivider("Status")
-                    SwitchRow(Icons.Rounded.TvOff, "Disable channels", "The channels will not be shown in the status screen.", p.disableChannels) {
+                    SwitchRow(com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.channelOff), "Disable channels", "The channels will not be shown in the status screen.", p.disableChannels) {
                         preferences.updatePrivacy(p.copy(disableChannels = it), logTitle = "Disable channels")
                     }
                     SwitchRow(Icons.Rounded.VisibilityOff, "Hide View Status", "Do not tell contact that you have viewed their status", p.hideViewStatus) {

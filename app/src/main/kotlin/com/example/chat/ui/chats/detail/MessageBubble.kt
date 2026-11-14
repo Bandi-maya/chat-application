@@ -1300,7 +1300,7 @@ private fun VoiceNoteCard(
         scope.launch {
             try {
                 if (!prepared) {
-                    loading = true
+                    loading = true; playbackError = null
                     val path = attachment.url
                     if (path.isNullOrEmpty()) throw IllegalStateException("Voice note path is missing.")
                     val url = if (binding != null) {

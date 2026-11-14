@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 
 data class AppTrafficSnapshot(
@@ -44,8 +45,20 @@ class AppTrafficMonitor(context: Context) {
             if (job?.isActive == true) return
             job = scope.launch(Dispatchers.IO) {
                 while (isActive) {
-                    sample()
-                    delay(1_000L)
+                    // Battery: per-second sampling only pays off while a screen
+                    // actually shows the counters (chat header rate readout or
+                    // the Network & Data Usage screen). With no collectors the
+                    // loop suspends until one appears instead of waking the
+                    // process every second for the app's lifetime. Totals stay
+                    // exact: deltas come from Android's cumulative per-UID
+                    // counters, so the next sample after an idle gap still
+                    // counts every byte transferred meanwhile.
+                    if (_state.subscriptionCount.value > 0) {
+                        sample()
+                        delay(1_000L)
+                    } else {
+                        _state.subscriptionCount.first { it > 0 }
+                    }
                 }
             }
         }

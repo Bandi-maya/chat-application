@@ -30,23 +30,9 @@ class ChatyApplication : Application() {
         } catch (e: Exception) {
             android.util.Log.w("ChatyApplication", "Dynamic Island bootstrap skipped: $e")
         }
-        // Keep the custom-backend WebSocket alive without Firebase. The backend owns one
-        // account-scoped socket; the foreground service only preserves process execution.
-        // Auth transitions start it for real accounts and stop it immediately on sign-out/demo.
-        try {
-            val backend = ServiceLocator.apiBackend
-            backend.addAuthScopeListener { account ->
-                val shouldConnect = !account.userId.isNullOrBlank() &&
-                    backend.isAuthenticated && !backend.isDemoSession
-                if (shouldConnect) {
-                    com.example.chat.notifications.ChatyRealtimeForegroundService.start(this)
-                } else {
-                    com.example.chat.notifications.ChatyRealtimeForegroundService.stop(this)
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.w("ChatyApplication", "Realtime notification service bootstrap skipped: $e")
-        }
+        // Clear a service left running by an older process/build. Idle background
+        // delivery now uses FCM; only an accepted active call may own its service.
+        com.example.chat.notifications.ChatyRealtimeForegroundService.stop(this)
         // Ring / notify even when no screen is open (process started by a push or kept alive).
         try {
             ServiceLocator.startCallNotifications()
@@ -90,7 +76,6 @@ class ChatyApplication : Application() {
             ServiceLocator.appScope.launch { ServiceLocator.appLock.onResumed() }
             val backend = ServiceLocator.apiBackend
             if (backend.isAuthenticated && !backend.isDemoSession) {
-                com.example.chat.notifications.ChatyRealtimeForegroundService.start(this@ChatyApplication)
                 backend.onAppResumed()
                 try { ServiceLocator.callLifecycle.onAppResumed() } catch (e: Exception) { android.util.Log.w("ChatyApplication", "call resume sync failed: $e") }
                 ServiceLocator.appScope.launch {

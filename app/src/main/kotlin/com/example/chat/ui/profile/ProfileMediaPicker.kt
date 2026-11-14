@@ -103,7 +103,7 @@ import kotlinx.coroutines.withContext
  *  encode JPEG at [quality] with metadata dropped (keepExif: false). */
 object ProfileImageCompressor {
     fun compress(bytes: ByteArray, square: Int, quality: Int): ByteArray? {
-        val decoded = decodeWithOrientation(bytes) ?: return null
+        val decoded = decodeWithOrientation(bytes, minShortEdgePx = square) ?: return null
         val src = decoded
         val short = minOf(src.width, src.height)
         val scaled = if (short > square) {
@@ -144,9 +144,18 @@ object ProfileImageCompressor {
     }
 
     /** Decode with EXIF orientation baked in (Image.file / the plugins all
-     *  present the oriented bitmap). */
-    fun decodeWithOrientation(bytes: ByteArray): Bitmap? {
-        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+     *  present the oriented bitmap). [minShortEdgePx] bounds the decode: the
+     *  sampled result keeps its short edge at or above it, so a compressor
+     *  targeting a [square] short side never allocates the full-size source
+     *  (a 50 MP gallery photo is ~200 MB of heap, decoded twice here with the
+     *  rotation copy). Rotation preserves the short side, so sampling before
+     *  it changes nothing downstream. */
+    fun decodeWithOrientation(bytes: ByteArray, minShortEdgePx: Int = Int.MAX_VALUE): Bitmap? {
+        val bitmap = if (minShortEdgePx == Int.MAX_VALUE) {
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        } else {
+            com.example.chat.ui.core.system.SampledBitmapDecoder.decodeShortEdge(bytes, minShortEdgePx) ?: return null
+        }
         val matrix = orientationMatrix(bytes)
         if (matrix.isIdentity) return bitmap
         val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)

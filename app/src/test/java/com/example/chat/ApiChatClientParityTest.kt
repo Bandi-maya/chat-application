@@ -204,4 +204,11 @@ class ApiChatClientParityTest {
         val empty = ApiChatClient.userFromApi(mapOf("id" to "u4"))
         assertEquals("User", empty.displayName)
     }
+    @Test fun userMediaSurvivesSnakePublicProfile() {
+        val user = ApiChatClient.userFromApi(mapOf("id" to "peer", "display_name" to "Peer Name",
+            "public_profile" to mapOf("avatarUrl" to "https://example.invalid/a.jpg", "banner_url" to "https://example.invalid/b.jpg")))
+        assertEquals("Peer Name", user.displayName)
+        assertEquals("https://example.invalid/a.jpg", user.avatarUrl)
+        assertEquals("https://example.invalid/b.jpg", user.bannerUrl)
+    }
 }

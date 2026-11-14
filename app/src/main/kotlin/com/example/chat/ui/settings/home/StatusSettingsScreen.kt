@@ -162,7 +162,7 @@ fun StatusSettingsScreen(preferences: ChatyPreferencesController, onBack: () -> 
                         onTap = { showStatusStyleModal() },
                     )
                     GbSettingRow(
-                        icon = Icons.Rounded.AddReaction, title = "Status Reaction Emoji", subtitle = "Change status reaction button: ${p.statusReactionEmoji}", hasSubScreen = true,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.reactionAdd), title = "Status Reaction Emoji", subtitle = "Change status reaction button: ${p.statusReactionEmoji}", hasSubScreen = true,
                         onTap = { showReactionEmojiModal() },
                     )
                 }
@@ -187,7 +187,7 @@ fun StatusSettingsScreen(preferences: ChatyPreferencesController, onBack: () -> 
                         onColorTap = { pickColor("Status Seen Color", p.statusSeenColor) { c -> preferences.updateStatus(preferences.status.copy(statusSeenColor = c)) } },
                     )
                     GbSettingRow(
-                        icon = Icons.Rounded.RadioButtonChecked, title = "Status UnSeen", subtitle = "Select color for circle unseen Status", colorValue = p.statusUnseenColor,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.radioOn), title = "Status UnSeen", subtitle = "Select color for circle unseen Status", colorValue = p.statusUnseenColor,
                         onColorTap = { pickColor("Status UnSeen Color", p.statusUnseenColor) { c -> preferences.updateStatus(preferences.status.copy(statusUnSeenColor = c)) } },
                     )
                     GbSettingRow(
@@ -204,7 +204,7 @@ fun StatusSettingsScreen(preferences: ChatyPreferencesController, onBack: () -> 
                         onColorTap = { pickColor("Counter Text Color", p.counterTextColor) { c -> preferences.updateStatus(preferences.status.copy(counterTextColor = c)) } },
                     )
                     GbSwitchTile(
-                        icon = Icons.Rounded.RadioButtonChecked, title = "Status around profile", subtitle = "Turn on to access status updates by clicking profile picture", value = p.statusAroundProfile,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.radioOn), title = "Status around profile", subtitle = "Turn on to access status updates by clicking profile picture", value = p.statusAroundProfile,
                         onChanged = { preferences.updateStatus(preferences.status.copy(statusAroundProfile = it)) },
                     )
                     GbSwitchTile(
@@ -212,7 +212,7 @@ fun StatusSettingsScreen(preferences: ChatyPreferencesController, onBack: () -> 
                         onChanged = { preferences.updateStatus(preferences.status.copy(saveAndMarkSeenOptions = it)) },
                     )
                     GbSwitchTile(
-                        icon = Icons.Rounded.CameraFront, title = "Change Photo Profile / Status Preview", subtitle = "Change display in Stories from Profile picture to Status preview", value = p.changePhotoProfileStatusPreview,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.cameraSwitch), title = "Change Photo Profile / Status Preview", subtitle = "Change display in Stories from Profile picture to Status preview", value = p.changePhotoProfileStatusPreview,
                         onChanged = { preferences.updateStatus(preferences.status.copy(changePhotoProfileStatusPreview = it)) },
                     )
                     GbSwitchTile(
@@ -224,7 +224,7 @@ fun StatusSettingsScreen(preferences: ChatyPreferencesController, onBack: () -> 
                         onChanged = { preferences.updateStatus(preferences.status.copy(confirmBeforeSendingStatus = it)) },
                     )
                     GbSwitchTile(
-                        icon = Icons.Rounded.Timelapse, title = "5-minute status", subtitle = "Allows you to put a 50 minute video instead of 30 seconds as a Status. Note: Only Chaty users can see the full status! Other users will see 30sec only.", value = p.fiveMinuteStatus,
+                        icon = com.example.chat.ui.icons.ChatyGlyphVectors.of(com.example.chat.ui.icons.ChatyIconId.timer), title = "5-minute status", subtitle = "Allows you to put a 50 minute video instead of 30 seconds as a Status. Note: Only Chaty users can see the full status! Other users will see 30sec only.", value = p.fiveMinuteStatus,
                         onChanged = { preferences.updateStatus(preferences.status.copy(fiveMinuteStatus = it)) },
                     )
                 }

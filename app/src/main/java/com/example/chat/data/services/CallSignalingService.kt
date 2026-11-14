@@ -716,9 +716,12 @@ class CallSignalingService(
         remoteAvatarInitials: String? = null,
         remoteAvatarColorHex: String? = null,
         isVideo: Boolean,
+        expectedAccountScope: Any? = null,
     ) {
+        // Preserve the initiating UI scope across initialize(), which may suspend.
+        val expectedAccount = expectedAccountScope ?: captureAccountScope()
+        requireCallScope(expectedAccount)
         initialize()
-        val expectedAccount = captureAccountScope()
         requireCallScope(expectedAccount)
         val myId = currentUserId() ?: throw IllegalStateException("Authentication required.")
         require(remoteUserId.isNotEmpty() && remoteUserId != myId) {

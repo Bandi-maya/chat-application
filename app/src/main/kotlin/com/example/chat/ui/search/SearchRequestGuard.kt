@@ -29,8 +29,8 @@ object LocalConversationSearch {
         query: String,
         isHidden: (String) -> Boolean,
     ): List<Conversation> {
-        if (query.isEmpty()) return emptyList()
-        val lower = query.lowercase()
+        val lower = query.trim().lowercase()
+        if (lower.isEmpty()) return emptyList()
         return conversations.filter { conversation ->
             // Privacy rule: Exclude hidden locked chats from global search
             if (isHidden(conversation.id)) return@filter false

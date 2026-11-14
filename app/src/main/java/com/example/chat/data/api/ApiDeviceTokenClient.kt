@@ -81,7 +81,7 @@ class ApiDeviceTokenClient(
 
     /** Device transport over OkHttp, mirroring package:http's post/delete. */
     class OkHttpTransport : Transport {
-        private val client = okhttp3.OkHttpClient()
+        private val client = com.example.chat.data.api.ChatyOkHttp.shared
 
         override fun send(method: String, url: String, headers: Map<String, String>, body: String?): Int {
             val requestBody = body?.let {
