@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 /** The OS embeds this activity over other apps. It never hosts AppRoot or bypasses its account gates. */
 class ChatBubbleActivity : FragmentActivity() {
     private var ticket: ChatBubbleController.Ticket? = null
-    private var visible by mutableStateOf(false)
+    private var bubbleContentVisible by mutableStateOf(false)
     private var validation: Job? = null
     private val invalidation: () -> Unit = {
         runOnUiThread {
@@ -50,7 +50,7 @@ class ChatBubbleActivity : FragmentActivity() {
         setContent {
             val selected = ticket
             // Recheck on every composition before ever mounting a composer or message loader.
-            if (visible && selected != null && ChatBubbleController.resolve(selected.id) != null) {
+            if (bubbleContentVisible && selected != null && ChatBubbleController.resolve(selected.id) != null) {
                 if (ChatBubbleController.resolve(selected.id) != null) {
                     ChatyTheme(GbThemeOverrides.resolve(ServiceLocator.themeController.globalTheme, ServiceLocator.preferencesController)) {
                         com.example.chat.ui.icons.ProvideChatyIconTheme(ServiceLocator.preferencesController) {
@@ -58,8 +58,8 @@ class ChatBubbleActivity : FragmentActivity() {
                             Surface {
                                 Column(Modifier.fillMaxSize().imePadding()) {
                                     Row(Modifier.fillMaxWidth()) {
-                                        TextButton(onClick = { visible = false; finish() }) { Text("Collapse") }
-                                        TextButton(onClick = { ChatBubbleController.close(selected.id); visible = false; finish() }) { Text("Close bubble") }
+                                        TextButton(onClick = { bubbleContentVisible = false; finish() }) { Text("Collapse") }
+                                        TextButton(onClick = { ChatBubbleController.close(selected.id); bubbleContentVisible = false; finish() }) { Text("Close bubble") }
                                     }
                                     Box(Modifier.weight(1f).fillMaxWidth()) {
                                         BubbleConversationSurface(selected) { openFullApp() }
@@ -80,13 +80,13 @@ class ChatBubbleActivity : FragmentActivity() {
             launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(launch)
         }
-        visible = false
+        bubbleContentVisible = false
         finish()
     }
 
     override fun onStart() {
         super.onStart()
-        visible = false
+        bubbleContentVisible = false
         validation?.cancel()
         validation = lifecycleScope.launch {
             // Re-enter the same auto-lock policy as the normal app, before mounting any chat UI.
@@ -94,18 +94,18 @@ class ChatBubbleActivity : FragmentActivity() {
             ServiceLocator.appLock.awaitPendingCheck()
             ServiceLocator.appLock.scheduleInitialIfNeeded()
             ServiceLocator.appLock.awaitPendingCheck()
-            if (ChatBubbleController.resolve(ticket?.id) == null) dismissUnsafe() else visible = true
+            if (ChatBubbleController.resolve(ticket?.id) == null) dismissUnsafe() else bubbleContentVisible = true
         }
     }
 
     override fun onStop() {
-        visible = false
+        bubbleContentVisible = false
         validation?.cancel()
         super.onStop()
     }
 
     private fun dismissUnsafe() {
-        visible = false
+        bubbleContentVisible = false
         ticket?.id?.let(ChatBubbleController::close)
         if (!isFinishing) {
             Toast.makeText(this, "Open and unlock Chaty, then choose the bubble again.", Toast.LENGTH_SHORT).show()
